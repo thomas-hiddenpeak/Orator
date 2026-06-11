@@ -2,6 +2,7 @@
 
 #include <cuda_runtime.h>
 #include <sys/mman.h>
+#include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <sstream>
@@ -64,11 +65,25 @@ MmapAllocator::MmapAllocator(const std::string& filepath)
     throw GpuMemoryException(std::string("Cannot open file: " + filepath).c_str());
   }
 
+  // Reject anything that is not a regular file (e.g. a directory): mmap'ing it
+  // would either fail cryptically or read a garbage size from lseek.
+  struct stat st;
+  if (fstat(fd_, &st) != 0 || !S_ISREG(st.st_mode)) {
+    close(fd_);
+    fd_ = -1;
+    throw GpuMemoryException(
+        std::string("Not a regular file (expected a .safetensors file): " +
+                    filepath)
+            .c_str());
+  }
+
   // Get file size
   off_t file_size = lseek(fd_, 0, SEEK_END);
-  if (file_size < 0) {
+  if (file_size <= 0) {
     close(fd_);
-    throw GpuMemoryException("Cannot seek in file");
+    fd_ = -1;
+    throw GpuMemoryException(
+        std::string("Empty or unseekable file: " + filepath).c_str());
   }
 
   mapped_size_ = static_cast<size_t>(file_size);
@@ -76,9 +91,13 @@ MmapAllocator::MmapAllocator(const std::string& filepath)
   // Map file to memory
   mapped_ptr_ = mmap(nullptr, mapped_size_, PROT_READ, MAP_SHARED, fd_, 0);
   if (mapped_ptr_ == MAP_FAILED) {
+    int err = errno;
     close(fd_);
     mapped_ptr_ = nullptr;
-    throw GpuMemoryException("mmap failed");
+    std::ostringstream oss;
+    oss << "mmap failed for " << filepath << " (size=" << mapped_size_
+        << ", errno=" << err << " " << std::strerror(err) << ")";
+    throw GpuMemoryException(oss.str().c_str());
   }
 }
 
