@@ -46,6 +46,16 @@ class MelSpectrogram {
   std::vector<float> Compute(const float* samples, int num_samples,
                              int* out_num_frames) const;
 
+  // Streaming frame producer for continuous real-time use. `sig` is an
+  // already-pre-emphasized signal buffer; the first produced frame's window
+  // starts at `input_offset` samples into `sig`. Out-of-range reads (start pad
+  // or final-tail pad) are zero, matching torch.stft(center=True). Returns
+  // frame-major [num_frames * n_mels], bit-identical to Compute over the same
+  // underlying samples. Pre-emphasis continuity is the caller's responsibility.
+  std::vector<float> ComputeStreamFrames(const float* sig, int num_samples,
+                                         int input_offset,
+                                         int num_frames) const;
+
   int n_mels() const { return config_.n_mels; }
   int n_freqs() const { return config_.n_fft / 2 + 1; }
   const MelConfig& config() const { return config_; }
@@ -67,6 +77,9 @@ class MelSpectrogram {
 
   void BuildHannWindow();
   void BuildMelFilterbank();
+  // Shared GPU STFT+mel core (used by both Compute and ComputeStreamFrames).
+  std::vector<float> RunStftMel(const float* sig, int num_samples,
+                                int input_offset, int num_frames) const;
 };
 
 }  // namespace feature

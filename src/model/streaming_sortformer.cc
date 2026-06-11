@@ -329,6 +329,17 @@ void SortformerDiarizer::Reset() {
   if (state_) state_->Clear();
   stream_state_.Clear();
   stream_time_sec_ = 0.0;
+  // Incremental streaming state.
+  sig_.clear();
+  sig_abs_ = 0;
+  last_raw_ = 0.0f;
+  stream_started_ = false;
+  mel_seq_.clear();
+  mel_base_ = 0;
+  mel_avail_ = 0;
+  mel_w_ = 0;
+  stt_feat_ = 0;
+  emitted_frames_ = 0;
 }
 
 std::vector<float> SortformerDiarizer::ForwardEncoderDecoder(
@@ -364,11 +375,8 @@ core::DiarizationFrames SortformerDiarizer::RunStreaming(const float* mel_fm,
                                                          int n_mels, int t_mel,
                                                          int valid_mel,
                                                          double t_start_sec) {
-  const int D = config_.encoder_d_model;
-  const int n_spk = config_.max_num_speakers;
   const int sub = config_.encoder_subsampling_factor;
   const int chunk_mel = config_.chunk_len * sub;
-  const int spkcache_len = config_.spkcache_len;
 
   stream_state_.Clear();
 
@@ -385,123 +393,150 @@ core::DiarizationFrames SortformerDiarizer::RunStreaming(const float* mel_fm,
                    stt * config_.hop_size_sec);
       std::fflush(stderr);
     }
-    const int lc = std::min(config_.chunk_left_context * sub, stt);
-    const int end = std::min(stt + chunk_mel, t_mel);
-    const int rc = std::min(config_.chunk_right_context * sub, t_mel - end);
-    const int s0 = stt - lc;
-    const int s1 = end + rc;
-    const int mlen = s1 - s0;
-
-    // feat_length: valid (non-pad) mel frames inside this slice (offset=0).
-    int feat_len = valid_mel - stt + lc;
-    feat_len = std::max(0, std::min(feat_len, mlen));
-
-    // Slice the freq-major mel [n_mels, t_mel] into [n_mels, mlen].
-    std::vector<float> slice(static_cast<size_t>(n_mels) * mlen);
-    for (int m = 0; m < n_mels; ++m)
-      for (int t = 0; t < mlen; ++t)
-        slice[static_cast<size_t>(m) * mlen + t] =
-            mel_fm[static_cast<size_t>(m) * t_mel + (s0 + t)];
-
-    // pre_encode -> chunk embeddings [chunk_T, D].
-    int chunk_T = 0, chunk_valid = 0;
-    std::vector<float> chunk_embs =
-        pre_encode_->Forward(slice.data(), n_mels, mlen, feat_len, &chunk_T,
-                             &chunk_valid);
-
-    const int lc_sub = static_cast<int>(std::lround(static_cast<double>(lc) / sub));
-    const int rc_sub = static_cast<int>(std::ceil(static_cast<double>(rc) / sub));
-    const int chunk_center_len = chunk_T - lc_sub - rc_sub;
-
-    // concat [spkcache, chunk_embs] -> encoder input [Tcat, D].
-    const int spk_len = stream_state_.spk_len;
-    const int Tcat = spk_len + chunk_T;
-    std::vector<float> enc_in(static_cast<size_t>(Tcat) * D);
-    std::copy(stream_state_.spkcache.begin(),
-              stream_state_.spkcache.begin() +
-                  static_cast<size_t>(spk_len) * D,
-              enc_in.begin());
-    std::copy(chunk_embs.begin(), chunk_embs.end(),
-              enc_in.begin() + static_cast<size_t>(spk_len) * D);
-    const int valid_cat = spk_len + chunk_valid;
-
-    // encoder + decoder -> preds [Tcat, n_spk].
-    std::vector<float> preds = ForwardEncoderDecoder(enc_in, Tcat, valid_cat);
-
-    // chunk_preds = preds[spk_len + lc_sub : spk_len + lc_sub + chunk_center_len]
-    const int cp_start = spk_len + lc_sub;
-    for (int f = 0; f < chunk_center_len; ++f) {
-      int src = cp_start + f;
-      for (int s = 0; s < n_spk; ++s)
-        total_preds.push_back(preds[static_cast<size_t>(src) * n_spk + s]);
-    }
-    total_frames += chunk_center_len;
-
-    // --- streaming_update (sync, fifo_len=0) ---
-    // chunk center embeddings + preds become the pop-out appended to spkcache.
-    std::vector<float> pop_embs(static_cast<size_t>(chunk_center_len) * D);
-    std::vector<float> pop_preds(static_cast<size_t>(chunk_center_len) * n_spk);
-    for (int f = 0; f < chunk_center_len; ++f) {
-      int ce = lc_sub + f;  // chunk[lc:chunk_len+lc]
-      for (int d = 0; d < D; ++d)
-        pop_embs[static_cast<size_t>(f) * D + d] =
-            chunk_embs[static_cast<size_t>(ce) * D + d];
-      int pp = cp_start + f;
-      for (int s = 0; s < n_spk; ++s)
-        pop_preds[static_cast<size_t>(f) * n_spk + s] =
-            preds[static_cast<size_t>(pp) * n_spk + s];
-    }
-
-    UpdateSilenceProfile(pop_embs, pop_preds, chunk_center_len, n_spk, D,
-                         stream_state_.mean_sil_emb,
-                         stream_state_.n_sil_frames);
-
-    // append pop-out to spkcache
-    const int new_len = spk_len + chunk_center_len;
-    stream_state_.spkcache.insert(stream_state_.spkcache.end(),
-                                  pop_embs.begin(), pop_embs.end());
-    if (stream_state_.spkcache_preds_valid) {
-      stream_state_.spkcache_preds.insert(stream_state_.spkcache_preds.end(),
-                                          pop_preds.begin(), pop_preds.end());
-    }
-    stream_state_.spk_len = new_len;
-
-    if (new_len > spkcache_len) {
-      if (!stream_state_.spkcache_preds_valid) {
-        // first compression: spkcache_preds = [preds[:spk_len], pop_preds]
-        stream_state_.spkcache_preds.assign(
-            static_cast<size_t>(new_len) * n_spk, 0.0f);
-        for (int f = 0; f < spk_len; ++f)
-          for (int s = 0; s < n_spk; ++s)
-            stream_state_.spkcache_preds[static_cast<size_t>(f) * n_spk + s] =
-                preds[static_cast<size_t>(f) * n_spk + s];
-        std::copy(pop_preds.begin(), pop_preds.end(),
-                  stream_state_.spkcache_preds.begin() +
-                      static_cast<size_t>(spk_len) * n_spk);
-        stream_state_.spkcache_preds_valid = true;
-      }
-      std::vector<float> comp_emb, comp_preds;
-      CompressSpkcache(stream_state_.spkcache, stream_state_.spkcache_preds,
-                       new_len, n_spk, D, spkcache_len,
-                       stream_state_.mean_sil_emb, comp_emb, comp_preds);
-      stream_state_.spkcache.swap(comp_emb);
-      stream_state_.spkcache_preds.swap(comp_preds);
-      stream_state_.spk_len = spkcache_len;
-    }
-
-    stt = end;
+    // Offline path: the whole mel buffer is available, base frame = 0,
+    // available == total mel frames.
+    StreamMelChunk(mel_fm, n_mels, t_mel, /*buf_base_frame=*/0,
+                   /*stt_abs=*/stt, /*valid_abs=*/valid_mel,
+                   /*avail_abs=*/t_mel, total_preds, total_frames);
+    stt = std::min(stt + chunk_mel, t_mel);
     ++chunk_idx;
   }
   if (std::getenv("ORATOR_STREAM_PROGRESS")) std::fprintf(stderr, "\n");
 
   core::DiarizationFrames out;
   out.num_frames = total_frames;
-  out.num_speakers = n_spk;
+  out.num_speakers = config_.max_num_speakers;
   out.frame_period_sec = config_.FramePeriodSec();
   out.t_start_sec = t_start_sec;
   out.probs = std::move(total_preds);
   stream_time_sec_ = t_start_sec + total_frames * out.frame_period_sec;
   return out;
+}
+
+// One streaming chunk step over a freq-major mel buffer that covers absolute
+// mel frames [buf_base_frame, buf_base_frame + buf_len). Processes the chunk
+// starting at absolute frame stt_abs, using chunk_left/right_context clamped to
+// the absolute stream bounds (start = frame 0, end = avail_abs). Appends this
+// chunk's center-frame sigmoids to out_preds and advances the persistent
+// stream_state_ (spkcache). This is the shared core of both the offline
+// RunStreaming loop and the incremental StreamAudio path, so the two are
+// bit-identical for identical mel content.
+void SortformerDiarizer::StreamMelChunk(const float* mel_buf, int n_mels,
+                                        int buf_len, long buf_base_frame,
+                                        long stt_abs, long valid_abs,
+                                        long avail_abs,
+                                        std::vector<float>& out_preds,
+                                        int& out_frames) {
+  const int D = config_.encoder_d_model;
+  const int n_spk = config_.max_num_speakers;
+  const int sub = config_.encoder_subsampling_factor;
+  const int chunk_mel = config_.chunk_len * sub;
+  const int spkcache_len = config_.spkcache_len;
+
+  const int lc =
+      static_cast<int>(std::min<long>(config_.chunk_left_context * sub, stt_abs));
+  const long end_abs = std::min<long>(stt_abs + chunk_mel, avail_abs);
+  const int rc = static_cast<int>(
+      std::min<long>(config_.chunk_right_context * sub, avail_abs - end_abs));
+  const long s0_abs = stt_abs - lc;
+  const long s1_abs = end_abs + rc;
+  const int mlen = static_cast<int>(s1_abs - s0_abs);
+  const int s0_rel = static_cast<int>(s0_abs - buf_base_frame);
+
+  // feat_length: valid (non-pad) mel frames inside this slice.
+  int feat_len = static_cast<int>(valid_abs - stt_abs + lc);
+  feat_len = std::max(0, std::min(feat_len, mlen));
+
+  // Slice the freq-major mel [n_mels, buf_len] into [n_mels, mlen].
+  std::vector<float> slice(static_cast<size_t>(n_mels) * mlen);
+  for (int m = 0; m < n_mels; ++m)
+    for (int t = 0; t < mlen; ++t)
+      slice[static_cast<size_t>(m) * mlen + t] =
+          mel_buf[static_cast<size_t>(m) * buf_len + (s0_rel + t)];
+
+  // pre_encode -> chunk embeddings [chunk_T, D].
+  int chunk_T = 0, chunk_valid = 0;
+  std::vector<float> chunk_embs = pre_encode_->Forward(
+      slice.data(), n_mels, mlen, feat_len, &chunk_T, &chunk_valid);
+
+  const int lc_sub = static_cast<int>(std::lround(static_cast<double>(lc) / sub));
+  const int rc_sub = static_cast<int>(std::ceil(static_cast<double>(rc) / sub));
+  const int chunk_center_len = chunk_T - lc_sub - rc_sub;
+
+  // concat [spkcache, chunk_embs] -> encoder input [Tcat, D].
+  const int spk_len = stream_state_.spk_len;
+  const int Tcat = spk_len + chunk_T;
+  std::vector<float> enc_in(static_cast<size_t>(Tcat) * D);
+  std::copy(
+      stream_state_.spkcache.begin(),
+      stream_state_.spkcache.begin() + static_cast<size_t>(spk_len) * D,
+      enc_in.begin());
+  std::copy(chunk_embs.begin(), chunk_embs.end(),
+            enc_in.begin() + static_cast<size_t>(spk_len) * D);
+  const int valid_cat = spk_len + chunk_valid;
+
+  // encoder + decoder -> preds [Tcat, n_spk].
+  std::vector<float> preds = ForwardEncoderDecoder(enc_in, Tcat, valid_cat);
+
+  // chunk_preds = preds[spk_len + lc_sub : spk_len + lc_sub + chunk_center_len]
+  const int cp_start = spk_len + lc_sub;
+  for (int f = 0; f < chunk_center_len; ++f) {
+    int src = cp_start + f;
+    for (int s = 0; s < n_spk; ++s)
+      out_preds.push_back(preds[static_cast<size_t>(src) * n_spk + s]);
+  }
+  out_frames += chunk_center_len;
+
+  // --- streaming_update (sync, fifo_len=0) ---
+  // chunk center embeddings + preds become the pop-out appended to spkcache.
+  std::vector<float> pop_embs(static_cast<size_t>(chunk_center_len) * D);
+  std::vector<float> pop_preds(static_cast<size_t>(chunk_center_len) * n_spk);
+  for (int f = 0; f < chunk_center_len; ++f) {
+    int ce = lc_sub + f;  // chunk[lc:chunk_len+lc]
+    for (int d = 0; d < D; ++d)
+      pop_embs[static_cast<size_t>(f) * D + d] =
+          chunk_embs[static_cast<size_t>(ce) * D + d];
+    int pp = cp_start + f;
+    for (int s = 0; s < n_spk; ++s)
+      pop_preds[static_cast<size_t>(f) * n_spk + s] =
+          preds[static_cast<size_t>(pp) * n_spk + s];
+  }
+
+  UpdateSilenceProfile(pop_embs, pop_preds, chunk_center_len, n_spk, D,
+                       stream_state_.mean_sil_emb, stream_state_.n_sil_frames);
+
+  // append pop-out to spkcache
+  const int new_len = spk_len + chunk_center_len;
+  stream_state_.spkcache.insert(stream_state_.spkcache.end(), pop_embs.begin(),
+                                pop_embs.end());
+  if (stream_state_.spkcache_preds_valid) {
+    stream_state_.spkcache_preds.insert(stream_state_.spkcache_preds.end(),
+                                        pop_preds.begin(), pop_preds.end());
+  }
+  stream_state_.spk_len = new_len;
+
+  if (new_len > spkcache_len) {
+    if (!stream_state_.spkcache_preds_valid) {
+      // first compression: spkcache_preds = [preds[:spk_len], pop_preds]
+      stream_state_.spkcache_preds.assign(static_cast<size_t>(new_len) * n_spk,
+                                          0.0f);
+      for (int f = 0; f < spk_len; ++f)
+        for (int s = 0; s < n_spk; ++s)
+          stream_state_.spkcache_preds[static_cast<size_t>(f) * n_spk + s] =
+              preds[static_cast<size_t>(f) * n_spk + s];
+      std::copy(pop_preds.begin(), pop_preds.end(),
+                stream_state_.spkcache_preds.begin() +
+                    static_cast<size_t>(spk_len) * n_spk);
+      stream_state_.spkcache_preds_valid = true;
+    }
+    std::vector<float> comp_emb, comp_preds;
+    CompressSpkcache(stream_state_.spkcache, stream_state_.spkcache_preds,
+                     new_len, n_spk, D, spkcache_len,
+                     stream_state_.mean_sil_emb, comp_emb, comp_preds);
+    stream_state_.spkcache.swap(comp_emb);
+    stream_state_.spkcache_preds.swap(comp_preds);
+    stream_state_.spk_len = spkcache_len;
+  }
 }
 
 core::DiarizationFrames SortformerDiarizer::ProcessChunk(
@@ -537,6 +572,172 @@ core::DiarizationFrames SortformerDiarizer::ProcessChunk(
   // 2) Streaming chunked forward over the full mel.
   return RunStreaming(mel_fm.data(), n_mels, t_mel, valid_mel,
                       chunk.t_start_sec);
+}
+
+void SortformerDiarizer::AppendRaw(const float* samples, int num_samples) {
+  const auto& mc = mel_->config();
+  const float preemph = mc.preemph;
+  // Append new samples with pre-emphasis continuity. Offline does y[0]=x[0]
+  // only for the very first sample of the stream; thereafter
+  // y[n]=x[n]-a*x[n-1].
+  sig_.reserve(sig_.size() + std::max(0, num_samples));
+  for (int i = 0; i < num_samples; ++i) {
+    const float x = samples[i];
+    const float y = stream_started_ ? (x - preemph * last_raw_) : x;
+    sig_.push_back(y);
+    last_raw_ = x;
+    stream_started_ = true;
+  }
+}
+
+void SortformerDiarizer::EnsureMel(bool final) {
+  const int n_mels = config_.mel_features;
+  const auto& mc = mel_->config();
+  const int hop = mc.hop_length;
+
+  // A frame t is stable (its STFT window is fully covered by real samples, so
+  // it will never change as more audio arrives) iff t*hop + rmargin <=
+  // total_abs, with rmargin = win_off + win_length - pad_left. On final, emit
+  // all floor(total/hop) frames (the trailing ones use the zero tail, exactly
+  // as the offline center-padded STFT does).
+  const int win_off = (mc.n_fft - mc.win_length) / 2;
+  const int pad_left = mc.center ? mc.n_fft / 2 : 0;
+  const long rmargin = static_cast<long>(win_off) + mc.win_length - pad_left;
+  const long total_abs = sig_abs_ + static_cast<long>(sig_.size());
+  long target;
+  if (final)
+    target = total_abs / hop;
+  else
+    target = (total_abs >= rmargin) ? (total_abs - rmargin) / hop + 1 : 0;
+  if (target <= mel_avail_) return;
+
+  const int k = static_cast<int>(target - mel_avail_);
+  const int input_offset = static_cast<int>(mel_avail_ * hop - sig_abs_);
+  std::vector<float> fm = mel_->ComputeStreamFrames(
+      sig_.data(), static_cast<int>(sig_.size()), input_offset, k);
+
+  // Append the k frame-major rows as freq-major columns to mel_seq_.
+  const int newW = mel_w_ + k;
+  std::vector<float> nm(static_cast<size_t>(n_mels) * newW);
+  for (int m = 0; m < n_mels; ++m) {
+    for (int j = 0; j < mel_w_; ++j)
+      nm[static_cast<size_t>(m) * newW + j] =
+          mel_seq_[static_cast<size_t>(m) * mel_w_ + j];
+    for (int c = 0; c < k; ++c)
+      nm[static_cast<size_t>(m) * newW + (mel_w_ + c)] =
+          fm[static_cast<size_t>(c) * n_mels + m];
+  }
+  mel_seq_.swap(nm);
+  mel_w_ = newW;
+  mel_avail_ = target;
+}
+
+void SortformerDiarizer::TrimStreamingBuffers() {
+  const auto& mc = mel_->config();
+  const int hop = mc.hop_length;
+  const int n_mels = config_.mel_features;
+  const int sub = config_.encoder_subsampling_factor;
+  const int lc_max = config_.chunk_left_context * sub;
+
+  // mel: only frames in [stt_feat_ - lc_max, mel_avail_) are still needed.
+  long keep_from = stt_feat_ - lc_max;
+  if (keep_from < 0) keep_from = 0;
+  long drop = keep_from - mel_base_;
+  if (drop > 0 && drop <= mel_w_) {
+    const int newW = mel_w_ - static_cast<int>(drop);
+    std::vector<float> nm(static_cast<size_t>(n_mels) * newW);
+    for (int m = 0; m < n_mels; ++m)
+      for (int j = 0; j < newW; ++j)
+        nm[static_cast<size_t>(m) * newW + j] =
+            mel_seq_[static_cast<size_t>(m) * mel_w_ + (drop + j)];
+    mel_seq_.swap(nm);
+    mel_w_ = newW;
+    mel_base_ += drop;
+  }
+
+  // signal: keep samples needed by the next mel frame (frame mel_avail_), whose
+  // earliest sample is mel_avail_*hop + win_off - pad_left, with a margin.
+  const int win_off = (mc.n_fft - mc.win_length) / 2;
+  const int pad_left = mc.center ? mc.n_fft / 2 : 0;
+  long earliest = mel_avail_ * hop + win_off - pad_left;
+  long keep = earliest - 2 * hop;
+  if (keep < 0) keep = 0;
+  long drop_s = keep - sig_abs_;
+  if (drop_s > 0 && drop_s <= static_cast<long>(sig_.size())) {
+    sig_.erase(sig_.begin(), sig_.begin() + drop_s);
+    sig_abs_ += drop_s;
+  }
+}
+
+core::DiarizationFrames SortformerDiarizer::StreamAudio(const float* samples,
+                                                        int num_samples,
+                                                        bool final) {
+  if (!initialized_)
+    throw std::runtime_error("SortformerDiarizer not initialized");
+  if (!weights_loaded_)
+    throw std::runtime_error("SortformerDiarizer weights not loaded");
+
+  if (samples != nullptr && num_samples > 0) AppendRaw(samples, num_samples);
+
+  const int n_mels = config_.mel_features;
+  const int sub = config_.encoder_subsampling_factor;
+  const int chunk_mel = config_.chunk_len * sub;
+  const int rc_max = config_.chunk_right_context * sub;
+
+  std::vector<float> out_preds;
+  int out_frames = 0;
+
+  // Defer (batch) mel + chunk processing: a non-final chunk can only fire once
+  // a full chunk plus its right context is stable. Computing mel one tiny slice
+  // per binary frame would launch thousands of tiny GPU kernels and rebuild
+  // mel_seq_ each time; instead we only compute mel when enough audio has
+  // accumulated to advance at least one chunk (or on final). This keeps the hot
+  // per-frame path to a cheap CPU append while preserving bit-exact frames.
+  if (!final) {
+    const auto& mc = mel_->config();
+    const int hop = mc.hop_length;
+    const int win_off = (mc.n_fft - mc.win_length) / 2;
+    const int pad_left = mc.center ? mc.n_fft / 2 : 0;
+    const long rmargin = static_cast<long>(win_off) + mc.win_length - pad_left;
+    const long total_abs = sig_abs_ + static_cast<long>(sig_.size());
+    const long stable_target =
+        (total_abs >= rmargin) ? (total_abs - rmargin) / hop + 1 : 0;
+    // Need mel out to the next chunk's end + right context to fire it.
+    if (stable_target < stt_feat_ + chunk_mel + rc_max) {
+      core::DiarizationFrames out;
+      out.num_frames = 0;
+      out.num_speakers = config_.max_num_speakers;
+      out.frame_period_sec = config_.FramePeriodSec();
+      out.t_start_sec = emitted_frames_ * out.frame_period_sec;
+      return out;
+    }
+  }
+
+  EnsureMel(final);
+
+  while (stt_feat_ < mel_avail_) {
+    const long end_abs = std::min<long>(stt_feat_ + chunk_mel, mel_avail_);
+    const bool full = (end_abs - stt_feat_ == chunk_mel);
+    if (!final) {
+      // Only finalize a chunk once a full chunk plus its right context is
+      // available; otherwise wait for more audio (keeps frames bit-exact).
+      if (!full || end_abs + rc_max > mel_avail_) break;
+    }
+    StreamMelChunk(mel_seq_.data(), n_mels, mel_w_, mel_base_, stt_feat_,
+                   /*valid_abs=*/mel_avail_, /*avail_abs=*/mel_avail_, out_preds,
+                   out_frames);
+    stt_feat_ = end_abs;
+    TrimStreamingBuffers();
+  }
+
+  core::DiarizationFrames out;
+  out.num_frames = out_frames;
+  out.num_speakers = config_.max_num_speakers;
+  out.frame_period_sec = config_.FramePeriodSec();
+  out.t_start_sec = emitted_frames_ * out.frame_period_sec;
+  out.probs = std::move(out_preds);
+  emitted_frames_ += out_frames;
+  return out;
 }
 
 }  // namespace model

@@ -29,14 +29,15 @@ __global__ void PowerSpectrumKernel(const float* signal, int num_samples,
                                     const float* window, int win_length,
                                     int hop_length, int n_fft, int n_freqs,
                                     int num_frames, int pad_left, int win_off,
-                                    float* power) {
+                                    int input_offset, float* power) {
   const int idx = blockIdx.x * blockDim.x + threadIdx.x;
   const long total = static_cast<long>(num_frames) * n_freqs;
   if (idx >= total) return;
 
   const int frame = idx / n_freqs;
   const int k = idx % n_freqs;
-  const int base = frame * hop_length;  // start index into the padded signal
+  // start index into the (possibly offset) signal buffer
+  const int base = frame * hop_length + input_offset;
 
   float re = 0.0f;
   float im = 0.0f;
@@ -151,11 +152,6 @@ std::vector<float> MelSpectrogram::Compute(const float* samples, int num_samples
   if (out_num_frames) *out_num_frames = num_frames;
   if (num_frames <= 0) return {};
 
-  const int n_freqs = this->n_freqs();
-  const int n_mels = config_.n_mels;
-  const int pad_left = config_.center ? config_.n_fft / 2 : 0;
-  const int win_off = (config_.n_fft - config_.win_length) / 2;
-
   // Pre-emphasis on host: y[0]=x[0]; y[n]=x[n]-preemph*x[n-1].
   std::vector<float> sig(samples, samples + num_samples);
   if (config_.preemph != 0.0f && num_samples > 1) {
@@ -167,6 +163,30 @@ std::vector<float> MelSpectrogram::Compute(const float* samples, int num_samples
     }
   }
 
+  return RunStftMel(sig.data(), num_samples, /*input_offset=*/0, num_frames);
+}
+
+// Streaming frame producer: computes `num_frames` log-mel frames from an
+// already-pre-emphasized signal buffer, where the first produced frame's window
+// starts at `input_offset` samples into `sig`. Out-of-range samples (start or
+// final-tail) read as zero, matching torch.stft(center=True, pad="constant").
+// Returns frame-major [num_frames * n_mels], bit-identical to the offline path.
+std::vector<float> MelSpectrogram::ComputeStreamFrames(const float* sig,
+                                                       int num_samples,
+                                                       int input_offset,
+                                                       int num_frames) const {
+  if (num_frames <= 0) return {};
+  return RunStftMel(sig, num_samples, input_offset, num_frames);
+}
+
+std::vector<float> MelSpectrogram::RunStftMel(const float* sig, int num_samples,
+                                              int input_offset,
+                                              int num_frames) const {
+  const int n_freqs = this->n_freqs();
+  const int n_mels = config_.n_mels;
+  const int pad_left = config_.center ? config_.n_fft / 2 : 0;
+  const int win_off = (config_.n_fft - config_.win_length) / 2;
+
   gpu::DeviceBuffer d_samples(static_cast<size_t>(num_samples) * sizeof(float));
   gpu::DeviceBuffer d_win(static_cast<size_t>(config_.win_length) * sizeof(float));
   gpu::DeviceBuffer d_filters(mel_filters_.size() * sizeof(float));
@@ -175,7 +195,7 @@ std::vector<float> MelSpectrogram::Compute(const float* samples, int num_samples
   gpu::DeviceBuffer d_mel(static_cast<size_t>(num_frames) * n_mels *
                           sizeof(float));
 
-  gpu::GpuMemory::CopyHostToDevice(d_samples.data(), sig.data(),
+  gpu::GpuMemory::CopyHostToDevice(d_samples.data(), sig,
                                    static_cast<size_t>(num_samples) * sizeof(float));
   gpu::GpuMemory::CopyHostToDevice(d_win.data(), hann_.data(),
                                    hann_.size() * sizeof(float));
@@ -189,7 +209,7 @@ std::vector<float> MelSpectrogram::Compute(const float* samples, int num_samples
       static_cast<const float*>(d_samples.data()), num_samples,
       static_cast<const float*>(d_win.data()), config_.win_length,
       config_.hop_length, config_.n_fft, n_freqs, num_frames, pad_left, win_off,
-      static_cast<float*>(d_power.data()));
+      input_offset, static_cast<float*>(d_power.data()));
   CUDA_CHECK(cudaGetLastError());
 
   const long mel_total = static_cast<long>(num_frames) * n_mels;

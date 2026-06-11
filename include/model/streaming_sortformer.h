@@ -106,6 +106,18 @@ class SortformerDiarizer final : public core::IDiarizer {
   void Reset() override;
   core::DiarizationFrames ProcessChunk(const core::AudioChunk& chunk) override;
 
+  // Incremental real-time streaming. Feeds `num_samples` new mono 16k samples
+  // and returns ONLY the diarization frames newly finalized by this call (may
+  // be empty if not enough audio has accumulated for a chunk). State (mel
+  // continuity + speaker cache) persists across calls so speaker identity is
+  // stable for the whole session; call Reset() to start a new session. Pass
+  // final=true on the last call to flush the trailing partial chunk. Compute is
+  // O(total audio) and memory is bounded regardless of session length, and the
+  // emitted frames are bit-identical to the offline ProcessChunk over the same
+  // audio. The returned frames' t_start_sec is the absolute stream time.
+  core::DiarizationFrames StreamAudio(const float* samples, int num_samples,
+                                      bool final);
+
   int max_speakers() const override { return config_.max_num_speakers; }
   double frame_period_sec() const override { return config_.FramePeriodSec(); }
   std::string name() const override { return "sortformer"; }
@@ -126,6 +138,15 @@ class SortformerDiarizer final : public core::IDiarizer {
   std::vector<float> ForwardEncoderDecoder(const std::vector<float>& emb_seq,
                                            int T, int valid);
 
+  // One streaming chunk step over a freq-major mel buffer covering absolute
+  // frames [buf_base_frame, buf_base_frame+buf_len). Advances the persistent
+  // stream_state_ and appends the chunk's center sigmoids to out_preds. Shared
+  // by the offline RunStreaming loop and the incremental StreamAudio path.
+  void StreamMelChunk(const float* mel_buf, int n_mels, int buf_len,
+                      long buf_base_frame, long stt_abs, long valid_abs,
+                      long avail_abs, std::vector<float>& out_preds,
+                      int& out_frames);
+
   SortformerConfig config_;
   bool initialized_ = false;
   bool weights_loaded_ = false;
@@ -143,6 +164,27 @@ class SortformerDiarizer final : public core::IDiarizer {
   std::unique_ptr<SortformerDecoder> decoder_;
   int num_conformer_layers_ = 17;
   HostStreamState stream_state_;
+
+  // --- Incremental real-time streaming state (persists across StreamAudio
+  // calls for speaker-identity continuity; reset by Reset()). ---
+  std::vector<float> sig_;       // pre-emphasized signal; sig_[0] = abs sample sig_abs_
+  long sig_abs_ = 0;             // absolute sample index of sig_[0]
+  float last_raw_ = 0.0f;        // last raw sample, for pre-emphasis continuity
+  bool stream_started_ = false;  // false until the first sample of the session
+  std::vector<float> mel_seq_;   // freq-major [mel_features, mel_w_]; col0 = frame mel_base_
+  long mel_base_ = 0;            // absolute mel-frame index of mel_seq_ column 0
+  long mel_avail_ = 0;           // absolute count of mel frames computed so far
+  int mel_w_ = 0;                // columns currently held in mel_seq_
+  long stt_feat_ = 0;            // absolute mel-frame index of next chunk to process
+  long emitted_frames_ = 0;      // diar frames emitted so far (output time origin)
+
+  // Appends new pre-emphasized samples (cheap; no GPU work).
+  void AppendRaw(const float* samples, int num_samples);
+  // Computes newly-stable mel frames up to the current stable horizon (or all
+  // floor(total/hop) frames when final). Batched: called at chunk granularity.
+  void EnsureMel(bool final);
+  // Drops mel columns / signal samples no longer needed for future chunks.
+  void TrimStreamingBuffers();
 };
 
 }  // namespace model

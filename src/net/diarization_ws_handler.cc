@@ -52,7 +52,7 @@ void DiarizationWsHandler::OnOpen(WebSocketConnection& conn) {
 
 void DiarizationWsHandler::OnBinary(WebSocketConnection& conn,
                                     const uint8_t* data, size_t n) {
-  // Decode the incoming PCM into a temporary, then append under the buffer cap.
+  // Decode the incoming PCM frame.
   std::vector<float> in;
   if (float_format_) {
     size_t count = n / sizeof(float);
@@ -68,25 +68,25 @@ void DiarizationWsHandler::OnBinary(WebSocketConnection& conn,
       p += 2;
     }
   }
+  if (in.empty()) return;
 
-  // Bound the accumulated buffer to prevent unbounded memory growth and the
-  // sample-count integer overflow on very long un-flushed sessions.
-  size_t cap = 0;
-  if (config_.max_buffer_sec > 0)
-    cap = static_cast<size_t>(config_.max_buffer_sec * config_.sample_rate);
-  if (cap && pcm_.size() + in.size() > cap) {
-    size_t room = pcm_.size() < cap ? cap - pcm_.size() : 0;
-    if (room < in.size()) in.resize(room);
-    if (!buffer_capped_) {
-      buffer_capped_ = true;
-      conn.SendText(
-          "{\"type\":\"warning\",\"code\":\"buffer_cap_reached\","
-          "\"max_buffer_sec\":" +
-          std::to_string(config_.max_buffer_sec) +
-          ",\"detail\":\"flush+reset to continue; excess audio dropped\"}");
-    }
+  // True incremental streaming: feed this frame straight into the diarizer,
+  // which keeps persistent state across the session. Newly stabilized frames
+  // are appended to the full-session timeline. Compute is O(n) and the
+  // diarizer's internal buffers stay bounded regardless of session length.
+  auto t0 = std::chrono::steady_clock::now();
+  core::DiarizationFrames part =
+      diarizer_->StreamAudio(in.data(), static_cast<int>(in.size()), false);
+  auto t1 = std::chrono::steady_clock::now();
+  compute_sec_ += std::chrono::duration<double>(t1 - t0).count();
+  total_samples_ += static_cast<long>(in.size());
+
+  if (part.num_frames > 0) {
+    accum_probs_.insert(accum_probs_.end(), part.probs.begin(),
+                        part.probs.end());
+    total_frames_ += part.num_frames;
   }
-  pcm_.insert(pcm_.end(), in.begin(), in.end());
+  (void)conn;
 }
 
 void DiarizationWsHandler::OnText(WebSocketConnection& conn,
@@ -96,43 +96,64 @@ void DiarizationWsHandler::OnText(WebSocketConnection& conn,
     float_format_ = true;
   }
   if (text.find("reset") != std::string::npos) {
-    pcm_.clear();
-    buffer_capped_ = false;
-    diarizer_->Reset();
+    ResetState();
     conn.SendText("{\"type\":\"reset_ok\"}");
     return;
   }
-  if (text.find("flush") != std::string::npos ||
-      text.find("end") != std::string::npos) {
-    Flush(conn);
+  if (text.find("end") != std::string::npos) {
+    Flush(conn, /*finalize=*/true);
+    return;
+  }
+  if (text.find("flush") != std::string::npos) {
+    Flush(conn, /*finalize=*/false);
   }
 }
 
-void DiarizationWsHandler::Flush(WebSocketConnection& conn) {
-  if (pcm_.empty()) {
+void DiarizationWsHandler::ResetState() {
+  accum_probs_.clear();
+  total_frames_ = 0;
+  total_samples_ = 0;
+  compute_sec_ = 0.0;
+  diarizer_->Reset();
+}
+
+void DiarizationWsHandler::Flush(WebSocketConnection& conn, bool finalize) {
+  if (finalize) {
+    // Drain any buffered tail frames (partial final chunk) out of the diarizer.
+    auto t0 = std::chrono::steady_clock::now();
+    core::DiarizationFrames tail = diarizer_->StreamAudio(nullptr, 0, true);
+    auto t1 = std::chrono::steady_clock::now();
+    compute_sec_ += std::chrono::duration<double>(t1 - t0).count();
+    if (tail.num_frames > 0) {
+      accum_probs_.insert(accum_probs_.end(), tail.probs.begin(),
+                          tail.probs.end());
+      total_frames_ += tail.num_frames;
+    }
+  }
+
+  if (total_frames_ == 0) {
     conn.SendText(DiarizationSegmentsToJson({}, 0.0, 0.0));
     return;
   }
-  core::AudioChunk chunk;
-  chunk.samples = pcm_.data();
-  // pcm_ is bounded by max_buffer_sec, so this fits in int; clamp defensively.
-  chunk.num_samples = pcm_.size() > size_t(INT32_MAX)
-                          ? INT32_MAX
-                          : static_cast<int>(pcm_.size());
-  chunk.sample_rate = config_.sample_rate;
-  chunk.t_start_sec = 0.0;
 
-  auto t0 = std::chrono::steady_clock::now();
-  core::DiarizationFrames frames = diarizer_->ProcessChunk(chunk);
-  auto t1 = std::chrono::steady_clock::now();
-  double compute_s = std::chrono::duration<double>(t1 - t0).count();
-  double audio_s = double(pcm_.size()) / config_.sample_rate;
+  core::DiarizationFrames frames;
+  frames.num_frames = static_cast<int>(total_frames_);
+  frames.num_speakers = config_.max_speakers;
+  frames.frame_period_sec = diarizer_->frame_period_sec();
+  frames.t_start_sec = 0.0;
+  frames.probs = accum_probs_;
+
+  double audio_s = double(total_samples_) / config_.sample_rate;
 
   auto segs = pipeline::FramesToSegments(frames, config_.activity_threshold,
                                          config_.merge_gap_sec);
   segs = pipeline::CoalesceSegments(std::move(segs), config_.merge_gap_sec);
 
-  conn.SendText(DiarizationSegmentsToJson(segs, audio_s, compute_s));
+  conn.SendText(DiarizationSegmentsToJson(segs, audio_s, compute_sec_));
+
+  // After a finalize, the session is complete; reset so a subsequent stream
+  // starts fresh (clients that keep streaming should use "flush", not "end").
+  if (finalize) ResetState();
 }
 
 void DiarizationWsHandler::OnClose() {}
