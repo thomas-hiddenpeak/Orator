@@ -16,6 +16,8 @@
 // Server -> client (text frames, JSON):
 //   {"type":"diarization","audio_sec":S,"compute_sec":C,"rt_factor":R,
 //    "segments":[{"start":..,"end":..,"speaker":k,"confidence":..}, ...]}
+//   {"type":"warning","code":"buffer_cap_reached",...}  (un-flushed audio hit
+//    max_buffer_sec; excess dropped — flush+reset to continue)
 
 #include <memory>
 #include <string>
@@ -34,6 +36,11 @@ struct DiarizationWsConfig {
   int max_speakers = 4;
   float activity_threshold = 0.5f;
   double merge_gap_sec = 0.5;
+  // Hard cap on accumulated (un-flushed) audio to bound memory and prevent the
+  // sample-count integer overflow on extremely long sessions. Audio beyond the
+  // cap is dropped and the client is notified once; it should flush+reset
+  // periodically (the supported real-time pattern). 0 disables the cap.
+  double max_buffer_sec = 1800.0;
 };
 
 // Builds a diarization JSON document from segments + timing (exposed for tests).
@@ -57,6 +64,7 @@ class DiarizationWsHandler final : public WebSocketHandler {
   std::unique_ptr<model::SortformerDiarizer> diarizer_;
   std::vector<float> pcm_;  // accumulated mono float samples
   bool float_format_ = false;
+  bool buffer_capped_ = false;  // true once max_buffer_sec was hit (one-shot warn)
 };
 
 }  // namespace net

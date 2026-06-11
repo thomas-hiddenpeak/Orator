@@ -1,6 +1,6 @@
 // orator_ws: real-time diarization WebSocket server.
 //
-// Usage: orator_ws [port] [weights.safetensors]
+// Usage: orator_ws [port] [weights.safetensors] [max_buffer_sec]
 // Streams diarized speaker segments back to clients that push PCM audio.
 
 #include <csignal>
@@ -17,6 +17,7 @@ int main(int argc, char** argv) {
   int port = argc > 1 ? std::atoi(argv[1]) : 8765;
   net::DiarizationWsConfig cfg;
   if (argc > 2) cfg.weights = argv[2];
+  if (argc > 3) cfg.max_buffer_sec = std::atof(argv[3]);
 
   std::signal(SIGPIPE, SIG_IGN);
 

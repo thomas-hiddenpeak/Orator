@@ -50,21 +50,43 @@ void DiarizationWsHandler::OnOpen(WebSocketConnection& conn) {
                 std::to_string(config_.sample_rate) + "}");
 }
 
-void DiarizationWsHandler::OnBinary(WebSocketConnection&, const uint8_t* data,
-                                    size_t n) {
+void DiarizationWsHandler::OnBinary(WebSocketConnection& conn,
+                                    const uint8_t* data, size_t n) {
+  // Decode the incoming PCM into a temporary, then append under the buffer cap.
+  std::vector<float> in;
   if (float_format_) {
     size_t count = n / sizeof(float);
     const float* f = reinterpret_cast<const float*>(data);
-    pcm_.insert(pcm_.end(), f, f + count);
+    in.assign(f, f + count);
   } else {
     size_t count = n / sizeof(int16_t);
     const uint8_t* p = data;
+    in.reserve(count);
     for (size_t i = 0; i < count; ++i) {
       int16_t s = int16_t(uint16_t(p[0]) | (uint16_t(p[1]) << 8));
-      pcm_.push_back(float(s) / 32768.0f);
+      in.push_back(float(s) / 32768.0f);
       p += 2;
     }
   }
+
+  // Bound the accumulated buffer to prevent unbounded memory growth and the
+  // sample-count integer overflow on very long un-flushed sessions.
+  size_t cap = 0;
+  if (config_.max_buffer_sec > 0)
+    cap = static_cast<size_t>(config_.max_buffer_sec * config_.sample_rate);
+  if (cap && pcm_.size() + in.size() > cap) {
+    size_t room = pcm_.size() < cap ? cap - pcm_.size() : 0;
+    if (room < in.size()) in.resize(room);
+    if (!buffer_capped_) {
+      buffer_capped_ = true;
+      conn.SendText(
+          "{\"type\":\"warning\",\"code\":\"buffer_cap_reached\","
+          "\"max_buffer_sec\":" +
+          std::to_string(config_.max_buffer_sec) +
+          ",\"detail\":\"flush+reset to continue; excess audio dropped\"}");
+    }
+  }
+  pcm_.insert(pcm_.end(), in.begin(), in.end());
 }
 
 void DiarizationWsHandler::OnText(WebSocketConnection& conn,
@@ -75,6 +97,7 @@ void DiarizationWsHandler::OnText(WebSocketConnection& conn,
   }
   if (text.find("reset") != std::string::npos) {
     pcm_.clear();
+    buffer_capped_ = false;
     diarizer_->Reset();
     conn.SendText("{\"type\":\"reset_ok\"}");
     return;
@@ -92,7 +115,10 @@ void DiarizationWsHandler::Flush(WebSocketConnection& conn) {
   }
   core::AudioChunk chunk;
   chunk.samples = pcm_.data();
-  chunk.num_samples = int(pcm_.size());
+  // pcm_ is bounded by max_buffer_sec, so this fits in int; clamp defensively.
+  chunk.num_samples = pcm_.size() > size_t(INT32_MAX)
+                          ? INT32_MAX
+                          : static_cast<int>(pcm_.size());
   chunk.sample_rate = config_.sample_rate;
   chunk.t_start_sec = 0.0;
 
