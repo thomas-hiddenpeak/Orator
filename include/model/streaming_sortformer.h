@@ -1,0 +1,149 @@
+#pragma once
+
+// Streaming Sortformer diarizer.
+//
+// Implements core::IDiarizer. Configuration and streaming-state fields mirror
+// NVIDIA's `diar_streaming_sortformer_4spk-v2` (see
+// third_party/streaming_sortformer/research_notes.txt). The CUDA forward pass
+// is not yet implemented; ProcessChunk currently emits a placeholder activity
+// track so the pipeline runs end-to-end. The interface, config, and state are
+// production-shaped so the forward kernels can be filled in without touching
+// any consumer.
+
+#include <cstdint>
+#include <algorithm>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "core/stages.h"
+#include "feature/mel_spectrogram.h"
+#include "gpu/memory.h"
+#include "io/safetensor.h"
+#include "model/conformer_layer.h"
+#include "model/conformer_preencode.h"
+#include "model/sortformer_decoder.h"
+
+namespace orator {
+namespace model {
+
+// Model-specific architecture/streaming parameters (from model_config.yaml).
+struct SortformerConfig {
+  int sample_rate = 16000;
+  int mel_features = 128;
+  int n_fft = 512;
+  float window_size_sec = 0.025f;
+  float hop_size_sec = 0.01f;
+
+  int max_num_speakers = 4;
+
+  int encoder_d_model = 512;
+  int encoder_subsampling_factor = 8;
+
+  int transformer_layers = 18;
+  int transformer_hidden_size = 192;
+  int transformer_heads = 8;
+
+  int spkcache_len = 188;
+  int fifo_len = 0;
+  int chunk_len = 188;
+  int spkcache_update_period = 188;
+  int chunk_left_context = 1;
+  int chunk_right_context = 1;
+  int spkcache_sil_frames_per_spk = 3;
+
+  bool Validate() const;
+  // diar frame period = hop * subsampling (e.g. 0.01 * 8 = 0.08s).
+  double FramePeriodSec() const {
+    return static_cast<double>(hop_size_sec) * encoder_subsampling_factor;
+  }
+};
+
+// Host-side streaming state for the synchronous streaming update path
+// (mirrors NeMo StreamingSortformerState; fifo_len=0 so no persistent FIFO).
+// Tensors here are tiny (<=188*512 floats), inherently sequential control data,
+// so they live on the CPU while the heavy encoder/decoder run on the GPU.
+struct HostStreamState {
+  std::vector<float> spkcache;        // [spk_len * fc_d_model]
+  std::vector<float> spkcache_preds;  // [spk_len * n_spk]
+  int spk_len = 0;
+  bool spkcache_preds_valid = false;  // mirrors "spkcache_preds is not None"
+  std::vector<float> mean_sil_emb;    // [fc_d_model]
+  long n_sil_frames = 0;
+  void Clear() {
+    spkcache.clear();
+    spkcache_preds.clear();
+    spk_len = 0;
+    spkcache_preds_valid = false;
+    std::fill(mean_sil_emb.begin(), mean_sil_emb.end(), 0.0f);
+    n_sil_frames = 0;
+  }
+};
+
+// Streaming state mirroring NeMo's StreamingSortformerState.
+struct SortformerState {
+  gpu::UnifiedBuffer spkcache;
+  gpu::UnifiedBuffer spkcache_lengths;
+  gpu::UnifiedBuffer spkcache_preds;
+  gpu::UnifiedBuffer fifo;
+  gpu::UnifiedBuffer fifo_lengths;
+  gpu::UnifiedBuffer fifo_preds;
+  gpu::UnifiedBuffer spk_perm;
+  gpu::UnifiedBuffer mean_sil_emb;
+  gpu::UnifiedBuffer n_sil_frames;
+
+  explicit SortformerState(const SortformerConfig& cfg);
+  void Clear();
+};
+
+class SortformerDiarizer final : public core::IDiarizer {
+ public:
+  SortformerDiarizer();
+  explicit SortformerDiarizer(const SortformerConfig& cfg);
+
+  void Initialize(const core::DiarizationConfig& config) override;
+  void LoadWeights(const std::string& path) override;
+  void Reset() override;
+  core::DiarizationFrames ProcessChunk(const core::AudioChunk& chunk) override;
+
+  int max_speakers() const override { return config_.max_num_speakers; }
+  double frame_period_sec() const override { return config_.FramePeriodSec(); }
+  std::string name() const override { return "sortformer"; }
+
+  const SortformerConfig& config() const { return config_; }
+
+  // Streaming forward over a full freq-major log-mel tensor [n_mels, t_mel]
+  // (valid_mel real frames). Mirrors NeMo forward_streaming: chunked encode
+  // with persistent speaker cache, returning concatenated per-chunk sigmoids.
+  // Resets streaming state on entry. t_start_sec sets the output time origin.
+  core::DiarizationFrames RunStreaming(const float* mel_fm, int n_mels,
+                                       int t_mel, int valid_mel,
+                                       double t_start_sec);
+
+ private:
+  // Runs xscale -> 17 Conformer layers -> decoder on a host emb sequence
+  // [T, fc_d_model] and returns masked per-frame sigmoids [T, n_spk].
+  std::vector<float> ForwardEncoderDecoder(const std::vector<float>& emb_seq,
+                                           int T, int valid);
+
+  SortformerConfig config_;
+  bool initialized_ = false;
+  bool weights_loaded_ = false;
+  std::string weights_path_;
+  double stream_time_sec_ = 0.0;
+  std::unique_ptr<SortformerState> state_;
+
+  // Real CUDA forward (offline path: mel -> pre_encode -> 17 Conformer layers
+  // -> encoder_proj + 18 transformer + speaker head -> sigmoid). Verified
+  // numerically against NeMo (see tools/verify_forward.cc).
+  std::unique_ptr<io::SafeTensorReader> reader_;
+  std::unique_ptr<feature::MelSpectrogram> mel_;
+  std::unique_ptr<ConformerPreEncode> pre_encode_;
+  std::vector<std::unique_ptr<ConformerLayer>> conformer_layers_;
+  std::unique_ptr<SortformerDecoder> decoder_;
+  int num_conformer_layers_ = 17;
+  HostStreamState stream_state_;
+};
+
+}  // namespace model
+}  // namespace orator
