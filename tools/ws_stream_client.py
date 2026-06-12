@@ -193,6 +193,13 @@ def main():
         return 1
 
     tl = reader.timeline
+    # The comprehensive timeline carries one track per pipeline; index them by
+    # kind so the metrics summary does not depend on track ordering.
+    tracks = {t.get("kind"): t for t in tl.get("tracks", [])}
+    diar = tracks.get("diarization", {})
+    asr = tracks.get("asr", {})
+    diar_compute = diar.get("compute_sec")
+    asr_compute = asr.get("compute_sec")
     out = {
         "meta": {
             "pcm": args.pcm,
@@ -202,12 +209,10 @@ def main():
             "push_wall_sec": round(push_wall, 3),
             "total_wall_sec": round(total_wall, 3),
             "stream_rt_factor": round(audio_sec / total_wall, 3) if total_wall else None,
-            "diar_compute_sec": tl.get("diar_compute_sec"),
-            "asr_compute_sec": tl.get("asr_compute_sec"),
-            "diar_rt_factor": (round(audio_sec / tl["diar_compute_sec"], 3)
-                               if tl.get("diar_compute_sec") else None),
-            "asr_rt_factor": (round(audio_sec / tl["asr_compute_sec"], 3)
-                              if tl.get("asr_compute_sec") else None),
+            "diar_compute_sec": diar_compute,
+            "asr_compute_sec": asr_compute,
+            "diar_rt_factor": diar.get("real_time_factor"),
+            "asr_rt_factor": asr.get("real_time_factor"),
         },
         "events": reader.events,
         "timeline": tl,
@@ -216,11 +221,13 @@ def main():
         json.dump(out, f, ensure_ascii=False, indent=2)
 
     m = out["meta"]
+    n_diar = len(diar.get("entries", []))
+    n_asr = len(asr.get("entries", []))
     print(f"\nwrote {args.out}")
     print(f"  audio={audio_sec:.2f}s  total_wall={total_wall:.2f}s  "
           f"stream_rt={m['stream_rt_factor']}x")
-    print(f"  diar: {len(tl.get('diarization', []))} segs, rt={m['diar_rt_factor']}x   "
-          f"asr: {len(tl.get('transcript', []))} utts, rt={m['asr_rt_factor']}x")
+    print(f"  diar: {n_diar} segments, rt={m['diar_rt_factor']}x   "
+          f"asr: {n_asr} utterances, rt={m['asr_rt_factor']}x")
     return 0
 
 

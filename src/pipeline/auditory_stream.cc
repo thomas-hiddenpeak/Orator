@@ -121,10 +121,11 @@ void AuditoryStream::EmitLocked(const std::string& json) {
 
 
 void AuditoryStream::EmitTimeline(bool finalize) {
-  // Drain the pipelines before serializing. On finalize: signal end-of-stream
-  // and join the workers (each flushes its tail inside its loop). On flush:
-  // wait until both workers have consumed all audio pushed so far, without
-  // stopping -- streaming continues with state preserved.
+  // Ensure all buffered audio has been processed before serializing. On
+  // finalize: close the buffer and join the workers (each transcribes its
+  // remaining audio inside its loop before exiting). On flush: wait until both
+  // workers have processed all audio appended so far, without stopping;
+  // streaming continues and worker state is retained.
   if (finalize) {
     StopWorkers();
   } else {
@@ -134,9 +135,11 @@ void AuditoryStream::EmitTimeline(bool finalize) {
 }
 
 std::string AuditoryStream::Serialize() {
-  // Snapshot both result streams under the timeline lock, then build the
-  // unified document: independent diarization + transcript arrays on one clock
-  // (fusion/attribution is a downstream concern).
+  // Read both result sets from the timeline store under its lock, then build the
+  // comprehensive timeline document. The document is a single container with a
+  // shared time axis; each pipeline contributes one track of time-ordered
+  // entries. Adding a future pipeline adds another track without changing the
+  // schema. Speaker-to-text attribution is performed by a later component.
   core::DiarizationFrames frames = timeline_.SnapshotDiarFrames();
   core::Transcript transcript = timeline_.SnapshotTranscript();
 
@@ -148,15 +151,23 @@ std::string AuditoryStream::Serialize() {
   }
   last_transcript_ = transcript;
 
-  std::string out = "{\"type\":\"timeline\",";
-  char buf[256];
-  std::snprintf(buf, sizeof(buf),
-                "\"audio_sec\":%.3f,\"diar_compute_sec\":%.3f,"
-                "\"asr_compute_sec\":%.3f,",
-                audio_sec(), diar_compute_sec(), asr_compute_sec());
-  out += buf;
+  const double audio = audio_sec();
+  const double diar_c = diar_compute_sec();
+  const double asr_c = asr_compute_sec();
 
-  out += "\"diarization\":[";
+  char buf[256];
+  std::string out = "{\"type\":\"timeline\",\"schema_version\":1,";
+  std::snprintf(buf, sizeof(buf), "\"audio_sec\":%.3f,\"sample_rate\":%d,",
+                audio, config_.sample_rate);
+  out += buf;
+  out += "\"tracks\":[";
+
+  // Track: speaker diarization.
+  std::snprintf(buf, sizeof(buf),
+                "{\"kind\":\"diarization\",\"source\":\"sortformer\","
+                "\"compute_sec\":%.3f,\"real_time_factor\":%.3f,\"entries\":[",
+                diar_c, diar_c > 0 ? audio / diar_c : 0.0);
+  out += buf;
   for (size_t i = 0; i < last_segments_.size(); ++i) {
     const auto& s = last_segments_[i];
     std::snprintf(buf, sizeof(buf),
@@ -165,14 +176,25 @@ std::string AuditoryStream::Serialize() {
     out += buf;
     if (i + 1 < last_segments_.size()) out += ",";
   }
-  out += "],\"transcript\":[";
-  for (size_t i = 0; i < last_transcript_.tokens.size(); ++i) {
-    const auto& t = last_transcript_.tokens[i];
-    std::snprintf(buf, sizeof(buf), "{\"start\":%.3f,\"end\":%.3f,\"text\":\"",
-                  t.start_sec, t.end_sec);
-    out += std::string(buf) + JsonEscape(t.text) + "\"}";
-    if (i + 1 < last_transcript_.tokens.size()) out += ",";
+  out += "]}";
+
+  // Track: automatic speech recognition (present only when ASR is enabled).
+  if (asr_) {
+    std::snprintf(buf, sizeof(buf),
+                  ",{\"kind\":\"asr\",\"source\":\"qwen3_asr\","
+                  "\"compute_sec\":%.3f,\"real_time_factor\":%.3f,\"entries\":[",
+                  asr_c, asr_c > 0 ? audio / asr_c : 0.0);
+    out += buf;
+    for (size_t i = 0; i < last_transcript_.tokens.size(); ++i) {
+      const auto& t = last_transcript_.tokens[i];
+      std::snprintf(buf, sizeof(buf), "{\"start\":%.3f,\"end\":%.3f,\"text\":\"",
+                    t.start_sec, t.end_sec);
+      out += std::string(buf) + JsonEscape(t.text) + "\"}";
+      if (i + 1 < last_transcript_.tokens.size()) out += ",";
+    }
+    out += "]}";
   }
+
   out += "]}";
   return out;
 }
@@ -185,7 +207,7 @@ void AuditoryStream::Reset() {
   last_transcript_.tokens.clear();
   if (diarizer_) diarizer_->Reset();
   if (asr_) asr_->Reset();
-  StartWorkers();        // re-arm so streaming can resume
+  StartWorkers();        // start new workers so streaming can resume
 }
 
 }  // namespace pipeline

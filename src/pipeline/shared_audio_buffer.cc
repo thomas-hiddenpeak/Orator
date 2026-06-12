@@ -36,24 +36,25 @@ bool SharedAudioBuffer::WaitAndRead(int cursor, std::vector<float>* out) {
   std::unique_lock<std::mutex> lock(mutex_);
   cv_.wait(lock, [&] { return cursors_[cursor] < total_samples_ || closed_; });
 
-  if (cursors_[cursor] >= total_samples_) return false;  // drained + closed
+  if (cursors_[cursor] >= total_samples_)
+    return false;  // all samples read and the stream is closed
 
   const long from = cursors_[cursor] - base_sample_;
   const long count = total_samples_ - cursors_[cursor];
   out->assign(samples_.begin() + from, samples_.begin() + from + count);
   cursors_[cursor] = total_samples_;
 
-  TrimToLowWaterMark();
+  RemovePassedPrefix();
   return true;
 }
 
-void SharedAudioBuffer::TrimToLowWaterMark() {
+void SharedAudioBuffer::RemovePassedPrefix() {
   if (cursors_.empty()) return;
-  const long low = *std::min_element(cursors_.begin(), cursors_.end());
-  const long drop = low - base_sample_;
-  if (drop <= 0) return;
-  samples_.erase(samples_.begin(), samples_.begin() + drop);
-  base_sample_ = low;
+  const long min_cursor = *std::min_element(cursors_.begin(), cursors_.end());
+  const long remove_count = min_cursor - base_sample_;
+  if (remove_count <= 0) return;
+  samples_.erase(samples_.begin(), samples_.begin() + remove_count);
+  base_sample_ = min_cursor;
 }
 
 void SharedAudioBuffer::Reset() {

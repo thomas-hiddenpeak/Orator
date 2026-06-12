@@ -1,11 +1,12 @@
 # Orator Constitution
 
-The non-negotiable principles that govern every change to this project. Specs,
+The mandatory principles that govern every change to this project. Specs,
 plans, tasks, and code are all subordinate to this document. When any artifact
-conflicts with the Constitution, the Constitution wins. Amending it is a
-deliberate, recorded act (see *Amendment Process*), never an implicit drift.
+conflicts with the Constitution, the Constitution takes precedence. Amending it
+is a deliberate, recorded action (see *Amendment Process*), not an undocumented
+change.
 
-- **Version**: 1.0.0
+- **Version**: 1.1.0
 - **Ratified**: 2026-06-12
 - **Last amended**: 2026-06-12
 
@@ -20,7 +21,7 @@ deliberate, recorded act (see *Amendment Process*), never an implicit drift.
    - The C++ standard library and libc.
    - The CUDA toolkit runtime libraries (`cudart`, `cuBLAS`, `cuFFT`, …).
    - OS facilities reached through libc/POSIX (sockets, threads, mmap). The
-     WebSocket server is implemented from scratch on raw POSIX sockets for this
+     WebSocket server is implemented directly on POSIX sockets for this
      reason — networking is an OS facility, not a dependency.
 3. Vendored sources (e.g. `third_party/minimp3`) are allowed **only** in offline
    tooling and tests, never on a runtime path.
@@ -47,55 +48,65 @@ binary with a fixed, auditable surface is a hard product requirement.
    accuracy comparison against the prior verified output, and they are not
    merged without sign-off. Quantization in particular is deferred until
    explicitly scheduled by the project owner.
-4. A change that cannot be validated against a reference is not "done"; it is a
-   spike, and must be labeled as such.
+4. A change that cannot be validated against a reference is not complete; it is
+   an unvalidated experiment, and must be labeled as such.
 
 ## Article III — Two Independent Pipelines on One Timeline
 
+## Article III — Independent Pipelines on a Comprehensive Timeline
+
 1. Diarization (speaker separation) and ASR are **independent pipelines**.
    Neither reads the other's results; neither blocks on the other.
-2. Their only shared contract is the **input audio stream** and a **single
+2. Their only shared inputs are the **input audio stream** and a **single
    absolute time base** (stream seconds). Audio entering the system is the sole
-   coupling point: after it lands in the shared buffer, the two businesses
-   proceed at their own pace ("whoever finishes first is fine").
-3. Both pipelines emit onto **one unified timeline**. The terminal output of the
-   system is always a timeline carrying BOTH speaker-separation segments AND ASR
-   transcript content on the shared clock.
-4. The pipelines are decoupled from concrete models by interfaces
+   point of coupling: after it is written to the shared buffer, each pipeline
+   processes it at its own rate and in any order.
+3. The terminal output of the system is **one comprehensive timeline**: a single
+   document with a shared time axis that contains one **track** per pipeline.
+   Each track holds that pipeline's time-ordered entries (for example a speaker
+   diarization track and an ASR transcript track). The timeline always carries
+   the diarization track and, when ASR is enabled, the ASR track.
+4. The timeline is **extensible by adding tracks**. A new pipeline contributes a
+   new track; existing tracks and the document schema are unchanged. Combining
+   tracks (for example attributing transcript text to a speaker) is performed by
+   a separate component and does not alter how each pipeline produces its track.
+5. The pipelines are decoupled from concrete models by interfaces
    (`core::IDiarizer`, `core::IAsr`, `core::ITimelineMerger`, …) plus a registry.
-   Swapping a model is a registration/config change, never an edit to a consumer.
+   Replacing a model is a registration/configuration change, not an edit to a
+   consumer.
 
-## Article IV — Streaming Is Real, Tests Prove It
+## Article IV — Streaming Validation Through the Real Transport
 
-1. The system is a **real-time streaming** system. The authoritative path is:
-   audio arrives incrementally → shared buffer → pipelines consume continuously.
-2. Tests MUST exercise the real end-to-end path and assert on the **real
-   terminal output** (the unified timeline JSON). Convenience shortcuts that
-   bypass the streaming path are not acceptable as validation of streaming
-   behavior.
-3. Specifically: streaming behavior is validated by pushing audio **through the
-   WebSocket transport as an incremental stream** (optionally at an accelerated
-   real-time multiple), never by handing a whole clip to a single offline call.
-   Offline whole-clip tools may exist for component debugging, but they do not
-   count as streaming validation.
-4. Performance is reported honestly and from the real path. Real-time factors
-   are measured on the streaming pipeline under stated clock/thermal conditions,
-   and clip-based numbers are never presented as if they were streaming numbers.
+1. The system is a **real-time streaming** system. The primary execution path
+   is: audio arrives incrementally → shared buffer → pipelines consume it
+   continuously.
+2. Tests MUST exercise the complete end-to-end path and assert on the **actual
+   terminal output** (the comprehensive timeline JSON). A test that bypasses the
+   streaming path does not validate streaming behavior.
+3. Streaming behavior is validated by sending audio **through the WebSocket
+   transport as an incremental stream** (optionally faster than real time),
+   not by passing a complete recording to a single non-streaming call.
+   Non-streaming whole-recording tools may exist for component debugging, but
+   they do not constitute streaming validation.
+4. Performance is reported only from the real streaming path. Real-time factors
+   are measured on the streaming pipeline under stated clock and thermal
+   conditions. A measurement taken from a non-streaming whole-recording run is
+   never reported as a streaming result.
 
-## Article V — Engineering Quality Is a Requirement, Not a Preference
+## Article V — Engineering Quality Is a Requirement
 
-This project is delivered with high engineering taste and very high code
-quality. The following are acceptance criteria, enforced in review:
+This project is delivered to a high standard of code quality. The following are
+acceptance criteria, enforced in review:
 
 1. **Readability**
    - Google C++ Style: 2-space indent, `PascalCase` types/methods,
      `lower_snake_case` locals, trailing-underscore `member_` fields,
      `I`-prefixed interfaces, `#pragma once` headers.
-   - Every translation unit and public header opens with a doc comment stating
-     its purpose and its place in the system. Comments explain **why**, not
-     **what**; they justify non-obvious decisions and cite the contract or
-     reference being honored.
-   - Names reveal intent. No abbreviations that a newcomer must decode.
+   - Every translation unit and public header opens with a documentation comment
+     stating its purpose and its role in the system. Comments explain the
+     reason for a decision, not a restatement of the code; they justify
+     non-obvious choices and cite the contract or reference being implemented.
+   - Names state their intent. No abbreviations that require decoding.
 
 2. **Organization**
    - Strict layering by directory: `core/` (types + interfaces), `model/`
@@ -106,35 +117,70 @@ quality. The following are acceptance criteria, enforced in review:
      contract; implementation detail stays in the `.cc`/`.cu`.
 
 3. **Maintainability**
-   - No duplicated logic; shared behavior is factored once. No dead code, no
-     commented-out code, no "fallback" kept "just in case" without a stated
-     reason.
-   - Resources are RAII-owned (`std::unique_ptr`, `std::shared_ptr`, owning GPU
-     buffers). No raw `new`/`delete`/`cudaMalloc` on a hot path that isn't
-     wrapped by an owner. Every CUDA call is error-checked.
+   - No duplicated logic; shared behavior is defined once. No dead code, no
+     commented-out code, and no unused fallback path retained without a stated,
+     written reason.
+   - Resources are owned through RAII (`std::unique_ptr`, `std::shared_ptr`,
+     owning GPU buffers). No raw `new`/`delete`/`cudaMalloc` on a
+     performance-critical path without an owning wrapper. Every CUDA call is
+     error-checked.
    - Functions are small and single-purpose. Deep nesting and long parameter
-     lists are refactored, not tolerated.
+     lists are refactored.
 
 4. **Extensibility**
    - New models/stages are added by implementing an interface and registering
      it — never by editing consumers. New behavior is added behind the existing
      contracts wherever possible.
-   - Configuration is explicit and typed (`*Config` structs), not magic
-     constants scattered through code. Tunable knobs carry documented defaults.
+   - Configuration is explicit and typed (`*Config` structs), not unnamed
+     constants distributed through the code. Tunable parameters carry documented
+     defaults.
 
-5. **Concurrency discipline** (applies as the threaded pipeline lands)
+5. **Concurrency discipline**
    - Shared state crosses threads only through clearly-owned, documented
      synchronization primitives. Every shared field states which lock guards it.
    - No data races: this is verified, not assumed. Thread lifecycles
-     (start/stop/join) are deterministic and owned by a single controller.
+     (start, stop, join) are deterministic and owned by a single controller.
 
 6. **Implementation discipline**
-   - Make the change that is requested or clearly necessary — nothing more. No
-     speculative features, no unrequested refactors riding along with a fix.
-   - Validate every change: it builds clean (`-Wall -Wextra`, no new warnings),
-     the full test suite passes, and any behavioral claim is backed by a run.
+   - Make the change that is requested or clearly necessary, and no more. No
+     speculative features, and no unrequested refactoring combined with a fix.
+   - Validate every change: it builds with no new warnings (`-Wall -Wextra`),
+     the full test suite passes, and any behavioral claim is supported by a run.
 
-## Article VI — Process: Spec-Driven Development
+## Article VI — Documentation and Terminology Standards
+
+All project documents (the Constitution, specs, plans, tasks, READMEs, code
+comments, and commit messages) MUST be written so that a reader unfamiliar with
+the recent conversation can understand them months later. The following are
+enforced in review:
+
+1. **Use standard, precise engineering terminology.** Name the actual mechanism,
+   data structure, or measurement. Examples: "mutex", "condition variable",
+   "read cursor", "absolute sample index", "real-time factor", "end-of-stream
+   flag".
+2. **No metaphors, analogies, or figurative language.** Do not describe behavior
+   with imagery (for example racing, draining, barriers as physical objects,
+   anthropomorphism such as "the worker waits its turn"). Describe the mechanism
+   directly (for example "blocks on the condition variable until new samples are
+   available or the end-of-stream flag is set").
+3. **No jargon, slang, or insider shorthand.** Do not use informal phrases whose
+   meaning depends on context that will be lost over time (for example "whoever
+   finishes first", "just in case", "bolted on", "spike", "magic constant").
+   State the precise condition or fact instead.
+4. **Define terms once and use them consistently.** A concept has exactly one
+   name across all documents and code. Do not introduce synonyms for the same
+   thing.
+5. **Quantify rather than characterize.** Prefer measured numbers with units and
+   stated conditions over qualitative words. Do not assert a property (for
+   example correctness or performance) without the evidence or the method used
+   to obtain it.
+6. **Spell out an acronym or abbreviation at first use** in each document, then
+   use it consistently.
+
+A document that relies on metaphor or undefined jargon is rejected in review and
+rewritten in plain, standard terminology.
+
+## Article VII — Process: Spec-Driven Development
 
 1. Work of non-trivial scope follows the SDD flow, adapted from spec-kit:
    `constitution → spec → plan → tasks → implement`. Each artifact lives under
@@ -164,7 +210,7 @@ quality. The following are acceptance criteria, enforced in review:
   (a "Constitution Check"). A violation must be resolved, or justified and
   recorded, before implementation proceeds.
 - Reviews reject changes that violate an Article without a recorded amendment.
-- When guidance is silent, Articles II (accuracy) and V (quality) are the
-  tie-breakers.
+- When guidance is silent, Articles II (accuracy) and V (quality) take
+  precedence over other considerations.
 
-**Version 1.0.0 · Ratified 2026-06-12 · Last amended 2026-06-12**
+**Version 1.1.0 · Ratified 2026-06-12 · Last amended 2026-06-12**

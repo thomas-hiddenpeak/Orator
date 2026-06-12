@@ -7,7 +7,7 @@ work is specified under [specs/](.).
 
 - **Last updated**: 2026-06-12 (Spec 001 implemented)
 - **Branch**: `master`
-- **Constitution**: v1.0.0
+- **Constitution**: v1.1.0
 
 ---
 
@@ -15,17 +15,20 @@ work is specified under [specs/](.).
 
 A real-time, edge-deployed (Jetson Orin) auditory pipeline, **pure C++/CUDA with
 zero runtime third-party dependencies**. It ingests a live mono-audio stream over
-WebSocket and produces a unified timeline carrying both **speaker separation**
-and **ASR transcript** content on one absolute clock.
+WebSocket and produces a comprehensive timeline that carries both **speaker
+separation** and **ASR transcript** content, one track per pipeline, on one
+absolute time base.
 
 ## 2. Current phase
 
 **Spec 001 implemented: threaded streaming dual pipeline live through WebSocket.**
 Diarization and ASR run on independent worker threads behind a controller, fed
-by a shared audio buffer, emitting one unified timeline. Validated end-to-end by
-streaming `test.mp3` through the real WebSocket at max rate, with full JSON
-export. GPU access across the two threads is serialized by a process-wide GPU
-lock (one physical device; required for correctness on Tegra unified memory).
+by a shared audio buffer, producing one comprehensive timeline (one track per
+pipeline). Validated end-to-end by streaming `test.mp3` through the real
+WebSocket faster than real time, with the full timeline written to JSON. GPU
+access across the two threads is serialized by a process-wide GPU mutex (one
+physical device; required for correctness on the Jetson unified-memory
+platform).
 
 ## 3. Component status
 
@@ -36,11 +39,11 @@ lock (one physical device; required for correctness on Tegra unified memory).
 | WhisperMel / BPE tokenizer / sharded safetensors loader | ✅ Verified | Unit-tested. |
 | Decoupling (interfaces + registry) | ✅ In place | `IDiarizer`, `IAsr`, `ITimelineMerger`; registry-constructed. |
 | WebSocket server (from-scratch POSIX) | ✅ Working | RFC6455 handshake + frame codec, no deps. |
-| ASR ↔ WS integration | ✅ Threaded, independent | `AuditoryStream` is a controller owning a `SharedAudioBuffer` + two worker threads (`DiarizationWorker`, `AsrWorker`) + a mutex-guarded `StreamTimeline`. Emits incremental `asr` events + a unified timeline. GPU work serialized by `gpu::DeviceLock()`. |
+| ASR + WS integration | Done; threaded, independent | `AuditoryStream` is a controller owning a `SharedAudioBuffer`, two worker threads (`DiarizationWorker`, `AsrWorker`), and a mutex-guarded `StreamTimeline`. Sends incremental `asr` messages and a comprehensive timeline. GPU work serialized by `gpu::DeviceLock()`. |
 | Streaming validation | ✅ Through real WebSocket | `tools/ws_stream_client.py` (stdlib, reader thread) streams PCM through the socket at an accelerated rate and exports the full event log + timeline to JSON. |
 | Test suite | ✅ 19/19 ctests pass | Clean build under `-Wall -Wextra`; `test_shared_buffer` exercises the threaded buffer (deterministic across runs). |
 
-## 4. Honest performance snapshot (locked 1.3 GHz, MaxN)
+## 4. Measured performance (GPU fixed at 1.3 GHz, power mode MaxN)
 
 Measured through the **real WebSocket** at max push rate, 120 s of `test.mp3`
 (`/tmp/orator_stream_120.json`):

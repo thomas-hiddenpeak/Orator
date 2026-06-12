@@ -1,22 +1,23 @@
 #pragma once
 
-// AuditoryStream: the controller that runs speaker diarization and ASR as TWO
-// INDEPENDENT pipelines over one streamed audio source, on independent threads.
+// AuditoryStream: the controller that runs speaker diarization and ASR as two
+// independent pipelines over one streamed audio source, on independent threads.
 //
-// Per the architecture (Spec 001): audio arriving from the stream is the only
-// thing the two businesses share. PushAudio() appends samples to a shared
-// buffer; two worker threads (diarization, ASR) consume that buffer at their
-// own pace, never reading each other's results, and deposit their output onto
-// one mutex-guarded timeline keyed by the shared absolute clock. The controller
-// owns the buffer, the workers, and the thread lifecycle (start, drain on
-// flush, stop+join on end). "Whoever finishes first is fine" -- the only
-// contract is the shared clock.
+// Per the architecture (Spec 001): the input audio is the only data the two
+// pipelines share. PushAudio() appends samples to a shared buffer; two worker
+// threads (diarization, ASR) read that buffer at their own rate, do not read
+// each other's results, and append their output to one mutex-guarded timeline
+// indexed by the shared absolute time base. The controller owns the buffer, the
+// workers, and the thread lifecycle: start on session open; on flush, wait for
+// both workers to reach the current input position; on end, close the buffer,
+// process all remaining audio, and join the threads. The pipelines may complete
+// in any order; their only shared reference is the time base.
 //
-// This class is transport-agnostic: results are delivered through the `Emit`
-// callback as JSON strings (incremental {"type":"asr",...} events from the ASR
-// worker, and the unified {"type":"timeline",...} document on flush/end). It
-// owns no sockets; the WebSocket handler and the offline streaming test drive
-// it identically.
+// This class is independent of the transport: results are delivered through the
+// `Emit` callback as JSON strings (incremental {"type":"asr",...} messages from
+// the ASR worker, and the {"type":"timeline",...} document on flush/end). It
+// contains no socket code; the WebSocket handler and the streaming test drive it
+// through the same interface.
 
 #include <condition_variable>
 #include <functional>
@@ -74,14 +75,15 @@ class AuditoryStream {
   // immediately; the worker threads consume it independently.
   void PushAudio(const float* samples, int n);
 
-  // Emit the unified timeline. When finalize is true: signal end-of-stream,
-  // drain + join both workers (flushing tails), then serialize. When false
-  // (flush): wait until both workers have consumed all audio pushed so far,
-  // then serialize; streaming continues with state preserved.
+  // Send the comprehensive timeline. When finalize is true: signal
+  // end-of-stream, process all remaining audio, join both workers, then
+  // serialize. When false (flush): wait until both workers have processed all
+  // audio appended so far, then serialize; streaming continues and worker state
+  // is retained.
   void EmitTimeline(bool finalize);
 
-  // Stop the workers (if running) and clear all state for a fresh session, then
-  // re-arm the workers so streaming can resume.
+  // Stop the workers (if running), clear all state for a fresh session, then
+  // start new workers so streaming can resume.
   void Reset();
 
   bool asr_enabled() const { return asr_ != nullptr; }
@@ -92,11 +94,12 @@ class AuditoryStream {
   double asr_compute_sec() const;
 
  private:
-  void StartWorkers();           // spawn diar + asr threads
+  void StartWorkers();           // start diar + asr threads
   void StopWorkers();            // close buffer, join threads
-  void WaitForBarrier(long target_samples);  // block until both workers caught up
-  std::string Serialize();       // build the unified timeline JSON (snapshots)
-  void EmitLocked(const std::string& json);  // serialized transport emit
+  // Block until both workers have processed up to `target_samples`.
+  void WaitForBarrier(long target_samples);
+  std::string Serialize();       // build the comprehensive timeline JSON
+  void EmitLocked(const std::string& json);  // serialize transport sends
 
   Config config_;
   Emit emit_;

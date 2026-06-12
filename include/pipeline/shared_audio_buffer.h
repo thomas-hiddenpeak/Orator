@@ -1,20 +1,22 @@
 #pragma once
 
-// SharedAudioBuffer: the single coupling point between the ingest producer and
-// the independent pipeline consumers (diarization, ASR).
+// SharedAudioBuffer: the single point of coupling between the ingest producer
+// and the independent pipeline consumers (diarization, ASR).
 //
-// Per the architecture (Spec 001 / plan.md §2.1), audio entering the system is
-// the only thing the two businesses share. The producer appends decoded mono
-// PCM on one absolute clock (sample 0 == stream start). Each consumer holds its
-// OWN read cursor and pulls "everything new since I last read" at its own pace;
-// consumers never see or wait on each other. Memory is bounded by dropping only
-// the prefix that EVERY consumer has already passed (a low-water mark), so no
-// consumer can lose unread audio while a faster one races ahead.
+// Per the architecture (Spec 001 / plan.md §2.1), the input audio is the only
+// data the two pipelines share. The producer appends decoded mono PCM indexed
+// by absolute sample position (sample 0 is the start of the stream). Each
+// consumer holds its own read cursor and reads the samples appended since its
+// last read, at its own rate; consumers do not read or wait on each other. The
+// buffer removes a prefix only after every consumer's cursor has advanced past
+// it (the minimum of all cursors), so no consumer loses unread audio when one
+// consumer is further ahead than another.
 //
-// Thread-safety: all mutable state is guarded by `mutex_`; `cv_` signals
-// "new data appended or stream closed". Consumers block in WaitAndRead instead
-// of spinning. The class owns no threads -- the controller that spawns the
-// pipeline workers owns their lifecycle.
+// Thread-safety: all mutable state is guarded by `mutex_`; `cv_` signals that
+// samples were appended or the stream was closed. A consumer blocks in
+// WaitAndRead until one of those occurs, rather than polling. This class owns
+// no threads; the controller that starts the pipeline workers owns their
+// lifecycle.
 
 #include <condition_variable>
 #include <cstddef>
@@ -52,7 +54,7 @@ class SharedAudioBuffer {
   bool WaitAndRead(int cursor, std::vector<float>* out);
 
   // Clear all state for a fresh session. Consumers MUST be stopped (joined)
-  // first; this resets cursors and re-arms the buffer.
+  // first; this resets cursors and re-initializes the buffer.
   void Reset();
 
   int sample_rate() const { return sample_rate_; }
@@ -60,12 +62,13 @@ class SharedAudioBuffer {
   // Total samples appended this session (absolute clock head). Thread-safe.
   long total_samples() const;
 
-  // Absolute index of the oldest sample still retained (low-water mark).
+  // Absolute index of the oldest sample still retained.
   long base_sample() const;
 
  private:
-  // Drop the prefix every consumer has already read. Caller holds `mutex_`.
-  void TrimToLowWaterMark();
+  // Remove the leading samples that every consumer has already read. The caller
+  // holds `mutex_`.
+  void RemovePassedPrefix();
 
   mutable std::mutex mutex_;
   std::condition_variable cv_;
