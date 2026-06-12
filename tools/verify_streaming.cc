@@ -25,7 +25,7 @@ static std::vector<float> ReadF32(const std::string& p) {
 }
 
 int main(int argc, char** argv) {
-  std::string dir = argc > 1 ? argv[1] : "models";
+  std::string dir = argc > 1 ? argv[1] : "models/reference";
   auto proc = ReadF32(dir + "/ref_stream_proc.f32");    // [128, t_mel]
   auto ref = ReadF32(dir + "/ref_stream_total.f32");    // [diar, 4]
   std::ifstream mf(dir + "/ref_stream_meta.i32", std::ios::binary);
@@ -41,7 +41,7 @@ int main(int argc, char** argv) {
   cfg.sample_rate = 16000;
   cfg.max_speakers = 4;
   diar.Initialize(cfg);
-  diar.LoadWeights(dir + "/sortformer_4spk_v2.safetensors");
+  diar.LoadWeights("models/sortformer_4spk_v2.safetensors");
 
   core::DiarizationFrames out =
       diar.RunStreaming(proc.data(), n_mels, t_mel, valid_mel, 0.0);

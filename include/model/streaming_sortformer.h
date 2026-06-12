@@ -4,11 +4,12 @@
 //
 // Implements core::IDiarizer. Configuration and streaming-state fields mirror
 // NVIDIA's `diar_streaming_sortformer_4spk-v2` (see
-// third_party/streaming_sortformer/research_notes.txt). The CUDA forward pass
-// is not yet implemented; ProcessChunk currently emits a placeholder activity
-// track so the pipeline runs end-to-end. The interface, config, and state are
-// production-shaped so the forward kernels can be filled in without touching
-// any consumer.
+// third_party/streaming_sortformer/research_notes.txt). The full CUDA forward
+// pass is implemented (mel -> pre_encode -> 17 Conformer layers -> encoder_proj
+// + 18 transformer layers -> speaker head -> sigmoid) and verified numerically
+// against the NeMo reference (see tools/verify_forward.cc and
+// tools/verify_streaming.cc). The streaming path is bit-identical to the
+// offline ProcessChunk over the same audio (tools/verify_streaming_incremental).
 
 #include <cstdint>
 #include <algorithm>

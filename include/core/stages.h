@@ -66,6 +66,35 @@ class ISpeakerRegistry {
   virtual int Size() const = 0;
 };
 
+// Configuration handed to an ASR engine at initialization. Fields are
+// model-agnostic; model-specific knobs (beam size, encoder chunking, etc.)
+// live inside each implementation.
+struct AsrConfig {
+  int sample_rate = 16000;
+  std::string language = "";  // BCP-47-ish hint; "" => auto-detect
+};
+
+// Automatic speech recognition: turns audio into a timed token Transcript.
+// Generalizes any encoder-decoder ASR (Whisper-family, Qwen3-ASR, etc.); the
+// pipeline depends only on this contract, never on a concrete engine. The
+// Transcript it returns is the input the ITimelineMerger fuses with
+// diarization, so ASR and diarization meet on a single timeline.
+class IAsr {
+ public:
+  virtual ~IAsr() = default;
+
+  virtual void Initialize(const AsrConfig& config) = 0;
+  // Load weights from a model path. Stubs may ignore the path.
+  virtual void LoadWeights(const std::string& path) = 0;
+  // Clear any streaming/decoding state between sessions.
+  virtual void Reset() = 0;
+  // Transcribe a span of audio into timed tokens. Token times are absolute
+  // within the stream (offset by audio.t_start_sec).
+  virtual Transcript Transcribe(const AudioChunk& audio) = 0;
+
+  virtual std::string name() const = 0;
+};
+
 // Fuses diarization segments with the ASR transcript into a labeled timeline.
 class ITimelineMerger {
  public:

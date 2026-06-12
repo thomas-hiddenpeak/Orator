@@ -23,12 +23,12 @@ static std::vector<float> ReadF32(const std::string& path) {
 }
 
 int main(int argc, char** argv) {
-  std::string dir = argc > 1 ? argv[1] : "models";
+  std::string dir = argc > 1 ? argv[1] : "models/reference";
   const int T = 126, D = 512, valid = 125, n_layers = 17;
   auto xin = ReadF32(dir + "/ref_conf_l0_in.f32");
   auto ref = ReadF32(dir + "/ref_conf_l16_out.f32");
 
-  io::SafeTensorReader reader(dir + "/sortformer_4spk_v2.safetensors");
+  io::SafeTensorReader reader("models/sortformer_4spk_v2.safetensors");
   float* dx;
   cudaMalloc(&dx, xin.size() * sizeof(float));
   cudaMemcpy(dx, xin.data(), xin.size() * sizeof(float), cudaMemcpyHostToDevice);

@@ -25,11 +25,14 @@ set(ORATOR_CORE_SOURCES
     src/gpu/buffer.cc
     src/gpu/kernels.cu
     src/io/safetensor.cc
+    src/io/sharded_safetensor.cc
+    src/io/bpe_tokenizer.cc
     src/io/json_sink.cc
     src/io/audio_file.cc
     src/io/reference_transcript.cc
     # feature extraction (real Sortformer front-end)
     src/feature/mel_spectrogram.cu
+    src/feature/whisper_mel.cu
     # core data model
     src/core/tensor.cc
     # model implementations (decoupled behind interfaces)
@@ -39,15 +42,23 @@ set(ORATOR_CORE_SOURCES
     src/model/sortformer_decoder.cu
     src/model/stub_diarizer.cc
     src/model/stub_embedder.cc
+    src/model/stub_asr.cc
+    src/model/asr_ops.cu
+    src/model/asr_gemm.cu
+    src/model/asr_audio_tower.cu
+    src/model/asr_text_decoder.cu
+    src/model/qwen3_asr.cc
     src/model/speaker_database.cc
     src/model/builtin_registration.cc
     # pipeline orchestration
     src/pipeline/diar_postprocess.cc
     src/pipeline/timeline_merger.cc
     src/pipeline/auditory_pipeline.cc
+    src/pipeline/auditory_stream.cc
     # networking (dependency-free WebSocket over POSIX sockets)
     src/net/websocket_server.cc
     src/net/diarization_ws_handler.cc
+    src/net/auditory_ws_handler.cc
 )
 
 add_library(orator_core STATIC ${ORATOR_CORE_SOURCES})
@@ -59,7 +70,7 @@ target_include_directories(orator_core PUBLIC
 target_include_directories(orator_core PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/minimp3
 )
-target_link_libraries(orator_core PUBLIC cudart)
+target_link_libraries(orator_core PUBLIC cudart cublas)
 if(NOT MSVC)
     target_compile_options(orator_core PRIVATE
         $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra>)
@@ -78,6 +89,21 @@ target_link_libraries(orator PRIVATE orator_core)
 add_executable(orator_ws src/ws_main.cc)
 set_property(TARGET orator_ws PROPERTY CUDA_ARCHITECTURES native)
 target_link_libraries(orator_ws PRIVATE orator_core)
+
+# ---------------------------------------------------------------------------
+# asr_testmp3: native Qwen3-ASR end-to-end on an audio clip.
+# ---------------------------------------------------------------------------
+add_executable(asr_testmp3 tools/asr_testmp3.cc)
+set_property(TARGET asr_testmp3 PROPERTY CUDA_ARCHITECTURES native)
+target_link_libraries(asr_testmp3 PRIVATE orator_core)
+
+# ---------------------------------------------------------------------------
+# asr_stream_test: drive the streaming AuditoryStream (diar + asr) frame by
+# frame, exactly like the WebSocket server -- the real streaming path.
+# ---------------------------------------------------------------------------
+add_executable(asr_stream_test tools/asr_stream_test.cc)
+set_property(TARGET asr_stream_test PROPERTY CUDA_ARCHITECTURES native)
+target_link_libraries(asr_stream_test PRIVATE orator_core)
 
 # ---------------------------------------------------------------------------
 # Tests

@@ -52,7 +52,18 @@ void SafeTensorReader::ParseHeader(const std::string& header_json) {
     std::string key =
         header_json.substr(quote_start + 1, quote_end - quote_start - 1);
     if (!key.empty() && key.front() == '_') {  // __metadata__
-      pos = quote_end + 1;
+      // Skip its value object {...} too, not just the key, otherwise the keys
+      // inside the metadata object (e.g. "format") get mis-parsed as tensors.
+      size_t mb = header_json.find('{', quote_end);
+      if (mb == std::string::npos) break;
+      int mdepth = 1;
+      size_t mp = mb + 1;
+      while (mp < header_json.size() && mdepth > 0) {
+        if (header_json[mp] == '{') mdepth++;
+        if (header_json[mp] == '}') mdepth--;
+        mp++;
+      }
+      pos = mp;
       continue;
     }
 

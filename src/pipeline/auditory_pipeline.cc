@@ -47,6 +47,18 @@ std::unique_ptr<AuditoryPipeline> AuditoryPipeline::FromConfig(
     }
   }
 
+  if (!config.asr.empty()) {
+    components.asr =
+        core::Registry<core::IAsr>::Instance().Create(config.asr);
+    core::AsrConfig asr_cfg;
+    asr_cfg.sample_rate = config.sample_rate;
+    asr_cfg.language = config.asr_language;
+    components.asr->Initialize(asr_cfg);
+    if (!config.asr_weights.empty()) {
+      components.asr->LoadWeights(config.asr_weights);
+    }
+  }
+
   components.registry = std::move(registry);
   components.timeline_merger = std::make_unique<OverlapTimelineMerger>();
 
@@ -55,7 +67,13 @@ std::unique_ptr<AuditoryPipeline> AuditoryPipeline::FromConfig(
 
 void AuditoryPipeline::Start() {
   diar_segments_.clear();
+  audio_buffer_.clear();
+  have_session_start_ = false;
+  session_t_start_sec_ = 0.0;
+  session_sample_rate_ = config_.sample_rate;
+  transcript_.tokens.clear();
   components_.diarizer->Reset();
+  if (components_.asr) components_.asr->Reset();
 }
 
 void AuditoryPipeline::ProcessAudio(const core::AudioChunk& chunk) {
@@ -71,6 +89,20 @@ void AuditoryPipeline::ProcessAudio(const core::AudioChunk& chunk) {
 
   for (auto& seg : segments) {
     diar_segments_.push_back(std::move(seg));
+  }
+
+  // Buffer audio for the ASR pass only when an engine is configured. The
+  // session's absolute start time is anchored to the first chunk so emitted
+  // tokens share the diarization timeline.
+  if (components_.asr && chunk.samples != nullptr && chunk.num_samples > 0) {
+    if (!have_session_start_) {
+      session_t_start_sec_ = chunk.t_start_sec;
+      session_sample_rate_ = chunk.sample_rate > 0 ? chunk.sample_rate
+                                                    : config_.sample_rate;
+      have_session_start_ = true;
+    }
+    audio_buffer_.insert(audio_buffer_.end(), chunk.samples,
+                         chunk.samples + chunk.num_samples);
   }
 }
 
@@ -101,6 +133,23 @@ core::Timeline AuditoryPipeline::Finalize(const core::Transcript& transcript) {
   std::vector<core::DiarSegment> coalesced =
       CoalesceSegments(diar_segments_, config_.segment_merge_gap_sec);
   return components_.timeline_merger->Merge(coalesced, transcript);
+}
+
+core::Transcript AuditoryPipeline::RunAsr() {
+  core::Transcript transcript;
+  if (!components_.asr || audio_buffer_.empty()) return transcript;
+
+  core::AudioChunk session;
+  session.samples = audio_buffer_.data();
+  session.num_samples = static_cast<int>(audio_buffer_.size());
+  session.sample_rate = session_sample_rate_;
+  session.t_start_sec = session_t_start_sec_;
+  return components_.asr->Transcribe(session);
+}
+
+core::Timeline AuditoryPipeline::Finalize() {
+  transcript_ = RunAsr();
+  return Finalize(transcript_);
 }
 
 }  // namespace pipeline

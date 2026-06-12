@@ -22,7 +22,7 @@ static std::vector<float> ReadF32(const std::string& path) {
 }
 
 int main(int argc, char** argv) {
-  std::string dir = argc > 1 ? argv[1] : "models";
+  std::string dir = argc > 1 ? argv[1] : "models/reference";
   auto wav = ReadF32(dir + "/ref_wav_10s.f32");
   auto window = ReadF32(dir + "/ref_window.f32");
   auto fb = ReadF32(dir + "/ref_fb.f32");

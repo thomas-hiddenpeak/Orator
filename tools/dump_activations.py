@@ -36,7 +36,7 @@ def main():
         "diar_streaming_sortformer_4spk-v2.nemo.bin"))
     ap.add_argument("--seconds", type=float, default=10.0)
     ap.add_argument("--out", default=os.path.join(
-        os.path.dirname(__file__), "..", "models", "ref_activations.npz"))
+        os.path.dirname(__file__), "..", "models", "reference", "ref_activations.npz"))
     ap.add_argument("--device", default="cuda")
     args = ap.parse_args()
 

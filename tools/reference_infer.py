@@ -35,7 +35,7 @@ def main():
     ap.add_argument("--audio", default=os.path.join(
         os.path.dirname(__file__), "..", "test.mp3"))
     ap.add_argument("--out", default=os.path.join(
-        os.path.dirname(__file__), "..", "models", "reference_diar.npz"))
+        os.path.dirname(__file__), "..", "models", "reference", "reference_diar.npz"))
     ap.add_argument("--device", default="cuda")
     args = ap.parse_args()
 

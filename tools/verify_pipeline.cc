@@ -22,7 +22,7 @@ static std::vector<float> ReadF32(const std::string& p) {
 }
 
 int main(int argc, char** argv) {
-  std::string dir = argc > 1 ? argv[1] : "models";
+  std::string dir = argc > 1 ? argv[1] : "models/reference";
   auto wav = ReadF32(dir + "/ref_wav_10s.f32");
   auto ref = ReadF32(dir + "/ref_preds.f32");
 
@@ -31,7 +31,7 @@ int main(int argc, char** argv) {
   cfg.sample_rate = 16000;
   cfg.max_speakers = 4;
   diar.Initialize(cfg);
-  diar.LoadWeights(dir + "/sortformer_4spk_v2.safetensors");
+  diar.LoadWeights("models/sortformer_4spk_v2.safetensors");
 
   core::AudioChunk chunk;
   chunk.samples = wav.data();

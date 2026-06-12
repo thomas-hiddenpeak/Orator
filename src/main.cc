@@ -69,6 +69,7 @@ int main(int argc, char** argv) {
     pipeline::PipelineConfig cfg;
     cfg.diarizer = diarizer;
     cfg.embedder = "stub_embedder";  // enable speaker-id resolution
+    cfg.asr = "stub";                // pipeline-owned ASR -> unified timeline
     cfg.sample_rate = 16000;
     cfg.max_speakers = 4;
 
@@ -89,14 +90,12 @@ int main(int argc, char** argv) {
     std::cout << "Diarization segments: " << pipe->diar_segments().size()
               << std::endl;
 
-    // Upstream ASR result (would come from the ASR system in production).
-    core::Transcript asr;
-    asr.tokens.push_back({0.2, 1.0, "hello"});
-    asr.tokens.push_back({1.0, 2.0, "everyone"});
-    asr.tokens.push_back({2.2, 3.0, "lets"});
-    asr.tokens.push_back({3.0, 3.8, "begin"});
-
-    core::Timeline timeline = pipe->Finalize(asr);
+    // Unified path: the pipeline runs its configured ASR over the buffered
+    // session audio and fuses the transcript with diarization onto one
+    // timeline. (A real engine such as Qwen3-ASR slots in via config.asr.)
+    core::Timeline timeline = pipe->Finalize();
+    std::cout << "ASR tokens: " << pipe->transcript().tokens.size()
+              << std::endl;
 
     std::cout << "\n--- Timeline (JSON for LLM consumer) ---" << std::endl;
     io::JsonSink sink(std::cout, /*pretty=*/true);

@@ -28,8 +28,8 @@ static std::vector<float> ReadF32(const std::string& path) {
 }
 
 int main(int argc, char** argv) {
-  std::string dir = argc > 1 ? argv[1] : "models";
-  std::string weights = dir + "/sortformer_4spk_v2.safetensors";
+  std::string dir = argc > 1 ? argv[1] : "models/reference";
+  std::string weights = "models/sortformer_4spk_v2.safetensors";
   const int n_mels = 128, n_frames = 1008, in_valid = 1000, D = 512;
 
   auto mel = ReadF32(dir + "/ref_processed_signal.f32");  // [128,1008]
