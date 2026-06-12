@@ -1,0 +1,30 @@
+GNU AFFERO GENERAL PUBLIC LICENSE NOTICE
+=========================================
+
+This project is licensed under the GNU Affero General Public License,
+version 3 or (at your option) any later version (AGPL-3.0-or-later).
+
+SPDX-License-Identifier: AGPL-3.0-or-later
+
+Copyright (C) 2026 Orator Contributors
+
+Permission is granted to use, modify, and redistribute this software under
+the terms of the GNU Affero General Public License as published by the
+Free Software Foundation, either version 3 of the License, or (at your
+option) any later version.
+
+IMPORTANT STRONG COPYLEFT REQUIREMENT:
+- If you distribute this software (modified or unmodified), you must provide
+  complete corresponding source code under AGPL-3.0-or-later.
+- If you run a modified version to provide network services, you must offer
+  complete corresponding source code to users of that service under
+  AGPL-3.0-or-later.
+
+This program is distributed WITHOUT ANY WARRANTY; without even the implied
+warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+Full license text:
+https://www.gnu.org/licenses/agpl-3.0.txt
+
+If that URL is unavailable in your environment, obtain the text from the
+Free Software Foundation and treat it as incorporated here by reference.

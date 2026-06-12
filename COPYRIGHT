@@ -1,0 +1,15 @@
+Copyright (C) 2026 Orator Contributors
+
+All source code and related materials in this repository are provided under:
+GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later).
+
+SPDX-License-Identifier: AGPL-3.0-or-later
+
+Additional clarifications:
+1. Derivative works must remain under AGPL-3.0-or-later.
+2. Distribution of binaries or source requires making corresponding source
+   available under AGPL-3.0-or-later.
+3. Providing this software as a network service requires offering
+   corresponding source to service users under AGPL-3.0-or-later.
+
+See LICENSE for licensing notice and reference.
