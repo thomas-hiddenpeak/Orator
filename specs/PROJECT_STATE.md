@@ -55,8 +55,9 @@ Measured through the **real WebSocket** at max push rate, 120 s of `test.mp3`
   share ONE GPU, the GPU lock serializes device work, so wall ≈
   diar_compute + asr_compute. The threads still overlap their CPU-side work
   (buffering, endpointing, serialization); the wall is GPU-bound.
-- 25 diarization segments + 27 transcript utterances on one monotonic clock;
-  transcript matches the verified engine's output.
+- 25 diarization segments + 27 transcript utterances on one time base; the
+  comprehensive view groups them into 10 speaker turns; transcript matches the
+  verified engine's output.
 
 Clip-based ("whole buffer") numbers are **not** treated as streaming results,
 per Constitution Art. IV.
@@ -73,18 +74,22 @@ per Constitution Art. IV.
 
 ## 6. SDD artifacts
 
-- [.specify/memory/constitution.md](../.specify/memory/constitution.md) — v1.0.0
-- [specs/001-streaming-pipeline/spec.md](001-streaming-pipeline/spec.md)
-- [specs/001-streaming-pipeline/plan.md](001-streaming-pipeline/plan.md)
-- [specs/001-streaming-pipeline/tasks.md](001-streaming-pipeline/tasks.md)
+- [.specify/memory/constitution.md](../.specify/memory/constitution.md) — v1.1.0
+- [specs/001-streaming-pipeline/spec.md](001-streaming-pipeline/spec.md) — implemented
+- [specs/001-streaming-pipeline/plan.md](001-streaming-pipeline/plan.md) — implemented
+- [specs/001-streaming-pipeline/tasks.md](001-streaming-pipeline/tasks.md) — implemented
+- [specs/002-gpu-scheduling/spec.md](002-gpu-scheduling/spec.md) — draft (awaiting review)
+- [specs/002-gpu-scheduling/plan.md](002-gpu-scheduling/plan.md) — draft
+- [specs/002-gpu-scheduling/tasks.md](002-gpu-scheduling/tasks.md) — draft
 
 ## 7. Immediate next step
 
-Spec 001 is functionally complete and validated. Known follow-ups to discuss
-with the owner (noted, not yet acted on):
-- **ASR streaming throughput** (~2.6×): the dominant end-to-end cost. Options
-  include larger utterances, reduced per-call fixed cost, or batching (NG1).
-- **GPU sharing**: device work is serialized by one lock; if higher end-to-end
-  throughput is needed, options include CUDA streams/priorities or time-slicing
-  — to be weighed against accuracy and complexity.
-- Potential issues the owner flagged for later review remain open by design.
+Spec 001 is complete (including the comprehensive speaker-turn view). The next
+feature is **Spec 002 — GPU Scheduling**: replace the single global GPU mutex
+with per-pipeline CUDA streams and stream priorities, remove the unsafe host
+access to device-managed memory, and reduce the total wall time. Spec 002 is
+measurement-gated: the baseline (GPU-busy fraction and per-pipeline timing) is
+recorded before any engine change. Awaiting owner review of Spec 002 (T000),
+then Phase 1 measurement.
+
+Other known follow-ups (not in Spec 002): ASR streaming throughput (~2.6x, NG1).
