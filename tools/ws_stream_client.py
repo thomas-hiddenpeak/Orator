@@ -181,12 +181,14 @@ def main():
                 time.sleep(slack)
     push_wall = time.monotonic() - t0
 
-    # End the stream and wait for the final unified timeline.
+    # End the stream and wait for the final timeline document.
     sock.sendall(mask_frame(0x1, b'{"end":true}'))
     got = reader.timeline_event.wait(timeout=600.0)
     total_wall = time.monotonic() - t0
     sock.sendall(mask_frame(0x8, b"\x03\xe8"))  # CLOSE
     sock.close()
+    # Join the reader thread so it stops reading before the interpreter exits.
+    reader.join(timeout=2.0)
 
     if not got or reader.timeline is None:
         print("ERROR: no timeline received", file=sys.stderr)
@@ -223,11 +225,18 @@ def main():
     m = out["meta"]
     n_diar = len(diar.get("entries", []))
     n_asr = len(asr.get("entries", []))
+    comprehensive = tl.get("comprehensive", [])
     print(f"\nwrote {args.out}")
     print(f"  audio={audio_sec:.2f}s  total_wall={total_wall:.2f}s  "
           f"stream_rt={m['stream_rt_factor']}x")
     print(f"  diar: {n_diar} segments, rt={m['diar_rt_factor']}x   "
           f"asr: {n_asr} utterances, rt={m['asr_rt_factor']}x")
+    if comprehensive:
+        print(f"  comprehensive: {len(comprehensive)} speaker turns")
+        for turn in comprehensive:
+            mm = int(turn["start"]) // 60
+            ss = int(turn["start"]) % 60
+            print(f"    [{mm:02d}:{ss:02d}] {turn['speaker']}: {turn['text']}")
     return 0
 
 

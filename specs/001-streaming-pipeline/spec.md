@@ -70,9 +70,10 @@ and validates it on the real streaming path.
   fixed-cost reduction, batching). Deferred by the owner; not in this feature.
 - **NG2** Quantization or any reduction in numerical fidelity. Deferred until
   explicitly scheduled (Constitution II.3).
-- **NG3** Combining tracks across pipelines (attributing each transcript entry
-  to a speaker). This feature produces one track per pipeline on a shared time
-  axis; combining tracks is a separate future feature.
+- **NG3** Per-word speaker attribution and overlapping-speech attribution. The
+  `comprehensive` view attributes whole utterances to speakers (the ASR engine
+  does not emit per-word timestamps), and represents each turn as a single
+  speaker. Per-word timing and simultaneous-speaker handling are future work.
 - **NG4** Concurrent handling of multiple connections. One stream at a time
   matches the edge deployment.
 
@@ -115,8 +116,11 @@ Each requirement is testable.
 - **FR6 — Comprehensive timeline output**: On flush/end, the server SHALL send
   one timeline document. The document SHALL contain a `tracks` array with one
   track per pipeline (a diarization track and, when ASR is enabled, an ASR
-  track), each track holding time-ordered entries on the shared time base
-  (`{"type":"timeline", ...}`; schema in §8).
+  track), each track holding time-ordered entries on the shared time base. The
+  document SHALL also contain a `comprehensive` array: a derived view whose unit
+  is the speaker turn, listing for each turn the start time, end time, speaker,
+  and spoken text, ordered by time. The `comprehensive` view is present when ASR
+  is enabled (`{"type":"timeline", ...}`; schema in §8).
 - **FR7 — Control protocol**: The server SHALL honor the text controls `reset`
   (discard all state), `flush` (send the timeline accumulated so far; streaming
   continues), and `end` (process all buffered audio to completion, then send the
@@ -192,6 +196,9 @@ Comprehensive timeline (sent on flush/end):
         { "start": 0.00, "end": 9.80, "text": "..." }
       ]
     }
+  ],
+  "comprehensive": [
+    { "start": 0.00, "end": 9.80, "speaker": "speaker_0", "text": "..." }
   ]
 }
 ```
@@ -200,14 +207,19 @@ Schema rules:
 - Times are seconds on the shared absolute time base; `end >= start`.
 - A track's `kind` identifies the pipeline (`diarization`, `asr`, and future
   kinds); `source` names the model that produced it.
-- `entries` are ordered by `start`. Entry fields depend on `kind`:
-  diarization entries carry `speaker` (a diarizer-local slot index; attribution
-  to an enrolled identity is NG3) and `confidence`; ASR entries carry `text`
-  (UTF-8, JSON-escaped).
+- Track `entries` are ordered by `start`. Entry fields depend on `kind`:
+  diarization entries carry `speaker` (a diarizer-local slot index) and
+  `confidence`; ASR entries carry `text` (UTF-8, JSON-escaped).
+- `comprehensive` entries are speaker turns ordered by `start`, each with
+  `start`, `end`, `speaker` (the diarizer-local slot, formatted `speaker_N`),
+  and `text`. Each ASR utterance is assigned to the diarization speaker with the
+  greatest temporal overlap; consecutive utterances of the same speaker are
+  combined into one turn. Granularity is the utterance, because the ASR engine
+  does not produce per-word timestamps.
 - Adding a pipeline adds a new track; existing tracks and the document schema
-  are unchanged.
-- The document is the single terminal output and is the unit captured for
-  inspection and comparison.
+  are unchanged. A consumer reads whichever part it needs.
+- The document is the terminal output and is the unit captured for inspection
+  and comparison.
 
 ## 9. Constitution Check
 

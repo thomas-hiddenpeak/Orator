@@ -5,6 +5,7 @@
 
 #include "pipeline/diar_postprocess.h"
 #include "pipeline/json_util.h"
+#include "pipeline/timeline_merger.h"
 
 namespace orator {
 namespace pipeline {
@@ -136,10 +137,16 @@ void AuditoryStream::EmitTimeline(bool finalize) {
 
 std::string AuditoryStream::Serialize() {
   // Read both result sets from the timeline store under its lock, then build the
-  // comprehensive timeline document. The document is a single container with a
-  // shared time axis; each pipeline contributes one track of time-ordered
-  // entries. Adding a future pipeline adds another track without changing the
-  // schema. Speaker-to-text attribution is performed by a later component.
+  // timeline document. The document has a shared time axis and three parts:
+  //   - "tracks": one independent track per pipeline (diarization, asr), each a
+  //     list of that pipeline's time-ordered entries.
+  //   - "comprehensive": a derived view that attributes each ASR utterance to
+  //     the diarization speaker with the greatest temporal overlap and groups
+  //     consecutive same-speaker utterances. Its unit is the speaker turn: who
+  //     spoke, from when to when, and the text spoken. Attribution is at
+  //     utterance granularity (the ASR engine does not emit per-word times).
+  // A consumer reads whichever part it needs. Adding a future pipeline adds a
+  // track and, optionally, a contribution to the comprehensive view.
   core::DiarizationFrames frames = timeline_.SnapshotDiarFrames();
   core::Transcript transcript = timeline_.SnapshotTranscript();
 
@@ -194,7 +201,24 @@ std::string AuditoryStream::Serialize() {
     }
     out += "]}";
   }
+  out += "]";  // close "tracks"
 
+  // Comprehensive view: speaker turns with their spoken text, ordered by time.
+  // Present only when ASR is enabled (it requires both modalities).
+  out += ",\"comprehensive\":[";
+  if (asr_) {
+    OverlapTimelineMerger merger;
+    core::Timeline merged = merger.Merge(last_segments_, last_transcript_);
+    for (size_t i = 0; i < merged.segments.size(); ++i) {
+      const auto& seg = merged.segments[i];
+      std::snprintf(buf, sizeof(buf),
+                    "{\"start\":%.3f,\"end\":%.3f,\"speaker\":\"",
+                    seg.start_sec, seg.end_sec);
+      out += std::string(buf) + JsonEscape(seg.speaker_id) + "\",\"text\":\"" +
+             JsonEscape(seg.text) + "\"}";
+      if (i + 1 < merged.segments.size()) out += ",";
+    }
+  }
   out += "]}";
   return out;
 }
