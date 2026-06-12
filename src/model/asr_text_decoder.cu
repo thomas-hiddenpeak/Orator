@@ -598,6 +598,13 @@ void AsrTextDecoder::DecodeBodyImpl(cudaStream_t s, int ban0, int ban1) {
 std::vector<int> AsrTextDecoder::DecodeGreedy(int start_pos, int max_new,
                                               int eos0, int eos1, int ban_steps,
                                               int batch) {
+  // The graph loop checks the stop condition (EOS / repetition) only at batch
+  // boundaries, so a large batch over-generates tokens past EOS for short
+  // utterances. ORATOR_ASR_BATCH overrides the batch size for tuning.
+  if (const char* b = std::getenv("ORATOR_ASR_BATCH")) {
+    const int v = std::atoi(b);
+    if (v > 0) batch = v;
+  }
   const int Hh = config_.hidden_size;
   if (!step_x_) {
     step_x_ = std::make_shared<UnifiedBuffer>(sizeof(float) * Hh);

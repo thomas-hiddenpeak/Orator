@@ -73,11 +73,14 @@ std::string Qwen3Asr::BuildAndRun(const std::vector<float>& encoder_out,
 
   // ---- greedy autoregressive decode, driven entirely on the GPU. The per-token
   // body (embed-gather -> 28-layer forward -> argmax) is captured as a CUDA graph
-  // and replayed back-to-back in batches with a single host sync per batch, so
-  // the GPU never idles between tokens (keeps the DVFS clock boosted). ----
+  // and replayed in small batches with a host sync per batch. The stop condition
+  // (EOS / repetition) is checked only at batch boundaries, so the batch size
+  // bounds how many tokens are computed past EOS. batch=4 stops within a few
+  // tokens of EOS (short utterances dominate streaming) while keeping the
+  // per-token sync overhead amortized. ORATOR_ASR_BATCH overrides it. ----
   std::vector<int> out_tokens =
       decoder_->DecodeGreedy(T, max_new_tokens_, kImEnd, kEndOfText,
-                             /*ban_steps=*/3, /*batch=*/32);
+                             /*ban_steps=*/3, /*batch=*/4);
   if (prof) {
     auto p2 = now();
     auto ms = [](auto a, auto b) {
