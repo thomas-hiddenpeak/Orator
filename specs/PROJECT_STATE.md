@@ -62,6 +62,32 @@ Measured through the **real WebSocket** at max push rate, 120 s of `test.mp3`
 Clip-based ("whole buffer") numbers are **not** treated as streaming results,
 per Constitution Art. IV.
 
+### Spec 002 baseline (Phase 1, measured before any engine change)
+
+Three configurations, 120 s of `test.mp3`, through the real WebSocket at max
+push rate, GPU fixed at 1.3 GHz, power mode MaxN:
+
+| Configuration | Wall time | GPU compute | GPU-busy fraction |
+|---|---|---|---|
+| Diarization only | 3.2 s (37.2×) | 3.0 s (39.9×) | 78.8% |
+| ASR only | 38.4 s (3.13×) | 33.9 s (3.54×) | 72.8% |
+| Both (current, global lock) | 53.3 s (2.26×) | — | ~63% |
+
+Findings:
+- The lower bound on total wall time is the larger single-pipeline compute time,
+  which is ASR (~38 s). The current both-pipelines wall time is 53 s, so the
+  global lock adds about 15 s of serialization.
+- Diarization alone is about 3 s of GPU work, but under the global lock its
+  measured time rises to 12.5 s because it waits behind ASR. The lock delays the
+  latency-critical pipeline.
+- ASR alone leaves the GPU idle about 27% of the time, so diarization's small
+  GPU work can run during ASR's idle intervals.
+- Realistic target (M3): reduce total wall time from 53 s toward the ASR-only
+  floor (~38–40 s, about 3.0× real-time), a 25–28% reduction. The total cannot
+  go below ASR-only without an ASR speedup (Spec 001 NG1, deferred).
+
+
+
 ## 5. Decisions on record
 
 - **No quantization at this stage.** int8 was prototyped and **fully reverted**;

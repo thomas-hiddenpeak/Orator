@@ -16,13 +16,18 @@ AuditoryStream::AuditoryStream(const Config& config, Emit emit)
 AuditoryStream::~AuditoryStream() { StopWorkers(); }
 
 void AuditoryStream::Start() {
-  diarizer_ = std::make_unique<model::SortformerDiarizer>();
-  core::DiarizationConfig dc;
-  dc.sample_rate = config_.sample_rate;
-  dc.max_speakers = config_.max_speakers;
-  dc.activity_threshold = config_.diar_threshold;
-  diarizer_->Initialize(dc);
-  diarizer_->LoadWeights(config_.diarizer_weights);
+  // The diarizer is optional: an empty weights path disables the diarization
+  // pipeline (symmetric with ASR). This supports measuring each pipeline in
+  // isolation. In normal operation both weights are provided.
+  if (!config_.diarizer_weights.empty()) {
+    diarizer_ = std::make_unique<model::SortformerDiarizer>();
+    core::DiarizationConfig dc;
+    dc.sample_rate = config_.sample_rate;
+    dc.max_speakers = config_.max_speakers;
+    dc.activity_threshold = config_.diar_threshold;
+    diarizer_->Initialize(dc);
+    diarizer_->LoadWeights(config_.diarizer_weights);
+  }
 
   if (!config_.asr_model_dir.empty()) {
     asr_ = std::make_unique<model::Qwen3Asr>();
@@ -37,17 +42,19 @@ void AuditoryStream::Start() {
 }
 
 void AuditoryStream::StartWorkers() {
-  diar_worker_ = std::make_unique<DiarizationWorker>(diarizer_.get(), &timeline_);
-  diar_cursor_ = buffer_.AddConsumer();
-  diar_thread_ = std::thread([this] {
-    std::vector<float> chunk;
-    while (buffer_.WaitAndRead(diar_cursor_, &chunk)) {
-      diar_worker_->ProcessSpan(chunk.data(), static_cast<int>(chunk.size()));
+  if (diarizer_) {
+    diar_worker_ = std::make_unique<DiarizationWorker>(diarizer_.get(), &timeline_);
+    diar_cursor_ = buffer_.AddConsumer();
+    diar_thread_ = std::thread([this] {
+      std::vector<float> chunk;
+      while (buffer_.WaitAndRead(diar_cursor_, &chunk)) {
+        diar_worker_->ProcessSpan(chunk.data(), static_cast<int>(chunk.size()));
+        progress_cv_.notify_all();
+      }
+      diar_worker_->Finalize();
       progress_cv_.notify_all();
-    }
-    diar_worker_->Finalize();
-    progress_cv_.notify_all();
-  });
+    });
+  }
 
   if (asr_) {
     AsrWorker::Params p;

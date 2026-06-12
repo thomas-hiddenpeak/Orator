@@ -12,19 +12,18 @@
 ---
 
 ## Phase 0 — Review gate
-- [ ] **T000** Owner reviews and approves `spec.md` and `plan.md`.
+- [x] **T000** Owner approved proceeding ("请开始").
 
 ## Phase 1 — Baseline measurement (no engine change)
-- [ ] **T010** Add a measurement mode to the streaming test that records, on a
-  fixed 120 s input at the fixed clock (1.3 GHz, MaxN): `diar_compute_sec`,
-  `asr_compute_sec`, total wall time, and per-pipeline real-time factors.
-  *(Verify: numbers reproduced across two runs.)*
-- [ ] **T011** Record the `tegrastats` `GR3D_FREQ` GPU-busy fraction for three
-  configurations: diarization only, ASR only, both pipelines. *(Verify: M1 table
-  recorded.)*
-- [ ] **T012** Write the baseline (M1–M3) to `/memories/repo/` and a measurement
-  note; state the maximum achievable wall-time reduction and the target.
-  *(Verify: AC1.)*
+- [x] **T010** Per-pipeline + total timing on 120 s `test.mp3` at fixed clock,
+  reproduced across two runs (both: 53.15 s / 53.37 s). Measurement harness:
+  `/tmp/measure_config.sh`; the diarizer was made optional in `AuditoryStream`
+  (empty weights path disables it) to allow ASR-only measurement.
+- [x] **T011** `tegrastats` `GR3D_FREQ` GPU-busy fraction recorded for the three
+  configurations: diarization only 78.8%, ASR only 72.8%, both ~63%.
+- [x] **T012** Baseline (M1–M3) written to `/memories/repo/` and PROJECT_STATE.
+  Realistic target: total wall 53 s toward the ASR-only floor ~38–40 s (~3.0×),
+  about 25–28% reduction; the floor is ASR-only because ASR dominates.
 
 ## Phase 2 — Stream infrastructure
 - [ ] **T020** In the controller, create `diar_stream_` and `asr_stream_` with
