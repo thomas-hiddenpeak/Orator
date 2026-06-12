@@ -55,7 +55,6 @@ set(ORATOR_CORE_SOURCES
     # pipeline orchestration
     src/pipeline/diar_postprocess.cc
     src/pipeline/timeline_merger.cc
-    src/pipeline/auditory_pipeline.cc
     src/pipeline/auditory_stream.cc
     src/pipeline/shared_audio_buffer.cc
     src/pipeline/stream_timeline.cc
@@ -63,7 +62,6 @@ set(ORATOR_CORE_SOURCES
     src/pipeline/asr_worker.cc
     # networking (dependency-free WebSocket over POSIX sockets)
     src/net/websocket_server.cc
-    src/net/diarization_ws_handler.cc
     src/net/auditory_ws_handler.cc
 )
 
@@ -83,14 +81,7 @@ if(NOT MSVC)
 endif()
 
 # ---------------------------------------------------------------------------
-# orator: application entrypoint.
-# ---------------------------------------------------------------------------
-add_executable(orator src/main.cc)
-set_property(TARGET orator PROPERTY CUDA_ARCHITECTURES native)
-target_link_libraries(orator PRIVATE orator_core)
-
-# ---------------------------------------------------------------------------
-# orator_ws: real-time diarization WebSocket server.
+# orator_ws: real-time diarization + ASR WebSocket server (the realtime entry).
 # ---------------------------------------------------------------------------
 add_executable(orator_ws src/ws_main.cc)
 set_property(TARGET orator_ws PROPERTY CUDA_ARCHITECTURES native)
