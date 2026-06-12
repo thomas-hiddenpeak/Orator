@@ -103,6 +103,14 @@ set_property(TARGET asr_stream_test PROPERTY CUDA_ARCHITECTURES native)
 target_link_libraries(asr_stream_test PRIVATE orator_core)
 
 # ---------------------------------------------------------------------------
+# asr_stream_window_probe: evaluate the official growing-window streaming
+# method (audio_accum + prefix rollback) and observe memory / RTF growth.
+# ---------------------------------------------------------------------------
+add_executable(asr_stream_window_probe tools/asr_stream_window_probe.cc)
+set_property(TARGET asr_stream_window_probe PROPERTY CUDA_ARCHITECTURES native)
+target_link_libraries(asr_stream_window_probe PRIVATE orator_core)
+
+# ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
 enable_testing()

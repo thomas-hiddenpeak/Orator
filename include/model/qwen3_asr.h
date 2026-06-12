@@ -43,6 +43,15 @@ class Qwen3Asr final : public core::IAsr {
   // the decoder context stays short.
   std::string TranscribeText(const float* samples, int num_samples);
 
+  // Transcribe `samples` with an optional committed text prefix. The prefix is
+  // appended to the prompt after the <asr_text> tag so the model continues from
+  // it; only the newly generated continuation is returned (the caller holds the
+  // committed prefix). This is the growing-window streaming primitive used to
+  // evaluate the official Qwen3-ASR streaming method (audio_accum + prefix
+  // rollback). `samples` is all audio from the stream start.
+  std::string TranscribeWindow(const float* samples, int num_samples,
+                               const std::string& prefix_text);
+
   // Energy-VAD speech segmentation. Splits [0,num_samples) into bounded speech
   // spans (sample offsets) separated by silence, capping each at
   // max_segment_sec and bridging gaps below min_silence_sec. Independent of
@@ -51,8 +60,13 @@ class Qwen3Asr final : public core::IAsr {
   std::vector<Span> SegmentSpeech(const float* samples, int num_samples,
                                   int sample_rate) const;
 
+  // Tokenizer access for the streaming caller's prefix rollback (encode the
+  // committed text, drop the last K tokens, decode back to a prefix string).
+  const io::BpeTokenizer& tokenizer() const { return tokenizer_; }
+
  private:
-  std::string BuildAndRun(const std::vector<float>& encoder_out, int n_tokens);
+  std::string BuildAndRun(const std::vector<float>& encoder_out, int n_tokens,
+                          const std::string& prefix_text);
 
   core::AsrConfig cfg_;
   std::string language_ = "Chinese";

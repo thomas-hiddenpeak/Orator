@@ -38,7 +38,7 @@ void Qwen3Asr::Reset() {
 // then greedily decode until EOS. Returns the decoded text (language prefix
 // stripped).
 std::string Qwen3Asr::BuildAndRun(const std::vector<float>& encoder_out,
-                                  int n_tokens) {
+                                  int n_tokens, const std::string& prefix_text) {
   const int H = decoder_->hidden_size();
 
   // ---- prompt token ids ----
@@ -51,6 +51,10 @@ std::string Qwen3Asr::BuildAndRun(const std::vector<float>& encoder_out,
                                kAssistant, kNewline});
   for (int t : tokenizer_.Encode("language " + language_)) prompt.push_back(t);
   prompt.push_back(kAsrText);
+  // Committed text prefix: the model continues from it (growing-window
+  // streaming). Empty for the single-segment path.
+  if (!prefix_text.empty())
+    for (int t : tokenizer_.Encode(prefix_text)) prompt.push_back(t);
 
   const int T = static_cast<int>(prompt.size());
 
@@ -120,7 +124,7 @@ std::string Qwen3Asr::TranscribeText(const float* samples, int num_samples) {
   if (n_tokens <= 0) return "";
   auto t_enc = now();
 
-  std::string text = BuildAndRun(enc, n_tokens);
+  std::string text = BuildAndRun(enc, n_tokens, /*prefix_text=*/"");
   auto t_dec = now();
 
   if (prof) {
@@ -132,6 +136,23 @@ std::string Qwen3Asr::TranscribeText(const float* samples, int num_samples) {
                  ms(t0, t_mel), ms(t_mel, t_enc), ms(t_enc, t_dec), n_tokens);
   }
   return text;
+}
+
+std::string Qwen3Asr::TranscribeWindow(const float* samples, int num_samples,
+                                       const std::string& prefix_text) {
+  if (!loaded_) throw std::runtime_error("Qwen3Asr: weights not loaded");
+  if (samples == nullptr || num_samples <= 0) return "";
+
+  int n_frames = 0;
+  std::vector<float> mel = mel_->Compute(samples, num_samples, &n_frames);
+  if (n_frames <= 0) return "";
+
+  int n_tokens = 0;
+  std::vector<float> enc = encoder_->Forward(mel.data(), n_frames, &n_tokens);
+  if (n_tokens <= 0) return "";
+
+  // Returns only the newly generated continuation; the caller holds the prefix.
+  return BuildAndRun(enc, n_tokens, prefix_text);
 }
 
 // Energy-VAD: frame the signal, mark frames above a relative-RMS threshold as
