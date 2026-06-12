@@ -8,6 +8,7 @@ set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 
 # CUDA setup
 find_package(CUDA REQUIRED)
+find_package(Threads REQUIRED)
 enable_language(CUDA)
 
 # Resolve the CUDA runtime library explicitly (Tegra/ARM64 friendly).
@@ -24,6 +25,7 @@ set(ORATOR_CORE_SOURCES
     src/gpu/memory.cc
     src/gpu/buffer.cc
     src/gpu/kernels.cu
+    src/gpu/gpu_lock.cc
     src/io/safetensor.cc
     src/io/sharded_safetensor.cc
     src/io/bpe_tokenizer.cc
@@ -55,6 +57,10 @@ set(ORATOR_CORE_SOURCES
     src/pipeline/timeline_merger.cc
     src/pipeline/auditory_pipeline.cc
     src/pipeline/auditory_stream.cc
+    src/pipeline/shared_audio_buffer.cc
+    src/pipeline/stream_timeline.cc
+    src/pipeline/diarization_worker.cc
+    src/pipeline/asr_worker.cc
     # networking (dependency-free WebSocket over POSIX sockets)
     src/net/websocket_server.cc
     src/net/diarization_ws_handler.cc
@@ -70,7 +76,7 @@ target_include_directories(orator_core PUBLIC
 target_include_directories(orator_core PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/minimp3
 )
-target_link_libraries(orator_core PUBLIC cudart cublas)
+target_link_libraries(orator_core PUBLIC cudart cublas Threads::Threads)
 if(NOT MSVC)
     target_compile_options(orator_core PRIVATE
         $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra>)

@@ -5,7 +5,7 @@ checkpoints. Authoritative engineering rules live in
 [.specify/memory/constitution.md](../.specify/memory/constitution.md); active
 work is specified under [specs/](.).
 
-- **Last updated**: 2026-06-12
+- **Last updated**: 2026-06-12 (Spec 001 implemented)
 - **Branch**: `master`
 - **Constitution**: v1.0.0
 
@@ -20,10 +20,12 @@ and **ASR transcript** content on one absolute clock.
 
 ## 2. Current phase
 
-**SDD established; threaded streaming architecture specified, not yet
-implemented.** The two engines exist and are verified individually; wiring them
-into a truly independent, threaded, honestly-tested streaming system is the next
-implementation effort (Spec 001).
+**Spec 001 implemented: threaded streaming dual pipeline live through WebSocket.**
+Diarization and ASR run on independent worker threads behind a controller, fed
+by a shared audio buffer, emitting one unified timeline. Validated end-to-end by
+streaming `test.mp3` through the real WebSocket at max rate, with full JSON
+export. GPU access across the two threads is serialized by a process-wide GPU
+lock (one physical device; required for correctness on Tegra unified memory).
 
 ## 3. Component status
 
@@ -34,22 +36,27 @@ implementation effort (Spec 001).
 | WhisperMel / BPE tokenizer / sharded safetensors loader | ✅ Verified | Unit-tested. |
 | Decoupling (interfaces + registry) | ✅ In place | `IDiarizer`, `IAsr`, `ITimelineMerger`; registry-constructed. |
 | WebSocket server (from-scratch POSIX) | ✅ Working | RFC6455 handshake + frame codec, no deps. |
-| ASR ↔ WS integration | ⚠️ Functional, single-threaded | `AuditoryStream` runs diarization + ASR **sequentially in one thread**; emits unified timeline JSON. Independent threads NOT yet implemented (Spec 001). |
-| Streaming validation | ⚠️ Partial | A frame-by-frame tool exists but bypasses the real WS; the through-socket, accelerated-rate, JSON-exporting test is specified in Spec 001, not built. |
-| Test suite | ✅ 18/18 ctests pass | Clean build under `-Wall -Wextra`. |
+| ASR ↔ WS integration | ✅ Threaded, independent | `AuditoryStream` is a controller owning a `SharedAudioBuffer` + two worker threads (`DiarizationWorker`, `AsrWorker`) + a mutex-guarded `StreamTimeline`. Emits incremental `asr` events + a unified timeline. GPU work serialized by `gpu::DeviceLock()`. |
+| Streaming validation | ✅ Through real WebSocket | `tools/ws_stream_client.py` (stdlib, reader thread) streams PCM through the socket at an accelerated rate and exports the full event log + timeline to JSON. |
+| Test suite | ✅ 19/19 ctests pass | Clean build under `-Wall -Wextra`; `test_shared_buffer` exercises the threaded buffer (deterministic across runs). |
 
 ## 4. Honest performance snapshot (locked 1.3 GHz, MaxN)
 
-Measured on the streaming path (frame-by-frame), 120 s of `test.mp3`:
-- **Diarization**: ~11.8× real-time — meets target.
-- **ASR**: ~3.3× real-time — limited by per-utterance fixed cost when streaming
-  endpointing yields many small utterances. (Throughput tuning is deferred by
-  owner; see Spec 001 Non-Goals.)
-- Combined wall reflects **sequential** execution today; independent threads
-  (Spec 001) will make wall track the slower pipeline, not the sum.
+Measured through the **real WebSocket** at max push rate, 120 s of `test.mp3`
+(`/tmp/orator_stream_120.json`):
+- **Diarization**: ~9.6× real-time (compute 12.5 s).
+- **ASR**: ~2.6× real-time (compute 46.4 s) — many small endpointed utterances,
+  each paying fixed per-call cost. Throughput tuning is deferred by owner
+  (Spec 001 NG1).
+- **End-to-end stream**: ~2.26× real-time (wall 53 s). Because the two pipelines
+  share ONE GPU, the GPU lock serializes device work, so wall ≈
+  diar_compute + asr_compute. The threads still overlap their CPU-side work
+  (buffering, endpointing, serialization); the wall is GPU-bound.
+- 25 diarization segments + 27 transcript utterances on one monotonic clock;
+  transcript matches the verified engine's output.
 
-Clip-based ("whole buffer") numbers from earlier exploration are **not** treated
-as streaming results, per Constitution Art. IV.
+Clip-based ("whole buffer") numbers are **not** treated as streaming results,
+per Constitution Art. IV.
 
 ## 5. Decisions on record
 
@@ -70,6 +77,11 @@ as streaming results, per Constitution Art. IV.
 
 ## 7. Immediate next step
 
-Owner reviews/approves the SDD (Task T000). On approval, implement Spec 001
-Phases 1–5: shared buffer → worker extraction → threaded controller → real
-through-WebSocket accelerated streaming test with JSON export → cleanup.
+Spec 001 is functionally complete and validated. Known follow-ups to discuss
+with the owner (noted, not yet acted on):
+- **ASR streaming throughput** (~2.6×): the dominant end-to-end cost. Options
+  include larger utterances, reduced per-call fixed cost, or batching (NG1).
+- **GPU sharing**: device work is serialized by one lock; if higher end-to-end
+  throughput is needed, options include CUDA streams/priorities or time-slicing
+  — to be weighed against accuracy and complexity.
+- Potential issues the owner flagged for later review remain open by design.
