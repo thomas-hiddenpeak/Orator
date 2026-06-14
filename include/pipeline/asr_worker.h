@@ -9,11 +9,9 @@
 // StreamTimeline as a timed token, and emitted as an incremental event. It keeps
 // its own state and never reads diarization output.
 //
-// Endpointing (energy VAD): 10 ms RMS frames, a relative threshold against the
-// monotonic session peak; an utterance ends after `endpoint_silence_sec` of
-// trailing silence or at the `max_utterance_sec` cap, and utterances shorter
-// than `min_utterance_sec` are ignored. This keeps each decode bounded so the
-// pipeline can run at its own maximum rate.
+// Endpointing (Silero VAD): an ASR-only front gate detects speech segments
+// from the same PCM stream and emits bounded utterances for decode. This keeps
+// ASR segmentation independent from diarization and each decode context bounded.
 
 #include <atomic>
 #include <functional>
@@ -21,6 +19,7 @@
 #include <vector>
 
 #include "model/qwen3_asr.h"
+#include "pipeline/asr_vad.h"
 #include "pipeline/stream_timeline.h"
 #include <cuda_runtime.h>
 
@@ -29,13 +28,7 @@ namespace pipeline {
 
 class AsrWorker {
  public:
-  struct Params {
-    int sample_rate = 16000;
-    double endpoint_silence_sec = 0.8;
-    double max_utterance_sec = 28.0;
-    double min_utterance_sec = 0.20;
-    float vad_rel_threshold = 0.08f;
-  };
+  using Params = AsrSileroVad::Params;
 
   // Emits an incremental result event (JSON) as each utterance completes.
   using Emit = std::function<void(const std::string&)>;
@@ -61,8 +54,8 @@ class AsrWorker {
   double compute_sec() const { return compute_sec_; }
 
  private:
-  // Pull complete utterances from the front of `pcm_`; when `finalize`, also
-  // flush the trailing open utterance. Consumes (erases) audio it is done with.
+  // Pull complete utterances from the front VAD; when finalize, also flush the
+  // trailing open utterance. Consumes audio that has already been processed.
   void DrainUtterances(bool finalize);
   // Transcribe pcm_[begin,end) (relative) as one utterance, commit + emit it.
   void EmitUtterance(int begin, int end);
@@ -72,12 +65,10 @@ class AsrWorker {
   Params params_;
   Emit emit_;
 
-  std::vector<float> pcm_;     // unconsumed tail of the stream
-  long base_sample_ = 0;       // absolute index of pcm_.front()
-  float peak_rms_ = 0.0f;      // monotonic session peak for the relative VAD
+  AsrSileroVad vad_;            // ASR-only independent front VAD (Silero)
   std::atomic<long> processed_samples_{0};
   double compute_sec_ = 0.0;
-    cudaStream_t stream_ = 0;    // GPU stream for ASR kernels (default = 0)
+  cudaStream_t stream_ = 0;    // GPU stream for ASR kernels (default = 0)
 };
 
 }  // namespace pipeline

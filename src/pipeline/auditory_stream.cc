@@ -75,10 +75,13 @@ void AuditoryStream::StartWorkers() {
   if (asr_) {
     AsrWorker::Params p;
     p.sample_rate = config_.sample_rate;
-    p.endpoint_silence_sec = config_.asr_endpoint_silence_sec;
     p.max_utterance_sec = config_.asr_max_utterance_sec;
     p.min_utterance_sec = config_.asr_min_utterance_sec;
-    p.vad_rel_threshold = config_.asr_vad_rel_threshold;
+    p.silero_model_path = config_.asr_vad_model;
+    p.silero_threshold = config_.asr_vad_threshold;
+    p.silero_min_speech_ms = config_.asr_vad_min_speech_ms;
+    p.silero_min_silence_ms = config_.asr_vad_min_silence_ms;
+    p.silero_speech_pad_ms = config_.asr_vad_speech_pad_ms;
     // Wrap the transport emit so worker-thread events are serialized with the
     // controller's timeline emit.
     asr_worker_ = std::make_unique<AsrWorker>(

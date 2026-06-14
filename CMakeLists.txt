@@ -56,6 +56,7 @@ set(ORATOR_CORE_SOURCES
     src/pipeline/diar_postprocess.cc
     src/pipeline/timeline_merger.cc
     src/pipeline/auditory_stream.cc
+        src/pipeline/asr_vad.cc
     src/pipeline/shared_audio_buffer.cc
     src/pipeline/stream_timeline.cc
     src/pipeline/diarization_worker.cc
