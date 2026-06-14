@@ -497,10 +497,7 @@ void AsrTextDecoder::Prefill(const float* embeds, int T, cudaStream_t stream) {
     stream_cap = need;
   }
   float* x = static_cast<float*>(stream_buf->data());
-  CheckCudaError(
-      cudaMemcpyAsync(x, embeds, sizeof(float) * need,
-                      cudaMemcpyHostToDevice, stream),
-      __FILE__, __LINE__);
+  std::memcpy(x, embeds, sizeof(float) * need);
   Forward(x, T, 0, stream);
 }
 
@@ -513,10 +510,7 @@ void AsrTextDecoder::DecodeStep(const float* embed, int pos, cudaStream_t stream
   }
   float* x = static_cast<float*>(step_x_->data());
   int* p = static_cast<int*>(step_pos_->data());
-  CheckCudaError(
-      cudaMemcpyAsync(x, embed, sizeof(float) * Hh,
-                      cudaMemcpyHostToDevice, stream),
-      __FILE__, __LINE__);
+  std::memcpy(x, embed, sizeof(float) * Hh);
   *p = pos;
   cache_len_ = pos + 1;
   DecodeForwardOnStream(x, p, stream);

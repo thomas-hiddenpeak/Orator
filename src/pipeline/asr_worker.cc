@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <mutex>
 
+#include "gpu/gpu_lock.h"
 #include "pipeline/json_util.h"
 
 namespace orator {
@@ -127,7 +128,11 @@ void AsrWorker::EmitUtterance(int begin, int end) {
   if (end <= begin) return;
   const int sr = params_.sample_rate;
   const auto t0 = Clock::now();
-  std::string text = asr_->TranscribeText(pcm_.data() + begin, end - begin, stream_);
+  std::string text;
+  {
+    std::lock_guard<std::mutex> gpu(gpu::DeviceLock());
+    text = asr_->TranscribeText(pcm_.data() + begin, end - begin, stream_);
+  }
   compute_sec_ += Secs(t0, Clock::now());
   if (text.empty()) return;
 
