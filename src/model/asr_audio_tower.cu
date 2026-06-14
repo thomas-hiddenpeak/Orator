@@ -17,6 +17,7 @@ namespace model {
 
 using ::orator::gpu::CheckCudaError;
 using ::orator::gpu::UnifiedBuffer;
+using ::orator::gpu::DeviceBuffer;
 
 namespace {
 
@@ -154,6 +155,36 @@ __global__ void LayerNormKernel(const float* __restrict__ in, const float* __res
 __global__ void AddResidualKernel(float* __restrict__ a, const float* __restrict__ b, int n) {
   const int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i < n) a[i] += b[i];
+}
+
+// Drop padding frames per chunk: extract valid[c] frames from chunk c into a compact [N, D].
+// src: [chunks*Wc, D], dst: [N, D] (N = sum of valid[c]), valid: [chunks].
+__global__ void PaddingDropKernel(const float* __restrict__ src,
+                                  float* __restrict__ dst,
+                                  const int* __restrict__ valid,
+                                  int chunks, int Wc, int D, int N) {
+  const long total = static_cast<long>(N) * D;
+  const long idx = static_cast<long>(blockIdx.x) * blockDim.x + threadIdx.x;
+  if (idx >= total) return;
+  
+  // idx = dst_row * D + d => compute dst_row and d
+  const int d = idx % D;
+  const int dst_row = idx / D;
+  
+  // Binary search or linear scan to find which chunk this dst_row belongs to.
+  int acc = 0, src_chunk = 0, local_row = dst_row;
+  for (int c = 0; c < chunks; ++c) {
+    if (acc + valid[c] > dst_row) {
+      src_chunk = c;
+      local_row = dst_row - acc;
+      break;
+    }
+    acc += valid[c];
+  }
+  
+  // Source row: chunk src_chunk, frame local_row
+  const int src_row = src_chunk * Wc + local_row;
+  dst[idx] = src[src_row * D + d];
 }
 
 // Add positional embedding per chunk: hidden[chunk*Tc + t, :] += pe[t, :].
@@ -414,8 +445,12 @@ std::vector<float> AsrAudioTower::Forward(const float* mel, int n_frames,
     CheckCudaError(cudaStreamSynchronize(stream), __FILE__, __LINE__);
 
   // ---- Add positional embedding (per chunk, PE[0:Wc]) ----
-  UnifiedBuffer d_pe(sizeof(float) * static_cast<size_t>(Wc) * D);
-  std::memcpy(d_pe.data(), pe_.data(), sizeof(float) * static_cast<size_t>(Wc) * D);
+  gpu::DeviceBuffer d_pe(sizeof(float) * static_cast<size_t>(Wc) * D);
+  CheckCudaError(
+      cudaMemcpyAsync(d_pe.data(), pe_.data(),
+                      sizeof(float) * static_cast<size_t>(Wc) * D,
+                      cudaMemcpyHostToDevice, stream),
+      __FILE__, __LINE__);
     AddPeChunkedKernel<<<Blocks(static_cast<long>(rows) * D), kThreads, 0, stream>>>(
       static_cast<float*>(d_h.data()), static_cast<float*>(d_pe.data()), chunks, Wc, D);
   CheckCudaError(cudaGetLastError(), __FILE__, __LINE__);
@@ -425,14 +460,22 @@ std::vector<float> AsrAudioTower::Forward(const float* mel, int n_frames,
   std::vector<int> valid(chunks);
   int N = 0;
   for (int c = 0; c < chunks; ++c) { valid[c] = OutputLength(chunk_len[c]); N += valid[c]; }
-  UnifiedBuffer d_hid(sizeof(float) * static_cast<size_t>(N) * D);
+  gpu::DeviceBuffer d_hid(sizeof(float) * static_cast<size_t>(N) * D);
+  
+  // Copy valid[] to device for the kernel
+  gpu::DeviceBuffer d_valid(sizeof(int) * chunks);
+  CheckCudaError(
+      cudaMemcpyAsync(d_valid.data(), valid.data(), sizeof(int) * chunks,
+                      cudaMemcpyHostToDevice, stream),
+      __FILE__, __LINE__);
+  
+  // Launch kernel to drop padding frames
+  PaddingDropKernel<<<Blocks(static_cast<long>(N) * D), kThreads, 0, stream>>>(
+      static_cast<const float*>(d_h.data()), static_cast<float*>(d_hid.data()),
+      static_cast<const int*>(d_valid.data()), chunks, Wc, D, N);
+  CheckCudaError(cudaGetLastError(), __FILE__, __LINE__);
+  
   float* hid = static_cast<float*>(d_hid.data());
-  const float* hp = static_cast<const float*>(d_h.data());
-  int row = 0;
-  for (int c = 0; c < chunks; ++c)
-    for (int t = 0; t < valid[c]; ++t, ++row)
-      std::memcpy(hid + static_cast<size_t>(row) * D,
-                  hp + (static_cast<size_t>(c) * Wc + t) * D, sizeof(float) * D);
 
   // ---- Attention windows (cu_seqlens) ----
   const int window_aftercnn = Wc * (config_.n_window_infer / win);  // 13*8=104
@@ -517,7 +560,11 @@ std::vector<float> AsrAudioTower::Forward(const float* mel, int n_frames,
       CheckCudaError(cudaStreamSynchronize(stream), __FILE__, __LINE__);
 
   std::vector<float> out(static_cast<size_t>(N) * config_.output_dim);
-  std::memcpy(out.data(), d_out.data(), sizeof(float) * out.size());
+  CheckCudaError(
+      cudaMemcpyAsync(out.data(), d_out.data(), sizeof(float) * out.size(),
+                      cudaMemcpyDeviceToHost, stream),
+      __FILE__, __LINE__);
+  CheckCudaError(cudaStreamSynchronize(stream), __FILE__, __LINE__);
   if (out_tokens) *out_tokens = N;
   return out;
 }
