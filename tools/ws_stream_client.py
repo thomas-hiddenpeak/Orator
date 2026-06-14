@@ -150,6 +150,8 @@ def main():
                     help="push speed x real-time; 0 = max (no pacing)")
     ap.add_argument("--frame-ms", type=int, default=100)
     ap.add_argument("--out", default="/tmp/orator_stream.json")
+    ap.add_argument("--timeline-timeout", type=float, default=600.0,
+                    help="seconds to wait for final timeline after sending end")
     args = ap.parse_args()
 
     pcm = open(args.pcm, "rb").read()
@@ -183,7 +185,7 @@ def main():
 
     # End the stream and wait for the final timeline document.
     sock.sendall(mask_frame(0x1, b'{"end":true}'))
-    got = reader.timeline_event.wait(timeout=600.0)
+    got = reader.timeline_event.wait(timeout=args.timeline_timeout)
     total_wall = time.monotonic() - t0
     sock.sendall(mask_frame(0x8, b"\x03\xe8"))  # CLOSE
     sock.close()
@@ -191,7 +193,8 @@ def main():
     reader.join(timeout=2.0)
 
     if not got or reader.timeline is None:
-        print("ERROR: no timeline received", file=sys.stderr)
+        print(f"ERROR: no timeline received within {args.timeline_timeout:.1f}s",
+              file=sys.stderr)
         return 1
 
     tl = reader.timeline

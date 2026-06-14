@@ -46,17 +46,21 @@ void AsrWorker::DrainUtterances(bool finalize) {
     const int nf = n / frame;  // whole frames available
     if (nf == 0) return;
 
-    // Frame RMS + update the monotonic session peak (drives the relative VAD).
+    // Frame RMS over the CURRENT buffered tail. Using a session-wide monotonic
+    // peak makes the threshold drift upward permanently after one loud span,
+    // which can suppress later quieter speech for the rest of the meeting.
     std::vector<float> rms(nf);
+    float local_peak = 0.0f;
     for (int f = 0; f < nf; ++f) {
       const int b = f * frame;
       double s = 0.0;
       for (int i = 0; i < frame; ++i)
         s += static_cast<double>(pcm_[b + i]) * pcm_[b + i];
       rms[f] = static_cast<float>(std::sqrt(s / frame));
-      peak_rms_ = std::max(peak_rms_, rms[f]);
+      local_peak = std::max(local_peak, rms[f]);
     }
-    if (peak_rms_ <= 0.0f) {  // pure silence so far
+    peak_rms_ = std::max(peak_rms_, local_peak);
+    if (local_peak <= 0.0f) {  // pure silence in the current buffered tail
       if (nf > sil_frames) {  // drop stale leading silence (bound memory)
         const int drop = (nf - sil_frames) * frame;
         pcm_.erase(pcm_.begin(), pcm_.begin() + drop);
@@ -64,7 +68,7 @@ void AsrWorker::DrainUtterances(bool finalize) {
       }
       return;
     }
-    const float thr = params_.vad_rel_threshold * peak_rms_;
+    const float thr = params_.vad_rel_threshold * local_peak;
 
     // First voiced frame.
     int start_f = -1;
