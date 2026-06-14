@@ -38,7 +38,8 @@ void Qwen3Asr::Reset() {
 // then greedily decode until EOS. Returns the decoded text (language prefix
 // stripped).
 std::string Qwen3Asr::BuildAndRun(const std::vector<float>& encoder_out,
-                                  int n_tokens, const std::string& prefix_text) {
+                                  int n_tokens, const std::string& prefix_text,
+                                  cudaStream_t stream) {
   const int H = decoder_->hidden_size();
 
   // ---- prompt token ids ----
@@ -72,7 +73,7 @@ std::string Qwen3Asr::BuildAndRun(const std::vector<float>& encoder_out,
   auto now = [] { return std::chrono::steady_clock::now(); };
   auto p0 = now();
   decoder_->ResetCache();
-  decoder_->Prefill(embeds.data(), T);
+  decoder_->Prefill(embeds.data(), T, stream);
   auto p1 = now();
 
   // ---- greedy autoregressive decode, driven entirely on the GPU. The per-token
@@ -84,7 +85,7 @@ std::string Qwen3Asr::BuildAndRun(const std::vector<float>& encoder_out,
   // per-token sync overhead amortized. ORATOR_ASR_BATCH overrides it. ----
   std::vector<int> out_tokens =
       decoder_->DecodeGreedy(T, max_new_tokens_, kImEnd, kEndOfText,
-                             /*ban_steps=*/3, /*batch=*/4);
+                               /*ban_steps=*/3, /*batch=*/4, stream);
   if (prof) {
     auto p2 = now();
     auto ms = [](auto a, auto b) {
@@ -106,7 +107,8 @@ std::string Qwen3Asr::BuildAndRun(const std::vector<float>& encoder_out,
   return text;
 }
 
-std::string Qwen3Asr::TranscribeText(const float* samples, int num_samples) {
+std::string Qwen3Asr::TranscribeText(const float* samples, int num_samples,
+                                     cudaStream_t stream) {
   if (!loaded_) throw std::runtime_error("Qwen3Asr: weights not loaded");
   if (samples == nullptr || num_samples <= 0) return "";
 
@@ -115,16 +117,16 @@ std::string Qwen3Asr::TranscribeText(const float* samples, int num_samples) {
   auto t0 = now();
 
   int n_frames = 0;
-  std::vector<float> mel = mel_->Compute(samples, num_samples, &n_frames);
+  std::vector<float> mel = mel_->Compute(samples, num_samples, &n_frames, stream);
   if (n_frames <= 0) return "";
   auto t_mel = now();
 
   int n_tokens = 0;
-  std::vector<float> enc = encoder_->Forward(mel.data(), n_frames, &n_tokens);
+  std::vector<float> enc = encoder_->Forward(mel.data(), n_frames, &n_tokens, stream);
   if (n_tokens <= 0) return "";
   auto t_enc = now();
 
-  std::string text = BuildAndRun(enc, n_tokens, /*prefix_text=*/"");
+  std::string text = BuildAndRun(enc, n_tokens, /*prefix_text=*/"", stream);
   auto t_dec = now();
 
   if (prof) {

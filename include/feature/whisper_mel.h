@@ -1,7 +1,8 @@
 #pragma once
 
 // Whisper-style log-mel front-end for Qwen3-ASR.
-//
+//  CUDA stream is threaded through Compute so the kernels run on the caller's
+//  stream and can overlap with another pipeline's work.
 // Replicates transformers WhisperFeatureExtractor exactly:
 //   - reflect-pad n_fft/2 on each side (spectrogram center=True)
 //   - hann periodic window of length n_fft (=400)
@@ -13,6 +14,7 @@
 // to BF16 before the conv front-end). num_frames = num_samples / hop_length.
 
 #include <vector>
+#include <cuda_runtime.h>
 
 namespace orator {
 namespace feature {
@@ -33,7 +35,7 @@ class WhisperMel {
   // Computes the log-mel spectrogram for a mono 16 kHz signal.
   // Returns row-major [n_mels * num_frames]; *out_num_frames gets num_frames.
   std::vector<float> Compute(const float* samples, int num_samples,
-                             int* out_num_frames) const;
+                               int* out_num_frames, cudaStream_t stream = 0) const;
 
   int n_mels() const { return config_.n_mels; }
   int n_freqs() const { return config_.n_fft / 2 + 1; }

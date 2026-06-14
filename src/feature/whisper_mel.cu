@@ -151,7 +151,8 @@ void WhisperMel::BuildMelFilterbank() {
 }
 
 std::vector<float> WhisperMel::Compute(const float* samples, int num_samples,
-                                       int* out_num_frames) const {
+                                       int* out_num_frames,
+                                       cudaStream_t stream) const {
   const int n_fft = config_.n_fft;
   const int hop = config_.hop_length;
   const int nfreq = n_freqs();
@@ -167,42 +168,65 @@ std::vector<float> WhisperMel::Compute(const float* samples, int num_samples,
     return {};
   }
 
-  gpu::UnifiedBuffer d_sig(sizeof(float) * num_samples);
-  gpu::UnifiedBuffer d_win(sizeof(float) * n_fft);
-  gpu::UnifiedBuffer d_filt(sizeof(float) * mel_filters_.size());
-  gpu::UnifiedBuffer d_power(sizeof(float) * static_cast<size_t>(num_frames) * nfreq);
-  gpu::UnifiedBuffer d_out(sizeof(float) * static_cast<size_t>(n_mels) * num_frames);
+    gpu::DeviceBuffer d_sig(sizeof(float) * num_samples);
+    gpu::DeviceBuffer d_win(sizeof(float) * n_fft);
+    gpu::DeviceBuffer d_filt(sizeof(float) * mel_filters_.size());
+    gpu::DeviceBuffer d_power(sizeof(float) * static_cast<size_t>(num_frames) * nfreq);
+    gpu::DeviceBuffer d_out(sizeof(float) * static_cast<size_t>(n_mels) * num_frames);
 
-  std::memcpy(d_sig.data(), samples, sizeof(float) * num_samples);
-  std::memcpy(d_win.data(), hann_.data(), sizeof(float) * n_fft);
-  std::memcpy(d_filt.data(), mel_filters_.data(), sizeof(float) * mel_filters_.size());
+    CheckCudaError(
+      cudaMemcpyAsync(d_sig.data(), samples, sizeof(float) * num_samples,
+              cudaMemcpyHostToDevice, stream),
+      __FILE__, __LINE__);
+    CheckCudaError(
+      cudaMemcpyAsync(d_win.data(), hann_.data(), sizeof(float) * n_fft,
+              cudaMemcpyHostToDevice, stream),
+      __FILE__, __LINE__);
+    CheckCudaError(
+      cudaMemcpyAsync(d_filt.data(), mel_filters_.data(),
+              sizeof(float) * mel_filters_.size(), cudaMemcpyHostToDevice,
+              stream),
+      __FILE__, __LINE__);
 
-  PowerSpectrumKernel<<<num_frames, 128>>>(
+  PowerSpectrumKernel<<<num_frames, 128, 0, stream>>>(
       static_cast<float*>(d_sig.data()), num_samples,
       static_cast<float*>(d_win.data()), n_fft, hop, nfreq, num_frames, pad,
       static_cast<float*>(d_power.data()));
   CheckCudaError(cudaGetLastError(), __FILE__, __LINE__);
 
   const int total = n_mels * num_frames;
-  MelLog10Kernel<<<(total + 255) / 256, 256>>>(
+  MelLog10Kernel<<<(total + 255) / 256, 256, 0, stream>>>(
       static_cast<float*>(d_power.data()), nfreq,
       static_cast<float*>(d_filt.data()), n_mels, num_frames,
       static_cast<float*>(d_out.data()));
   CheckCudaError(cudaGetLastError(), __FILE__, __LINE__);
-  CheckCudaError(cudaDeviceSynchronize(), __FILE__, __LINE__);
+      CheckCudaError(cudaStreamSynchronize(stream), __FILE__, __LINE__);
 
   // Global max over the (kept) log-mel for the Whisper floor/normalization.
-  const float* o = static_cast<const float*>(d_out.data());
-  float gmax = -1e30f;
-  for (int i = 0; i < total; ++i) gmax = o[i] > gmax ? o[i] : gmax;
+  std::vector<float> logmel(static_cast<size_t>(total));
+  CheckCudaError(
+      cudaMemcpyAsync(logmel.data(), d_out.data(), sizeof(float) * logmel.size(),
+                      cudaMemcpyDeviceToHost, stream),
+      __FILE__, __LINE__);
+  CheckCudaError(cudaStreamSynchronize(stream), __FILE__, __LINE__);
 
-  WhisperNormKernel<<<(total + 255) / 256, 256>>>(
+  float gmax = -1e30f;
+  for (int i = 0; i < total; ++i)
+    gmax = logmel[static_cast<size_t>(i)] > gmax
+               ? logmel[static_cast<size_t>(i)]
+               : gmax;
+
+  WhisperNormKernel<<<(total + 255) / 256, 256, 0, stream>>>(
       static_cast<float*>(d_out.data()), total, gmax);
   CheckCudaError(cudaGetLastError(), __FILE__, __LINE__);
-  CheckCudaError(cudaDeviceSynchronize(), __FILE__, __LINE__);
+  CheckCudaError(cudaStreamSynchronize(stream), __FILE__, __LINE__);
 
   std::vector<float> out(static_cast<size_t>(n_mels) * num_frames);
-  std::memcpy(out.data(), d_out.data(), sizeof(float) * out.size());
+  CheckCudaError(
+      cudaMemcpyAsync(out.data(), d_out.data(), sizeof(float) * out.size(),
+                      cudaMemcpyDeviceToHost, stream),
+      __FILE__, __LINE__);
+  CheckCudaError(cudaStreamSynchronize(stream), __FILE__, __LINE__);
   if (out_num_frames) *out_num_frames = num_frames;
   return out;
 }

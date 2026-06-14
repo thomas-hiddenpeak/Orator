@@ -42,6 +42,17 @@ class UnifiedAllocator : public Allocator {
   void deallocate(void* ptr) override;
 };
 
+// Pinned allocator: cudaHostAlloc (page-locked host memory, DMA-accessible by
+// the device). The host can read/write it freely regardless of what GPU kernels
+// are in flight (no managed-memory migration hazard). Use for small scalars
+// that are written by device kernels on one stream and read by the host after
+// cudaStreamSynchronize, while another stream may still be executing.
+class PinnedAllocator : public Allocator {
+ public:
+  void* allocate(size_t bytes) override;
+  void deallocate(void* ptr) override;
+};
+
 // Host allocator: malloc (CPU-only memory)
 class HostAllocator : public Allocator {
  public:
@@ -148,6 +159,7 @@ class GpuBuffer {
 using DeviceBuffer = GpuBuffer<DeviceAllocator>;
 using UnifiedBuffer = GpuBuffer<UnifiedAllocator>;
 using HostBuffer = GpuBuffer<HostAllocator>;
+using PinnedBuffer = GpuBuffer<PinnedAllocator>;
 
 }  // namespace gpu
 }  // namespace orator

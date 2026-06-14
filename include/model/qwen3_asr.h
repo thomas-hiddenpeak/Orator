@@ -41,7 +41,8 @@ class Qwen3Asr final : public core::IAsr {
   // Transcribe raw mono-16k samples into text (no AudioChunk wrapper). This is
   // the single-segment path: the caller guarantees a bounded (<=~30s) span so
   // the decoder context stays short.
-  std::string TranscribeText(const float* samples, int num_samples);
+    std::string TranscribeText(const float* samples, int num_samples,
+                               cudaStream_t stream = 0);
 
   // Transcribe `samples` with an optional committed text prefix. The prefix is
   // appended to the prompt after the <asr_text> tag so the model continues from
@@ -66,7 +67,8 @@ class Qwen3Asr final : public core::IAsr {
 
  private:
   std::string BuildAndRun(const std::vector<float>& encoder_out, int n_tokens,
-                          const std::string& prefix_text);
+                          const std::string& prefix_text,
+                          cudaStream_t stream = 0);
 
   core::AsrConfig cfg_;
   std::string language_ = "Chinese";

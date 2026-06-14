@@ -20,8 +20,9 @@ double Secs(Clock::time_point a, Clock::time_point b) {
 }  // namespace
 
 AsrWorker::AsrWorker(model::Qwen3Asr* asr, StreamTimeline* timeline,
-                     const Params& params, Emit emit)
-    : asr_(asr), timeline_(timeline), params_(params), emit_(std::move(emit)) {}
+                     const Params& params, Emit emit, cudaStream_t stream)
+    : asr_(asr), timeline_(timeline), params_(params), emit_(std::move(emit)),
+      stream_(stream) {}
 
 void AsrWorker::ProcessSpan(const float* samples, int n) {
   if (samples == nullptr || n <= 0) return;
@@ -129,9 +130,10 @@ void AsrWorker::EmitUtterance(int begin, int end) {
   const auto t0 = Clock::now();
   std::string text;
   {
-    // Serialize GPU access against the diarization worker (one shared device).
+    // Temporary safety fence on Tegra: some ASR paths still touch unified
+    // memory from the host, which can fault under concurrent GPU activity.
     std::lock_guard<std::mutex> gpu(gpu::DeviceLock());
-    text = asr_->TranscribeText(pcm_.data() + begin, end - begin);
+    text = asr_->TranscribeText(pcm_.data() + begin, end - begin, stream_);
   }
   compute_sec_ += Secs(t0, Clock::now());
   if (text.empty()) return;

@@ -23,6 +23,8 @@
 #include <string>
 #include <vector>
 
+#include <cuda_runtime.h>
+
 #include "gpu/memory.h"
 #include "io/sharded_safetensor.h"
 
@@ -52,7 +54,8 @@ class AsrAudioTower {
 
   // mel: row-major [num_mel_bins, n_frames] FP32 (host). Returns row-major
   // [N_out, output_dim] FP32 (host); *out_tokens receives N_out.
-  std::vector<float> Forward(const float* mel, int n_frames, int* out_tokens) const;
+    std::vector<float> Forward(const float* mel, int n_frames, int* out_tokens,
+                               cudaStream_t stream = 0) const;
 
   // Output sequence length after the CNN front-end for a given mel length
   // (matches the reference _get_feat_extract_output_lengths).

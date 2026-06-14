@@ -57,6 +57,23 @@ void HostAllocator::deallocate(void* ptr) {
   }
 }
 
+// PinnedAllocator implementation: page-locked host memory accessible by the
+// device via direct physical address. The host can read/write it at any time
+// without the managed-memory migration hazard (safe on Tegra even when other
+// GPU streams are in flight). Suitable for small scalars that are host-read
+// after cudaStreamSynchronize of the owning stream.
+void* PinnedAllocator::allocate(size_t bytes) {
+  void* ptr = nullptr;
+  CUDA_CHECK(cudaHostAlloc(&ptr, bytes, cudaHostAllocDefault));
+  return ptr;
+}
+
+void PinnedAllocator::deallocate(void* ptr) {
+  if (ptr) {
+    CUDA_CHECK(cudaFreeHost(ptr));
+  }
+}
+
 // MmapAllocator implementation
 MmapAllocator::MmapAllocator(const std::string& filepath)
     : fd_(-1), mapped_ptr_(nullptr), mapped_size_(0) {
@@ -173,6 +190,13 @@ UnifiedAllocator& GpuBuffer<UnifiedAllocator>::get_default_allocator() {
 template <>
 HostAllocator& GpuBuffer<HostAllocator>::get_default_allocator() {
   return GpuMemory::host_allocator();
+}
+
+static PinnedAllocator g_pinned_allocator;
+
+template <>
+PinnedAllocator& GpuBuffer<PinnedAllocator>::get_default_allocator() {
+  return g_pinned_allocator;
 }
 
 }  // namespace gpu

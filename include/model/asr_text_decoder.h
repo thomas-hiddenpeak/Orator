@@ -55,26 +55,27 @@ class AsrTextDecoder {
 
   // Prefill T input embeddings [T, hidden] (host); populate the KV cache and
   // leave logits for the last token on the device (queryable via Argmax).
-  void Prefill(const float* embeds, int T);
+  void Prefill(const float* embeds, int T, cudaStream_t stream = 0);
 
   // Decode one step from embedding [hidden] (host) at absolute position `pos`.
-  void DecodeStep(const float* embed, int pos);
+  void DecodeStep(const float* embed, int pos, cudaStream_t stream = 0);
 
   // Fused GPU decode step: gathers the embedding for the token id held in the
   // device scalar `d_token` (e.g. the previous Argmax result), runs the forward
   // at absolute position `pos`, and leaves logits on the device. No host embed
   // lookup and no D->H sync of the embedding -> the autoregressive loop stays on
   // the GPU between Argmax calls.
-  void DecodeStepDevice(const int* d_token, int pos);
+  void DecodeStepDevice(const int* d_token, int pos, cudaStream_t stream = 0);
 
   // GPU argmax over the current logits, banning up to two ids (-1 = none).
-  int Argmax(int ban0 = -1, int ban1 = -1);
+  int Argmax(int ban0 = -1, int ban1 = -1, cudaStream_t stream = 0);
 
   // GPU argmax that writes the winning id to a device scalar (no host sync).
-  void ArgmaxToDevice(int* d_out, int ban0 = -1, int ban1 = -1);
+  void ArgmaxToDevice(int* d_out, int ban0 = -1, int ban1 = -1,
+                      cudaStream_t stream = 0);
 
   // Read a device int scalar to host (single 4-byte copy + sync).
-  int ReadTokenId(const int* d_token) const;
+  int ReadTokenId(const int* d_token, cudaStream_t stream = 0) const;
 
   // Greedy autoregressive decode driven entirely on the GPU. Seeds from the
   // current prefill logits, emits up to max_new tokens, stops at eos0/eos1 or a
@@ -83,9 +84,11 @@ class AsrTextDecoder {
   // batches of `batch` steps with a single host sync per batch -- so the GPU
   // never idles between tokens (lets DVFS boost off the min clock). The first
   // `ban_steps` tokens are decoded eagerly with EOS banned (matches the
-  // reference engine). Returns the emitted token ids (EOS excluded).
+  // reference engine). Returns the emitted token ids (EOS excluded). The graph
+  // is captured on `capture_stream_` (internal) and launched on `stream`.
   std::vector<int> DecodeGreedy(int start_pos, int max_new, int eos0, int eos1,
-                                int ban_steps = 3, int batch = 32);
+                                int ban_steps = 3, int batch = 32,
+                                cudaStream_t stream = 0);
 
   // Copy the current logits to host (for verification only).
   std::vector<float> CopyLogits() const;
@@ -101,7 +104,7 @@ class AsrTextDecoder {
     BfBuf q_w, k_w, v_w, o_w, gate_w, up_w, down_w;  // matmul weights (bf16)
   };
 
-  void Forward(float* d_x, int Tq, int pos0);
+  void Forward(float* d_x, int Tq, int pos0, cudaStream_t stream = 0);
   // Records the per-token (Tq==1) forward onto `stream`, reading the absolute
   // position from `d_pos` (device int). Used for both eager launch and graph
   // capture. d_x is the fixed step buffer step_x_.
@@ -112,6 +115,10 @@ class AsrTextDecoder {
   BfBuf embed_, lm_head_;        // bf16; lm_head aliases embed_ when tied
   F32Buf final_norm_;
   std::vector<Layer> layers_;
+  // Plain host copy of embed_ weights (bf16) for the Embed() function. Reading
+  // from plain host memory is safe regardless of what GPU kernels are in flight
+  // (no managed-memory migration hazard on Tegra).
+  std::vector<uint16_t> embed_host_;
 
   std::vector<std::shared_ptr<gpu::UnifiedBuffer>> k_cache_, v_cache_;
   int cache_len_ = 0;
@@ -131,11 +138,13 @@ class AsrTextDecoder {
   void* graph_exec_banned_ = nullptr;  // cudaGraphExec_t (one step, EOS banned)
   int graph_ban0_ = -1, graph_ban1_ = -1;  // EOS ids baked into the banned graph
   bool graph_ready_ = false;
-  std::shared_ptr<gpu::UnifiedBuffer> step_x_;     // [hidden] gathered embedding
-  std::shared_ptr<gpu::UnifiedBuffer> step_pos_;   // [1] absolute position (device)
-  std::shared_ptr<gpu::UnifiedBuffer> d_tok_;      // [1] current token id (device)
-  std::shared_ptr<gpu::UnifiedBuffer> d_count_;    // [1] emitted-token counter (device)
-  std::shared_ptr<gpu::UnifiedBuffer> d_out_;      // [max] recorded token ids (device)
+  std::shared_ptr<gpu::UnifiedBuffer> step_x_;  // [hidden] gathered embedding
+  // Pinned (page-locked) host memory: device writes, host reads after stream
+  // sync. Safe on Tegra even when another stream is still in flight.
+  std::shared_ptr<gpu::PinnedBuffer> step_pos_;  // [1] absolute position
+  std::shared_ptr<gpu::PinnedBuffer> d_tok_;     // [1] current token id
+  std::shared_ptr<gpu::PinnedBuffer> d_count_;   // [1] emitted-token counter
+  std::shared_ptr<gpu::PinnedBuffer> d_out_;     // [max] recorded token ids
   cudaStream_t capture_stream_ = nullptr;
 
   // Records the per-token decode body onto `s` (embed-gather d_tok_ -> forward

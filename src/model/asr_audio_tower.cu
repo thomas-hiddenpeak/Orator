@@ -323,7 +323,8 @@ void AsrAudioTower::LoadWeights(const io::ShardedSafeTensors& w) {
 }
 
 std::vector<float> AsrAudioTower::Forward(const float* mel, int n_frames,
-                                          int* out_tokens) const {
+                                          int* out_tokens,
+                                          cudaStream_t stream) const {
   const int F = config_.num_mel_bins;        // 128
   const int D = config_.d_model;             // 1024
   const int H = config_.encoder_heads;       // 16
@@ -370,15 +371,15 @@ std::vector<float> AsrAudioTower::Forward(const float* mel, int n_frames,
         sizeof(float) * static_cast<size_t>(chunks) * Cout * Ho * Wo);
     dim3 blk(32, 8);
     dim3 grd((K + 31) / 32, static_cast<unsigned>((rows + 7) / 8));
-    Im2ColKernel<<<grd, blk>>>(in, static_cast<uint16_t*>(col.data()), chunks, Cin,
+            Im2ColKernel<<<grd, blk, 0, stream>>>(in, static_cast<uint16_t*>(col.data()), chunks, Cin,
                                Hh, Ww, Ho, Wo);
     CheckCudaError(cudaGetLastError(), __FILE__, __LINE__);
     // bf16 GEMM: rows x K @ (Cout x K)^T -> rows x Cout (no bias/act; fused next).
     asr_gemm::LinearPre(static_cast<uint16_t*>(col.data()), wt.p, nullptr,
                         static_cast<float*>(outrows.data()),
-                        static_cast<int>(rows), K, Cout, 0);
+                      static_cast<int>(rows), K, Cout, 0, stream);
     const long total = static_cast<long>(chunks) * Cout * Ho * Wo;
-    ConvOutRearrangeKernel<<<Blocks(total), kThreads>>>(
+            ConvOutRearrangeKernel<<<Blocks(total), kThreads, 0, stream>>>(
         static_cast<float*>(outrows.data()), bias.p,
         static_cast<float*>(out->data()), chunks, Cout, Ho, Wo);
     CheckCudaError(cudaGetLastError(), __FILE__, __LINE__);
@@ -390,7 +391,7 @@ std::vector<float> AsrAudioTower::Forward(const float* mel, int n_frames,
                  ConvOut(max_cl), dh, Hc2, ConvOut(ConvOut(max_cl)));
   auto c3 = conv(static_cast<float*>(c2->data()), conv3_w_, conv3_b_, dh, Hc2,
                  ConvOut(ConvOut(max_cl)), dh, Hc3, Wc);
-  CheckCudaError(cudaDeviceSynchronize(), __FILE__, __LINE__);
+    CheckCudaError(cudaStreamSynchronize(stream), __FILE__, __LINE__);
 
   // ---- Reshape [chunks, dh, Hc3, Wc] -> [chunks*Wc, dh*Hc3] (permute b,t,c,f) ----
   const int rows = chunks * Wc;
@@ -408,17 +409,17 @@ std::vector<float> AsrAudioTower::Forward(const float* mel, int n_frames,
   // ---- conv_out Linear [rows, 7680] -> [rows, 1024] (no bias) ----
   UnifiedBuffer d_h(sizeof(float) * static_cast<size_t>(rows) * D);
   asr_gemm::Linear(feat, conv_out_w_.p, nullptr, static_cast<float*>(d_h.data()),
-                   rows, CF, D, 0);
+                     rows, CF, D, 0, stream);
   CheckCudaError(cudaGetLastError(), __FILE__, __LINE__);
-  CheckCudaError(cudaDeviceSynchronize(), __FILE__, __LINE__);
+    CheckCudaError(cudaStreamSynchronize(stream), __FILE__, __LINE__);
 
   // ---- Add positional embedding (per chunk, PE[0:Wc]) ----
   UnifiedBuffer d_pe(sizeof(float) * static_cast<size_t>(Wc) * D);
   std::memcpy(d_pe.data(), pe_.data(), sizeof(float) * static_cast<size_t>(Wc) * D);
-  AddPeChunkedKernel<<<Blocks(static_cast<long>(rows) * D), kThreads>>>(
+    AddPeChunkedKernel<<<Blocks(static_cast<long>(rows) * D), kThreads, 0, stream>>>(
       static_cast<float*>(d_h.data()), static_cast<float*>(d_pe.data()), chunks, Wc, D);
   CheckCudaError(cudaGetLastError(), __FILE__, __LINE__);
-  CheckCudaError(cudaDeviceSynchronize(), __FILE__, __LINE__);
+    CheckCudaError(cudaStreamSynchronize(stream), __FILE__, __LINE__);
 
   // ---- Drop padding: keep valid frames per chunk -> hidden [N, D] ----
   std::vector<int> valid(chunks);
@@ -474,46 +475,46 @@ std::vector<float> AsrAudioTower::Forward(const float* mel, int n_frames,
 
   for (int li = 0; li < config_.encoder_layers; ++li) {
     const Layer& L = layers_[li];
-    LayerNormKernel<<<N, kThreads>>>(hid, L.ln1_w.p, L.ln1_b.p,
+      LayerNormKernel<<<N, kThreads, 0, stream>>>(hid, L.ln1_w.p, L.ln1_b.p,
         static_cast<float*>(d_norm.data()), N, D, eps);
     asr_gemm::Linear(static_cast<float*>(d_norm.data()), L.q_w.p, L.q_b.p,
-                     static_cast<float*>(d_q.data()), N, D, D, 0);
+               static_cast<float*>(d_q.data()), N, D, D, 0, stream);
     asr_gemm::Linear(static_cast<float*>(d_norm.data()), L.k_w.p, L.k_b.p,
-                     static_cast<float*>(d_k.data()), N, D, D, 0);
+               static_cast<float*>(d_k.data()), N, D, D, 0, stream);
     asr_gemm::Linear(static_cast<float*>(d_norm.data()), L.v_w.p, L.v_b.p,
-                     static_cast<float*>(d_v.data()), N, D, D, 0);
+               static_cast<float*>(d_v.data()), N, D, D, 0, stream);
     const int warps = N * H;
-    WindowAttnKernel<<<Blocks(warps * kWarp), kThreads>>>(
+      WindowAttnKernel<<<Blocks(warps * kWarp), kThreads, 0, stream>>>(
         static_cast<float*>(d_q.data()), static_cast<float*>(d_k.data()),
         static_cast<float*>(d_v.data()), static_cast<float*>(d_attn.data()),
         static_cast<int*>(d_ss.data()), static_cast<int*>(d_se.data()), N, H, Dh, scale);
     asr_gemm::Linear(static_cast<float*>(d_attn.data()), L.o_w.p, L.o_b.p,
-                     static_cast<float*>(d_proj.data()), N, D, D, 0);
-    AddResidualKernel<<<Blocks(N * D), kThreads>>>(hid,
+               static_cast<float*>(d_proj.data()), N, D, D, 0, stream);
+      AddResidualKernel<<<Blocks(N * D), kThreads, 0, stream>>>(hid,
         static_cast<float*>(d_proj.data()), N * D);
     // mlp block
-    LayerNormKernel<<<N, kThreads>>>(hid, L.ln2_w.p, L.ln2_b.p,
+      LayerNormKernel<<<N, kThreads, 0, stream>>>(hid, L.ln2_w.p, L.ln2_b.p,
         static_cast<float*>(d_norm.data()), N, D, eps);
     asr_gemm::Linear(static_cast<float*>(d_norm.data()), L.fc1_w.p, L.fc1_b.p,
-                     static_cast<float*>(d_ff.data()), N, D, config_.ffn_dim, 1);  // GELU
+               static_cast<float*>(d_ff.data()), N, D, config_.ffn_dim, 1, stream);
     asr_gemm::Linear(static_cast<float*>(d_ff.data()), L.fc2_w.p, L.fc2_b.p,
-                     static_cast<float*>(d_proj.data()), N, config_.ffn_dim, D, 0);
-    AddResidualKernel<<<Blocks(N * D), kThreads>>>(hid,
+               static_cast<float*>(d_proj.data()), N, config_.ffn_dim, D, 0, stream);
+      AddResidualKernel<<<Blocks(N * D), kThreads, 0, stream>>>(hid,
         static_cast<float*>(d_proj.data()), N * D);
     CheckCudaError(cudaGetLastError(), __FILE__, __LINE__);
   }
-  CheckCudaError(cudaDeviceSynchronize(), __FILE__, __LINE__);
+      CheckCudaError(cudaStreamSynchronize(stream), __FILE__, __LINE__);
 
   // ---- ln_post -> proj1 -> GELU -> proj2 ----
-  LayerNormKernel<<<N, kThreads>>>(hid, ln_post_w_.p, ln_post_b_.p,
+      LayerNormKernel<<<N, kThreads, 0, stream>>>(hid, ln_post_w_.p, ln_post_b_.p,
       static_cast<float*>(d_norm.data()), N, D, eps);
   asr_gemm::Linear(static_cast<float*>(d_norm.data()), proj1_w_.p, proj1_b_.p,
-                   static_cast<float*>(d_proj.data()), N, D, D, 1);  // GELU
+               static_cast<float*>(d_proj.data()), N, D, D, 1, stream);
   UnifiedBuffer d_out(sizeof(float) * static_cast<size_t>(N) * config_.output_dim);
   asr_gemm::Linear(static_cast<float*>(d_proj.data()), proj2_w_.p, proj2_b_.p,
-                   static_cast<float*>(d_out.data()), N, D, config_.output_dim, 0);
+               static_cast<float*>(d_out.data()), N, D, config_.output_dim, 0, stream);
   CheckCudaError(cudaGetLastError(), __FILE__, __LINE__);
-  CheckCudaError(cudaDeviceSynchronize(), __FILE__, __LINE__);
+      CheckCudaError(cudaStreamSynchronize(stream), __FILE__, __LINE__);
 
   std::vector<float> out(static_cast<size_t>(N) * config_.output_dim);
   std::memcpy(out.data(), d_out.data(), sizeof(float) * out.size());

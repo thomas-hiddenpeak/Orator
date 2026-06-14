@@ -3,6 +3,8 @@
 #include <cstdio>
 #include <utility>
 
+#include <cuda_runtime.h>
+
 #include "pipeline/diar_postprocess.h"
 #include "pipeline/json_util.h"
 #include "pipeline/timeline_merger.h"
@@ -13,7 +15,10 @@ namespace pipeline {
 AuditoryStream::AuditoryStream(const Config& config, Emit emit)
     : config_(config), emit_(std::move(emit)), buffer_(config.sample_rate) {}
 
-AuditoryStream::~AuditoryStream() { StopWorkers(); }
+AuditoryStream::~AuditoryStream() {
+  StopWorkers();
+  if (asr_stream_) cudaStreamDestroy(asr_stream_);
+}
 
 void AuditoryStream::Start() {
   // The diarizer is optional: an empty weights path disables the diarization
@@ -37,6 +42,17 @@ void AuditoryStream::Start() {
     asr_->Initialize(ac);
     asr_->set_language(config_.asr_language);
     asr_->LoadWeights(config_.asr_model_dir);
+
+      // Create a CUDA stream for the ASR pipeline. Give it a lower priority than
+      // the default (diarization) stream so diarization latency is protected.
+      // On Tegra the priority range may be [0, 0]; cudaStreamCreateWithPriority
+      // still succeeds, it just creates a normal stream.
+      int leastPri = 0, greatestPri = 0;
+      cudaDeviceGetStreamPriorityRange(&leastPri, &greatestPri);
+      cudaStreamCreateWithPriority(&asr_stream_, cudaStreamNonBlocking, leastPri);
+      std::fprintf(stderr, "[gpu-sched] stream priority range [%d,%d]; "
+                   "asr_stream at %d (lower priority)\n",
+                   greatestPri, leastPri, leastPri);
   }
   StartWorkers();
 }
@@ -67,7 +83,8 @@ void AuditoryStream::StartWorkers() {
     // controller's timeline emit.
     asr_worker_ = std::make_unique<AsrWorker>(
         asr_.get(), &timeline_, p,
-        [this](const std::string& json) { EmitLocked(json); });
+        [this](const std::string& json) { EmitLocked(json); },
+        asr_stream_);
     asr_cursor_ = buffer_.AddConsumer();
     asr_thread_ = std::thread([this] {
       std::vector<float> chunk;

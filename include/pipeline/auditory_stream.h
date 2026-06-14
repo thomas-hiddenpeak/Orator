@@ -27,6 +27,8 @@
 #include <thread>
 #include <vector>
 
+#include <cuda_runtime.h>
+
 #include "core/types.h"
 #include "model/qwen3_asr.h"
 #include "model/streaming_sortformer.h"
@@ -117,6 +119,10 @@ class AuditoryStream {
   std::thread diar_thread_;
   std::thread asr_thread_;
   bool running_ = false;
+
+    // Per-pipeline GPU stream. diar runs on the default stream (0); asr runs
+    // on asr_stream_ so its kernels can overlap with diar's idle intervals.
+    cudaStream_t asr_stream_ = nullptr;
 
   // Wakes WaitForBarrier whenever a worker advances or finishes.
   std::mutex progress_mutex_;

@@ -22,6 +22,7 @@
 
 #include "model/qwen3_asr.h"
 #include "pipeline/stream_timeline.h"
+#include <cuda_runtime.h>
 
 namespace orator {
 namespace pipeline {
@@ -42,7 +43,7 @@ class AsrWorker {
   // `asr` and `timeline` are owned by the controller and must outlive the
   // worker. The engine must already be initialized + weight-loaded.
   AsrWorker(model::Qwen3Asr* asr, StreamTimeline* timeline, const Params& params,
-            Emit emit);
+              Emit emit, cudaStream_t stream = 0);
 
   // Consume `n` contiguous samples at the current stream position: append to the
   // endpoint buffer and transcribe any utterances that complete.
@@ -76,6 +77,7 @@ class AsrWorker {
   float peak_rms_ = 0.0f;      // monotonic session peak for the relative VAD
   std::atomic<long> processed_samples_{0};
   double compute_sec_ = 0.0;
+    cudaStream_t stream_ = 0;    // GPU stream for ASR kernels (default = 0)
 };
 
 }  // namespace pipeline
