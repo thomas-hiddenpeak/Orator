@@ -58,7 +58,9 @@ class AsrWorker {
   // trailing open utterance. Consumes audio that has already been processed.
   void DrainUtterances(bool finalize);
   // Transcribe pcm_[begin,end) (relative) as one utterance, commit + emit it.
-  void EmitUtterance(int begin, int end);
+  // With prefix rollback: keep the last K tokens unconfirmed for re-decoding
+  // in the next utterance (unless finalize, then emit all).
+  void EmitUtterance(int begin, int end, bool finalize);
 
   model::Qwen3Asr* asr_;
   StreamTimeline* timeline_;
@@ -69,6 +71,12 @@ class AsrWorker {
   std::atomic<long> processed_samples_{0};
   double compute_sec_ = 0.0;
   cudaStream_t stream_ = 0;    // GPU stream for ASR kernels (default = 0)
+  
+  // Prefix rollback: store unconfirmed text from previous utterance.
+  // On next utterance, re-feed this as prefix context so the model can refine
+  // boundaries (official Qwen3-ASR streaming strategy).
+  std::string pending_prefix_;  // unconfirmed text from last utterance
+  static constexpr int kRollbackTokens = 3;  // how many tokens to keep unfixed
 };
 
 }  // namespace pipeline

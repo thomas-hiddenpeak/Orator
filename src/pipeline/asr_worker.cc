@@ -37,13 +37,13 @@ void AsrWorker::DrainUtterances(bool finalize) {
   for (;;) {
     int begin = 0, end = 0, consume = 0;
     if (!vad_.NextSpan(finalize, &begin, &end, &consume)) return;
-    EmitUtterance(begin, end);
+    EmitUtterance(begin, end, finalize);
     vad_.Consume(consume);
     if (finalize) return;
   }
 }
 
-void AsrWorker::EmitUtterance(int begin, int end) {
+void AsrWorker::EmitUtterance(int begin, int end, bool finalize) {
   if (end <= begin) return;
   const int sr = params_.sample_rate;
   const auto t0 = Clock::now();
@@ -55,10 +55,39 @@ void AsrWorker::EmitUtterance(int begin, int end) {
   compute_sec_ += Secs(t0, Clock::now());
   if (text.empty()) return;
 
+  // Token-level prefix rollback: keep last kRollbackTokens unfixed for
+  // re-decoding in the next utterance, improving boundary accuracy.
+  std::string confirmed_text = text;
+  if (!finalize && !text.empty()) {
+    // Tokenize the output, split into confirmed + pending.
+    auto tokens = asr_->tokenizer().Encode(text);
+    if (static_cast<int>(tokens.size()) > kRollbackTokens) {
+      // Confirmed = all but last kRollbackTokens.
+      std::vector<int> confirmed_tokens(
+          tokens.begin(), tokens.end() - kRollbackTokens);
+      confirmed_text = asr_->tokenizer().Decode(confirmed_tokens, /*skip_special=*/true);
+      
+      // Pending = last kRollbackTokens.
+      std::vector<int> pending_tokens(
+          tokens.end() - kRollbackTokens, tokens.end());
+      pending_prefix_ = asr_->tokenizer().Decode(pending_tokens, /*skip_special=*/true);
+    } else {
+      // Too few tokens to split; keep all for next utterance.
+      confirmed_text = "";
+      pending_prefix_ = text;
+    }
+  } else if (finalize) {
+    // Last utterance: emit everything, clear pending.
+    confirmed_text = pending_prefix_ + text;
+    pending_prefix_.clear();
+  }
+
+  if (confirmed_text.empty()) return;  // Nothing to emit this round.
+
   core::AsrToken tok;
   tok.start_sec = static_cast<double>(vad_.base_sample() + begin) / sr;
   tok.end_sec = static_cast<double>(vad_.base_sample() + end) / sr;
-  tok.text = text;
+  tok.text = confirmed_text;
   timeline_->AppendToken(tok);
 
   if (emit_) {
@@ -72,6 +101,7 @@ void AsrWorker::EmitUtterance(int begin, int end) {
 
 void AsrWorker::Reset() {
   vad_.Reset();
+  pending_prefix_.clear();
   processed_samples_.store(0);
   compute_sec_ = 0.0;
   asr_->Reset();

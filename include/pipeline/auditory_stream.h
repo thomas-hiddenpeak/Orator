@@ -51,7 +51,7 @@ class AuditoryStream {
     double diar_merge_gap_sec = 0.5;
 
     // ASR streaming endpointing (independent of diarization):
-    double asr_max_utterance_sec = 42.0;     // force-flush cap (bounded decode context)
+    double asr_max_utterance_sec = 15.0;     // force-flush cap (bounded decode context)
     double asr_min_utterance_sec = 0.18;     // ignore shorter speech blips
     std::string asr_vad_model = "models/asr/silero_vad.safetensors";
     float asr_vad_threshold = 0.46f;
