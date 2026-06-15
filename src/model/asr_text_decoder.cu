@@ -488,6 +488,11 @@ void AsrTextDecoder::Forward(float* d_x, int Tq, int pos0, cudaStream_t stream) 
 }
 
 void AsrTextDecoder::Prefill(const float* embeds, int T, cudaStream_t stream) {
+  PrefillAt(embeds, T, 0, stream);
+}
+
+void AsrTextDecoder::PrefillAt(const float* embeds, int T, int pos0,
+                               cudaStream_t stream) {
   // Dedicated residual-stream buffer so it doesn't collide with Work(0..9).
   static thread_local std::shared_ptr<UnifiedBuffer> stream_buf;
   static thread_local size_t stream_cap = 0;
@@ -498,7 +503,14 @@ void AsrTextDecoder::Prefill(const float* embeds, int T, cudaStream_t stream) {
   }
   float* x = static_cast<float*>(stream_buf->data());
   std::memcpy(x, embeds, sizeof(float) * need);
-  Forward(x, T, 0, stream);
+  // Forward appends KV at [pos0, pos0+T) and sets cache_len_ = pos0 + T.
+  Forward(x, T, pos0, stream);
+  // Drain before returning: Forward host-writes the persistent Work() d_pos
+  // scalars, so a following PrefillAt/DecodeStep on the same buffers must not
+  // race this call's in-flight kernels. Prefill is once-per-chunk, not the
+  // per-token hot path, so the sync cost is negligible and makes back-to-back
+  // incremental prefills safe on Tegra unified memory.
+  CheckCudaError(cudaStreamSynchronize(stream), __FILE__, __LINE__);
 }
 
 void AsrTextDecoder::DecodeStep(const float* embed, int pos, cudaStream_t stream) {

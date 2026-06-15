@@ -14,11 +14,13 @@
 // ASR segmentation independent from diarization and each decode context bounded.
 
 #include <atomic>
+#include <deque>
 #include <functional>
 #include <string>
 #include <vector>
 
 #include "model/qwen3_asr.h"
+#include "pipeline/asr_preprocessor.h"
 #include "pipeline/asr_vad.h"
 #include "pipeline/stream_timeline.h"
 #include <cuda_runtime.h>
@@ -28,7 +30,23 @@ namespace pipeline {
 
 class AsrWorker {
  public:
-  using Params = AsrSileroVad::Params;
+  struct Params {
+    AsrSileroVad::Params vad;
+    AsrPreprocessor::Params preproc;
+    // Incremental KV-cache streaming (Spec 003): when true, the worker drives
+    // the engine's StreamReset/StreamChunk/StreamFinalize session instead of
+    // decoding each VAD span independently. VAD speech spans are fed into the
+    // session and accumulated into a segment carrying KV context across windows;
+    // the segment is committed at a natural endpoint or the segment cap.
+    bool incremental = false;
+    double segment_sec = 24.0;  // commit + reset cadence (cap), aligned to VAD
+    // T050: use Silero-VAD speech endpoints to choose segment reset points. The
+    // engine is still fed CONTINUOUS audio (the VAD only picks reset timing, it
+    // does not trim). A segment closes at the first endpoint past
+    // endpoint_min_segment_sec, or at segment_sec (hard cap) if no endpoint.
+    bool endpoint_reset = false;
+    double endpoint_min_segment_sec = 10.0;
+  };
 
   // Emits an incremental result event (JSON) as each utterance completes.
   using Emit = std::function<void(const std::string&)>;
@@ -36,7 +54,8 @@ class AsrWorker {
   // `asr` and `timeline` are owned by the controller and must outlive the
   // worker. The engine must already be initialized + weight-loaded.
   AsrWorker(model::Qwen3Asr* asr, StreamTimeline* timeline, const Params& params,
-              Emit emit, cudaStream_t stream = 0);
+              Emit emit, cudaStream_t stream = 0,
+              int rollback_tokens = 3);
 
   // Consume `n` contiguous samples at the current stream position: append to the
   // endpoint buffer and transcribe any utterances that complete.
@@ -58,9 +77,16 @@ class AsrWorker {
   // trailing open utterance. Consumes audio that has already been processed.
   void DrainUtterances(bool finalize);
   // Transcribe pcm_[begin,end) (relative) as one utterance, commit + emit it.
-  // With prefix rollback: keep the last K tokens unconfirmed for re-decoding
-  // in the next utterance (unless finalize, then emit all).
   void EmitUtterance(int begin, int end, bool finalize);
+
+  // Incremental-session path (Params::incremental): feed continuous audio into
+  // the engine's streaming session and commit + reset the segment at the cap or
+  // on finalize. The session consumes continuous (untrimmed) audio so the
+  // acoustic flow is preserved (VAD trimming degrades the streamed context).
+  // ProcessIncremental slices large input chunks at the segment cap; each slice
+  // is handed to EmitIncrementalChunk.
+  void ProcessIncremental(const float* samples, int n, bool finalize);
+  void EmitIncrementalChunk(const float* samples, int n, bool finalize);
 
   model::Qwen3Asr* asr_;
   StreamTimeline* timeline_;
@@ -68,15 +94,21 @@ class AsrWorker {
   Emit emit_;
 
   AsrSileroVad vad_;            // ASR-only independent front VAD (Silero)
+  AsrPreprocessor preproc_;     // ASR-only enhancement after VAD
   std::atomic<long> processed_samples_{0};
   double compute_sec_ = 0.0;
   cudaStream_t stream_ = 0;    // GPU stream for ASR kernels (default = 0)
-  
-  // Prefix rollback: store unconfirmed text from previous utterance.
-  // On next utterance, re-feed this as prefix context so the model can refine
-  // boundaries (official Qwen3-ASR streaming strategy).
-  std::string pending_prefix_;  // unconfirmed text from last utterance
-  static constexpr int kRollbackTokens = 3;  // how many tokens to keep unfixed
+  int rollback_tokens_ = 3;
+  std::string pending_prefix_;
+
+  // Incremental-session segment state (Params::incremental).
+  bool inc_in_segment_ = false;      // a segment is currently open
+  long inc_abs_pos_ = 0;             // absolute samples fed to the session
+  long inc_seg_start_sample_ = 0;    // absolute sample of segment start
+  long inc_seg_end_sample_ = 0;      // absolute sample of last fed audio
+  long inc_seg_samples_ = 0;         // samples accumulated this segment
+  std::string inc_live_text_;        // current live transcript of the segment
+  std::deque<long> inc_endpoints_;   // pending VAD endpoints (absolute samples)
 };
 
 }  // namespace pipeline

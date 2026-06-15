@@ -51,14 +51,23 @@ class AuditoryStream {
     double diar_merge_gap_sec = 0.5;
 
     // ASR streaming endpointing (independent of diarization):
-    double asr_max_utterance_sec = 15.0;     // force-flush cap (bounded decode context)
-    double asr_min_utterance_sec = 0.18;     // ignore shorter speech blips
+    double asr_max_utterance_sec = 28.0;     // force-flush cap (bounded decode context)
+    double asr_min_utterance_sec = 0.20;     // ignore shorter speech blips
     std::string asr_vad_model = "models/asr/silero_vad.safetensors";
-    float asr_vad_threshold = 0.46f;
-    int asr_vad_min_speech_ms = 200;
-    int asr_vad_min_silence_ms = 360;
-    int asr_vad_speech_pad_ms = 100;
+    float asr_vad_threshold = 0.5f;
+    int asr_vad_min_speech_ms = 250;
+    int asr_vad_min_silence_ms = 120;
+    int asr_vad_speech_pad_ms = 60;
+    int asr_max_new_tokens = 384;
+    int asr_rollback_tokens = 0;
+    bool asr_incremental = false;            // Spec 003 incremental KV-cache session
+    double asr_incremental_segment_sec = 24.0;  // commit/reset cadence (cap)
+    bool asr_incremental_endpoint_reset = false;  // T050: VAD endpoints pick reset points
+    double asr_incremental_min_segment_sec = 10.0;  // min segment before an endpoint cut
     std::string asr_language = "Chinese";
+    std::string asr_preproc_mode = "none";  // none|classical|frcrn|tfgridnet
+    std::string asr_frcrn_model = "models/asr_preproc/frcrn.safetensors";
+    std::string asr_tfgridnet_model = "models/asr_preproc/tfgridnet.safetensors";
   };
 
   // Delivers a result event as a JSON string. Invoked from the ASR worker thread

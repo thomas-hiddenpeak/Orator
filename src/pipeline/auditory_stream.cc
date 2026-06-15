@@ -41,6 +41,7 @@ void AuditoryStream::Start() {
     ac.language = config_.asr_language;
     asr_->Initialize(ac);
     asr_->set_language(config_.asr_language);
+    asr_->set_max_new_tokens(config_.asr_max_new_tokens);
     asr_->LoadWeights(config_.asr_model_dir);
 
       // Create a CUDA stream for the ASR pipeline. Give it a lower priority than
@@ -74,20 +75,28 @@ void AuditoryStream::StartWorkers() {
 
   if (asr_) {
     AsrWorker::Params p;
-    p.sample_rate = config_.sample_rate;
-    p.max_utterance_sec = config_.asr_max_utterance_sec;
-    p.min_utterance_sec = config_.asr_min_utterance_sec;
-    p.silero_model_path = config_.asr_vad_model;
-    p.silero_threshold = config_.asr_vad_threshold;
-    p.silero_min_speech_ms = config_.asr_vad_min_speech_ms;
-    p.silero_min_silence_ms = config_.asr_vad_min_silence_ms;
-    p.silero_speech_pad_ms = config_.asr_vad_speech_pad_ms;
+    p.vad.sample_rate = config_.sample_rate;
+    p.vad.max_utterance_sec = config_.asr_max_utterance_sec;
+    p.vad.min_utterance_sec = config_.asr_min_utterance_sec;
+    p.vad.silero_model_path = config_.asr_vad_model;
+    p.vad.silero_threshold = config_.asr_vad_threshold;
+    p.vad.silero_min_speech_ms = config_.asr_vad_min_speech_ms;
+    p.vad.silero_min_silence_ms = config_.asr_vad_min_silence_ms;
+    p.vad.silero_speech_pad_ms = config_.asr_vad_speech_pad_ms;
+    p.preproc.sample_rate = config_.sample_rate;
+    p.preproc.mode = config_.asr_preproc_mode;
+    p.preproc.frcrn_model_path = config_.asr_frcrn_model;
+    p.preproc.tfgridnet_model_path = config_.asr_tfgridnet_model;
+    p.incremental = config_.asr_incremental;
+    p.segment_sec = config_.asr_incremental_segment_sec;
+    p.endpoint_reset = config_.asr_incremental_endpoint_reset;
+    p.endpoint_min_segment_sec = config_.asr_incremental_min_segment_sec;
     // Wrap the transport emit so worker-thread events are serialized with the
     // controller's timeline emit.
     asr_worker_ = std::make_unique<AsrWorker>(
         asr_.get(), &timeline_, p,
         [this](const std::string& json) { EmitLocked(json); },
-        asr_stream_);
+      asr_stream_, config_.asr_rollback_tokens);
     asr_cursor_ = buffer_.AddConsumer();
     asr_thread_ = std::thread([this] {
       std::vector<float> chunk;

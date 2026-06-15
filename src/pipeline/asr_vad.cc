@@ -235,6 +235,29 @@ bool AsrSileroVad::NextSpan(bool finalize, int* begin, int* end, int* consume) {
   return false;
 }
 
+bool AsrSileroVad::NextEndpoint(bool finalize, long* endpoint_abs_sample) {
+  if (endpoint_abs_sample == nullptr) return false;
+
+  // Run the detector forward over buffered audio. Each window updates the LSTM
+  // state and reports a segment_end when a min-silence gap closes a speech run.
+  // We report the absolute sample index at that window's end as the endpoint,
+  // and keep one window of audio as context for the LSTM on the next call.
+  while (cursor_ + kWindowSize <= static_cast<int>(pcm_.size())) {
+    const int win_end = cursor_ + kWindowSize;
+    const StepResult st = ProcessWindow(pcm_.data() + cursor_, kWindowSize);
+    cursor_ = win_end;
+    if (st.segment_end) {
+      *endpoint_abs_sample = base_sample_ + win_end;
+      if (cursor_ > 2 * kWindowSize) Consume(cursor_ - kWindowSize);
+      return true;
+    }
+  }
+  // Bound memory between endpoints (keep one window of context for the LSTM).
+  if (cursor_ > 2 * kWindowSize) Consume(cursor_ - kWindowSize);
+  (void)finalize;
+  return false;
+}
+
 void AsrSileroVad::Consume(int n) {
   if (n <= 0) return;
   const int drop = std::min<int>(n, static_cast<int>(pcm_.size()));

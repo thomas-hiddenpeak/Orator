@@ -20,18 +20,30 @@ double Secs(Clock::time_point a, Clock::time_point b) {
 }  // namespace
 
 AsrWorker::AsrWorker(model::Qwen3Asr* asr, StreamTimeline* timeline,
-                     const Params& params, Emit emit, cudaStream_t stream)
+                     const Params& params, Emit emit, cudaStream_t stream,
+                     int rollback_tokens)
     : asr_(asr), timeline_(timeline), params_(params), emit_(std::move(emit)),
-  vad_(params), stream_(stream) {}
+  vad_(params.vad), preproc_(params.preproc), stream_(stream),
+  rollback_tokens_(rollback_tokens) {}
 
 void AsrWorker::ProcessSpan(const float* samples, int n) {
   if (samples == nullptr || n <= 0) return;
-  vad_.Push(samples, n);
-  DrainUtterances(/*finalize=*/false);
+  if (params_.incremental) {
+    ProcessIncremental(samples, n, /*finalize=*/false);
+  } else {
+    vad_.Push(samples, n);
+    DrainUtterances(/*finalize=*/false);
+  }
   processed_samples_.fetch_add(n);
 }
 
-void AsrWorker::Finalize() { DrainUtterances(/*finalize=*/true); }
+void AsrWorker::Finalize() {
+  if (params_.incremental) {
+    ProcessIncremental(nullptr, 0, /*finalize=*/true);
+  } else {
+    DrainUtterances(/*finalize=*/true);
+  }
+}
 
 void AsrWorker::DrainUtterances(bool finalize) {
   for (;;) {
@@ -45,49 +57,70 @@ void AsrWorker::DrainUtterances(bool finalize) {
 
 void AsrWorker::EmitUtterance(int begin, int end, bool finalize) {
   if (end <= begin) return;
-  const int sr = params_.sample_rate;
+  const int sr = params_.vad.sample_rate;
+  std::vector<float> enhanced;
+  const float* asr_input = vad_.data() + begin;
+  int asr_len = end - begin;
+  preproc_.Process(asr_input, asr_len, &enhanced);
+  if (!enhanced.empty()) {
+    asr_input = enhanced.data();
+    asr_len = static_cast<int>(enhanced.size());
+  }
   const auto t0 = Clock::now();
-  std::string text;
+  std::string continuation;
   {
     std::lock_guard<std::mutex> gpu(gpu::DeviceLock());
-    text = asr_->TranscribeText(vad_.data() + begin, end - begin, stream_);
+    if (rollback_tokens_ > 0) {
+      continuation = asr_->TranscribeWindow(asr_input, asr_len,
+                                            pending_prefix_, stream_);
+    } else {
+      continuation = asr_->TranscribeText(asr_input, asr_len,
+                                          stream_);
+    }
   }
   compute_sec_ += Secs(t0, Clock::now());
-  if (text.empty()) return;
+  if (continuation.empty() && !finalize) return;
 
-  // Token-level prefix rollback: keep last kRollbackTokens unfixed for
-  // re-decoding in the next utterance, improving boundary accuracy.
-  std::string confirmed_text = text;
-  if (!finalize && !text.empty()) {
-    // Tokenize the output, split into confirmed + pending.
-    auto tokens = asr_->tokenizer().Encode(text);
-    if (static_cast<int>(tokens.size()) > kRollbackTokens) {
-      // Confirmed = all but last kRollbackTokens.
-      std::vector<int> confirmed_tokens(
-          tokens.begin(), tokens.end() - kRollbackTokens);
-      confirmed_text = asr_->tokenizer().Decode(confirmed_tokens, /*skip_special=*/true);
-      
-      // Pending = last kRollbackTokens.
-      std::vector<int> pending_tokens(
-          tokens.end() - kRollbackTokens, tokens.end());
-      pending_prefix_ = asr_->tokenizer().Decode(pending_tokens, /*skip_special=*/true);
-    } else {
-      // Too few tokens to split; keep all for next utterance.
-      confirmed_text = "";
-      pending_prefix_ = text;
+  if (rollback_tokens_ <= 0) {
+    core::AsrToken tok;
+    tok.start_sec = static_cast<double>(vad_.base_sample() + begin) / sr;
+    tok.end_sec = static_cast<double>(vad_.base_sample() + end) / sr;
+    tok.text = continuation;
+    if (tok.text.empty()) return;
+    timeline_->AppendToken(tok);
+    if (emit_) {
+      char buf[128];
+      std::snprintf(buf, sizeof(buf),
+                    "{\"type\":\"asr\",\"start\":%.3f,\"end\":%.3f,\"text\":\"",
+                    tok.start_sec, tok.end_sec);
+      emit_(std::string(buf) + JsonEscape(tok.text) + "\"}");
     }
-  } else if (finalize) {
-    // Last utterance: emit everything, clear pending.
-    confirmed_text = pending_prefix_ + text;
-    pending_prefix_.clear();
+    return;
   }
 
-  if (confirmed_text.empty()) return;  // Nothing to emit this round.
+  std::string merged = pending_prefix_ + continuation;
+  std::string emit_text;
+  if (finalize || rollback_tokens_ <= 0) {
+    emit_text = merged;
+    pending_prefix_.clear();
+  } else {
+    std::vector<int> toks = asr_->tokenizer().Encode(merged);
+    if (static_cast<int>(toks.size()) > rollback_tokens_) {
+      std::vector<int> fixed(toks.begin(), toks.end() - rollback_tokens_);
+      std::vector<int> tail(toks.end() - rollback_tokens_, toks.end());
+      emit_text = asr_->tokenizer().Decode(fixed, /*skip_special=*/true);
+      pending_prefix_ = asr_->tokenizer().Decode(tail, /*skip_special=*/true);
+    } else {
+      pending_prefix_ = merged;
+      emit_text.clear();
+    }
+  }
+  if (emit_text.empty()) return;
 
   core::AsrToken tok;
   tok.start_sec = static_cast<double>(vad_.base_sample() + begin) / sr;
   tok.end_sec = static_cast<double>(vad_.base_sample() + end) / sr;
-  tok.text = confirmed_text;
+  tok.text = emit_text;
   timeline_->AppendToken(tok);
 
   if (emit_) {
@@ -99,9 +132,131 @@ void AsrWorker::EmitUtterance(int begin, int end, bool finalize) {
   }
 }
 
+// Incremental KV-cache path: continuous audio is fed into the engine's
+// streaming session, which carries KV context across its 8 s windows. The
+// segment is committed (one timeline token) and the session reset at the
+// segment cap or on finalize. Continuous (untrimmed) audio is fed so the
+// acoustic flow is preserved -- VAD trimming/concatenation degrades the
+// streamed context. The Silero front VAD is bypassed in this mode; segment
+// boundaries come from the cap (a natural-endpoint trigger can replace the cap
+// later without changing this contract).
+void AsrWorker::ProcessIncremental(const float* samples, int n, bool finalize) {
+  const int sr = params_.vad.sample_rate;
+  const long seg_cap = std::max<long>(1, static_cast<long>(params_.segment_sec * sr));
+  const long min_seg =
+      std::max<long>(1, static_cast<long>(params_.endpoint_min_segment_sec * sr));
+
+  // Endpoint detection (T050): the Silero VAD runs in parallel purely as an
+  // endpoint detector. The engine is fed the SAME continuous audio (the VAD
+  // does not trim it); endpoints only choose where to close a segment so the
+  // boundary lands on a natural pause (better speaker attribution + no
+  // mid-word cut) rather than a fixed cap. We push the audio to the VAD and
+  // drain endpoint positions into a queue.
+  if (params_.endpoint_reset && n > 0) {
+    vad_.Push(samples, n);
+    long ep = 0;
+    while (vad_.NextEndpoint(/*finalize=*/false, &ep)) inc_endpoints_.push_back(ep);
+  }
+
+  // Slice the input at the next segment boundary. The boundary is the earliest
+  // of: (a) a VAD endpoint at least min_seg past the segment start, or (b) the
+  // hard cap seg_cap. `take` is always > 0 so `off` strictly advances.
+  int off = 0;
+  while (off < n) {
+    // Close a full or endpoint-reached segment before feeding more, so the next
+    // sample starts a fresh segment (avoids a zero-length feed / spin).
+    if (inc_in_segment_) {
+      const long seg_start = inc_seg_start_sample_;
+      const long cap_boundary = seg_start + seg_cap;
+      long boundary = cap_boundary;
+      if (params_.endpoint_reset) {
+        while (!inc_endpoints_.empty() &&
+               inc_endpoints_.front() < seg_start + min_seg)
+          inc_endpoints_.pop_front();  // too early for this segment
+        if (!inc_endpoints_.empty())
+          boundary = std::min(boundary, inc_endpoints_.front());
+      }
+      if (inc_abs_pos_ >= boundary) {
+        EmitIncrementalChunk(nullptr, 0, /*finalize=*/true);
+        continue;  // re-evaluate with a closed segment
+      }
+      const int take =
+          static_cast<int>(std::min<long>(boundary - inc_abs_pos_, n - off));
+      EmitIncrementalChunk(samples + off, take, /*finalize=*/false);
+      off += take;
+    } else {
+      // No open segment: feed up to the cap (a new segment opens on first feed).
+      const int take = static_cast<int>(std::min<long>(seg_cap, n - off));
+      EmitIncrementalChunk(samples + off, take, /*finalize=*/false);
+      off += take;
+    }
+  }
+  if (finalize) EmitIncrementalChunk(nullptr, 0, /*finalize=*/true);
+}
+
+void AsrWorker::EmitIncrementalChunk(const float* samples, int n, bool finalize) {
+  const int sr = params_.vad.sample_rate;
+  const long seg_cap = std::max<long>(1, static_cast<long>(params_.segment_sec * sr));
+
+  const auto t0 = Clock::now();
+  {
+    std::lock_guard<std::mutex> gpu(gpu::DeviceLock());
+    if (n > 0) {
+      if (!inc_in_segment_) {
+        inc_seg_start_sample_ = inc_abs_pos_;
+        inc_seg_samples_ = 0;
+        inc_live_text_.clear();
+        asr_->StreamReset(inc_seg_start_sample_);
+        inc_in_segment_ = true;
+      }
+      inc_live_text_ = asr_->StreamChunk(samples, n, stream_);
+      inc_seg_samples_ += n;
+      inc_abs_pos_ += n;
+      inc_seg_end_sample_ = inc_abs_pos_;
+    }
+    const bool hit_cap = inc_seg_samples_ >= seg_cap;
+    if (inc_in_segment_ && (finalize || hit_cap)) {
+      inc_live_text_ = asr_->StreamFinalize(stream_);
+      inc_in_segment_ = false;
+    }
+  }
+  compute_sec_ += Secs(t0, Clock::now());
+
+  const bool segment_closed = !inc_in_segment_ && !inc_live_text_.empty();
+  if (segment_closed) {
+    core::AsrToken tok;
+    tok.start_sec = static_cast<double>(inc_seg_start_sample_) / sr;
+    tok.end_sec = static_cast<double>(inc_seg_end_sample_) / sr;
+    tok.text = inc_live_text_;
+    timeline_->AppendToken(tok);
+    if (emit_) {
+      char buf[128];
+      std::snprintf(buf, sizeof(buf),
+                    "{\"type\":\"asr\",\"start\":%.3f,\"end\":%.3f,\"text\":\"",
+                    tok.start_sec, tok.end_sec);
+      emit_(std::string(buf) + JsonEscape(tok.text) + "\"}");
+    }
+    inc_live_text_.clear();
+  } else if (n > 0 && emit_ && !inc_live_text_.empty()) {
+    // Partial live update (not yet committed to the timeline).
+    char buf[160];
+    std::snprintf(buf, sizeof(buf),
+                  "{\"type\":\"asr_partial\",\"start\":%.3f,\"end\":%.3f,"
+                  "\"text\":\"",
+                  static_cast<double>(inc_seg_start_sample_) / sr,
+                  static_cast<double>(inc_seg_end_sample_) / sr);
+    emit_(std::string(buf) + JsonEscape(inc_live_text_) + "\"}");
+  }
+}
+
 void AsrWorker::Reset() {
   vad_.Reset();
   pending_prefix_.clear();
+  inc_in_segment_ = false;
+  inc_abs_pos_ = 0;
+  inc_seg_samples_ = 0;
+  inc_live_text_.clear();
+  inc_endpoints_.clear();
   processed_samples_.store(0);
   compute_sec_ = 0.0;
   asr_->Reset();

@@ -1,116 +1,168 @@
-# Plan 003 — Bounded Sliding-Window Real-Time ASR
+# Plan 003 — Incremental KV-Cache Real-Time ASR
 
 - **Feature**: `003-sliding-window-asr`
 - **Spec**: [spec.md](spec.md)
-- **Status**: Draft (in progress)
+- **Status**: Revised (incremental KV cache + windowed encoder)
 - **Constitution**: v1.1.0
 
-> HOW to satisfy [spec.md](spec.md). Standard terminology; "window" is the
-> bounded span of recent audio re-decoded each step.
+> HOW to satisfy [spec.md](spec.md). Standard terminology.
 
 ---
 
-## 1. Algorithm
+## 1. Mechanism
 
-State held by the ASR worker (all in the time domain, on the shared clock):
+### 1.1 Prompt layout and what changes per step
 
-- `pcm_` — retained audio samples; `base_sample_` is the absolute index of
-  `pcm_[0]`. Only the window's worth of recent audio is retained.
-- `committed_text_` — the transcript that has been finalized (text for audio
-  that has passed out of the window). Supplied to the model as a prefix prompt.
-- `committed_until_sample_` — absolute sample index up to which audio has been
-  committed (its text is in `committed_text_`).
-- `last_decode_sample_` — absolute sample index of the last decode step.
+The decode prompt for one streaming segment is:
 
-Per arriving audio span (`ProcessSpan`):
+```
+[ system prefix S ] [ audio_start ] [ audio_pad x N ] [ audio_end ]
+[ assistant header ] [ "language X" ] [ <asr_text> ] [ committed tail ]
+```
 
-1. Append samples to `pcm_`; advance the producer position.
-2. If at least `step_sec` of new audio has arrived since `last_decode_sample_`,
-   run a decode step:
-   a. Define the window as `pcm_` from `committed_until_sample_` to the current
-      end, capped at `window_sec`. If the span exceeds `window_sec`, the oldest
-      part beyond the cap must be committed first (step 3 below) so the window
-      stays bounded.
-   b. Call `Qwen3Asr::TranscribeWindow(window_samples, committed_text_)`. It
-      returns the continuation text for the window (the model continues from the
-      committed prefix).
-   c. The live transcript is `committed_text_ + continuation`. Emit it as the
-      current incremental result.
-3. Commit: when the window would exceed `window_sec`, the audio from
-   `committed_until_sample_` up to `(end - window_sec)` leaves the window. Decode
-   that leaving span together with a trailing `commit_margin_sec` of context,
-   take the text for the leaving portion, append it to `committed_text_`, advance
-   `committed_until_sample_`, and drop the corresponding samples from `pcm_`.
-   The `commit_margin_sec` (the unfixed tail) prevents committing a word that is
-   still being spoken at the boundary.
+The audio-pad block sits in the middle. As audio arrives, only N grows (new
+audio-pad tokens are appended at the end of the audio block). The system prefix
+and the earlier audio-pad tokens keep their absolute positions, so their KV
+stays valid. Everything AFTER the audio block (audio_end ... committed tail)
+shifts to later positions when N grows, so its KV must be recomputed each step;
+it is short and bounded.
 
-On `Finalize`: decode the remaining window, commit the whole continuation, drop
-the buffer.
+### 1.2 Per-segment streaming session state
 
-Timeline: each committed span is appended to `StreamTimeline` as an `AsrToken`
-with absolute start/end derived from the committed sample range. The
-comprehensive view is built by the controller as today.
+- `cache_ckpt_` — cache length after `[S][audio_start][audio_pad x N]`
+  (the persistent checkpoint; suffix KV is dropped back to here each step).
+- `audio_tokens_` — N, the number of audio-pad tokens encoded so far.
+- `running_ids_` — the full decoded token ids of the segment so far
+  (committed + unfixed tail), used to build the suffix prefix.
+- `unfixed_token_num` — K; the last K tokens of `running_ids_` are re-decoded
+  each step (mirrors the official rollback); the rest are committed into the
+  suffix prefix verbatim.
+- `seg_base_sample_` — absolute sample index where this segment started, for
+  timeline anchoring.
 
-### Why this is bounded
-- The re-decoded window is at most `window_sec` of audio → encoder cost and
-  decode token count per step are bounded by `window_sec`, independent of total
-  stream length (spec FR6).
-- `pcm_` holds at most `window_sec + commit_margin_sec` of audio → bounded
-  memory. `committed_text_` grows as plain text (kilobytes per minute), which is
-  negligible and bounded by the session.
+### 1.3 Per chunk (`StreamChunk(pcm, n)`)
+
+1. Append `pcm` to the segment audio buffer; once at least `chunk_sec` of new
+   audio is available, run a step.
+2. **Encode new chunk only** (windowed encoder): mel + `AsrAudioTower::Forward`
+   on the new chunk produces `dN` new audio tokens whose embeddings equal their
+   slice of a full encode (chunk-local; AC2). Inject them into `dN` audio-pad
+   embedding slots.
+3. **Append audio KV**: `decoder.PrefillAt(new_audio_embeds, dN, pos0 =
+   cache_ckpt_)` writes the new audio KV after the existing audio block. Advance
+   `cache_ckpt_ += dN`, `audio_tokens_ += dN`.
+4. **Suffix prefill + decode**: build the suffix embeds
+   `[audio_end, assistant header, "language X", <asr_text>, committed_tail]` where
+   `committed_tail` = `running_ids_` with the last K tokens dropped; prefill the
+   suffix at `pos0 = cache_ckpt_`, then `DecodeGreedy(start_pos = cache_ckpt_ +
+   suffix_len, ...)` to get the continuation tokens. The new `running_ids_` =
+   committed_tail + continuation.
+5. **Truncate**: `decoder.TruncateCache(cache_ckpt_)` drops the suffix +
+   generated KV, leaving only `[S][audio_start][audio_pad x N]` cached for the
+   next chunk.
+6. Update the live transcript from `running_ids_` (decoded, language tag
+   stripped). The leading stable part (all but the unfixed tail) is what gets
+   committed to the timeline once it stops changing.
+
+### 1.4 Boundary reset (bounded growth)
+
+N, the audio-block KV, and per-token attention cost grow within a segment. To
+bound them over a long stream, the session resets on a natural boundary:
+
+- a speech endpoint (silence ≥ `endpoint_sec`), or
+- a hard cap `max_segment_sec`.
+
+On reset: commit the whole running transcript of the segment to the timeline with
+absolute times derived from `seg_base_sample_` and the segment audio length,
+`decoder.ResetCache()`, clear the session state, and start a new segment at the
+current sample. Per-step cost is therefore O(chunk) within a segment and the
+segment length is bounded by `max_segment_sec` (FR5, AC5).
+
+### 1.5 Why this is incremental
+
+- Per step the decoder prefills only `dN` (new chunk) + `suffix_len` (~10 +
+  bounded committed tail) tokens, not the whole prompt — O(chunk), not
+  O(elapsed). The bulk (N audio tokens, which reaches thousands) is reused from
+  cache (FR1–FR3, G1, AC1).
+- The windowed encoder encodes only the new chunk (chunk-local), so audio
+  encoding is also O(chunk) (FR4, G2, AC2).
+- Boundary reset caps N so per-token decode attention (O(cache_len)) stays
+  bounded over a long stream (FR5, G3, AC5).
 
 ## 2. Components
 
-### 2.1 `AsrWorker` (rewrite the internal method)
-- Replace the energy-VAD `DrainUtterances` / `EmitUtterance` with the
-  sliding-window step above. The public surface (`ProcessSpan`, `Finalize`,
-  `Reset`, `processed_samples`, `compute_sec`, `Emit`) is unchanged so the
-  controller and WS handler need no change.
-- New `Params`:
-  - `window_sec` (re-decoded window length; swept, default from §4),
-  - `step_sec` (decode cadence; how often a step runs),
-  - `commit_sec` (how much audio leaves the window per commit; ≤ window_sec),
-  - `commit_margin_sec` (unfixed tail kept for context at the commit boundary).
-  The old energy-VAD params are removed.
-- Uses `Qwen3Asr::TranscribeWindow(samples, n, prefix_text)` (already added).
+### 2.1 `AsrTextDecoder` (add two small primitives, no numeric change)
+- `PrefillAt(const float* embeds, int T, int pos0, cudaStream_t)` — thin public
+  wrapper over the existing `Forward(x, T, pos0)` that APPENDS KV at `pos0`
+  instead of resetting to 0. (`Prefill` stays as `PrefillAt(.,.,0)`.)
+- `TruncateCache(int len)` — set `cache_len_ = len` (buffers retained). Used to
+  drop suffix/generated KV back to the audio-block checkpoint.
+- `cache_len()` accessor for the session to read the current checkpoint.
+  No kernel or numeric change; the KV write path (`Forward` at arbitrary `pos0`)
+  and `GqaCacheAttnKernel` (attends over `pos0` cache positions) already exist.
 
-### 2.2 `Qwen3Asr`
-- `TranscribeWindow` exists. Add nothing unless the sweep shows a need (for
-  example a max-new-tokens proportional to window length).
+### 2.2 `AsrAudioTower` (streaming chunk-local mode)
+- The encoder already chunks mel into `n_window*2` frames with per-chunk conv +
+  per-chunk positional embedding. For streaming we run the trained windowed
+  attention (`ORATOR_ASR_WINDOWED`) so a standalone chunk encode equals its slice
+  of a full encode. T020 verifies the equivalence (AC2). Chunk size is chosen to
+  be a whole number of encoder windows so boundaries are clean.
 
-### 2.3 CER measurement (offline analysis tool, not a runtime path)
-- A small Python tool (`tools/cer.py`, standard library only) computes character
-  error rate between a hypothesis transcript and the gold transcript over the
-  same time span, after normalization (strip punctuation/whitespace, keep CJK
-  and alphanumerics). It reads the streamed JSON output (the `comprehensive`
-  text or the asr-track text) and `asrTest2Final.txt`.
-- This is offline analysis tooling under `tools/` (Constitution I.4 permits
-  Python tooling), not part of the runtime.
+### 2.3 `Qwen3Asr` (incremental streaming session API)
+- Add a small session object/state implementing §1.3–1.4 on top of the existing
+  mel/encoder/decoder and tokenizer: `StreamReset(base_sample)`,
+  `StreamChunk(pcm, n) -> live_text`, `StreamFinalize() -> committed_text`.
+  Reuses `Embed`, `PrefillAt`, `TruncateCache`, `DecodeGreedy`, `tokenizer()`.
+  `TranscribeText` (single-segment) and the energy-VAD `SegmentSpeech` stay for
+  fallback and for the boundary detector.
+
+### 2.4 `AsrWorker` (wire the session in)
+- Drive the streaming session from `ProcessSpan`: feed arriving audio to
+  `StreamChunk`, detect endpoints/cap to trigger `StreamReset`, append committed
+  spans to the timeline. Public surface (`ProcessSpan`, `Finalize`, `Reset`,
+  `processed_samples`, `compute_sec`, `Emit`) unchanged so the controller and WS
+  handler need no change.
+
+### 2.5 CER measurement (existing offline tool)
+- `tools/cer.py` (standard library only) already computes character error rate
+  between a hypothesis transcript and `asrTest2Final.txt` over the same span
+  after normalization. Reused unchanged.
 
 ## 3. Validation
 
-- **Cost stability (AC1)**: instrument the worker (or the probe) to log per-step
-  decode time; confirm the last-third average is within a small factor of the
-  first-third average (bounded, not linearly growing).
-- **RTF (AC2)**: measure streaming RTF on 120 s through the WS path, compare to
-  the current 4.99x.
-- **Accuracy (AC3)**: run `tools/cer.py` on the bounded-window output and on the
-  current energy-VAD output against the gold; require CER(window) ≤ CER(VAD).
-- **Determinism (AC4)**: two runs produce identical committed text.
-- **Memory (AC5)**: VmRSS bounded over a long run (reuse the probe's VmRSS
-  logging or `/proc/self/status`).
+- **Chunk-local equivalence (AC2)**: a probe encodes 120 s full vs
+  chunk-by-chunk-append in windowed mode and reports the max abs diff over the
+  frozen earlier tokens (tolerance from the bf16 encoder, ~1e-2).
+- **Per-step cost incremental (AC1)**: instrument the session to log per-step
+  prefill + decode time within a segment; confirm a deep step is within a small
+  bound of an early step (not linearly growing).
+- **RTF (AC4)**: measure streaming RTF on 120 s, compare to the Silero-VAD
+  baseline (3.27x ASR compute). Measured incremental seg-reset: 4.51x.
+- **Accuracy (AC3)**: run `tools/cer.py` on the incremental-streaming output and
+  on the Silero-VAD output against the gold; require CER(incremental) <=
+  CER(Silero) on the same span. Measured: incremental 17.6% vs Silero 30.8%.
+- **Determinism (AC7)**: two runs produce identical committed text.
+- **Memory + bounded cost (AC5)**: VmRSS and per-step time bounded over a long
+  run with boundary resets.
 - **Tests/build (AC7)**: `ctest` green, `-Wall -Wextra` clean.
 
 ## 4. Parameter sweep (decide defaults from data, not assumption)
 
-Sweep on 120 s of `test.mp3`, reporting RTF and CER for each:
-- `window_sec` ∈ {8, 12, 16, 24}
-- `step_sec` ∈ {1, 2}
-- `commit_margin_sec` ∈ {1, 2}
-- `commit_sec` derived (window minus margin, or a fixed fraction).
+The encoder fixes the chunk granularity: windowed attention is block-diagonal
+over `window_aftercnn = Wc * (n_window_infer/win) = 13*8 = 104` tokens = 8 s of
+audio. T011 verified a standalone 8 s window encode equals its slice of a full
+encode to 4.5e-3 (bf16 noise floor). So a streaming step appends whole 8 s
+windows; `chunk_sec` is a positive multiple of 8 s (finer live latency would
+require recomputing the trailing partial window, deferred). Sweep on 120 s of
+`test.mp3`, reporting RTF and CER for each:
+- `chunk_sec` in {8, 16} (whole encoder windows),
+- `unfixed_token_num` (K) in {3, 5, 8},
+- `endpoint_sec` in {0.6, 1.0} and `max_segment_sec` in {24, 32} (multiples of
+  the 8 s window).
 
-Pick the smallest window that does not increase CER versus the best, with RTF at
-or above target. Record the chosen defaults and the sweep table.
+Pick the settings with CER <= baseline and the highest sustained RTF; record the
+chosen defaults and the sweep table. Reset cadence (endpoint/cap) trades context
+(accuracy) against bounded per-step cost.
 
 ## 5. Constitution Check
 
@@ -124,14 +176,18 @@ or above target. Record the chosen defaults and the sweep table.
 
 ## 6. Risks and Mitigations
 
-- **Boundary word loss** → `commit_margin_sec` unfixed tail + tail re-decode
-  (AC3 verifies).
-- **Latency** → `step_sec` controls how often the live transcript updates;
-  committed text lags by about `window_sec`. Reported, tuned in §4.
-- **Repetition at prefix join** → the model continues from the committed prefix;
-  the existing repetition cleanup applies. Verified by AC3.
+- **Windowed-encoder drift** → T020 verifies chunk-local encode equivalence
+  (AC2) before any worker change; chunk size aligned to encoder windows.
+- **Suffix re-prefill / truncate correctness** → the audio-block KV must be
+  untouched by the suffix prefill + truncate; determinism (AC7) verifies it.
+- **Rollback cutting a multi-byte character** → mirror the official `\ufffd`
+  guard when dropping the unfixed tail.
+- **Reset cadence** → endpoint/cap parameters swept in §4; trade context
+  (accuracy) against bounded per-step cost.
+- **Repetition at suffix join** → the existing repetition cleanup + EOS-ban
+  steps apply; verified by AC3.
 
 ## 7. Out of Scope (per spec Non-Goals)
 
-Model numerics/quantization, per-word timestamps, GPU scheduling (Spec 002),
-diarization changes.
+Quantization, per-word timestamps, GPU scheduling (Spec 002), diarization
+changes.

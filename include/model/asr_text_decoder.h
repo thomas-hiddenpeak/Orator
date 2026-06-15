@@ -57,6 +57,22 @@ class AsrTextDecoder {
   // leave logits for the last token on the device (queryable via Argmax).
   void Prefill(const float* embeds, int T, cudaStream_t stream = 0);
 
+  // Append T input embeddings [T, hidden] (host) to the KV cache STARTING at
+  // absolute position `pos0` (instead of resetting to 0). The existing KV at
+  // positions [0, pos0) is left intact, so a streaming caller can keep the
+  // already-encoded audio-block KV across steps and prefill only the new tokens.
+  // Leaves logits for the last appended token on the device. `Prefill` is the
+  // special case pos0 == 0 (after ResetCache).
+  void PrefillAt(const float* embeds, int T, int pos0, cudaStream_t stream = 0);
+
+  // Set the logical cache length back to `len` (the KV buffers are retained).
+  // Used by the streaming caller to drop the suffix + generated KV after a step
+  // while keeping the persistent audio-block KV for the next step.
+  void TruncateCache(int len) { cache_len_ = len; }
+
+  // Current logical cache length (number of valid KV positions).
+  int cache_len() const { return cache_len_; }
+
   // Decode one step from embedding [hidden] (host) at absolute position `pos`.
   void DecodeStep(const float* embed, int pos, cudaStream_t stream = 0);
 

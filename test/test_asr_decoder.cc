@@ -65,5 +65,57 @@ int main() {
     return 1;
   }
   std::printf("ASR text decoder test PASSED\n");
+
+  // ---- T010: incremental PrefillAt(append) must equal a single Prefill ----
+  // Split the prompt into two parts and prefill the second at pos0 = len(part1)
+  // (keeping the first part's KV). The last-token logits must match a single
+  // Prefill over the whole prompt (same math, just split into two Forward
+  // calls), which is the foundational guarantee for incremental streaming.
+  std::printf("\nT010: incremental PrefillAt append equivalence...\n");
+  const int split = T / 2;
+  dec.ResetCache();
+  dec.PrefillAt(embeds.data(), split, 0);
+  dec.PrefillAt(embeds.data() + static_cast<size_t>(split) * hidden,
+                T - split, split);
+  if (dec.cache_len() != T) {
+    std::printf("FAIL: cache_len=%d expected %d\n", dec.cache_len(), T);
+    return 1;
+  }
+  auto logits_inc = dec.CopyLogits();
+  int inc_am = dec.Argmax();
+  double inc_max_abs = 0.0;
+  for (int i = 0; i < vocab; ++i)
+    inc_max_abs = std::max(inc_max_abs,
+                           std::abs((double)logits_inc[i] - logits[i]));
+  std::printf("  split=%d argmax inc=%d single=%d ; logits max abs diff = %.3e\n",
+              split, inc_am, our_am, inc_max_abs);
+  if (inc_am != our_am) {
+    std::printf("FAIL: incremental argmax mismatch\n");
+    return 1;
+  }
+  // The split changes the bf16 GEMM M-tiling (M=T single vs split parts), so
+  // logits differ at the bf16 noise floor (~1e-1, same order as vs the fp32
+  // oracle). Argmax match is the correctness guarantee (identical greedy
+  // decoding); the logit bound just rejects a real logic regression.
+  if (inc_max_abs > 0.5) {
+    std::printf("FAIL: incremental logits exceed tolerance\n");
+    return 1;
+  }
+
+  // TruncateCache must drop back to a checkpoint and re-prefill cleanly.
+  dec.TruncateCache(split);
+  if (dec.cache_len() != split) {
+    std::printf("FAIL: TruncateCache did not set cache_len\n");
+    return 1;
+  }
+  dec.PrefillAt(embeds.data() + static_cast<size_t>(split) * hidden,
+                T - split, split);
+  int retry_am = dec.Argmax();
+  if (retry_am != our_am) {
+    std::printf("FAIL: re-prefill after truncate argmax mismatch (%d vs %d)\n",
+                retry_am, our_am);
+    return 1;
+  }
+  std::printf("T010 PrefillAt/TruncateCache equivalence PASSED\n");
   return 0;
 }

@@ -56,6 +56,7 @@ set(ORATOR_CORE_SOURCES
     src/pipeline/diar_postprocess.cc
     src/pipeline/timeline_merger.cc
     src/pipeline/auditory_stream.cc
+    src/pipeline/asr_preprocessor.cc
         src/pipeline/asr_vad.cc
     src/pipeline/shared_audio_buffer.cc
     src/pipeline/stream_timeline.cc
@@ -110,6 +111,22 @@ target_link_libraries(asr_stream_test PRIVATE orator_core)
 add_executable(asr_stream_window_probe tools/asr_stream_window_probe.cc)
 set_property(TARGET asr_stream_window_probe PROPERTY CUDA_ARCHITECTURES native)
 target_link_libraries(asr_stream_window_probe PRIVATE orator_core)
+
+# ---------------------------------------------------------------------------
+# asr_encoder_chunk_probe (Spec 003 T011): verify windowed-encoder chunk-local
+# equivalence (standalone window encode == slice of full encode).
+# ---------------------------------------------------------------------------
+add_executable(asr_encoder_chunk_probe tools/asr_encoder_chunk_probe.cc)
+set_property(TARGET asr_encoder_chunk_probe PROPERTY CUDA_ARCHITECTURES native)
+target_link_libraries(asr_encoder_chunk_probe PRIVATE orator_core)
+
+# ---------------------------------------------------------------------------
+# asr_stream_incremental_probe (Spec 003 T031): drive the incremental KV-cache
+# streaming session; measure per-step cost, RTF, memory; write transcript JSON.
+# ---------------------------------------------------------------------------
+add_executable(asr_stream_incremental_probe tools/asr_stream_incremental_probe.cc)
+set_property(TARGET asr_stream_incremental_probe PROPERTY CUDA_ARCHITECTURES native)
+target_link_libraries(asr_stream_incremental_probe PRIVATE orator_core)
 
 # ---------------------------------------------------------------------------
 # Tests

@@ -34,6 +34,17 @@ int main(int argc, char** argv) {
   pipeline::AuditoryStream::Config cfg;
   cfg.asr_model_dir = argv[2];
   if (argc > 3) cfg.diarizer_weights = argv[3];
+  // Opt into the Spec 003 incremental KV-cache session via env, so the same
+  // harness measures Silero-VAD baseline (default) vs VAD-driven incremental.
+  if (const char* e = std::getenv("ORATOR_ASR_INCREMENTAL"); e && e[0] == '1') {
+    cfg.asr_incremental = true;
+    if (const char* s = std::getenv("ORATOR_ASR_SEGMENT_SEC"))
+      cfg.asr_incremental_segment_sec = std::atof(s);
+    if (const char* s = std::getenv("ORATOR_ASR_ENDPOINT_RESET"); s && s[0] == '1')
+      cfg.asr_incremental_endpoint_reset = true;
+    if (const char* s = std::getenv("ORATOR_ASR_MIN_SEGMENT_SEC"))
+      cfg.asr_incremental_min_segment_sec = std::atof(s);
+  }
   const double start_sec = argc > 4 ? std::atof(argv[4]) : 0.0;
   const double dur_sec = argc > 5 ? std::atof(argv[5]) : 0.0;  // 0 => to end
   const int frame_ms = argc > 6 ? std::atoi(argv[6]) : 100;    // stream granularity

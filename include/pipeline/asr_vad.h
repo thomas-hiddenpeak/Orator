@@ -14,14 +14,14 @@ class AsrSileroVad {
  public:
   struct Params {
     int sample_rate = 16000;
-    double max_utterance_sec = 42.0;
-    double min_utterance_sec = 0.18;
+    double max_utterance_sec = 28.0;
+    double min_utterance_sec = 0.20;
 
     std::string silero_model_path = "models/asr/silero_vad.safetensors";
-    float silero_threshold = 0.46f;
-    int silero_min_speech_ms = 200;
-    int silero_min_silence_ms = 360;
-    int silero_speech_pad_ms = 100;
+    float silero_threshold = 0.5f;
+    int silero_min_speech_ms = 250;
+    int silero_min_silence_ms = 120;
+    int silero_speech_pad_ms = 60;
   };
 
   explicit AsrSileroVad(const Params& params);
@@ -31,6 +31,15 @@ class AsrSileroVad {
   // Returns one completed span [begin,end) in samples relative to current
   // buffered front, and how many samples should be consumed afterward.
   bool NextSpan(bool finalize, int* begin, int* end, int* consume);
+
+  // Endpoint-only detection for the incremental streaming path (Spec 003 T050).
+  // Advances the VAD over buffered audio and reports the ABSOLUTE sample index
+  // of the next speech endpoint (a silence gap after speech). Returns false if
+  // none is available yet. Consumes processed audio to bound memory. Unlike
+  // NextSpan it does NOT trim or return spans -- the caller feeds the original
+  // continuous audio to the engine and only uses these endpoints to choose
+  // segment reset points. Do not interleave with NextSpan (shared cursor).
+  bool NextEndpoint(bool finalize, long* endpoint_abs_sample);
 
   const float* data() const { return pcm_.data(); }
   long base_sample() const { return base_sample_; }

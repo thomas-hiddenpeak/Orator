@@ -51,7 +51,42 @@ class Qwen3Asr final : public core::IAsr {
   // evaluate the official Qwen3-ASR streaming method (audio_accum + prefix
   // rollback). `samples` is all audio from the stream start.
   std::string TranscribeWindow(const float* samples, int num_samples,
-                               const std::string& prefix_text);
+                               const std::string& prefix_text,
+                               cudaStream_t stream = 0);
+
+  // ---- Incremental KV-cache streaming session (Spec 003) --------------------
+  // Across StreamChunk calls the decoder retains the KV of the system prefix
+  // and the audio-pad block; each completed 8 s audio window is encoded
+  // standalone (chunk-local windowed encoder, verified) and its audio-token KV
+  // is appended at the current cache position, then only the short suffix
+  // (audio_end ... <asr_text> + committed tail) is re-prefilled and decoded and
+  // that suffix KV is truncated away. The audio block KV persists, so per-step
+  // cost is O(one window), not O(elapsed audio). Reset on a natural boundary to
+  // bound the cache length over a long stream.
+  //
+  // Number of mel frames per 8 s encoder window and the audio tokens it yields.
+  static constexpr int kStreamWindowMel = 800;   // 8 s at hop 160 (n_window_infer)
+
+  // Begin a new segment. `base_sample` is the absolute sample index of the
+  // first sample fed after this call (for timeline anchoring by the caller).
+  void StreamReset(long base_sample = 0);
+
+  // Feed mono-16k samples. Once at least one full 8 s window has accumulated,
+  // encodes the new window(s), appends their KV, re-prefills the suffix and
+  // decodes. Returns the current live transcript (language tag stripped). If no
+  // new window has completed, returns the unchanged live transcript.
+  std::string StreamChunk(const float* pcm, int n, cudaStream_t stream = 0);
+
+  // Flush the residual (< 8 s) tail: encode it, append, decode once, and return
+  // the final transcript for the segment. Ends the session.
+  std::string StreamFinalize(cudaStream_t stream = 0);
+
+  // Streaming knobs (mirror the official unfixed_chunk_num / unfixed_token_num).
+  void set_stream_unfixed_chunks(int n) { stream_unfixed_chunks_ = n; }
+  void set_stream_unfixed_tokens(int n) { stream_unfixed_tokens_ = n; }
+  int stream_audio_tokens() const { return stream_audio_tokens_; }
+  int stream_chunk_id() const { return stream_chunk_id_; }
+
 
   // Energy-VAD speech segmentation. Splits [0,num_samples) into bounded speech
   // spans (sample offsets) separated by silence, capping each at
@@ -70,9 +105,16 @@ class Qwen3Asr final : public core::IAsr {
                           const std::string& prefix_text,
                           cudaStream_t stream = 0);
 
+  // One incremental streaming decode step: rollback the unfixed tail, build +
+  // prefill the suffix after the cached audio block, greedily decode the
+  // continuation, truncate the suffix/generated KV, update the running text.
+  std::string StreamDecodeStep(cudaStream_t stream);
+  // Current live transcript = running raw decode with the language tag removed.
+  std::string CurrentLiveText() const;
+
   core::AsrConfig cfg_;
   std::string language_ = "Chinese";
-  int max_new_tokens_ = 256;
+  int max_new_tokens_ = 384;
   bool loaded_ = false;
 
   // VAD / segmentation knobs (energy-based, dependency-free).
@@ -88,6 +130,19 @@ class Qwen3Asr final : public core::IAsr {
   std::unique_ptr<AsrAudioTower> encoder_;
   std::unique_ptr<AsrTextDecoder> decoder_;
   io::BpeTokenizer tokenizer_;
+
+  // --- incremental streaming session state (Spec 003) ---
+  std::vector<float> seg_pcm_;        // accumulated segment PCM (mono 16k)
+  long seg_base_sample_ = 0;          // absolute index of seg_pcm_[0]
+  int seg_encoded_frames_ = 0;        // mel frames already turned into audio tokens
+  int stream_cache_ckpt_ = 0;         // cache length after [system][audio block]
+  int stream_audio_tokens_ = 0;       // N audio tokens encoded so far
+  int stream_chunk_id_ = 0;           // completed-window counter
+  std::string stream_raw_decoded_;    // running raw decoded text (official _raw_decoded)
+  int stream_unfixed_chunks_ = 2;     // first N windows use empty prefix
+  int stream_unfixed_tokens_ = 5;     // roll back last K tokens each step
+  bool stream_active_ = false;
+
 
   // Special token ids (Qwen3-ASR).
   static constexpr int kImStart = 151644;
