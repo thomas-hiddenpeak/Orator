@@ -108,6 +108,47 @@ void AuditoryStream::StartWorkers() {
       progress_cv_.notify_all();
     });
   }
+
+  // Spec 004 T031: independent speech-endpoint detector as a THIRD buffer
+  // consumer. It runs Silero on the continuous audio purely to publish endpoint
+  // markers on the common time base; it is independent of the ASR and
+  // diarization pipelines (it reads only the shared audio, never their output).
+  if (config_.endpoint_stream) {
+    AsrSileroVad::Params vp;
+    vp.sample_rate = config_.sample_rate;
+    vp.silero_model_path = config_.asr_vad_model;
+    vp.silero_threshold = config_.asr_vad_threshold;
+    vp.silero_min_speech_ms = config_.asr_vad_min_speech_ms;
+    vp.silero_min_silence_ms = config_.asr_vad_min_silence_ms;
+    vp.silero_speech_pad_ms = config_.asr_vad_speech_pad_ms;
+    endpoint_vad_ = std::make_unique<AsrSileroVad>(vp);
+    endpoint_cursor_ = buffer_.AddConsumer();
+    endpoint_thread_ = std::thread([this] {
+      const int sr = config_.sample_rate;
+      std::vector<float> chunk;
+      auto drain = [this, sr](bool finalize) {
+        long ep = 0;
+        while (endpoint_vad_->NextEndpoint(finalize, &ep)) {
+          const double t = static_cast<double>(ep) / sr;
+          {
+            std::lock_guard<std::mutex> lk(comp_mutex_);
+            comp_.MarkEndpoint(t);
+          }
+          char buf[96];
+          std::snprintf(buf, sizeof(buf),
+                        "{\"type\":\"endpoint\",\"time\":%.3f}", t);
+          EmitLocked(buf);
+        }
+      };
+      while (buffer_.WaitAndRead(endpoint_cursor_, &chunk)) {
+        endpoint_vad_->Push(chunk.data(), static_cast<int>(chunk.size()));
+        drain(/*finalize=*/false);
+        progress_cv_.notify_all();
+      }
+      drain(/*finalize=*/true);
+      progress_cv_.notify_all();
+    });
+  }
   running_ = true;
 }
 
@@ -116,6 +157,7 @@ void AuditoryStream::StopWorkers() {
   buffer_.Close();
   if (diar_thread_.joinable()) diar_thread_.join();
   if (asr_thread_.joinable()) asr_thread_.join();
+  if (endpoint_thread_.joinable()) endpoint_thread_.join();
   running_ = false;
 }
 
@@ -240,20 +282,75 @@ std::string AuditoryStream::Serialize() {
   out += "]";  // close "tracks"
 
   // Comprehensive view: speaker turns with their spoken text, ordered by time.
-  // Present only when ASR is enabled (it requires both modalities).
+  // Present only when ASR is enabled (it requires both modalities). Built from
+  // the native stateful ComprehensiveTimeline (Spec 004): diarization provides
+  // who/when, ASR provides what/when, and the attribution is by time alignment
+  // on the common base. Diar segments are refreshed here (frame->segment is
+  // global); ASR text is upserted live by the worker. A tie on overlap prefers
+  // the tighter (more specific) speaker segment, fixing the multi-speaker
+  // mis-attribution of the old one-shot merger.
   out += ",\"comprehensive\":[";
   if (asr_) {
-    OverlapTimelineMerger merger;
-    core::Timeline merged = merger.Merge(last_segments_, last_transcript_);
-    for (size_t i = 0; i < merged.segments.size(); ++i) {
-      const auto& seg = merged.segments[i];
+    std::lock_guard<std::mutex> lk(comp_mutex_);
+    comp_.Clear();
+    comp_next_text_id_ = 0;
+    for (const auto& s : last_segments_) {
+      const std::string label =
+          s.speaker_id.empty() ? ("speaker_" + std::to_string(s.local_speaker))
+                               : s.speaker_id;
+      comp_.UpsertSpeaker(s.start_sec, s.end_sec, label, s.confidence);
+    }
+    for (const auto& t : last_transcript_.tokens)
+      comp_.UpsertText(comp_next_text_id_++, t.start_sec, t.end_sec, t.text);
+
+    auto view = comp_.Snapshot();
+    for (size_t i = 0; i < view.size(); ++i) {
+      const auto& e = view[i];
       std::snprintf(buf, sizeof(buf),
                     "{\"start\":%.3f,\"end\":%.3f,\"speaker\":\"",
-                    seg.start_sec, seg.end_sec);
-      out += std::string(buf) + JsonEscape(seg.speaker_id) + "\",\"text\":\"" +
-             JsonEscape(seg.text) + "\"}";
-      if (i + 1 < merged.segments.size()) out += ",";
+                    e.start, e.end);
+      out += std::string(buf) + JsonEscape(e.speaker) + "\",\"text\":\"" +
+             JsonEscape(e.text) + "\"}";
+      if (i + 1 < view.size()) out += ",";
     }
+
+    // Spec 004 T021: revision push. Compare the new comprehensive view against
+    // the one last emitted; if an already-reported region changed (e.g. the
+    // head's "unknown" is now attributed after diarization warmup covered it),
+    // emit a revision so the consumer overwrites those entries. We find the
+    // first index where the view diverges from prev_view_ and send everything
+    // from there as the revised region. No revision on the first emission.
+    if (!prev_view_.empty()) {
+      size_t idx = 0;
+      const size_t common = std::min(prev_view_.size(), view.size());
+      while (idx < common && prev_view_[idx].start == view[idx].start &&
+             prev_view_[idx].end == view[idx].end &&
+             prev_view_[idx].speaker == view[idx].speaker &&
+             prev_view_[idx].text == view[idx].text) {
+        ++idx;
+      }
+      if (idx < view.size()) {
+        const double dirty_start = view[idx].start;
+        const double dirty_end = view.back().end;
+        std::string rev = "{\"type\":\"revision\",";
+        std::snprintf(buf, sizeof(buf),
+                      "\"dirty_start\":%.3f,\"dirty_end\":%.3f,\"entries\":[",
+                      dirty_start, dirty_end);
+        rev += buf;
+        for (size_t i = idx; i < view.size(); ++i) {
+          const auto& e = view[i];
+          std::snprintf(buf, sizeof(buf),
+                        "{\"start\":%.3f,\"end\":%.3f,\"speaker\":\"",
+                        e.start, e.end);
+          rev += std::string(buf) + JsonEscape(e.speaker) + "\",\"text\":\"" +
+                 JsonEscape(e.text) + "\"}";
+          if (i + 1 < view.size()) rev += ",";
+        }
+        rev += "]}";
+        EmitLocked(rev);
+      }
+    }
+    prev_view_ = std::move(view);
   }
   out += "]}";
   return out;
@@ -265,6 +362,12 @@ void AuditoryStream::Reset() {
   timeline_.Clear();
   last_segments_.clear();
   last_transcript_.tokens.clear();
+  {
+    std::lock_guard<std::mutex> lk(comp_mutex_);
+    comp_.Clear();
+    prev_view_.clear();
+    comp_next_text_id_ = 0;
+  }
   if (diarizer_) diarizer_->Reset();
   if (asr_) asr_->Reset();
   StartWorkers();        // start new workers so streaming can resume

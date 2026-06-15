@@ -14,6 +14,7 @@
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <fstream>
 #include <string>
 #include <vector>
 
@@ -45,6 +46,9 @@ int main(int argc, char** argv) {
     if (const char* s = std::getenv("ORATOR_ASR_MIN_SEGMENT_SEC"))
       cfg.asr_incremental_min_segment_sec = std::atof(s);
   }
+  // Spec 004 T031: enable the independent endpoint-detector pipeline.
+  if (const char* e = std::getenv("ORATOR_ENDPOINT_STREAM"); e && e[0] == '1')
+    cfg.endpoint_stream = true;
   const double start_sec = argc > 4 ? std::atof(argv[4]) : 0.0;
   const double dur_sec = argc > 5 ? std::atof(argv[5]) : 0.0;  // 0 => to end
   const int frame_ms = argc > 6 ? std::atoi(argv[6]) : 100;    // stream granularity
@@ -64,19 +68,39 @@ int main(int argc, char** argv) {
               start_sec, start_sec + clip_sec, total, clip_sec, frame_ms);
 
   std::printf(">> loading pipelines (diar + asr) ...\n");
-  pipeline::AuditoryStream stream(cfg, [](const std::string& json) {
-    // Print incremental ASR events as they stream; the final timeline too.
+  const char* json_out = std::getenv("ORATOR_TIMELINE_JSON");
+  pipeline::AuditoryStream stream(cfg, [json_out](const std::string& json) {
+    // Print incremental ASR events as they stream; optionally dump the final
+    // timeline (and any revisions) to a file for inspection.
     if (json.rfind("{\"type\":\"asr\"", 0) == 0)
       std::printf("   [stream] %s\n", json.c_str());
+    if (json_out != nullptr &&
+        (json.rfind("{\"type\":\"timeline\"", 0) == 0 ||
+         json.rfind("{\"type\":\"revision\"", 0) == 0 ||
+         json.rfind("{\"type\":\"endpoint\"", 0) == 0 ||
+         json.rfind("{\"type\":\"meta\"", 0) == 0)) {
+      std::ofstream f(json_out, std::ios::app);
+      f << json << "\n";
+    }
   });
   stream.Start();
 
   std::printf(">> streaming ...\n");
   const int frame = std::max(1, sr * frame_ms / 1000);
+  // Spec 004 T021: optional mid-stream flush to exercise revision push. When
+  // ORATOR_FLUSH_AT_SEC is set, emit a timeline partway through; the final emit
+  // then carries revisions for any already-reported region that changed.
+  const char* flush_env = std::getenv("ORATOR_FLUSH_AT_SEC");
+  const long flush_at = flush_env ? static_cast<long>(std::atof(flush_env) * sr) : -1;
+  bool flushed = false;
   auto t0 = std::chrono::steady_clock::now();
   for (long off = 0; off < total; off += frame) {
     const int n = static_cast<int>(std::min<long>(frame, total - off));
     stream.PushAudio(pcm + off, n);
+    if (flush_at > 0 && !flushed && off + n >= flush_at) {
+      stream.EmitTimeline(/*finalize=*/false);
+      flushed = true;
+    }
   }
   stream.EmitTimeline(/*finalize=*/true);
   auto t1 = std::chrono::steady_clock::now();

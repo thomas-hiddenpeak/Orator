@@ -18,10 +18,15 @@ void AuditoryWsHandler::OnOpen(WebSocketConnection& conn) {
       });
   stream_->Start();
 
+  // Session-open metadata. Declares the COMMON TIME BASE (Spec 004 FR1): all
+  // result messages (diar, asr, endpoint, timeline, revision) carry start/end in
+  // seconds on this absolute base, where t_sec = absolute_sample / sample_rate
+  // and the origin is sample 0 of the session. A consumer can align any
+  // pipeline's output using only this declaration.
   std::string ready = "{\"type\":\"ready\",\"sample_rate\":" +
                       std::to_string(config_.sample_rate) +
                       ",\"asr\":" + (stream_->asr_enabled() ? "true" : "false") +
-                      "}";
+                      ",\"time_base\":\"absolute_samples\",\"origin_sample\":0}";
   conn.SendText(ready);
 }
 

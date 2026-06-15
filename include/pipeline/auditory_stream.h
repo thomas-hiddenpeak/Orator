@@ -33,6 +33,8 @@
 #include "model/qwen3_asr.h"
 #include "model/streaming_sortformer.h"
 #include "pipeline/asr_worker.h"
+#include "pipeline/asr_vad.h"
+#include "pipeline/comprehensive_timeline.h"
 #include "pipeline/diarization_worker.h"
 #include "pipeline/shared_audio_buffer.h"
 #include "pipeline/stream_timeline.h"
@@ -64,6 +66,10 @@ class AuditoryStream {
     double asr_incremental_segment_sec = 24.0;  // commit/reset cadence (cap)
     bool asr_incremental_endpoint_reset = false;  // T050: VAD endpoints pick reset points
     double asr_incremental_min_segment_sec = 10.0;  // min segment before an endpoint cut
+    // Spec 004 T031: run the speech-endpoint detector (Silero) as an INDEPENDENT
+    // third buffer consumer that publishes endpoint markers on the common time
+    // base. Independent of the ASR pipeline (which keeps its own internal reset).
+    bool endpoint_stream = false;
     std::string asr_language = "Chinese";
     std::string asr_preproc_mode = "none";  // none|classical|frcrn|tfgridnet
     std::string asr_frcrn_model = "models/asr_preproc/frcrn.safetensors";
@@ -132,6 +138,11 @@ class AuditoryStream {
   std::thread asr_thread_;
   bool running_ = false;
 
+  // Spec 004 T031: independent endpoint detector (third buffer consumer).
+  std::unique_ptr<AsrSileroVad> endpoint_vad_;
+  int endpoint_cursor_ = -1;
+  std::thread endpoint_thread_;
+
     // Per-pipeline GPU stream. diar runs on the default stream (0); asr runs
     // on asr_stream_ so its kernels can overlap with diar's idle intervals.
     cudaStream_t asr_stream_ = nullptr;
@@ -145,6 +156,17 @@ class AuditoryStream {
   // Last serialized snapshots, exposed for inspection by the test tool.
   std::vector<core::DiarSegment> last_segments_;
   core::Transcript last_transcript_;
+
+  // Spec 004: native stateful comprehensive view. ASR commits upsert text
+  // incrementally (with live revision push); diar segments are upserted at
+  // serialize (frame->segment is global). Guarded by comp_mutex_ because the
+  // ASR worker thread and the controller both touch it.
+  ComprehensiveTimeline comp_;
+  std::mutex comp_mutex_;
+  long comp_next_text_id_ = 0;
+  // Spec 004 T021: the comprehensive view as last emitted, to compute revisions
+  // (what changed in an already-reported region) on a subsequent emit.
+  std::vector<ComprehensiveTimeline::Entry> prev_view_;
 };
 
 }  // namespace pipeline
