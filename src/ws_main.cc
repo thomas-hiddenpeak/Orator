@@ -69,7 +69,12 @@ int main(int argc, char** argv) {
   ReadEnvInt("ORATOR_ASR_VAD_MIN_SPEECH_MS", &cfg.asr_vad_min_speech_ms);
   ReadEnvInt("ORATOR_ASR_VAD_MIN_SILENCE_MS", &cfg.asr_vad_min_silence_ms);
   ReadEnvInt("ORATOR_ASR_VAD_SPEECH_PAD_MS", &cfg.asr_vad_speech_pad_ms);
+  ReadEnvInt("ORATOR_ASR_MAX_NEW_TOKENS", &cfg.asr_max_new_tokens);
+  ReadEnvInt("ORATOR_ASR_ROLLBACK_TOKENS", &cfg.asr_rollback_tokens);
   ReadEnvString("ORATOR_ASR_LANGUAGE", &cfg.asr_language);
+  ReadEnvString("ORATOR_ASR_PREPROC_MODE", &cfg.asr_preproc_mode);
+  ReadEnvString("ORATOR_ASR_FRCRN_MODEL", &cfg.asr_frcrn_model);
+  ReadEnvString("ORATOR_ASR_TFGRIDNET_MODEL", &cfg.asr_tfgridnet_model);
 
   std::signal(SIGPIPE, SIG_IGN);
 
@@ -90,7 +95,10 @@ int main(int argc, char** argv) {
             << " min_speech=" << cfg.asr_vad_min_speech_ms
             << "ms min_silence=" << cfg.asr_vad_min_silence_ms
             << "ms pad=" << cfg.asr_vad_speech_pad_ms
+            << "ms max_new=" << cfg.asr_max_new_tokens
+            << " rollback=" << cfg.asr_rollback_tokens
             << "ms lang=" << cfg.asr_language
+            << " preproc=" << cfg.asr_preproc_mode
             << std::endl;
   std::cout << "  send binary PCM (int16le mono 16k); text {\"flush\"} or "
                "{\"end\"} to get the timeline." << std::endl;

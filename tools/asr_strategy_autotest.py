@@ -7,8 +7,8 @@ that satisfies target thresholds.
 
 Design intent:
 - Baseline profile mirrors current defaults.
-- Comparison profiles explore shorter/lighter or longer/heavier segmentation
-    around that baseline to measure the accuracy/RT trade-off.
+- vLLM-style profiles reduce segmentation fragmentation by allowing longer
+  utterances and longer pause threshold, to amortize fixed per-utterance cost.
 
 Usage:
   python3 tools/asr_strategy_autotest.py \
@@ -81,14 +81,16 @@ def default_profiles() -> List[Profile]:
         Profile(
             name="baseline",
             env={
-                "ORATOR_ASR_MAX_UTTERANCE_SEC": "42",
-                "ORATOR_ASR_MIN_UTTERANCE_SEC": "0.18",
-                "ORATOR_ASR_VAD_THRESHOLD": "0.46",
-                "ORATOR_ASR_VAD_MIN_SPEECH_MS": "200",
-                "ORATOR_ASR_VAD_MIN_SILENCE_MS": "360",
-                "ORATOR_ASR_VAD_SPEECH_PAD_MS": "100",
+                "ORATOR_ASR_MAX_UTTERANCE_SEC": "28",
+                "ORATOR_ASR_MIN_UTTERANCE_SEC": "0.20",
+                "ORATOR_ASR_VAD_THRESHOLD": "0.50",
+                "ORATOR_ASR_VAD_MIN_SPEECH_MS": "250",
+                "ORATOR_ASR_VAD_MIN_SILENCE_MS": "120",
+                "ORATOR_ASR_VAD_SPEECH_PAD_MS": "60",
+                "ORATOR_ASR_MAX_NEW_TOKENS": "384",
+                "ORATOR_ASR_ROLLBACK_TOKENS": "0",
             },
-            note="Current default config (selected full-run winner)",
+            note="Current default config",
         ),
         Profile(
             name="vllm_long_context_a",
@@ -99,20 +101,52 @@ def default_profiles() -> List[Profile]:
                 "ORATOR_ASR_VAD_MIN_SPEECH_MS": "220",
                 "ORATOR_ASR_VAD_MIN_SILENCE_MS": "280",
                 "ORATOR_ASR_VAD_SPEECH_PAD_MS": "80",
+                "ORATOR_ASR_MAX_NEW_TOKENS": "512",
+                "ORATOR_ASR_ROLLBACK_TOKENS": "0",
             },
-            note="Slightly shorter context than baseline",
+            note="Fewer/larger utterances, lighter threshold",
         ),
         Profile(
-            name="legacy_baseline",
+            name="vllm_long_context_b",
             env={
-                "ORATOR_ASR_MAX_UTTERANCE_SEC": "28",
-                "ORATOR_ASR_MIN_UTTERANCE_SEC": "0.20",
-                "ORATOR_ASR_VAD_THRESHOLD": "0.50",
-                "ORATOR_ASR_VAD_MIN_SPEECH_MS": "250",
-                "ORATOR_ASR_VAD_MIN_SILENCE_MS": "120",
-                "ORATOR_ASR_VAD_SPEECH_PAD_MS": "60",
+                "ORATOR_ASR_MAX_UTTERANCE_SEC": "42",
+                "ORATOR_ASR_MIN_UTTERANCE_SEC": "0.18",
+                "ORATOR_ASR_VAD_THRESHOLD": "0.46",
+                "ORATOR_ASR_VAD_MIN_SPEECH_MS": "200",
+                "ORATOR_ASR_VAD_MIN_SILENCE_MS": "360",
+                "ORATOR_ASR_VAD_SPEECH_PAD_MS": "100",
+                "ORATOR_ASR_MAX_NEW_TOKENS": "640",
+                "ORATOR_ASR_ROLLBACK_TOKENS": "0",
             },
-            note="Pre-switch default config for regression comparison",
+            note="Aggressive long-chunk policy",
+        ),
+        Profile(
+            name="accuracy_focus",
+            env={
+                "ORATOR_ASR_MAX_UTTERANCE_SEC": "50",
+                "ORATOR_ASR_MIN_UTTERANCE_SEC": "0.16",
+                "ORATOR_ASR_VAD_THRESHOLD": "0.44",
+                "ORATOR_ASR_VAD_MIN_SPEECH_MS": "180",
+                "ORATOR_ASR_VAD_MIN_SILENCE_MS": "420",
+                "ORATOR_ASR_VAD_SPEECH_PAD_MS": "120",
+                "ORATOR_ASR_MAX_NEW_TOKENS": "768",
+                "ORATOR_ASR_ROLLBACK_TOKENS": "0",
+            },
+            note="Accuracy-first long context + higher decode cap",
+        ),
+        Profile(
+            name="rollback_experimental",
+            env={
+                "ORATOR_ASR_MAX_UTTERANCE_SEC": "36",
+                "ORATOR_ASR_MIN_UTTERANCE_SEC": "0.20",
+                "ORATOR_ASR_VAD_THRESHOLD": "0.48",
+                "ORATOR_ASR_VAD_MIN_SPEECH_MS": "220",
+                "ORATOR_ASR_VAD_MIN_SILENCE_MS": "280",
+                "ORATOR_ASR_VAD_SPEECH_PAD_MS": "80",
+                "ORATOR_ASR_MAX_NEW_TOKENS": "512",
+                "ORATOR_ASR_ROLLBACK_TOKENS": "3",
+            },
+            note="Experimental prefix rollback path",
         ),
     ]
 

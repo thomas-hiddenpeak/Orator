@@ -38,6 +38,61 @@ def normalize(text: str) -> str:
     return "".join(out)
 
 
+def _cn_to_arabic(s: str) -> str:
+    """Convert a matched Chinese-numeral sequence to Arabic digits."""
+    units = {'十': 10, '百': 100, '千': 1000, '万': 10000, '亿': 100000000}
+    digits = {'零': 0, '一': 1, '二': 2, '三': 3, '四': 4,
+              '五': 5, '六': 6, '七': 7, '八': 8, '九': 9, '两': 2}
+    if not s:
+        return s
+    if s.isdigit():
+        return s
+    if '点' in s:
+        left, right = s.split('点', 1)
+        int_part = _cn_to_arabic(left) if left else '0'
+        frac_part = ''.join(str(digits.get(c, c)) if c in digits else c for c in right)
+        return int_part + '.' + frac_part
+    result = 0
+    section = 0
+    tmp = 0
+    for ch in s:
+        if ch.isdigit():
+            tmp = tmp * 10 + int(ch)
+        elif ch in digits:
+            tmp = tmp * 10 + digits[ch]
+        elif ch in units:
+            u = units[ch]
+            if u >= 10000:
+                section = (section + (tmp if tmp else 0)) * u
+                result += section
+                section = 0
+                tmp = 0
+            else:
+                section += (tmp if tmp else 1) * u
+                tmp = 0
+        else:
+            return s
+    result += section + tmp
+    return str(result) if result or section or tmp else s
+
+
+_CN_NUM_RE = re.compile(
+    r'百分之([零一二三四五六七八九十百千两\d点]+)'
+    r'|([零一二三四五六七八九十百千万亿两点]+)'
+)
+
+_FILLER_RE = re.compile(r'[嗯呃啊额哦唉]')
+
+
+def _unify_numbers(text: str) -> str:
+    """Normalise number representation: cn numerals → arabic."""
+    def _repl(m: re.Match) -> str:
+        if m.group(1) is not None:
+            return _cn_to_arabic(m.group(1)) + '%'
+        return _cn_to_arabic(m.group(2))
+    return _CN_NUM_RE.sub(_repl, text)
+
+
 def parse_gold(path: str, max_sec: float) -> str:
     header = re.compile(r"^(\d{2}):(\d{2}):(\d{2})\s")
     parts = []
@@ -53,6 +108,12 @@ def parse_gold(path: str, max_sec: float) -> str:
             if include:
                 parts.append(line)
     return "".join(parts)
+
+
+def _normalize_with_numbers(text: str) -> str:
+    text = _FILLER_RE.sub('', text)
+    text = _unify_numbers(text)
+    return normalize(text)
 
 
 def hyp_from_json(path: str) -> str:
@@ -94,11 +155,11 @@ def main() -> int:
                     help="include gold segments with header time < max-sec (0 = all)")
     args = ap.parse_args()
 
-    ref = normalize(parse_gold(args.gold, args.max_sec))
+    ref = _normalize_with_numbers(parse_gold(args.gold, args.max_sec))
     if args.hyp_json:
-        hyp = normalize(hyp_from_json(args.hyp_json))
+        hyp = _normalize_with_numbers(hyp_from_json(args.hyp_json))
     elif args.hyp_text is not None:
-        hyp = normalize(args.hyp_text)
+        hyp = _normalize_with_numbers(args.hyp_text)
     else:
         print("error: need --hyp-json or --hyp-text", file=sys.stderr)
         return 2

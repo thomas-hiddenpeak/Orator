@@ -23,6 +23,7 @@ __pycache__/
 
 # Test audio (large media)
 test.mp3
+asrTest2Final.txt
 *.pcm
 
 # Editor / OS
@@ -30,3 +31,6 @@ test.mp3
 .idea/
 *.swp
 .DS_Store
+
+# One-off experiment scripts (not version-controlled)
+tools/tmp_*
