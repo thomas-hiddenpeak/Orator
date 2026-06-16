@@ -4,9 +4,13 @@
 - **Spec**: [spec.md](spec.md) · **Plan**: [plan.md](plan.md)
 - **Status**: In progress. Phase 2 (priority registry) + the periodic
   `gpu_telemetry` WS message are implemented and verified (dbebf5f, 854dc7e).
-  The engine stream-routing + global-lock removal (T030/T031/T040/T041/T050) are
-  BLOCKED pending a runnable diarization numeric gate (see the blocker note in
-  Phase 2). The global lock is retained until then (no regression).
+  The lock-free concurrency (T030/T031/T040/T041/T050) was ATTEMPTED behind an
+  env gate and the **R1 red-line was empirically confirmed** (immediate SIGSEGV
+  from managed-memory host access during concurrent kernels, 2026-06-17,
+  efa184d/3b01bbb). The lock-free path is gated OFF (safe no-op); the global
+  lock stays the production default. Safe concurrency requires de-coupling both
+  engines from `cudaMallocManaged` (device buffers + pinned staging) — the next
+  accuracy-gated phase. See §7a of the spec for the finding.
 - **Constitution**: v1.2.1
 
 > Ordered, independently verifiable steps. Measurement precedes any engine

@@ -192,16 +192,23 @@ Open, independently-scheduled items:
   (dbebf5f, 854dc7e). Each pipeline declares a priority index at registration
   (diar=0 fg, asr=1 fg, vad=2 bg); the ASR stream is sourced from the registry;
   telemetry was confirmed on the real WS path (4 snapshots over 120 s at a 2 s
-  interval, env `ORATOR_GPU_TELEMETRY_SEC`). BLOCKED next step: removing the
-  global `gpu::DeviceLock()` requires routing the diarization + ASR engines onto
-  their streams, replacing the device-wide `cudaDeviceSynchronize()` calls, and
-  removing the ASR decoder's host read of in-flight managed memory (R1). The ASR
-  side is gateable (`test_asr_*` ctests) but the DIARIZATION side has no runnable
-  numeric gate in the current build (the `verify_streaming`/`verify_pipeline`
-  tools are not in `CMakeLists.txt`). Per Constitution Art. II the verified
-  diarizer must not be modified without a re-validatable reference; the
-  precondition is to re-add a diarization numeric gate to the build first. The
-  global lock is retained until then (correct, serialized, no regression).
+  interval, env `ORATOR_GPU_TELEMETRY_SEC`). **R1 red-line tested and confirmed
+  (2026-06-17):** an env-gated lock-free concurrent path (`ORATOR_GPU_CONCURRENT=1`,
+  `gpu::DeviceGuard`, ASR lock-free on its own stream + stream-scoped diar syncs)
+  produced an IMMEDIATE SIGSEGV on the first 120 s real-WS stream, while the
+  serialized default completed correctly (40.6 s, 25 diar + 5 asr + 45 comp).
+  Root cause = R1: both verified engines pervasively host-access
+  `cudaMallocManaged` (`UnifiedBuffer`) memory during streaming, which faults on
+  Tegra when the other pipeline's kernels run concurrently; fixing the one named
+  case (`AsrTextDecoder::Embed`, already a plain-host shadow) was necessary but
+  not sufficient. DECISION: `DeviceGuard` always takes the global lock (a
+  compile-time constant disables the own-stream skip), so the env flag is a safe
+  no-op (re-verified serialized, 40.7 s, no crash). The registry, telemetry, and
+  stream-scoped diar syncs are retained as the foundation. Safe lock-free
+  concurrency requires de-coupling BOTH engines from managed memory (device
+  buffers + pinned host staging) — the next, accuracy-gated phase. The global
+  lock stays the production default; no regression. A diarization numeric gate
+  (`test_diar_stream`, d75da36) is in place for that future engine work.
 - **Full 1-hour real-WS revalidation on the current `text_id` revision code**:
   done (2026-06-17, commit c94c2fa) — see the milestone-gate section in §2.
 - ASR streaming throughput (~2.6x, Spec 001 NG1) — deferred by owner.

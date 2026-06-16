@@ -187,6 +187,38 @@ changed until the baseline exists.
   compute/occupancy summary; setting the interval to 0 suppresses it; a client
   can read it without any change to the existing messages. (FR7)
 
+## 7a. Empirical R1 finding (2026-06-17) — lock-free concurrency is gated OFF
+
+The R1 risk (a host access to in-flight device-managed memory faulting when the
+two pipelines' GPU work overlaps) was tested directly and **confirmed**:
+
+- **Method**: the env-gated concurrent path (`ORATOR_GPU_CONCURRENT=1`,
+  `gpu::DeviceGuard`) made ASR lock-free on its own non-default CUDA stream while
+  diarization ran concurrently on the default stream; diar's hot-path device
+  synchronizations were scoped to the default stream. A 120 s real-WS stream was
+  run.
+- **Result**: an **immediate `SIGSEGV` (core dumped)** on the first stream — the
+  server crashed before completing one run. The serialized default
+  (`ORATOR_GPU_CONCURRENT` unset) completed the same input in 40.6 s with correct
+  output (25 diarization + 5 ASR + 45 comprehensive entries).
+- **Root cause**: both verified engines pervasively host-access
+  `cudaMallocManaged` memory (`gpu::UnifiedBuffer`) during steady-state streaming
+  (diarization result `cudaMemcpy` from managed buffers; ASR scalar reads). On
+  Tegra unified memory, a host access to managed pages while another pipeline's
+  kernel executes faults via page migration. Fixing the single named case
+  (`AsrTextDecoder::Embed`, which already reads a plain-host bf16 shadow
+  `embed_host_`) was necessary but **not sufficient**.
+- **Impact / decision**: lock-free concurrency cannot ship safely until BOTH
+  engines are de-coupled from managed memory (device buffers + pinned host
+  staging for every host-visible result), a separate, accuracy-gated phase. The
+  `DeviceGuard` therefore **always takes the global lock** (a compile-time
+  constant disables the own-stream skip), so `ORATOR_GPU_CONCURRENT=1` is a safe
+  no-op (verified: it now runs serialized at 40.7 s, no crash). The priority
+  registry, the periodic telemetry, and the stream-scoped diarization
+  synchronizations (correct in serialized mode too) are retained as the
+  foundation for that future phase. The global lock stays the production default;
+  there is no regression.
+
 ## 8. Constitution Check
 
 - **Art. I (no dependencies)**: uses CUDA stream APIs already in the toolkit and
