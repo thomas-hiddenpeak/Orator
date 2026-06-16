@@ -14,6 +14,7 @@ namespace model {
 using ::orator::gpu::CheckCudaError;
 using ::orator::gpu::UnifiedAllocator;
 using ::orator::gpu::UnifiedBuffer;
+using ::orator::gpu::DeviceBuffer;
 
 namespace {
 
@@ -246,7 +247,11 @@ std::vector<float> ConformerPreEncode::Forward(const float* mel, int n_mels,
   const int D = d_model_;
   const int Kflat = C * W2;
   UnifiedBuffer flatbuf(static_cast<size_t>(H2) * Kflat * sizeof(float));
-  UnifiedBuffer outbuf(static_cast<size_t>(H2) * D * sizeof(float));
+  // Spec 002 Phase 7 (T071): the pre-encode output is copied to the host
+  // (cudaMemcpy DtoH below), so it MUST be DEVICE memory, not managed — a host
+  // copy from managed memory while the concurrent lock-free ASR pipeline runs a
+  // kernel faults on Tegra (R1). Device memory is safe for the DtoH copy.
+  DeviceBuffer outbuf(static_cast<size_t>(H2) * D * sizeof(float));
   int threads = 256;
   int gtotal = H2 * Kflat;
   FlattenGatherKernel<<<(gtotal + threads - 1) / threads, threads>>>(

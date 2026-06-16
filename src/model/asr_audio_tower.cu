@@ -17,6 +17,7 @@ namespace model {
 
 using ::orator::gpu::CheckCudaError;
 using ::orator::gpu::UnifiedBuffer;
+using ::orator::gpu::DeviceBuffer;
 
 namespace {
 
@@ -471,14 +472,25 @@ std::vector<float> AsrAudioTower::Forward(const float* mel, int n_frames,
       static_cast<float*>(d_norm.data()), N, D, eps);
   asr_gemm::Linear(static_cast<float*>(d_norm.data()), proj1_w_.p, proj1_b_.p,
                static_cast<float*>(d_proj.data()), N, D, D, 1, stream);
-  UnifiedBuffer d_out(sizeof(float) * static_cast<size_t>(N) * config_.output_dim);
+  // Spec 002 Phase 7 (T072): the encoder output is copied to the host below. It
+  // MUST be DEVICE memory, not managed: the raw host memcpy from managed memory
+  // while the concurrent diarization pipeline runs a kernel faults on Tegra (R1).
+  // Device memory does not page-migrate, so the DtoH copy is safe regardless of
+  // concurrent kernels. The GPU-only working buffers above stay managed.
+  DeviceBuffer d_out(sizeof(float) * static_cast<size_t>(N) * config_.output_dim);
   asr_gemm::Linear(static_cast<float*>(d_proj.data()), proj2_w_.p, proj2_b_.p,
                static_cast<float*>(d_out.data()), N, D, config_.output_dim, 0, stream);
   CheckCudaError(cudaGetLastError(), __FILE__, __LINE__);
       CheckCudaError(cudaStreamSynchronize(stream), __FILE__, __LINE__);
 
   std::vector<float> out(static_cast<size_t>(N) * config_.output_dim);
-  std::memcpy(out.data(), d_out.data(), sizeof(float) * out.size());
+  // DtoH copy from DEVICE memory on the ASR stream (R1-safe). Replaces the raw
+  // host memcpy from managed memory.
+  CheckCudaError(cudaMemcpyAsync(out.data(), d_out.data(),
+                                 sizeof(float) * out.size(),
+                                 cudaMemcpyDeviceToHost, stream),
+                 __FILE__, __LINE__);
+  CheckCudaError(cudaStreamSynchronize(stream), __FILE__, __LINE__);
   if (out_tokens) *out_tokens = N;
   return out;
 }

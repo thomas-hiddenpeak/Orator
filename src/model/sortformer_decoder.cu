@@ -12,6 +12,7 @@ namespace model {
 
 using ::orator::gpu::CheckCudaError;
 using ::orator::gpu::UnifiedBuffer;
+using ::orator::gpu::DeviceBuffer;
 
 namespace {
 
@@ -291,7 +292,13 @@ std::vector<float> SortformerDecoder::Forward(const float* conformer_out, int T,
   LaunchLinear(lnp,
       W("sortformer_modules.first_hidden_to_hidden.weight"),
       W("sortformer_modules.first_hidden_to_hidden.bias"), tp, T, D, D, 1);
-  UnifiedBuffer predb(static_cast<size_t>(T) * n_spk_ * sizeof(float));
+  // Spec 002 Phase 7 (T071): the per-frame sigmoid result is copied to the host
+  // (cudaMemcpy DtoH below). It MUST be DEVICE memory, not managed: a host copy
+  // from managed memory while the concurrent (lock-free) ASR pipeline runs a
+  // kernel faults on Tegra (R1). Device memory does not page-migrate, so the
+  // DtoH copy is safe regardless of concurrent kernels. GPU-only working buffers
+  // above stay managed (only the GPU touches them).
+  DeviceBuffer predb(static_cast<size_t>(T) * n_spk_ * sizeof(float));
   float* predp = static_cast<float*>(predb.data());
   LaunchLinear(tp,
       W("sortformer_modules.single_hidden_to_spks.weight"),
