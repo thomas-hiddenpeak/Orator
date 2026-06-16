@@ -18,54 +18,6 @@ namespace {
 constexpr int kThreads = 256;
 inline int Blocks(int n) { return (n + kThreads - 1) / kThreads; }
 
-// out[m,n] = bias[n] + sum_k in[m,k]*W[n,k].  act: 0 none, 1 relu, 2 sigmoid.
-__global__ void LinearKernel(const float* __restrict__ in,
-                             const float* __restrict__ W,
-                             const float* __restrict__ bias,
-                             float* __restrict__ out, int M, int K, int N, int act) {
-  int idx = blockIdx.x * blockDim.x + threadIdx.x;
-  if (idx >= M * N) return;
-  int n = idx % N, m = idx / N;
-  const float* xr = in + static_cast<size_t>(m) * K;
-  const float* wr = W + static_cast<size_t>(n) * K;
-  float acc = bias ? bias[n] : 0.0f;
-  for (int k = 0; k < K; ++k) acc += xr[k] * wr[k];
-  if (act == 1) acc = fmaxf(acc, 0.0f);
-  else if (act == 2) acc = 1.0f / (1.0f + __expf(-acc));
-  out[idx] = acc;
-}
-
-constexpr int kTile = 16;
-__global__ void LinearTiledKernel(const float* __restrict__ in,
-                                  const float* __restrict__ W,
-                                  const float* __restrict__ bias,
-                                  float* __restrict__ out, int M, int K, int N,
-                                  int act) {
-  __shared__ float As[kTile][kTile];
-  __shared__ float Ws[kTile][kTile];
-  int ty = threadIdx.y, tx = threadIdx.x;
-  int m = blockIdx.y * kTile + ty;
-  int n = blockIdx.x * kTile + tx;
-  float acc = 0.0f;
-  for (int k0 = 0; k0 < K; k0 += kTile) {
-    int ak = k0 + tx;
-    As[ty][tx] = (m < M && ak < K) ? in[static_cast<size_t>(m) * K + ak] : 0.0f;
-    int wn = blockIdx.x * kTile + ty;
-    int wk = k0 + tx;
-    Ws[ty][tx] = (wn < N && wk < K) ? W[static_cast<size_t>(wn) * K + wk] : 0.0f;
-    __syncthreads();
-#pragma unroll
-    for (int t = 0; t < kTile; ++t) acc += As[ty][t] * Ws[tx][t];
-    __syncthreads();
-  }
-  if (m < M && n < N) {
-    if (bias) acc += bias[n];
-    if (act == 1) acc = fmaxf(acc, 0.0f);
-    else if (act == 2) acc = 1.0f / (1.0f + __expf(-acc));
-    out[static_cast<size_t>(m) * N + n] = acc;
-  }
-}
-
 inline void LaunchLinear(const float* in, const float* W, const float* bias,
                          float* out, int M, int K, int N, int act) {
   // Local act codes: 0 none, 1 ReLU, 2 sigmoid. Remap to universal SGEMM
@@ -120,60 +72,6 @@ __global__ void LayerNormKernel(const float* __restrict__ in,
 __global__ void AddKernel(float* r, const float* x, int n) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i < n) r[i] += x[i];
-}
-
-// Standard MHA scores+softmax+context. q,k,v: [T,H,Dk]. One block per (i,head).
-__global__ void AttnKernel(const float* __restrict__ q, const float* __restrict__ k,
-                           const float* __restrict__ v, float* __restrict__ ctx,
-                           int T, int H, int Dk, int valid, float scale) {
-  int h = blockIdx.y, i = blockIdx.x;
-  if (h >= H || i >= T) return;
-  extern __shared__ float sc[];
-  const float* qi = q + (static_cast<size_t>(i) * H + h) * Dk;
-  for (int j = threadIdx.x; j < T; j += blockDim.x) {
-    if (j >= valid) {
-      sc[j] = -1e30f;
-      continue;
-    }
-    const float* kj = k + (static_cast<size_t>(j) * H + h) * Dk;
-    float s = 0.0f;
-    for (int d = 0; d < Dk; ++d) s += qi[d] * kj[d];
-    sc[j] = s * scale;
-  }
-  __syncthreads();
-  __shared__ float red[kThreads];
-  __shared__ float s_max, s_sum;
-  float lmax = -1e30f;
-  for (int j = threadIdx.x; j < T; j += blockDim.x) lmax = fmaxf(lmax, sc[j]);
-  red[threadIdx.x] = lmax;
-  __syncthreads();
-  for (int s = blockDim.x / 2; s > 0; s >>= 1) {
-    if (threadIdx.x < s) red[threadIdx.x] = fmaxf(red[threadIdx.x], red[threadIdx.x + s]);
-    __syncthreads();
-  }
-  if (threadIdx.x == 0) s_max = red[0];
-  __syncthreads();
-  float mx = s_max, lsum = 0.0f;
-  for (int j = threadIdx.x; j < T; j += blockDim.x) {
-    float e = __expf(sc[j] - mx);
-    sc[j] = e;
-    lsum += e;
-  }
-  red[threadIdx.x] = lsum;
-  __syncthreads();
-  for (int s = blockDim.x / 2; s > 0; s >>= 1) {
-    if (threadIdx.x < s) red[threadIdx.x] += red[threadIdx.x + s];
-    __syncthreads();
-  }
-  if (threadIdx.x == 0) s_sum = red[0];
-  __syncthreads();
-  float inv = 1.0f / s_sum;
-  for (int d = threadIdx.x; d < Dk; d += blockDim.x) {
-    float acc = 0.0f;
-    for (int j = 0; j < T; ++j)
-      acc += sc[j] * v[(static_cast<size_t>(j) * H + h) * Dk + d];
-    ctx[(static_cast<size_t>(i) * H + h) * Dk + d] = acc * inv;
-  }
 }
 
 __global__ void MaskRowsKernel(float* x, int T, int D, int valid) {

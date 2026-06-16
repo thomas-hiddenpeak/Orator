@@ -31,45 +31,6 @@ __global__ void Bf16ToF32Kernel(const uint16_t* __restrict__ in,
   out[i] = __uint_as_float(static_cast<uint32_t>(in[i]) << 16);
 }
 
-// Exact GELU (torch F.gelu default): 0.5 x (1 + erf(x/sqrt2)).
-__global__ void GeluKernel(float* __restrict__ x, int n) {
-  const int i = blockIdx.x * blockDim.x + threadIdx.x;
-  if (i >= n) return;
-  const float v = x[i];
-  x[i] = 0.5f * v * (1.0f + erff(v * 0.70710678118654752440f));
-}
-
-// Conv2d, stride 2, pad 1, kernel 3. in: [B,Cin,H,W], W:[Cout,Cin,3,3],
-// bias:[Cout]. out: [B,Cout,Hout,Wout], Hout=(H-1)/2+1, Wout=(W-1)/2+1.
-// One thread per output element. (Kept for reference / fallback.)
-__global__ void Conv2dKernel(const float* __restrict__ in, const float* __restrict__ wt,
-                             const float* __restrict__ bias, float* __restrict__ out,
-                             int B, int Cin, int H, int W, int Cout, int Hout, int Wout) {
-  const long idx = static_cast<long>(blockIdx.x) * blockDim.x + threadIdx.x;
-  const long total = static_cast<long>(B) * Cout * Hout * Wout;
-  if (idx >= total) return;
-  const int wo = idx % Wout;
-  const int ho = (idx / Wout) % Hout;
-  const int co = (idx / (static_cast<long>(Wout) * Hout)) % Cout;
-  const int b = idx / (static_cast<long>(Wout) * Hout * Cout);
-
-  float acc = bias ? bias[co] : 0.0f;
-  for (int ci = 0; ci < Cin; ++ci) {
-    const float* inb = in + ((static_cast<long>(b) * Cin + ci) * H) * W;
-    const float* wcc = wt + ((static_cast<long>(co) * Cin + ci) * 3) * 3;
-    for (int kh = 0; kh < 3; ++kh) {
-      const int hi = ho * 2 - 1 + kh;
-      if (hi < 0 || hi >= H) continue;
-      for (int kw = 0; kw < 3; ++kw) {
-        const int wi = wo * 2 - 1 + kw;
-        if (wi < 0 || wi >= W) continue;
-        acc += inb[hi * W + wi] * wcc[kh * 3 + kw];
-      }
-    }
-  }
-  out[idx] = acc;
-}
-
 // im2col for stride-2 pad-1 3x3 conv: build col[B*Hout*Wout, Cin*9] (bf16) so a
 // single bf16 tensor-core GEMM with the weight [Cout, Cin*9] computes the conv.
 // Row r = (b*Hout+ho)*Wout+wo; column ci*9 + kh*3 + kw = input[b,ci,ho*2-1+kh,wo*2-1+kw].

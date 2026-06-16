@@ -689,7 +689,6 @@ std::vector<int> AsrTextDecoder::DecodeGreedy(int start_pos, int max_new,
     ++emitted;
 
     auto capture = [&](int b0, int b1) -> void* {
-      cudaGraph_t g;
       CheckCudaError(cudaStreamBeginCapture(capture_stream_,
                      cudaStreamCaptureModeThreadLocal), __FILE__, __LINE__);
       DecodeBodyImpl(capture_stream_, b0, b1);

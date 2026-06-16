@@ -1,14 +1,11 @@
 # Spec 004 — Common Time Base + Revisable Comprehensive Timeline
 
 - **Feature**: `004-comprehensive-timeline`
-- **Status**: Partially implemented. Comprehensive-timeline core + revisions +
-  common time base are implemented, verified, committed (3159b75, 673f95d) and
-  pushed. The **endpoint pipeline (FR6/FR7) is NOT complete**: endpoints are
-  detected on a CPU-only detector and `MarkEndpoint` writes a `endpoints_` vector
-  that is never read or serialized (write-only dead state), so FR7's final
-  timeline does not carry them and FR6's compute violates the GPU-work principle.
-  Phase 5 completes it (GPU detector + serialized endpoint track) and folds in the
-  related dead-code cleanup.
+- **Status**: Implemented. Comprehensive-timeline core + revisions + common time
+  base (3159b75, 673f95d) and the endpoint pipeline (Phase 5: GPU detector +
+  serialized endpoint track + dead-code cleanup) are done and validated on the
+  real WS full-hour run. The endpoint detector now runs batched on the GPU and
+  its markers are a serialized track in the timeline document.
 - **Created**: 2026-06-15
 - **Owner**: project owner
 - **Constitution**: v1.2.1
@@ -128,9 +125,10 @@ in time. Consequences:
   split, or re-segment the ASR or diarization tracks (it never drives their
   boundaries — that would be one pipeline doing another's job).
 - **FR8 — Endpoint numeric gate**: the GPU detector's per-window speech
-  probability SHALL be validated against a trusted reference (a PyTorch silero-vad
-  dump) and against the prior CPU implementation, within a recorded tolerance,
-  before it is considered done (Constitution Art. II — the detector currently has
+  probability SHALL be validated against the prior CPU implementation (the
+  reference of record for the endpoint detector; a PyTorch silero-vad hub dump is
+  not reproducible in this offline environment) within a recorded tolerance,
+  before it is considered done (Constitution Art. II — the detector previously had
   no numeric gate at all).
 - **FR9 — Dead-code removal**: code made dead by this work or found dead in its
   vicinity SHALL be removed in the same change: the write-only

@@ -42,9 +42,6 @@ set(ORATOR_CORE_SOURCES
     src/model/conformer_preencode.cu
     src/model/conformer_layer.cu
     src/model/sortformer_decoder.cu
-    src/model/stub_diarizer.cc
-    src/model/stub_embedder.cc
-    src/model/stub_asr.cc
     src/model/asr_ops.cu
     src/model/asr_gemm.cu
     src/model/asr_audio_tower.cu
@@ -58,6 +55,7 @@ set(ORATOR_CORE_SOURCES
     src/pipeline/asr_preprocessor.cc
     src/pipeline/comprehensive_timeline.cc
         src/pipeline/asr_vad.cc
+    src/pipeline/gpu_vad.cu
     src/pipeline/shared_audio_buffer.cc
     src/pipeline/stream_timeline.cc
     src/pipeline/diarization_worker.cc

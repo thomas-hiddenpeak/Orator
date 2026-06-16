@@ -2,20 +2,25 @@
 
 // AsrWorker: the speech-recognition pipeline as an independent unit.
 //
-// It owns the ASR engine and its own endpointing buffer. Audio spans handed to
-// it (by the controller's worker thread, pulled from the SharedAudioBuffer) are
-// appended to a local PCM buffer and segmented by an energy VAD into complete
-// utterances. Each completed utterance is transcribed, deposited into the shared
-// StreamTimeline as a timed token, and emitted as an incremental event. It keeps
-// its own state and never reads diarization output.
+// It owns the ASR engine and drives it over audio spans handed to it (by the
+// controller's worker thread, pulled from the SharedAudioBuffer). In the default
+// PRODUCTION mode it runs the Spec 003 incremental KV-cache session: continuous
+// audio is fed into a persistent decode session and committed in fixed-cadence
+// segments, each deposited into the shared StreamTimeline as a timed token and
+// emitted as an incremental event. It keeps its own state and never reads
+// diarization output.
 //
-// Endpointing (Silero VAD): an ASR-only front gate detects speech segments
-// from the same PCM stream and emits bounded utterances for decode. This keeps
-// ASR segmentation independent from diarization and each decode context bounded.
+// A LEGACY utterance mode (ORATOR_ASR_INCREMENTAL=0, retained for regression)
+// instead segments the audio with a Silero VAD into bounded utterances and
+// transcribes each independently. The Silero VAD is loaded only for that legacy
+// mode and the opt-in endpoint_reset; the default incremental path does not use
+// it. This keeps ASR segmentation independent from diarization and each decode
+// context bounded.
 
 #include <atomic>
 #include <deque>
 #include <functional>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -110,7 +115,10 @@ class AsrWorker {
   // absolute on the common clock; time codes go through this base.
   core::TimeBase tb_{params_.vad.sample_rate, 0};
 
-  AsrSileroVad vad_;            // ASR-only independent front VAD (Silero)
+  // ASR-only independent front VAD (Silero, CPU). Constructed lazily: only the
+  // legacy utterance path (!incremental) and the opt-in endpoint_reset use it,
+  // so the default incremental path never loads it (FR9). Null when unused.
+  std::unique_ptr<AsrSileroVad> vad_;
   AsrPreprocessor preproc_;     // ASR-only enhancement after VAD
   std::atomic<long> processed_samples_{0};
   double compute_sec_ = 0.0;

@@ -2,12 +2,10 @@
 
 - **Feature**: `004-comprehensive-timeline`
 - **Spec**: [spec.md](spec.md) · **Plan**: [plan.md](plan.md)
-- **Status**: Partially implemented. Phases 1–4 done + committed (3159b75 step 1,
-  673f95d step 2). Phase 3 T031 (endpoint pipeline) is only PARTLY done: the third
-  thread runs and emits `{"type":"endpoint"}`, but its detector is CPU-only and
-  `MarkEndpoint` writes a vector that is never read/serialized (FR6/FR7 unmet).
-  Phase 5 completes the endpoint pipeline (GPU detector + serialized track) and
-  folds in the related dead-code cleanup.
+- **Status**: Implemented. Phases 1–5 done. Core + revisions + timebase
+  (3159b75 step 1, 673f95d step 2); endpoint pipeline completed in Phase 5 (GPU
+  detector + serialized endpoint track + dead-code cleanup), validated on the
+  real WS full-hour run.
 - **Constitution**: v1.2.1
 
 > Ordered, independently verifiable steps. Each phase builds + tests before the
@@ -40,13 +38,11 @@
 - [x] **T030** WS meta: on session open send the common-base declaration
   (`sample_rate`, `time_base`, `origin_sample`) in the `ready` message; all
   messages carry common-base start/end. *(Done 673f95d; AC6.)*
-- [~] **T031** Endpoint pipeline: a third `buffer_.AddConsumer()` + thread runs
-  `AsrSileroVad` as an endpoint detector (continuous, no trim), calls
-  `MarkEndpoint`, emits `{"type":"endpoint","time"}`. ASR worker unchanged.
-  *(PARTIAL: third thread + emission done (673f95d) and disabling it does not
-  stall others (AC5 met). NOT done: the detector is CPU-only (violates FR6 GPU
-  compute; caused the full-hour single-CPU-core stall), and `MarkEndpoint` writes
-  a vector that is never serialized (FR7 unmet — endpoints are write-only). Completed in Phase 5.)*
+- [x] **T031** Endpoint pipeline: a third `buffer_.AddConsumer()` + thread runs
+  the endpoint detector (continuous, no trim), calls `MarkEndpoint`, emits
+  `{"type":"endpoint","time"}`. ASR worker unchanged. *(Phase 3 wired the thread
+  + emission (673f95d), AC5 met. Phase 5 completed it: the detector is now the
+  batched GPU `GpuVad` (FR6) and endpoints are serialized into the timeline (FR7).)*
 
 ## Phase 4 — Validation
 - [x] **T040** Multi-speaker attribution on test.mp3 (real diarizer + incremental
@@ -61,39 +57,47 @@
 ## Phase 5 — Complete the endpoint pipeline (GPU detector + serialized track) + cleanup
 > Closes the FR6/FR7 gap left by T031 and folds in FR8/FR9. Each task builds +
 > tests before the next; the final gate is the real-WS full-hour run.
-- [ ] **T060** PyTorch silero-vad oracle: a `tools/` dump of per-window speech
-  probabilities over a fixed audio slice (and the prior CPU implementation's
-  probabilities), saved under `models/reference/` for a numeric gate. *(Verify:
-  oracle file exists; CPU vs oracle within tolerance recorded — establishes the
-  baseline the GPU port must match.)* (FR8)
-- [ ] **T061** GPU endpoint detector: port the per-window compute (STFT via the
+- [x] **T060** Detector numeric reference. The CPU `AsrSileroVad` is the
+  reference of record for the endpoint detector (it produced every validated
+  run's endpoints); a PyTorch silero-vad hub dump is not reproducible in this
+  offline environment, so the gate is GPU-vs-CPU equivalence on identical fp32
+  weights. Added `AsrSileroVad::DebugWindowProbs` exposing per-window
+  probabilities. *(Done; reference established.)* (FR8)
+- [x] **T061** GPU endpoint detector: ported the per-window compute (STFT via the
   fixed conv basis, the 4-layer conv encoder + ReLU, the LSTM cell step, the
-  linear + sigmoid) to CUDA, driven in BATCHES — one buffered read is processed as
-  a single batched GPU pass over all ready windows; the LSTM recurrence is one
-  scan over the batch. Runs under `gpu::DeviceLock()`. *(Verify: `test_vad` numeric
-  gate — GPU per-window probability matches oracle + CPU within tolerance; AC10.)*
-  (FR6, FR8)
-- [ ] **T062** Wire the GPU detector into the endpoint thread, replacing the
-  CPU detector; remove the CPU per-window path from the streaming thread. *(Verify:
-  endpoint markers still emitted on the common base; thread independent.)* (FR6)
-- [ ] **T063** Serialize endpoints into the timeline document: add an additive
-  endpoint marker track to `Snapshot()`/`Serialize()` (pure marker track — it does
-  NOT alter the ASR/diar tracks). Replace the write-only `endpoints_` accessor.
-  *(Verify: final `{"type":"timeline"}` carries endpoints; AC9; schema additive.)*
-  (FR7)
-- [ ] **T064** Dead-code cleanup (FR9): remove `StubAsr`/`StubDiarizer`/
-  `StubEmbedder` + their registrations; remove never-launched kernels
-  (`RelAttnKernel`, `FlattenLinearKernel`, `GeluKernel`/`Conv2dKernel` in
-  `asr_audio_tower.cu`); drop the unused eager Silero load in `AsrWorker`; fix the
-  stale `asr_worker.h` "energy VAD" comment and any others found. *(Verify: build
-  has no `#177-D` for the listed kernels; ctest green; AC11.)*
-- [ ] **T065** Real-WS full-hour validation: stream the full 3615 s `test.mp3`
-  through the production `orator_ws` path at the default config; confirm ASR
-  covers the whole hour with NO multi-minute single-CPU-core stall, endpoints are
-  in the final timeline, reconcile clean, CER unchanged. *(Verify: AC8, AC9
-  end-to-end on the real transport — not the bypass harness.)*
-- [ ] **T066** Update `tasks.md` checkboxes, spec status → Implemented, `/memories/`
-  and `PROJECT_STATE.md` with commit refs. *(Verify: Constitution Art. VIII.)*
+  linear + sigmoid) to CUDA in `GpuVad` (`include/pipeline/gpu_vad.h`,
+  `src/pipeline/gpu_vad.cu`), driven in BATCHES — one buffered read is processed
+  as a single batched GPU pass over all ready windows; the LSTM recurrence is one
+  scan over the batch in shared memory. Runs under `gpu::DeviceLock()`. *(Done;
+  `test_vad` gate: GPU vs CPU max |dprob| = 3.7e-8, tol 2e-3; AC10.)* (FR6, FR8)
+- [x] **T062** Wired the GPU detector into the endpoint thread, replacing the
+  CPU detector (`endpoint_vad_` is now a `GpuVad`; `DrainEndpoints` batches the
+  buffered read). *(Done; endpoint markers still emitted on the common base.)* (FR6)
+- [x] **T063** Serialized endpoints into the timeline document: an additive
+  `{"kind":"endpoint","source":"silero_gpu"}` track in `Serialize()` (pure marker
+  track — does NOT alter the ASR/diar tracks); replaced the write-only `endpoints()`
+  accessor with `SnapshotEndpoints()`. *(Done; final timeline carries 1454
+  endpoints alongside diarization + asr tracks; AC9; schema additive.)* (FR7)
+- [x] **T064** Dead-code cleanup (FR9): removed the stub models
+  (`StubAsr`/`StubDiarizer`/`StubEmbedder` + headers + registrations + CMake) and
+  SIX never-launched kernels (the audit caught 4 — `RelAttnKernel`,
+  `FlattenLinearKernel`, `GeluKernel`/`Conv2dKernel` in `asr_audio_tower.cu` — plus
+  `LinearKernel`/`LinearTiledKernel`/`PointwiseConvKernel` in `conformer_layer.cu`
+  and `LinearKernel`/`LinearTiledKernel`/`AttnKernel` in `sortformer_decoder.cu`)
+  and an unused variable in `asr_text_decoder.cu`; made `AsrWorker`'s Silero load
+  lazy (default incremental path no longer loads it); fixed the stale
+  `asr_worker.h` "energy VAD" comment. *(Done; build now ZERO warnings; 19/19
+  ctest; AC11.)*
+- [x] **T065** Real-WS full-hour validation: streamed the full 3615 s `test.mp3`
+  through the production `orator_ws` path at the default config. ASR covered the
+  whole hour (0 → 3615.1 s, 151 segments, ZERO discontinuities); the timeline
+  carries the endpoint track (1454) with diarization (1083) + asr (151);
+  reconcile clean; CER 16.2% (unchanged). GPU stayed busy (59.7%, mean 38%, max
+  100%, longest idle 30 s — no CPU-only stall). *(Done; AC8, AC9 on the real
+  transport.)*
+- [x] **T066** Updated `tasks.md` checkboxes, spec status → Implemented,
+  `/memories/` and `PROJECT_STATE.md` with commit refs. *(Done; Constitution
+  Art. VIII.)*
 
 ## Traceability
 

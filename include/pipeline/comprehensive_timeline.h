@@ -74,14 +74,18 @@ class ComprehensiveTimeline {
   std::vector<Revision> UpsertText(long id, double start, double end,
                                    const std::string& text);
 
-  // Record an endpoint marker (informational; does not change the view).
+  // Record an endpoint marker. Endpoints are a PURE MARKER track: they are
+  // serialized into the timeline document (see SnapshotEndpoints) but never
+  // modify, split, or re-segment the speaker/text attribution.
   void MarkEndpoint(double time);
 
   // The current comprehensive view, time-ordered, consecutive same-speaker
   // entries coalesced. Used for the final timeline snapshot.
   std::vector<Entry> Snapshot() const;
 
-  const std::vector<double>& endpoints() const { return endpoints_; }
+  // The recorded endpoint marker times (sorted), for the serialized endpoint
+  // track in the timeline document (Spec 004 FR7).
+  std::vector<double> SnapshotEndpoints() const { return endpoints_; }
 
   void Clear();
 

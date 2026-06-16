@@ -151,26 +151,30 @@ void AuditoryStream::StartWorkers() {
     });
   }
 
-  // Spec 004 T031: independent speech-endpoint detector as a THIRD buffer
-  // consumer. It runs Silero on the continuous audio purely to publish endpoint
-  // markers on the common time base; it is independent of the ASR and
-  // diarization pipelines (it reads only the shared audio, never their output).
+  // Spec 004 T031/Phase 5: independent speech-endpoint detector as a THIRD
+  // buffer consumer. It runs the GPU Silero detector (GpuVad) on the continuous
+  // audio purely to publish endpoint markers on the common time base; it is
+  // independent of the ASR and diarization pipelines (it reads only the shared
+  // audio, never their output). Its per-window compute is batched on the GPU, so
+  // draining a large buffered span never stalls on a single CPU core.
   if (config_.endpoint_stream) {
-    AsrSileroVad::Params vp;
+    GpuVad::Params vp;
     vp.sample_rate = config_.sample_rate;
     vp.silero_model_path = config_.asr_vad_model;
     vp.silero_threshold = config_.asr_vad_threshold;
     vp.silero_min_speech_ms = config_.asr_vad_min_speech_ms;
     vp.silero_min_silence_ms = config_.asr_vad_min_silence_ms;
     vp.silero_speech_pad_ms = config_.asr_vad_speech_pad_ms;
-    endpoint_vad_ = std::make_unique<AsrSileroVad>(vp);
+    endpoint_vad_ = std::make_unique<GpuVad>(vp);
     endpoint_cursor_ = buffer_.AddConsumer();
     endpoint_thread_ = std::thread([this] {
       const core::TimeBase tb = buffer_.time_base();
       std::vector<float> chunk;
-      auto drain = [this, &tb](bool finalize) {
-        long ep = 0;
-        while (endpoint_vad_->NextEndpoint(finalize, &ep)) {
+      std::vector<long> eps;
+      auto drain = [this, &tb, &eps](bool finalize) {
+        eps.clear();
+        endpoint_vad_->DrainEndpoints(finalize, &eps);
+        for (long ep : eps) {
           // `ep` is an absolute sample on the common clock; convert via the base.
           const double t = tb.SecondsAt(ep);
           {
@@ -315,10 +319,12 @@ std::string AuditoryStream::Serialize() {
   // under comp_mutex_. No derivation, no upserts here.
   std::vector<core::DiarSegment> diar_view;
   std::vector<ComprehensiveTimeline::Entry> comp_view;
+  std::vector<double> endpoint_view;
   {
     std::lock_guard<std::mutex> lk(comp_mutex_);
     diar_view = last_segments_;
     comp_view = comp_.Snapshot();
+    endpoint_view = comp_.SnapshotEndpoints();
   }
   last_transcript_ = transcript;
 
@@ -362,6 +368,20 @@ std::string AuditoryStream::Serialize() {
                     t.start_sec, t.end_sec);
       out += std::string(buf) + JsonEscape(t.text) + "\"}";
       if (i + 1 < last_transcript_.tokens.size()) out += ",";
+    }
+    out += "]}";
+  }
+
+  // Track: speech endpoints (Spec 004 FR7). A PURE MARKER track on the common
+  // time base: it carries the endpoint times the detector published, and does
+  // not alter the diarization or ASR tracks. Present only when the endpoint
+  // pipeline is enabled.
+  if (config_.endpoint_stream) {
+    out += ",{\"kind\":\"endpoint\",\"source\":\"silero_gpu\",\"entries\":[";
+    for (size_t i = 0; i < endpoint_view.size(); ++i) {
+      std::snprintf(buf, sizeof(buf), "{\"time\":%.3f}", endpoint_view[i]);
+      out += buf;
+      if (i + 1 < endpoint_view.size()) out += ",";
     }
     out += "]}";
   }

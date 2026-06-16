@@ -34,6 +34,7 @@
 #include "model/streaming_sortformer.h"
 #include "pipeline/asr_worker.h"
 #include "pipeline/asr_vad.h"
+#include "pipeline/gpu_vad.h"
 #include "pipeline/comprehensive_timeline.h"
 #include "pipeline/diarization_worker.h"
 #include "pipeline/shared_audio_buffer.h"
@@ -162,7 +163,7 @@ class AuditoryStream {
   bool running_ = false;
 
   // Spec 004 T031: independent endpoint detector (third buffer consumer).
-  std::unique_ptr<AsrSileroVad> endpoint_vad_;
+  std::unique_ptr<GpuVad> endpoint_vad_;
   int endpoint_cursor_ = -1;
   std::thread endpoint_thread_;
 

@@ -14,6 +14,7 @@ target_link_libraries(test_shared_buffer PRIVATE pthread)
 orator_add_test(test_postprocess test_postprocess.cc)
 orator_add_test(test_comprehensive_timeline test_comprehensive_timeline.cc)
 orator_add_test(test_time_base   test_time_base.cc)
+orator_add_test(test_vad         test_vad.cc)
 orator_add_test(test_speaker_db  test_speaker_db.cc)
 orator_add_test(test_asr_ops     test_asr_ops.cc)
 orator_add_test(test_asr_weights test_asr_weights.cc)
@@ -34,6 +35,8 @@ set_tests_properties(test_asr_encoder PROPERTIES
 set_tests_properties(test_asr_decoder PROPERTIES
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_bpe PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_vad PROPERTIES
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 orator_add_test(test_mel         test_mel.cc)
 orator_add_test(test_audio       test_audio.cc)

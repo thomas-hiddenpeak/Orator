@@ -23,8 +23,15 @@ AsrWorker::AsrWorker(model::Qwen3Asr* asr, StreamTimeline* timeline,
                      const Params& params, Emit emit, cudaStream_t stream,
                      int rollback_tokens)
     : asr_(asr), timeline_(timeline), params_(params), emit_(std::move(emit)),
-  vad_(params.vad), preproc_(params.preproc), stream_(stream),
-  rollback_tokens_(rollback_tokens) {}
+  preproc_(params.preproc), stream_(stream),
+  rollback_tokens_(rollback_tokens) {
+  // Construct the Silero VAD only on the paths that use it: the legacy utterance
+  // path (!incremental) and the opt-in endpoint_reset. The default incremental
+  // path never touches it, so it is not loaded.
+  if (!params_.incremental || params_.endpoint_reset) {
+    vad_ = std::make_unique<AsrSileroVad>(params_.vad);
+  }
+}
 
 void AsrWorker::ProcessSpan(const float* samples, int n) {
   if (samples == nullptr || n <= 0) return;
@@ -36,7 +43,7 @@ void AsrWorker::ProcessSpan(const float* samples, int n) {
     // KV-cache path on both accuracy and speed (600 s CER 26.4% vs 11.6%; asr
     // 3.50x vs 4.78x). Retained only for regression comparison via
     // ORATOR_ASR_INCREMENTAL=0.
-    vad_.Push(samples, n);
+    vad_->Push(samples, n);
     DrainUtterances(/*finalize=*/false);
   }
   processed_samples_.fetch_add(n);
@@ -53,9 +60,9 @@ void AsrWorker::Finalize() {
 void AsrWorker::DrainUtterances(bool finalize) {
   for (;;) {
     int begin = 0, end = 0, consume = 0;
-    if (!vad_.NextSpan(finalize, &begin, &end, &consume)) return;
+    if (!vad_->NextSpan(finalize, &begin, &end, &consume)) return;
     EmitUtterance(begin, end, finalize);
-    vad_.Consume(consume);
+    vad_->Consume(consume);
     if (finalize) return;
   }
 }
@@ -63,7 +70,7 @@ void AsrWorker::DrainUtterances(bool finalize) {
 void AsrWorker::EmitUtterance(int begin, int end, bool finalize) {
   if (end <= begin) return;
   std::vector<float> enhanced;
-  const float* asr_input = vad_.data() + begin;
+  const float* asr_input = vad_->data() + begin;
   int asr_len = end - begin;
   preproc_.Process(asr_input, asr_len, &enhanced);
   if (!enhanced.empty()) {
@@ -87,8 +94,8 @@ void AsrWorker::EmitUtterance(int begin, int end, bool finalize) {
 
   if (rollback_tokens_ <= 0) {
     core::AsrToken tok;
-    tok.start_sec = tb_.SecondsAt(vad_.base_sample() + begin);
-    tok.end_sec = tb_.SecondsAt(vad_.base_sample() + end);
+    tok.start_sec = tb_.SecondsAt(vad_->base_sample() + begin);
+    tok.end_sec = tb_.SecondsAt(vad_->base_sample() + end);
     tok.text = continuation;
     if (tok.text.empty()) return;
     timeline_->AppendToken(tok);
@@ -123,8 +130,8 @@ void AsrWorker::EmitUtterance(int begin, int end, bool finalize) {
   if (emit_text.empty()) return;
 
   core::AsrToken tok;
-  tok.start_sec = tb_.SecondsAt(vad_.base_sample() + begin);
-  tok.end_sec = tb_.SecondsAt(vad_.base_sample() + end);
+  tok.start_sec = tb_.SecondsAt(vad_->base_sample() + begin);
+  tok.end_sec = tb_.SecondsAt(vad_->base_sample() + end);
   tok.text = emit_text;
   timeline_->AppendToken(tok);
   if (text_sink_) text_sink_(tok.start_sec, tok.end_sec, tok.text);
@@ -159,9 +166,9 @@ void AsrWorker::ProcessIncremental(const float* samples, int n, bool finalize) {
   // mid-word cut) rather than a fixed cap. We push the audio to the VAD and
   // drain endpoint positions into a queue.
   if (params_.endpoint_reset && n > 0) {
-    vad_.Push(samples, n);
+    vad_->Push(samples, n);
     long ep = 0;
-    while (vad_.NextEndpoint(/*finalize=*/false, &ep)) inc_endpoints_.push_back(ep);
+    while (vad_->NextEndpoint(/*finalize=*/false, &ep)) inc_endpoints_.push_back(ep);
   }
 
   // Slice the input at the next segment boundary. The boundary is the earliest
@@ -257,7 +264,7 @@ void AsrWorker::EmitIncrementalChunk(const float* samples, int n, bool finalize)
 }
 
 void AsrWorker::Reset() {
-  vad_.Reset();
+  if (vad_) vad_->Reset();
   pending_prefix_.clear();
   inc_in_segment_ = false;
   inc_abs_pos_ = 0;

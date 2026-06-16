@@ -103,28 +103,6 @@ __global__ void FlattenGatherKernel(const float* __restrict__ x,
   flat[idx] = x[(static_cast<size_t>(c) * T + t) * F + f];
 }
 
-// Flatten [C,T,F] (channel-major per frame: feat = c*F + f) and apply
-// Linear(in=C*F -> out=D): out[t,o] = bias[o] + sum_{c,f} x[c,t,f]*W[o, c*F+f].
-__global__ void FlattenLinearKernel(const float* __restrict__ x,
-                                    const float* __restrict__ W,
-                                    const float* __restrict__ bias,
-                                    float* __restrict__ out, int C, int T, int F,
-                                    int D) {
-  int idx = blockIdx.x * blockDim.x + threadIdx.x;
-  if (idx >= T * D) return;
-  int o = idx % D;
-  int t = idx / D;
-  int in_dim = C * F;
-  const float* Wo = W + static_cast<size_t>(o) * in_dim;
-  float acc = bias ? bias[o] : 0.0f;
-  for (int c = 0; c < C; ++c) {
-    const float* xc = x + (static_cast<size_t>(c) * T + t) * F;
-    const float* Wc = Wo + c * F;
-    for (int f = 0; f < F; ++f) acc += xc[f] * Wc[f];
-  }
-  out[idx] = acc;
-}
-
 int ConvOutLen(int L, int k, int s, int pad) {
   return (L + 2 * pad - k) / s + 1;
 }

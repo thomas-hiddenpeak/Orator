@@ -18,55 +18,6 @@ namespace {
 constexpr int kThreads = 256;
 inline int Blocks(int n) { return (n + kThreads - 1) / kThreads; }
 
-// out[m,n] = bias[n] + sum_k in[m,k] * W[n,k].  W stored row-major [N,K].
-__global__ void LinearKernel(const float* __restrict__ in,
-                             const float* __restrict__ W,
-                             const float* __restrict__ bias,
-                             float* __restrict__ out, int M, int K, int N,
-                             int act /*0 none,1 silu*/) {
-  int idx = blockIdx.x * blockDim.x + threadIdx.x;
-  if (idx >= M * N) return;
-  int n = idx % N, m = idx / N;
-  const float* xr = in + static_cast<size_t>(m) * K;
-  const float* wr = W + static_cast<size_t>(n) * K;
-  float acc = bias ? bias[n] : 0.0f;
-  for (int k = 0; k < K; ++k) acc += xr[k] * wr[k];
-  if (act == 1) acc = acc / (1.0f + __expf(-acc));  // SiLU/Swish
-  out[idx] = acc;
-}
-
-// Tiled GEMM: out[m,n] = bias[n] + sum_k in[m,k] * W[n,k].
-// in is [M,K] row-major, W is [N,K] row-major (i.e. out = in * W^T).
-constexpr int kTile = 16;
-__global__ void LinearTiledKernel(const float* __restrict__ in,
-                                  const float* __restrict__ W,
-                                  const float* __restrict__ bias,
-                                  float* __restrict__ out, int M, int K, int N,
-                                  int act /*0 none,1 silu*/) {
-  __shared__ float As[kTile][kTile];
-  __shared__ float Ws[kTile][kTile];
-  int ty = threadIdx.y, tx = threadIdx.x;
-  int m = blockIdx.y * kTile + ty;  // output row
-  int n = blockIdx.x * kTile + tx;  // output col
-  float acc = 0.0f;
-  for (int k0 = 0; k0 < K; k0 += kTile) {
-    int ak = k0 + tx;
-    As[ty][tx] = (m < M && ak < K) ? in[static_cast<size_t>(m) * K + ak] : 0.0f;
-    int wk = k0 + tx;  // W[n_row, wk] with n_row = blockIdx.x*kTile + ty
-    int wn = blockIdx.x * kTile + ty;
-    Ws[ty][tx] = (wn < N && wk < K) ? W[static_cast<size_t>(wn) * K + wk] : 0.0f;
-    __syncthreads();
-#pragma unroll
-    for (int t = 0; t < kTile; ++t) acc += As[ty][t] * Ws[tx][t];
-    __syncthreads();
-  }
-  if (m < M && n < N) {
-    if (bias) acc += bias[n];
-    if (act == 1) acc = acc / (1.0f + __expf(-acc));  // SiLU/Swish
-    out[static_cast<size_t>(m) * N + n] = acc;
-  }
-}
-
 inline void LaunchLinear(const float* in, const float* W, const float* bias,
                          float* out, int M, int K, int N, int act) {
   gemm::LaunchSgemm(in, W, bias, out, M, K, N, act);  // act: 0 none, 1 SiLU
@@ -123,93 +74,6 @@ __global__ void MaskRowsKernel(float* x, int T, int D, int valid) {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx >= T * D) return;
   if (idx / D >= valid) x[idx] = 0.0f;
-}
-
-// pos projection p[m,h,d] is computed by LinearKernel into [P, d_model].
-// Attention scores for a head, including matrix_ac, rel_shift(matrix_bd),
-// scale, masking and softmax, then context = attn @ v.  One block per (head,i).
-__global__ void RelAttnKernel(const float* __restrict__ q,   // [T,H,Dk]
-                              const float* __restrict__ k,    // [T,H,Dk]
-                              const float* __restrict__ v,    // [T,H,Dk]
-                              const float* __restrict__ p,    // [P,H,Dk]
-                              const float* __restrict__ bu,   // [H,Dk]
-                              const float* __restrict__ bv,   // [H,Dk]
-                              float* __restrict__ ctx,        // [T,H,Dk]
-                              int T, int H, int Dk, int valid, float scale) {
-  int h = blockIdx.y;
-  int i = blockIdx.x;
-  if (h >= H || i >= T) return;
-  int P = 2 * T - 1;
-  extern __shared__ float sc[];  // scores over j (size T), then qbu[Dk], bvh_s[Dk]
-  const float* qi = q + (static_cast<size_t>(i) * H + h) * Dk;
-  const float* buh = bu + h * Dk;
-  const float* bvh = bv + h * Dk;
-  float* qbu = sc + T;          // qi + bu, cached per block
-  float* bvh_s = qbu + Dk;      // bv head vector, cached
-  for (int d = threadIdx.x; d < Dk; d += blockDim.x) {
-    qbu[d] = qi[d] + buh[d];
-    bvh_s[d] = bvh[d];
-  }
-  __syncthreads();
-
-  for (int j = threadIdx.x; j < T; j += blockDim.x) {
-    if (j >= valid) {
-      sc[j] = -1e30f;
-      continue;
-    }
-    const float* kj = k + (static_cast<size_t>(j) * H + h) * Dk;
-    float ac = 0.0f;
-    for (int d = 0; d < Dk; ++d) ac += qbu[d] * kj[d];
-    // rel_shift index: bd[i,j] = raw[i', c2-1], idx = T + i*(2T-1)+j
-    long idx = static_cast<long>(T) + static_cast<long>(i) * P + j;
-    int ip = static_cast<int>(idx / (2 * T));
-    int c2 = static_cast<int>(idx % (2 * T));
-    float bd = 0.0f;
-    if (c2 != 0) {
-      int m = c2 - 1;  // pos index in [0,P)
-      const float* pm = p + (static_cast<size_t>(m) * H + h) * Dk;
-      const float* qip = q + (static_cast<size_t>(ip) * H + h) * Dk;
-      for (int d = 0; d < Dk; ++d) bd += (qip[d] + bvh_s[d]) * pm[d];
-    }
-    sc[j] = (ac + bd) * scale;
-  }
-  __syncthreads();
-  // softmax over j in [0,T)
-  __shared__ float s_max, s_sum;
-  float lmax = -1e30f;
-  for (int j = threadIdx.x; j < T; j += blockDim.x) lmax = fmaxf(lmax, sc[j]);
-  __shared__ float red[kThreads];
-  red[threadIdx.x] = lmax;
-  __syncthreads();
-  for (int s = blockDim.x / 2; s > 0; s >>= 1) {
-    if (threadIdx.x < s) red[threadIdx.x] = fmaxf(red[threadIdx.x], red[threadIdx.x + s]);
-    __syncthreads();
-  }
-  if (threadIdx.x == 0) s_max = red[0];
-  __syncthreads();
-  float mx = s_max;
-  float lsum = 0.0f;
-  for (int j = threadIdx.x; j < T; j += blockDim.x) {
-    float e = __expf(sc[j] - mx);
-    sc[j] = e;
-    lsum += e;
-  }
-  red[threadIdx.x] = lsum;
-  __syncthreads();
-  for (int s = blockDim.x / 2; s > 0; s >>= 1) {
-    if (threadIdx.x < s) red[threadIdx.x] += red[threadIdx.x + s];
-    __syncthreads();
-  }
-  if (threadIdx.x == 0) s_sum = red[0];
-  __syncthreads();
-  float inv = 1.0f / s_sum;
-  // context[i,h,d] = sum_j attn[j] * v[j,h,d]
-  for (int d = threadIdx.x; d < Dk; d += blockDim.x) {
-    float acc = 0.0f;
-    for (int j = 0; j < T; ++j)
-      acc += sc[j] * v[(static_cast<size_t>(j) * H + h) * Dk + d];
-    ctx[(static_cast<size_t>(i) * H + h) * Dk + d] = acc * inv;
-  }
 }
 
 // ---- GEMM-decomposed relative-position attention helpers ----
@@ -373,22 +237,6 @@ __global__ void BatchNormSiluKernel(float* x, const float* mean, const float* va
   int c = idx % C;
   float y = (x[idx] - mean[c]) * rsqrtf(var[c] + eps) * gamma[c] + beta[c];
   x[idx] = y / (1.0f + __expf(-y));  // SiLU
-}
-
-// pointwise conv (kernel 1) == per-time linear over channels.
-// out[t,co] = bias[co] + sum_ci in[t,ci]*W[co,ci]. W [Co,Ci,1] row-major.
-__global__ void PointwiseConvKernel(const float* __restrict__ in,
-                                    const float* __restrict__ W,
-                                    const float* __restrict__ bias,
-                                    float* __restrict__ out, int T, int Ci, int Co) {
-  int idx = blockIdx.x * blockDim.x + threadIdx.x;
-  if (idx >= T * Co) return;
-  int co = idx % Co, t = idx / Co;
-  const float* xr = in + static_cast<size_t>(t) * Ci;
-  const float* wr = W + static_cast<size_t>(co) * Ci;
-  float acc = bias ? bias[co] : 0.0f;
-  for (int ci = 0; ci < Ci; ++ci) acc += xr[ci] * wr[ci];
-  out[idx] = acc;
 }
 
 }  // namespace

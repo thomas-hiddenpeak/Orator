@@ -41,6 +41,11 @@ class AsrSileroVad {
   // segment reset points. Do not interleave with NextSpan (shared cursor).
   bool NextEndpoint(bool finalize, long* endpoint_abs_sample);
 
+  // Numeric-gate probe (Spec 004 Phase 5, FR8): from a fresh state, return the
+  // per-window speech probability for every full window in [pcm, pcm+n). This is
+  // the reference of record the GPU detector (GpuVad) is gated against.
+  std::vector<float> DebugWindowProbs(const float* pcm, int n);
+
   const float* data() const { return pcm_.data(); }
   long base_sample() const { return base_sample_; }
   void Consume(int n);

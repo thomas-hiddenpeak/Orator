@@ -285,6 +285,17 @@ void AsrSileroVad::Reset() {
   last_voiced_end_ = 0;
 }
 
+std::vector<float> AsrSileroVad::DebugWindowProbs(const float* pcm, int n) {
+  Reset();
+  std::vector<float> probs;
+  if (pcm == nullptr || n <= 0) return probs;
+  for (int off = 0; off + kWindowSize <= n; off += kWindowSize) {
+    const StepResult st = ProcessWindow(pcm + off, kWindowSize);
+    probs.push_back(st.probability);
+  }
+  return probs;
+}
+
 void AsrSileroVad::ReflectPadRight(const float* in, int len, int pad, float* out) {
   std::memcpy(out, in, len * sizeof(float));
   for (int i = 0; i < pad; ++i) out[len + i] = in[len - 2 - i];
