@@ -17,7 +17,7 @@ AuditoryStream::AuditoryStream(const Config& config, Emit emit)
 
 AuditoryStream::~AuditoryStream() {
   StopWorkers();
-  if (asr_stream_) cudaStreamDestroy(asr_stream_);
+  // asr_stream_ is owned by scheduler_ (destroyed with it); nothing to free here.
 }
 
 void AuditoryStream::Start() {
@@ -32,6 +32,14 @@ void AuditoryStream::Start() {
     dc.activity_threshold = config_.diar_threshold;
     diarizer_->Initialize(dc);
     diarizer_->LoadWeights(config_.diarizer_weights);
+    // Spec 002: register the diarization pipeline as foreground priority index 0
+    // (the latency-critical pipeline). Its engine is not yet stream-routed (it
+    // runs on the default stream under the global GPU lock); the registry still
+    // records its class so the scheduling telemetry reports it. create_stream is
+    // false until the engine's kernels are threaded onto the stream (a later,
+    // numerically-gated task).
+    scheduler_.Register("diarization", /*priority_index=*/0,
+                        /*background=*/false, /*create_stream=*/false);
   }
 
   if (!config_.asr_model_dir.empty()) {
@@ -44,16 +52,21 @@ void AuditoryStream::Start() {
     asr_->set_max_new_tokens(config_.asr_max_new_tokens);
     asr_->LoadWeights(config_.asr_model_dir);
 
-      // Create a CUDA stream for the ASR pipeline. Give it a lower priority than
-      // the default (diarization) stream so diarization latency is protected.
-      // On Tegra the priority range may be [0, 0]; cudaStreamCreateWithPriority
-      // still succeeds, it just creates a normal stream.
-      int leastPri = 0, greatestPri = 0;
-      cudaDeviceGetStreamPriorityRange(&leastPri, &greatestPri);
-      cudaStreamCreateWithPriority(&asr_stream_, cudaStreamNonBlocking, leastPri);
-      std::fprintf(stderr, "[gpu-sched] stream priority range [%d,%d]; "
-                   "asr_stream at %d (lower priority)\n",
-                   greatestPri, leastPri, leastPri);
+      // Spec 002: source the ASR pipeline's GPU stream from the priority
+      // registry. ASR registers as a foreground pipeline at priority index 1
+      // (below diarization at index 0); the scheduler derives the concrete CUDA
+      // priority from the index and creates the stream. On Tegra the supported
+      // priority range may be a single value, in which case priorities collapse
+      // to plain stream concurrency.
+      asr_stream_ = scheduler_.Register("asr", /*priority_index=*/1,
+                                        /*background=*/false,
+                                        /*create_stream=*/true);
+      int greatest = 0, least = 0;
+      scheduler_.PriorityRange(&greatest, &least);
+      std::fprintf(stderr,
+                   "[gpu-sched] priority range [greatest=%d, least=%d]; "
+                   "asr at index 1 (foreground)\n",
+                   greatest, least);
   }
   StartWorkers();
 }
@@ -181,6 +194,13 @@ void AuditoryStream::StartWorkers() {
     vp.silero_min_silence_ms = config_.asr_vad_min_silence_ms;
     vp.silero_speech_pad_ms = config_.asr_vad_speech_pad_ms;
     vad_detector_ = std::make_unique<GpuVad>(vp);
+    // Spec 002: register the VAD pipeline as BACKGROUND (priority index 2). It
+    // only publishes speech segments and is not latency-critical, so it yields
+    // to the foreground pipelines. Its engine runs on the default stream under
+    // the global GPU lock for now; the registry records its class for telemetry
+    // (create_stream is false until its kernels are stream-routed).
+    scheduler_.Register("vad", /*priority_index=*/2, /*background=*/true,
+                        /*create_stream=*/false);
     vad_cursor_ = buffer_.AddConsumer();
     vad_thread_ = std::thread([this] {
       const core::TimeBase tb = buffer_.time_base();

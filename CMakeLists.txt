@@ -26,6 +26,7 @@ set(ORATOR_CORE_SOURCES
     src/gpu/buffer.cc
     src/gpu/kernels.cu
     src/gpu/gpu_lock.cc
+    src/gpu/scheduler.cc
     src/io/safetensor.cc
     src/io/sharded_safetensor.cc
     src/io/bpe_tokenizer.cc

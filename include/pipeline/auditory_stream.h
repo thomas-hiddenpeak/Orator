@@ -30,6 +30,7 @@
 #include <cuda_runtime.h>
 
 #include "core/types.h"
+#include "gpu/scheduler.h"
 #include "model/qwen3_asr.h"
 #include "model/streaming_sortformer.h"
 #include "pipeline/asr_worker.h"
@@ -169,9 +170,15 @@ class AuditoryStream {
   int vad_cursor_ = -1;
   std::thread vad_thread_;
 
-    // Per-pipeline GPU stream. diar runs on the default stream (0); asr runs
-    // on asr_stream_ so its kernels can overlap with diar's idle intervals.
-    cudaStream_t asr_stream_ = nullptr;
+  // Spec 002: per-pipeline GPU stream priority registry. Each pipeline declares
+  // a priority index + class at registration and (when stream-routed) receives a
+  // prioritized CUDA stream owned by the scheduler. It is also the single source
+  // of truth for the GPU-scheduling telemetry snapshot.
+  gpu::GpuScheduler scheduler_;
+  // ASR pipeline GPU stream, sourced from the scheduler (owned by it, not here).
+  // diar/vad currently run on the default stream (their engine stream-routing is
+  // a later, separately-gated task); the scheduler still records their class.
+  cudaStream_t asr_stream_ = nullptr;
 
   // Wakes WaitForBarrier whenever a worker advances or finishes.
   std::mutex progress_mutex_;
