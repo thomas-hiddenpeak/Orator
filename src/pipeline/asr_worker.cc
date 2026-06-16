@@ -31,6 +31,11 @@ void AsrWorker::ProcessSpan(const float* samples, int n) {
   if (params_.incremental) {
     ProcessIncremental(samples, n, /*finalize=*/false);
   } else {
+    // LEGACY Silero-VAD utterance path. DEACTIVATED by default (params_.incremental
+    // is true in production) because it measured worse than the incremental
+    // KV-cache path on both accuracy and speed (600 s CER 26.4% vs 11.6%; asr
+    // 3.50x vs 4.78x). Retained only for regression comparison via
+    // ORATOR_ASR_INCREMENTAL=0.
     vad_.Push(samples, n);
     DrainUtterances(/*finalize=*/false);
   }

@@ -77,19 +77,26 @@ int main(int argc, char** argv) {
   ReadEnvString("ORATOR_ASR_TFGRIDNET_MODEL", &cfg.asr_tfgridnet_model);
 
   // Spec 003/004 streaming + comprehensive-timeline knobs (real WS path).
-  auto env_on = [](const char* name) {
+  // The incremental KV-cache ASR path and the endpoint stream are the PRODUCTION
+  // DEFAULT (cfg defaults are true). The env vars are explicit opt-OUT switches
+  // for regression comparison against the legacy Silero-VAD path:
+  //   ORATOR_ASR_INCREMENTAL=0  -> use the legacy Silero-VAD utterance path
+  //   ORATOR_ENDPOINT_STREAM=0  -> drop the independent endpoint marker stream
+  //   ORATOR_ASR_ENDPOINT_RESET=0 -> incremental resets on a fixed cap only
+  auto env_flag = [](const char* name, bool dflt) {
     const char* v = std::getenv(name);
-    return v != nullptr && v[0] == '1';
+    if (v == nullptr || v[0] == '\0') return dflt;
+    return v[0] == '1' || v[0] == 't' || v[0] == 'T' || v[0] == 'y' || v[0] == 'Y';
   };
-  if (env_on("ORATOR_ASR_INCREMENTAL")) {
-    cfg.asr_incremental = true;
+  cfg.asr_incremental = env_flag("ORATOR_ASR_INCREMENTAL", cfg.asr_incremental);
+  if (cfg.asr_incremental) {
     ReadEnvDouble("ORATOR_ASR_SEGMENT_SEC", &cfg.asr_incremental_segment_sec);
-    if (env_on("ORATOR_ASR_ENDPOINT_RESET"))
-      cfg.asr_incremental_endpoint_reset = true;
+    cfg.asr_incremental_endpoint_reset =
+        env_flag("ORATOR_ASR_ENDPOINT_RESET", cfg.asr_incremental_endpoint_reset);
     ReadEnvDouble("ORATOR_ASR_MIN_SEGMENT_SEC",
                   &cfg.asr_incremental_min_segment_sec);
   }
-  if (env_on("ORATOR_ENDPOINT_STREAM")) cfg.endpoint_stream = true;
+  cfg.endpoint_stream = env_flag("ORATOR_ENDPOINT_STREAM", cfg.endpoint_stream);
 
   std::signal(SIGPIPE, SIG_IGN);
 

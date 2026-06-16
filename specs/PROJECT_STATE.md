@@ -42,6 +42,24 @@ harness): the `ready` message declares the common time base, and `asr`,
 `asr_partial`, `endpoint`, `revision`, and `timeline` messages all flow; the
 timebase reconciliation check is clean (no gap).
 
+**Production default (2026-06-16):** the incremental KV-cache ASR path and the
+independent endpoint stream are the out-of-the-box `orator_ws` default
+(`asr_incremental` and `endpoint_stream` default true). The legacy Silero-VAD
+utterance path is deactivated by default (measured worse: 600 s CER 26.4% / 3.50x
+vs 11.6% / 4.78x) and retained only for regression comparison via
+`ORATOR_ASR_INCREMENTAL=0`. The `endpoint_reset` knob is **default off**: it runs
+a CPU-only Silero pass synchronously in the ASR thread, which stalls the worker
+(GPU idle, one CPU core busy) when ASR falls behind and drains a large backlog;
+it is opt-in only (`ORATOR_ASR_ENDPOINT_RESET=1`).
+
+**Full-length production validation (2026-06-16):** the full 1-hour `test.mp3`
+(3615 s) was streamed through the real `orator_ws` WebSocket at the default
+config. ASR covered the entire hour (0 → 3615.1 s, 151 segments, zero
+discontinuities), the comprehensive `timeline` was produced, endpoints reached
+3614 s (1454), reconciliation was clean, and CER vs gold was 16.2%
+(edits 2162 / ref 13352). GPU stayed busy (GR3D busy fraction 59.8%, mean 41%,
+longest idle stretch 25 s — no CPU-only stall).
+
 ### Pipeline responsibility boundaries (ratified, do not re-litigate)
 
 - **ASR** outputs ONLY plain transcript text + its own time codes. It has **no**
