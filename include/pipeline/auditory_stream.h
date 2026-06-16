@@ -98,6 +98,10 @@ class AuditoryStream {
     std::string asr_preproc_mode = "none";  // none|classical|frcrn|tfgridnet
     std::string asr_frcrn_model = "models/asr_preproc/frcrn.safetensors";
     std::string asr_tfgridnet_model = "models/asr_preproc/tfgridnet.safetensors";
+    // Spec 002 FR7: interval (seconds) for the periodic GPU-scheduling telemetry
+    // message ({"type":"gpu_telemetry"}). A dedicated low-rate timer thread
+    // emits it through the serialized transport. 0 disables it.
+    double gpu_telemetry_interval_sec = 1.0;
   };
 
   // Delivers a result event as a JSON string. Invoked from the ASR worker thread
@@ -147,6 +151,9 @@ class AuditoryStream {
   static std::string SerializeRevision(const ComprehensiveTimeline::Revision& r,
                                        const char* source);
   void EmitLocked(const std::string& json);  // serialize transport sends
+  // Spec 002 FR7: build the periodic GPU-scheduling telemetry message from the
+  // priority registry + each pipeline's compute/occupancy summary.
+  std::string SerializeGpuTelemetry() const;
 
   Config config_;
   Emit emit_;
@@ -185,6 +192,12 @@ class AuditoryStream {
   std::condition_variable progress_cv_;
   // Serializes Emit calls across the worker threads and the controller.
   std::mutex emit_mutex_;
+
+  // Spec 002 FR7: periodic GPU-scheduling telemetry timer thread.
+  std::thread telemetry_thread_;
+  std::mutex telemetry_mutex_;
+  std::condition_variable telemetry_cv_;
+  bool telemetry_stop_ = false;
 
   // Last serialized snapshots, exposed for inspection by the test tool.
   std::vector<core::DiarSegment> last_segments_;

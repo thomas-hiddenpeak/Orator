@@ -1,5 +1,6 @@
 #include "pipeline/auditory_stream.h"
 
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <utility>
@@ -234,11 +235,40 @@ void AuditoryStream::StartWorkers() {
       progress_cv_.notify_all();
     });
   }
+
+  // Spec 002 FR7: periodic GPU-scheduling telemetry. A dedicated low-rate timer
+  // thread builds a snapshot from the priority registry + each pipeline's
+  // compute/occupancy summary and emits it through the serialized transport, so
+  // no GPU worker thread emits on its hot path. Disabled when the interval is 0.
+  if (config_.gpu_telemetry_interval_sec > 0.0) {
+    telemetry_stop_ = false;
+    telemetry_thread_ = std::thread([this] {
+      const auto interval = std::chrono::duration<double>(
+          config_.gpu_telemetry_interval_sec);
+      for (;;) {
+        {
+          std::unique_lock<std::mutex> lk(telemetry_mutex_);
+          telemetry_cv_.wait_for(lk, interval,
+                                 [this] { return telemetry_stop_; });
+          if (telemetry_stop_) break;
+        }
+        const std::string msg = SerializeGpuTelemetry();
+        if (!msg.empty()) EmitLocked(msg);
+      }
+    });
+  }
   running_ = true;
 }
 
 void AuditoryStream::StopWorkers() {
   if (!running_) return;
+  // Stop the telemetry timer first so it does not emit during teardown.
+  {
+    std::lock_guard<std::mutex> lk(telemetry_mutex_);
+    telemetry_stop_ = true;
+  }
+  telemetry_cv_.notify_all();
+  if (telemetry_thread_.joinable()) telemetry_thread_.join();
   buffer_.Close();
   if (diar_thread_.joinable()) diar_thread_.join();
   if (asr_thread_.joinable()) asr_thread_.join();
@@ -334,6 +364,47 @@ std::string AuditoryStream::SerializeRevision(
     out += std::string(buf) + JsonEscape(e.speaker) + "\",\"text\":\"" +
            JsonEscape(e.text) + "\"}";
     if (i + 1 < r.entries.size()) out += ",";
+  }
+  out += "]}";
+  return out;
+}
+
+std::string AuditoryStream::SerializeGpuTelemetry() const {
+  // Spec 002 FR7: an additive snapshot of GPU scheduling state. For each
+  // registered pipeline (from the priority registry) report its declared
+  // priority index + class, whether it currently runs on a dedicated prioritized
+  // stream, its assigned CUDA stream priority, and a compute/occupancy summary
+  // (compute_sec + real-time factor already tracked per worker). The message
+  // carries the common time base like every other message and is additive: no
+  // existing message changes.
+  const auto entries = scheduler_.Snapshot();
+  const double audio = audio_sec();
+  char buf[256];
+  std::string out = "{\"type\":\"gpu_telemetry\",";
+  std::snprintf(buf, sizeof(buf), "\"time_sec\":%.3f,\"sample_rate\":%d,",
+                audio, config_.sample_rate);
+  out += buf;
+  out += "\"pipelines\":[";
+  for (size_t i = 0; i < entries.size(); ++i) {
+    const auto& e = entries[i];
+    double compute = 0.0;
+    if (e.name == "diarization")
+      compute = diar_worker_ ? diar_worker_->compute_sec() : 0.0;
+    else if (e.name == "asr")
+      compute = asr_worker_ ? asr_worker_->compute_sec() : 0.0;
+    else if (e.name == "vad")
+      compute = vad_detector_ ? vad_detector_->compute_sec() : 0.0;
+    const double rtf = compute > 0.0 ? audio / compute : 0.0;
+    std::snprintf(buf, sizeof(buf),
+                  "{\"name\":\"%s\",\"priority_index\":%d,\"class\":\"%s\","
+                  "\"stream_active\":%s,\"cuda_priority\":%d,"
+                  "\"compute_sec\":%.3f,\"real_time_factor\":%.3f}",
+                  e.name.c_str(), e.priority_index,
+                  e.background ? "background" : "foreground",
+                  e.stream_active ? "true" : "false", e.cuda_priority, compute,
+                  rtf);
+    out += buf;
+    if (i + 1 < entries.size()) out += ",";
   }
   out += "]}";
   return out;

@@ -98,6 +98,9 @@ int main(int argc, char** argv) {
   }
   cfg.vad_stream = env_flag("ORATOR_VAD_STREAM", cfg.vad_stream);
 
+  // Spec 002 FR7: periodic GPU-scheduling telemetry interval (seconds). 0 off.
+  ReadEnvDouble("ORATOR_GPU_TELEMETRY_SEC", &cfg.gpu_telemetry_interval_sec);
+
   std::signal(SIGPIPE, SIG_IGN);
 
   net::WebSocketServer server(port);
