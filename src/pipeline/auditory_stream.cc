@@ -142,12 +142,15 @@ void AuditoryStream::StartWorkers() {
     // common base); the controller upserts it (id-keyed) and pushes any
     // revisions. Text gets a provisional attribution against the current
     // speaker set and is revised when diarization refreshes at the next emit.
+    // The worker owns the text id: it delivers the SAME id repeatedly while a
+    // segment's text is revised in place (ASR self-revision, Spec 004 G3), so
+    // UpsertText revises the existing entry instead of inserting a new one.
     asr_worker_->set_text_sink(
-        [this](double start, double end, const std::string& text) {
+        [this](long id, double start, double end, const std::string& text) {
           std::vector<ComprehensiveTimeline::Revision> revs;
           {
             std::lock_guard<std::mutex> lk(comp_mutex_);
-            revs = comp_.UpsertText(comp_next_text_id_++, start, end, text);
+            revs = comp_.UpsertText(id, start, end, text);
           }
           for (const auto& r : revs) EmitLocked(SerializeRevision(r, "qwen3_asr"));
         });
@@ -415,7 +418,7 @@ std::string AuditoryStream::Serialize() {
   // Present only when ASR is enabled (it requires both modalities). Built from
   // the native stateful ComprehensiveTimeline (Spec 004): diarization provides
   // who/when, ASR provides what/when, attribution is by time alignment on the
-  // common base. All three pipelines (diarization, ASR, endpoint) deliver LIVE
+  // common base. All three pipelines (diarization, ASR, VAD) deliver LIVE
   // to comp_ via their sinks; Serialize is a pure reader and just emits the
   // snapshot taken above (comp_view). No upserts here.
   out += ",\"comprehensive\":[";
@@ -443,7 +446,6 @@ void AuditoryStream::Reset() {
   {
     std::lock_guard<std::mutex> lk(comp_mutex_);
     comp_.Clear();
-    comp_next_text_id_ = 0;
   }
   if (diarizer_) diarizer_->Reset();
   if (asr_) asr_->Reset();

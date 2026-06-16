@@ -2,10 +2,16 @@
 
 - **Feature**: `004-comprehensive-timeline`
 - **Spec**: [spec.md](spec.md)
-- **Status**: Draft
-- **Constitution**: v1.1.0
+- **Status**: Implemented (core, WS conformance, VAD pipeline, ASR live-revision)
+- **Constitution**: v1.2.1
 
 > HOW to satisfy [spec.md](spec.md). Standard terminology.
+>
+> Note: this plan is retained as implementation history. Where this file uses
+> legacy wording such as "endpoint" markers or max-overlap-only projection,
+> the authoritative runtime behavior is the current code + spec: `vad` speech
+> segments, diarization-driven split in the comprehensive view, and ASR
+> stable-`text_id` in-place revisions.
 
 ---
 

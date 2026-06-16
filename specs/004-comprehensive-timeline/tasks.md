@@ -2,10 +2,10 @@
 
 - **Feature**: `004-comprehensive-timeline`
 - **Spec**: [spec.md](spec.md) · **Plan**: [plan.md](plan.md)
-- **Status**: Implemented. Phases 1–5 done. Core + revisions + timebase
-  (3159b75 step 1, 673f95d step 2); endpoint pipeline completed in Phase 5 (GPU
-  detector + serialized endpoint track + dead-code cleanup), validated on the
-  real WS full-hour run.
+- **Status**: Implemented. Phases 1–6 done. Core + revisions + timebase
+  (3159b75 step 1, 673f95d step 2); VAD pipeline completed in Phase 5 (GPU
+  detector + serialized `vad` track + dead-code cleanup), validated on the
+  real WS path including live ASR self-revision behavior.
 - **Constitution**: v1.2.1
 
 > Ordered, independently verifiable steps. Each phase builds + tests before the
@@ -34,13 +34,13 @@
 - [x] **T021** Push revisions: returned revisions are emitted via `EmitLocked` as
   `{"type":"revision",...}`. *(Done 673f95d; revisions appear on the WS path.)*
 
-## Phase 3 — Common time base metadata + endpoint pipeline
+## Phase 3 — Common time base metadata + VAD pipeline
 - [x] **T030** WS meta: on session open send the common-base declaration
   (`sample_rate`, `time_base`, `origin_sample`) in the `ready` message; all
   messages carry common-base start/end. *(Done 673f95d; AC6.)*
-- [x] **T031** Endpoint pipeline: a third `buffer_.AddConsumer()` + thread runs
-  the endpoint detector (continuous, no trim), calls `MarkEndpoint`, emits
-  `{"type":"endpoint","time"}`. ASR worker unchanged. *(Phase 3 wired the thread
+- [x] **T031** VAD pipeline: a third `buffer_.AddConsumer()` + thread runs
+  the VAD detector (continuous, no trim), calls `AddVad`, emits
+  `{"type":"vad","start","end"}`. ASR worker unchanged. *(Phase 3 wired the thread
   + emission (673f95d), AC5 met. Phase 5 completed it: the detector is now the
   batched GPU `GpuVad` (FR6) and endpoints are serialized into the timeline (FR7).)*
 
@@ -54,11 +54,11 @@
   race-checked; schema additive-only. *(Done; AC7.)*
 - [x] **T051** Update `/memories/repo/` + `PROJECT_STATE.md`; commit. *(Done.)*
 
-## Phase 5 — Complete the endpoint pipeline (GPU detector + serialized track) + cleanup
+## Phase 5 — Complete the VAD pipeline (GPU detector + serialized track) + cleanup
 > Closes the FR6/FR7 gap left by T031 and folds in FR8/FR9. Each task builds +
 > tests before the next; the final gate is the real-WS full-hour run.
 - [x] **T060** Detector numeric reference. The CPU `AsrSileroVad` is the
-  reference of record for the endpoint detector (it produced every validated
+  reference of record for the VAD detector (it produced every validated
   run's endpoints); a PyTorch silero-vad hub dump is not reproducible in this
   offline environment, so the gate is GPU-vs-CPU equivalence on identical fp32
   weights. Added `AsrSileroVad::DebugWindowProbs` exposing per-window
@@ -70,14 +70,14 @@
   as a single batched GPU pass over all ready windows; the LSTM recurrence is one
   scan over the batch in shared memory. Runs under `gpu::DeviceLock()`. *(Done;
   `test_vad` gate: GPU vs CPU max |dprob| = 3.7e-8, tol 2e-3; AC10.)* (FR6, FR8)
-- [x] **T062** Wired the GPU detector into the endpoint thread, replacing the
+- [x] **T062** Wired the GPU detector into the VAD thread, replacing the
   CPU detector (`endpoint_vad_` is now a `GpuVad`; `DrainEndpoints` batches the
   buffered read). *(Done; endpoint markers still emitted on the common base.)* (FR6)
-- [x] **T063** Serialized endpoints into the timeline document: an additive
-  `{"kind":"endpoint","source":"silero_gpu"}` track in `Serialize()` (pure marker
-  track — does NOT alter the ASR/diar tracks); replaced the write-only `endpoints()`
-  accessor with `SnapshotEndpoints()`. *(Done; final timeline carries 1454
-  endpoints alongside diarization + asr tracks; AC9; schema additive.)* (FR7)
+- [x] **T063** Serialized VAD speech segments into the timeline document: an
+  additive `{"kind":"vad","source":"silero_gpu"}` track in `Serialize()` (pure data
+  track — does NOT alter the ASR/diar tracks); replaced the write-only endpoint
+  accessor with `SnapshotVad()`. *(Done; final timeline carries `vad` alongside
+  diarization + asr tracks; AC9; schema additive.)* (FR7)
 - [x] **T064** Dead-code cleanup (FR9): removed the stub models
   (`StubAsr`/`StubDiarizer`/`StubEmbedder` + headers + registrations + CMake) and
   SIX never-launched kernels (the audit caught 4 — `RelAttnKernel`,
@@ -98,6 +98,15 @@
 - [x] **T066** Updated `tasks.md` checkboxes, spec status → Implemented,
   `/memories/` and `PROJECT_STATE.md` with commit refs. *(Done; Constitution
   Art. VIII.)*
+
+## Phase 6 — ASR self-revision convergence hardening
+- [x] **T067** Stable `text_id` ownership moved to `AsrWorker` so in-segment ASR
+  self-revisions upsert the SAME id and revise in place; id advances only when a
+  segment closes. Removed obsolete controller-side id state.
+- [x] **T068** Added interleaved ASR+diar convergence test
+  (`test_comprehensive_timeline`) to assert order-independent final view under
+  out-of-order diar updates and ASR in-segment text revisions; validated with
+  real WS capture showing `asr_partial` + source-tagged `revision` events.
 
 ## Traceability
 

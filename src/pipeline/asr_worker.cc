@@ -99,7 +99,8 @@ void AsrWorker::EmitUtterance(int begin, int end, bool finalize) {
     tok.text = continuation;
     if (tok.text.empty()) return;
     timeline_->AppendToken(tok);
-    if (text_sink_) text_sink_(tok.start_sec, tok.end_sec, tok.text);
+    if (text_sink_)
+      text_sink_(inc_text_id_++, tok.start_sec, tok.end_sec, tok.text);
     if (emit_) {
       char buf[128];
       std::snprintf(buf, sizeof(buf),
@@ -135,7 +136,8 @@ void AsrWorker::EmitUtterance(int begin, int end, bool finalize) {
   tok.end_sec = tb_.SecondsAt(vad_->base_sample() + end);
   tok.text = emit_text;
   timeline_->AppendToken(tok);
-  if (text_sink_) text_sink_(tok.start_sec, tok.end_sec, tok.text);
+  if (text_sink_)
+    text_sink_(inc_text_id_++, tok.start_sec, tok.end_sec, tok.text);
 
   if (emit_) {
     char buf[128];
@@ -243,7 +245,12 @@ void AsrWorker::EmitIncrementalChunk(const float* samples, int n, bool finalize)
     tok.end_sec = tb_.SecondsAt(inc_seg_end_sample_);
     tok.text = inc_live_text_;
     timeline_->AppendToken(tok);
-    if (text_sink_) text_sink_(tok.start_sec, tok.end_sec, tok.text);
+    // Final revision of this segment: deliver under the SAME stable id so the
+    // comprehensive timeline revises the in-progress entry in place, then
+    // advance the id so the next segment is a new entry (Spec 004 G3).
+    if (text_sink_) text_sink_(inc_text_id_, tok.start_sec, tok.end_sec, tok.text);
+    ++inc_text_id_;
+    inc_delivered_text_.clear();
     if (emit_) {
       char buf[128];
       std::snprintf(buf, sizeof(buf),
@@ -253,16 +260,27 @@ void AsrWorker::EmitIncrementalChunk(const float* samples, int n, bool finalize)
       emit_(std::string(buf) + JsonEscape(tok.text) + "\"}");
     }
     inc_live_text_.clear();
-  } else if (n > 0 && emit_ && !inc_live_text_.empty()) {
-    // Partial live update (not yet committed to the timeline).
-    char buf[160];
-    std::snprintf(buf, sizeof(buf),
-                  "{\"type\":\"asr_partial\",\"source\":\"qwen3_asr\","
-                  "\"start\":%.3f,\"end\":%.3f,"
-                  "\"text\":\"",
-                  tb_.SecondsAt(inc_seg_start_sample_),
-                  tb_.SecondsAt(inc_seg_end_sample_));
-    emit_(std::string(buf) + JsonEscape(inc_live_text_) + "\"}");
+  } else if (n > 0 && !inc_live_text_.empty()) {
+    // In-segment revision: the engine has revised the segment's text (vLLM-style
+    // unfixed-tail rollback every window). Deliver it to the comprehensive
+    // timeline under the SAME stable id so the entry is revised in place (ASR
+    // self-revision, Spec 004 G3) -- only when the text actually changed, to
+    // bound revision volume. Also emit the live preview message.
+    if (text_sink_ && inc_live_text_ != inc_delivered_text_) {
+      text_sink_(inc_text_id_, tb_.SecondsAt(inc_seg_start_sample_),
+                 tb_.SecondsAt(inc_seg_end_sample_), inc_live_text_);
+      inc_delivered_text_ = inc_live_text_;
+    }
+    if (emit_) {
+      char buf[160];
+      std::snprintf(buf, sizeof(buf),
+                    "{\"type\":\"asr_partial\",\"source\":\"qwen3_asr\","
+                    "\"start\":%.3f,\"end\":%.3f,"
+                    "\"text\":\"",
+                    tb_.SecondsAt(inc_seg_start_sample_),
+                    tb_.SecondsAt(inc_seg_end_sample_));
+      emit_(std::string(buf) + JsonEscape(inc_live_text_) + "\"}");
+    }
   }
 }
 
@@ -273,6 +291,8 @@ void AsrWorker::Reset() {
   inc_abs_pos_ = 0;
   inc_seg_samples_ = 0;
   inc_live_text_.clear();
+  inc_text_id_ = 0;
+  inc_delivered_text_.clear();
   inc_endpoints_.clear();
   processed_samples_.store(0);
   compute_sec_ = 0.0;

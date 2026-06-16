@@ -32,22 +32,22 @@ absolute time base.
 
 **Specs 003 (incremental KV-cache ASR), 004 (revisable comprehensive timeline),
 and 005 (reusable common time base) are implemented, verified, committed, and
-pushed.** Spec 004's endpoint pipeline was completed in Phase 5: the endpoint
-detector now runs BATCHED ON THE GPU (`GpuVad`) and its markers are a serialized
-endpoint track in the timeline document (previously CPU-only and write-only).
+pushed.** Spec 004's VAD pipeline was completed in Phase 5: the VAD detector now
+runs BATCHED ON THE GPU (`GpuVad`) and its speech segments are a serialized
+`vad` track in the timeline document (previously CPU-only and write-only).
 The system runs **three independent active-producer pipelines** —
-diarization (who/when), ASR (what/when), and speech-endpoint detection — each
+diarization (who/when), ASR (what/when), and VAD speech-activity detection — each
 feeding one **native, revisable comprehensive timeline** on a single absolute
 time base. The comprehensive layer is a **pure time-alignment layer**: it never
 modifies, splits, infers, or back-fills any pipeline's content (Spec 004 §1a).
 Validated end-to-end through the **real WebSocket** path (not just the test
 harness): the `ready` message declares the common time base, and `asr`,
-`asr_partial`, `endpoint`, `revision`, and `timeline` messages all flow; the
+`asr_partial`, `vad`, `revision`, and `timeline` messages all flow; the
 timebase reconciliation check is clean (no gap).
 
 **Production default (2026-06-16):** the incremental KV-cache ASR path and the
-independent endpoint stream are the out-of-the-box `orator_ws` default
-(`asr_incremental` and `endpoint_stream` default true). The legacy Silero-VAD
+independent VAD stream are the out-of-the-box `orator_ws` default
+(`asr_incremental` and `vad_stream` default true). The legacy Silero-VAD
 utterance path is deactivated by default (measured worse: 600 s CER 26.4% / 3.50x
 vs 11.6% / 4.78x) and retained only for regression comparison via
 `ORATOR_ASR_INCREMENTAL=0`. The `endpoint_reset` knob is **default off**: it runs
@@ -85,7 +85,7 @@ longest idle stretch 25 s — no CPU-only stall).
 | Decoupling (interfaces + registry) | ✅ In place | `IDiarizer`, `IAsr`; registry-constructed. Text↔speaker combination is the concrete `ComprehensiveTimeline` (pure time-alignment), not an interface. |
 | `OverlapTimelineMerger` / `ITimelineMerger` | 🗑️ Removed | The old one-shot max-overlap merger and its orphaned interface were deleted (commit pending) — superseded by `ComprehensiveTimeline` (Spec 004). `orator_eval` now evaluates `ComprehensiveTimeline` on the real 4-speaker reference. |
 | WebSocket server (from-scratch POSIX) | ✅ Working | RFC6455 handshake + frame codec, no deps. |
-| ASR + WS integration | Done; threaded, three independent pipelines | `AuditoryStream` is a controller owning a `SharedAudioBuffer`, three worker threads (`DiarizationWorker`, `AsrWorker`, endpoint detector), and a mutex-guarded `ComprehensiveTimeline`. Each pipeline is an active push producer (Spec 004). Sends incremental `asr`/`asr_partial`, `endpoint`, `revision`, and a comprehensive `timeline`. GPU work serialized by `gpu::DeviceLock()`. |
+| ASR + WS integration | Done; threaded, three independent pipelines | `AuditoryStream` is a controller owning a `SharedAudioBuffer`, three worker threads (`DiarizationWorker`, `AsrWorker`, VAD detector), and a mutex-guarded `ComprehensiveTimeline`. Each pipeline is an active push producer (Spec 004). Sends incremental `diar`, `asr`/`asr_partial`, `vad`, `revision`, and a comprehensive `timeline`. ASR uses stable `text_id` for in-place segment revision. GPU work serialized by `gpu::DeviceLock()`. |
 | Incremental KV-cache ASR streaming (Spec 003) | ✅ Implemented, verified, committed (8cc31ab) | Persistent KV cache + prefix caching + chunk-local windowed encoder; Silero endpoint reset. Full 1hr CER 16.1% / 6.22x; beats production Silero-VAD at every scale. |
 | Revisable comprehensive timeline (Spec 004) | ✅ Implemented (core + VAD pipeline + WS conformance) | Native stateful PURE CONTAINER + diarization-driven VIEW. Three tracks (diarization, asr, vad) each carry data + `source` meta + time codes; every pipeline emits its own WS message (`diar`/`asr`/`vad`) and revisions are source-tagged. The comprehensive VIEW splits text at DIARIZATION boundaries (not ASR's coarse segmentation). VAD = batched GPU `GpuVad` publishing speech segments (`test_vad` gate 3.7e-8). Owner invariant: no overlap → "unknown", never borrowed. |
 | Reusable common time base (Spec 005) | ✅ Implemented, committed (84fba90) | Header-only `core::TimeBase` value type shared by all pipelines; reconciliation check clean (zero gap) at 120s + 600s. |

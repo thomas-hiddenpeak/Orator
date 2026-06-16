@@ -62,8 +62,15 @@ class AsrWorker {
   // the JSON Emit. The controller wires this to ComprehensiveTimeline::UpsertText
   // and pushes any returned revisions. Keeps the worker decoupled from the
   // timeline: the worker reports its segment; the controller delivers it.
+  //
+  // The `id` is a STABLE per-segment identifier the worker owns. For the
+  // incremental path the same id is delivered repeatedly as the segment's text
+  // is revised in place (ASR self-revision, Spec 004 G3) and the id advances only
+  // when the segment closes; for the legacy path each utterance gets a fresh id.
+  // The comprehensive timeline revises in place when it sees a known id.
   using TextSegmentSink =
-      std::function<void(double start, double end, const std::string& text)>;
+      std::function<void(long id, double start, double end,
+                         const std::string& text)>;
 
   // `asr` and `timeline` are owned by the controller and must outlive the
   // worker. The engine must already be initialized + weight-loaded.
@@ -133,6 +140,8 @@ class AsrWorker {
   long inc_seg_end_sample_ = 0;      // absolute sample of last fed audio
   long inc_seg_samples_ = 0;         // samples accumulated this segment
   std::string inc_live_text_;        // current live transcript of the segment
+  long inc_text_id_ = 0;             // stable id of the open segment (Spec 004 G3)
+  std::string inc_delivered_text_;   // last text delivered to the comp timeline
   std::deque<long> inc_endpoints_;   // pending VAD endpoints (absolute samples)
 };
 

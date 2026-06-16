@@ -134,6 +134,51 @@ int main() {
             "text 1 re-attributed to speaker_1 after diar refinement");
   }
 
+      // ---- 7. Interleaved convergence: ASR self-revisions and diar updates in
+      // different arrival orders must converge to the SAME final view. ----
+      {
+        ComprehensiveTimeline a;
+        ComprehensiveTimeline b;
+
+        // Order A: diar baseline -> text -> text revision -> diar refinement.
+        a.ReplaceSpeakers({{0.0, 4.0, "speaker_0", 0.8f},
+               {4.0, 8.0, "speaker_1", 0.8f}});
+        a.UpsertText(7, 2.0, 6.0, "abcd");
+        a.UpsertText(7, 2.0, 7.0, "abcdef");
+        a.ReplaceSpeakers({{0.0, 3.0, "speaker_0", 0.9f},
+               {3.0, 8.0, "speaker_1", 0.9f}});
+
+        // Order B: text and revision arrive first, diar view arrives later.
+        b.UpsertText(7, 2.0, 6.0, "abcd");
+        b.UpsertText(7, 2.0, 7.0, "abcdef");
+        b.ReplaceSpeakers({{0.0, 4.0, "speaker_0", 0.8f},
+               {4.0, 8.0, "speaker_1", 0.8f}});
+        b.ReplaceSpeakers({{0.0, 3.0, "speaker_0", 0.9f},
+               {3.0, 8.0, "speaker_1", 0.9f}});
+
+        const auto sa = a.Snapshot();
+        const auto sb = b.Snapshot();
+        CHECK(sa.size() == 2, "final view has two diar-driven turns");
+        CHECK(sb.size() == 2, "final view has two diar-driven turns (order B)");
+        if (sa.size() == 2) {
+      CHECK(sa[0].speaker == "speaker_0" && sa[0].start == 2.0 && sa[0].end == 3.0,
+        "order A first turn is speaker_0 [2,3)");
+      CHECK(sa[1].speaker == "speaker_1" && sa[1].start == 3.0 && sa[1].end == 7.0,
+        "order A second turn is speaker_1 [3,7)");
+      CHECK(sa[0].text + sa[1].text == "abcdef",
+        "order A split preserves full revised text");
+        }
+        if (sa.size() == sb.size() && sa.size() == 2) {
+      CHECK(sa[0].speaker == sb[0].speaker && sa[1].speaker == sb[1].speaker,
+        "arrival order does not change final speaker attribution");
+      CHECK(sa[0].text == sb[0].text && sa[1].text == sb[1].text,
+        "arrival order does not change final text split");
+      CHECK(sa[0].start == sb[0].start && sa[0].end == sb[0].end &&
+        sa[1].start == sb[1].start && sa[1].end == sb[1].end,
+        "arrival order does not change final time spans");
+        }
+      }
+
   if (g_fail == 0) {
     std::printf("ComprehensiveTimeline test PASSED\n");
     return 0;

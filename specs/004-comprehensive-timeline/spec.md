@@ -64,7 +64,7 @@ in time. Consequences:
 ## 3. Goals
 
 - **G1 — Common time base as a first-class contract**: every emitted datum
-  (diarization segment, ASR text, endpoint) carries timestamps on one absolute
+  (diarization segment, ASR text, VAD segment) carries timestamps on one absolute
   time base derived from the cumulative ingested sample count, and the WS
   protocol exposes this explicitly as metadata.
 - **G2 — Native stateful comprehensive timeline**: a single in-memory structure
@@ -79,9 +79,9 @@ in time. Consequences:
   timing on the common base.
 - **G5 — Revisions pushed to WS**: the consumer receives revision messages so it
   can update or overwrite previously shown entries for usability and debugging.
-- **G6 — Endpoint as an independent pipeline**: the speech-endpoint detector
-  (Silero) runs as a third independent consumer of the shared audio buffer,
-  publishing endpoint markers onto the common time base; it does not sit inside
+- **G6 — VAD as an independent pipeline**: the VAD detector (Silero) runs as a
+  third independent consumer of the shared audio buffer, publishing speech
+  segments onto the common time base; it does not sit inside
   the ASR worker.
 
 ## 4. Non-Goals
@@ -94,7 +94,7 @@ in time. Consequences:
 ## 5. Functional Requirements
 
 - **FR1 — Common time base metadata**: every result message (`diar`, `asr`,
-  `endpoint`, `timeline`, and revisions) SHALL carry absolute start/end times in
+  `vad`, `timeline`, and revisions) SHALL carry absolute start/end times in
   seconds on the shared base, and the protocol SHALL state the base (sample rate
   + absolute sample origin) so a consumer can align any pipeline's output.
 - **FR2 — Native comprehensive timeline**: the controller SHALL maintain one
@@ -113,24 +113,24 @@ in time. Consequences:
   the new entries; committed-and-unchanged entries SHALL NOT be re-emitted.
 - **FR5 — WS revision push**: revision messages SHALL be sent to the WS consumer
   as they occur (subject to the existing emit serialization).
-- **FR6 — Endpoint pipeline**: the endpoint detector SHALL be a third buffer
-  consumer on its own thread, depositing endpoint markers onto the timeline; the
-  ASR worker SHALL consume the continuous audio independently (its internal reset
-  may use these shared endpoints or its own). Its per-window detection compute
+- **FR6 — VAD pipeline**: the VAD detector SHALL be a third buffer consumer on
+  its own thread, depositing speech segments onto the timeline; the ASR worker
+  SHALL consume the continuous audio independently (its internal reset may use
+  these shared VAD signals or its own). Its per-window detection compute
   (STFT, the convolutional encoder, the LSTM step) SHALL run on the GPU in
   batches, not on the CPU on the streaming thread; a buffered read SHALL be
   processed as one batched GPU pass over all ready windows, so the detector never
   spends a long single-CPU-core stretch with the GPU idle.
 - **FR7 — Final timeline**: on flush/end the server SHALL still send one
   `{"type":"timeline",...}` document (tracks + comprehensive) consistent with the
-  incremental revisions already sent. The endpoint markers SHALL be a serialized
-  part of this document (an additive endpoint marker track), not a write-only
-  in-memory vector. The endpoint track is a PURE MARKER track: it does not modify,
+  incremental revisions already sent. The VAD speech segments SHALL be a
+  serialized part of this document (an additive `vad` track), not a write-only
+  in-memory vector. The VAD track is a PURE DATA track: it does not modify,
   split, or re-segment the ASR or diarization tracks (it never drives their
   boundaries — that would be one pipeline doing another's job).
-- **FR8 — Endpoint numeric gate**: the GPU detector's per-window speech
+- **FR8 — VAD numeric gate**: the GPU detector's per-window speech
   probability SHALL be validated against the prior CPU implementation (the
-  reference of record for the endpoint detector; a PyTorch silero-vad hub dump is
+  reference of record for the VAD detector; a PyTorch silero-vad hub dump is
   not reproducible in this offline environment) within a recorded tolerance,
   before it is considered done (Constitution Art. II — the detector previously had
   no numeric gate at all).
@@ -174,20 +174,20 @@ in time. Consequences:
 - **AC4** Revision messages are delivered over the real WS path and a client can
   reconstruct the same final comprehensive view by applying them in order. (G5,
   FR5, FR7)
-- **AC5** The endpoint detector runs as a third independent consumer/thread and
-  emits endpoint markers on the common time base; removing it does not stall the
+- **AC5** The VAD detector runs as a third independent consumer/thread and
+  emits `vad` speech segments on the common time base; removing it does not stall the
   other two pipelines. (G6, FR6)
 - **AC6** Every result message carries common-time-base metadata sufficient to
   align it without reference to other messages. (G1, FR1)
 - **AC7** Build clean under `-Wall -Wextra`; tests pass; threaded path race-free;
   the final timeline remains schema-compatible (additive only). (Constitution V)
-- **AC8** The endpoint detector's compute runs on the GPU in batches: streaming
+- **AC8** The VAD detector's compute runs on the GPU in batches: streaming
   the full 1-hour `test.mp3` through the real WS path, ASR covers the whole hour
   with no multi-minute single-CPU-core stall, and the GPU-busy fraction shows no
   long idle stretch attributable to the detector. (FR6)
-- **AC9** The final `{"type":"timeline"}` document carries the endpoint markers as
-  a serialized track (not a write-only vector), consistent with the
-  `{"type":"endpoint"}` messages already sent; a consumer can read endpoints from
+- **AC9** The final `{"type":"timeline"}` document carries the `vad` speech
+  segments as a serialized track (not a write-only vector), consistent with the
+  `{"type":"vad"}` messages already sent; a consumer can read VAD segments from
   the final document. (FR7)
 - **AC10** The GPU detector's per-window probability matches the PyTorch
   silero-vad reference and the prior CPU implementation within the recorded

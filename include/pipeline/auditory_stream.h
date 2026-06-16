@@ -189,7 +189,6 @@ class AuditoryStream {
   // ASR worker thread and the controller both touch it.
   ComprehensiveTimeline comp_;
   std::mutex comp_mutex_;
-  long comp_next_text_id_ = 0;
 };
 
 }  // namespace pipeline
