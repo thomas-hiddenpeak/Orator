@@ -14,7 +14,7 @@ work is specified under [specs/](.).
 > pass is the consistency proof. Status lines advance to `Implemented` in the
 > same change that lands the code, with the commit reference.
 
-- **Last updated**: 2026-06-16 (Specs 003, 004, 005 implemented + real-path WS validated)
+- **Last updated**: 2026-06-17 (Spec 004 live ASR revision convergence hardened; interleaved convergence test + real-path WS revalidated, commit f3496ae)
 - **Branch**: `master`
 - **Constitution**: v1.2.1
 
