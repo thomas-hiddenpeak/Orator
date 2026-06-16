@@ -2,7 +2,7 @@
 
 - **Feature**: `005-time-base`
 - **Spec**: [spec.md](spec.md) · **Plan**: [plan.md](plan.md)
-- **Status**: In progress (owner-approved)
+- **Status**: Implemented; verified + committed (84fba90)
 - **Constitution**: v1.1.0
 
 > Ordered, independently verifiable. Origin-0 integration first (numbers

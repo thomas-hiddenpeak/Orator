@@ -1,7 +1,7 @@
 # Spec 003 — Incremental KV-Cache Real-Time ASR
 
 - **Feature**: `003-sliding-window-asr`
-- **Status**: Revised (pivot from time-domain text-commit window to incremental KV cache)
+- **Status**: Implemented, verified, committed (8cc31ab) and pushed
 - **Created**: 2026-06-12
 - **Revised**: 2026-06-15
 - **Owner**: project owner

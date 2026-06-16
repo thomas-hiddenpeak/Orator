@@ -1,7 +1,7 @@
 # Spec 005 — Reusable Common Time Base
 
 - **Feature**: `005-time-base`
-- **Status**: Draft (owner-approved direction)
+- **Status**: Implemented, verified, committed (84fba90) and pushed
 - **Created**: 2026-06-16
 - **Owner**: project owner
 - **Constitution**: v1.1.0

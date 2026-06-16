@@ -2,7 +2,7 @@
 
 - **Feature**: `003-sliding-window-asr`
 - **Spec**: [spec.md](spec.md) · **Plan**: [plan.md](plan.md)
-- **Status**: Revised (incremental KV cache); owner approved direction
+- **Status**: Implemented (incremental KV cache); verified + committed (8cc31ab)
 - **Constitution**: v1.1.0
 
 > Ordered, independently verifiable steps. Foundational numeric equivalence is

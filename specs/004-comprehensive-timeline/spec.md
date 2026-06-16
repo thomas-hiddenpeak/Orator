@@ -1,7 +1,7 @@
 # Spec 004 — Common Time Base + Revisable Comprehensive Timeline
 
 - **Feature**: `004-comprehensive-timeline`
-- **Status**: Draft (owner-approved direction)
+- **Status**: Implemented, verified, committed (3159b75, 673f95d) and pushed
 - **Created**: 2026-06-15
 - **Owner**: project owner
 - **Constitution**: v1.1.0

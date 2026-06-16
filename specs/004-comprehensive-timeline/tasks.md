@@ -2,7 +2,7 @@
 
 - **Feature**: `004-comprehensive-timeline`
 - **Spec**: [spec.md](spec.md) · **Plan**: [plan.md](plan.md)
-- **Status**: In progress (owner-approved direction)
+- **Status**: Implemented; verified + committed (3159b75 step 1, 673f95d step 2)
 - **Constitution**: v1.1.0
 
 > Ordered, independently verifiable steps. Each phase builds + tests before the
