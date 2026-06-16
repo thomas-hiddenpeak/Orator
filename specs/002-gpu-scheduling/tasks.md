@@ -46,20 +46,18 @@
   default stream under the global lock (`create_stream=false`) until their engine
   kernels are stream-routed (T040/T041) — see the blocker below. *(Done dbebf5f.)*
 
-> **BLOCKER for T030/T031/T040/T041/T050 (engine stream-routing + lock removal).**
-> Removing the global `gpu::DeviceLock()` requires routing the diarization and
-> ASR engines onto their own streams, replacing the device-wide
-> `cudaDeviceSynchronize()` calls, and removing the host read of in-flight
-> device-managed memory in the ASR decoder (R1). The ASR side is gateable
-> (`test_asr_encoder` / `test_asr_decoder` ctests). The DIARIZATION side has NO
-> runnable numeric gate in the current build: the `verify_streaming` /
-> `verify_pipeline` tools (which compare the diarizer against the NeMo reference)
-> are NOT in `CMakeLists.txt` and are not built. Per Constitution Art. II, the
-> NeMo-verified diarizer engine MUST NOT be modified without a re-validatable
-> reference. PRECONDITION before T040: re-add the diarization verify tool(s) to
-> the build (or add a ctest diar gate) so the stream-routing change can be
-> numerically re-validated. Until then the global lock is retained and the
-> pipelines remain correctly serialized (no regression, no unvalidated change).
+> **PRECONDITION for T030/T031/T040/T041/T050 (engine stream-routing + lock**
+> **removal) — now MET.** Removing the global `gpu::DeviceLock()` requires routing
+> the diarization and ASR engines onto their own streams, replacing the
+> device-wide `cudaDeviceSynchronize()` calls, and removing the host read of
+> in-flight device-managed memory in the ASR decoder (R1). All three engines now
+> have a runnable numeric gate: ASR `test_asr_encoder` / `test_asr_decoder`, VAD
+> `test_vad`, and the new `test_diar_stream` (diarizer vs the NeMo streaming
+> oracle, max_abs < 1e-2; commit d75da36). The remaining work is a large,
+> multi-file refactor of two verified CUDA engines plus the lock removal and 5×
+> stability runs; it is the next scheduled phase. Each step MUST keep its gate
+> green; the global lock stays until T050 lands, so the current build is correct
+> and serialized (no regression, no unvalidated change).
 
 ## Phase 3 — ASR engine on its stream, managed-memory safety
 - [ ] **T030** Thread `asr_stream_` through the ASR call path; replace default
