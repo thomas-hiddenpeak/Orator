@@ -119,6 +119,8 @@ class AuditoryStream {
   // Block until both workers have processed up to `target_samples`.
   void WaitForBarrier(long target_samples);
   std::string Serialize();       // build the comprehensive timeline JSON
+  // Serialize one revision (Spec 004) to a {"type":"revision",...} message.
+  static std::string SerializeRevision(const ComprehensiveTimeline::Revision& r);
   void EmitLocked(const std::string& json);  // serialize transport sends
 
   Config config_;
@@ -164,9 +166,6 @@ class AuditoryStream {
   ComprehensiveTimeline comp_;
   std::mutex comp_mutex_;
   long comp_next_text_id_ = 0;
-  // Spec 004 T021: the comprehensive view as last emitted, to compute revisions
-  // (what changed in an already-reported region) on a subsequent emit.
-  std::vector<ComprehensiveTimeline::Entry> prev_view_;
 };
 
 }  // namespace pipeline

@@ -109,6 +109,23 @@ int main() {
     CHECK(snap[0].start == 0.0 && snap[0].end == 15.0, "coalesced span");
   }
 
+  // ---- 6. ReplaceSpeakers: diarization's whole-view delivery re-projects text ----
+  {
+    ComprehensiveTimeline tl;
+    tl.UpsertText(0, 0.0, 5.0, "x");
+    tl.UpsertText(1, 5.0, 10.0, "y");
+    // First diar view: one speaker covering everything -> both texts -> spk0.
+    auto r1 = tl.ReplaceSpeakers({{0.0, 10.0, "speaker_0", 0.8f}});
+    CHECK(r1.size() == 2, "ReplaceSpeakers re-projects both texts (new->spk0)");
+    // Refined diar view: spk1 owns [5,10) -> text 1 flips, text 0 unchanged.
+    auto r2 = tl.ReplaceSpeakers(
+        {{0.0, 5.0, "speaker_0", 0.9f}, {5.0, 10.0, "speaker_1", 0.9f}});
+    CHECK(r2.size() == 1, "refined diar view revises only the changed text");
+    if (r2.size() == 1 && !r2[0].entries.empty())
+      CHECK(r2[0].entries[0].speaker == "speaker_1",
+            "text 1 re-attributed to speaker_1 after diar refinement");
+  }
+
   if (g_fail == 0) {
     std::printf("ComprehensiveTimeline test PASSED\n");
     return 0;

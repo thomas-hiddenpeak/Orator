@@ -131,6 +131,28 @@ std::vector<ComprehensiveTimeline::Revision> ComprehensiveTimeline::UpsertText(
   return revs;
 }
 
+std::vector<ComprehensiveTimeline::Revision> ComprehensiveTimeline::ReplaceSpeakers(
+    const std::vector<SpeakerInput>& segs) {
+  // Diarization delivers its whole current segment view (global derivation), so
+  // replace the speaker set wholesale and re-project ALL text. Emit a revision
+  // for every text whose attributed result changed.
+  speakers_.clear();
+  for (const auto& s : segs) {
+    SpeakerSeg seg;
+    seg.start = s.start;
+    seg.end = s.end;
+    seg.speaker = s.speaker;
+    seg.conf = s.conf;
+    auto pos = std::lower_bound(
+        speakers_.begin(), speakers_.end(), s.start,
+        [](const SpeakerSeg& a, double v) { return a.start < v; });
+    speakers_.insert(pos, std::move(seg));
+  }
+  std::vector<Revision> revs;
+  for (const auto& t : texts_) ReprojectText(t, &revs);
+  return revs;
+}
+
 void ComprehensiveTimeline::MarkEndpoint(double time) {
   auto pos = std::lower_bound(endpoints_.begin(), endpoints_.end(), time);
   endpoints_.insert(pos, time);

@@ -51,11 +51,23 @@ class AsrWorker {
   // Emits an incremental result event (JSON) as each utterance completes.
   using Emit = std::function<void(const std::string&)>;
 
+  // Spec 004 Step 2: delivers a committed text segment (what/when on the common
+  // time base) to the comprehensive timeline. Called at each commit, alongside
+  // the JSON Emit. The controller wires this to ComprehensiveTimeline::UpsertText
+  // and pushes any returned revisions. Keeps the worker decoupled from the
+  // timeline: the worker reports its segment; the controller delivers it.
+  using TextSegmentSink =
+      std::function<void(double start, double end, const std::string& text)>;
+
   // `asr` and `timeline` are owned by the controller and must outlive the
   // worker. The engine must already be initialized + weight-loaded.
   AsrWorker(model::Qwen3Asr* asr, StreamTimeline* timeline, const Params& params,
               Emit emit, cudaStream_t stream = 0,
               int rollback_tokens = 3);
+
+  // Set the comprehensive-timeline delivery sink (Spec 004 Step 2). Optional;
+  // when unset the worker only does the JSON Emit + timeline token (legacy).
+  void set_text_sink(TextSegmentSink sink) { text_sink_ = std::move(sink); }
 
   // Consume `n` contiguous samples at the current stream position: append to the
   // endpoint buffer and transcribe any utterances that complete.
@@ -92,6 +104,7 @@ class AsrWorker {
   StreamTimeline* timeline_;
   Params params_;
   Emit emit_;
+  TextSegmentSink text_sink_;   // Spec 004 Step 2: live delivery to comp timeline
 
   AsrSileroVad vad_;            // ASR-only independent front VAD (Silero)
   AsrPreprocessor preproc_;     // ASR-only enhancement after VAD

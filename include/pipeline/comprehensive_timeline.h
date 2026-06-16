@@ -55,6 +55,20 @@ class ComprehensiveTimeline {
   std::vector<Revision> UpsertSpeaker(double start, double end,
                                       const std::string& speaker, float conf);
 
+  // Replace the ENTIRE speaker set in one call and re-project all text. This is
+  // the delivery model for diarization, whose segments are a GLOBAL derivation
+  // from frames (boundaries shift as frames arrive), so there is no stable
+  // per-segment event to upsert -- the pipeline delivers its whole current
+  // segment view and the timeline re-projects. Returns revisions for every text
+  // segment whose attribution changed.
+  struct SpeakerInput {
+    double start;
+    double end;
+    std::string speaker;
+    float conf;
+  };
+  std::vector<Revision> ReplaceSpeakers(const std::vector<SpeakerInput>& segs);
+
   // Deposit or replace a text segment (what/when), keyed by a stable id. Returns
   // the revision for this segment if its attributed entry is new or changed.
   std::vector<Revision> UpsertText(long id, double start, double end,

@@ -88,6 +88,7 @@ void AsrWorker::EmitUtterance(int begin, int end, bool finalize) {
     tok.text = continuation;
     if (tok.text.empty()) return;
     timeline_->AppendToken(tok);
+    if (text_sink_) text_sink_(tok.start_sec, tok.end_sec, tok.text);
     if (emit_) {
       char buf[128];
       std::snprintf(buf, sizeof(buf),
@@ -122,6 +123,7 @@ void AsrWorker::EmitUtterance(int begin, int end, bool finalize) {
   tok.end_sec = static_cast<double>(vad_.base_sample() + end) / sr;
   tok.text = emit_text;
   timeline_->AppendToken(tok);
+  if (text_sink_) text_sink_(tok.start_sec, tok.end_sec, tok.text);
 
   if (emit_) {
     char buf[128];
@@ -229,6 +231,7 @@ void AsrWorker::EmitIncrementalChunk(const float* samples, int n, bool finalize)
     tok.end_sec = static_cast<double>(inc_seg_end_sample_) / sr;
     tok.text = inc_live_text_;
     timeline_->AppendToken(tok);
+    if (text_sink_) text_sink_(tok.start_sec, tok.end_sec, tok.text);
     if (emit_) {
       char buf[128];
       std::snprintf(buf, sizeof(buf),

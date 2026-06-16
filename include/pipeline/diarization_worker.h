@@ -10,7 +10,10 @@
 // honest per-pipeline real-time factors). It never reads ASR state.
 
 #include <atomic>
+#include <functional>
+#include <vector>
 
+#include "core/types.h"
 #include "model/streaming_sortformer.h"
 #include "pipeline/stream_timeline.h"
 
@@ -19,9 +22,28 @@ namespace pipeline {
 
 class DiarizationWorker {
  public:
+  // Tuning for frame->segment derivation and live delivery cadence.
+  struct Params {
+    float threshold = 0.5f;        // per-speaker activity threshold
+    double merge_gap_sec = 0.5;    // coalesce same-speaker gaps up to this
+    double deliver_interval_sec = 1.0;  // min audio between live deliveries
+    int sample_rate = 16000;
+  };
+
+  // Spec 004: delivers the pipeline's current speaker view (who/when) to the
+  // comprehensive timeline. The diarization segments are a GLOBAL derivation
+  // from frames (boundaries shift as frames arrive), so the whole current view
+  // is delivered (the controller calls ReplaceSpeakers). Called live as audio
+  // is processed (throttled) and once on Finalize.
+  using SpeakerSink = std::function<void(const std::vector<core::DiarSegment>&)>;
+
   // `diarizer` and `timeline` are owned by the controller and must outlive the
   // worker. The diarizer must already be initialized + weight-loaded.
-  DiarizationWorker(model::SortformerDiarizer* diarizer, StreamTimeline* timeline);
+  DiarizationWorker(model::SortformerDiarizer* diarizer, StreamTimeline* timeline,
+                    Params params);
+
+  // Set the comprehensive-timeline speaker-view sink (Spec 004). Optional.
+  void set_speaker_sink(SpeakerSink sink) { speaker_sink_ = std::move(sink); }
 
   // Consume `n` contiguous samples at the current stream position. Runs the
   // diarizer incrementally and appends any stabilized frames to the timeline.
@@ -38,8 +60,15 @@ class DiarizationWorker {
   double compute_sec() const { return compute_sec_; }
 
  private:
+  // Derive the current speaker view from all accumulated frames and deliver it
+  // through speaker_sink_. `force` bypasses the delivery-interval throttle.
+  void DeliverSpeakers(bool force);
+
   model::SortformerDiarizer* diarizer_;
   StreamTimeline* timeline_;
+  Params params_;
+  SpeakerSink speaker_sink_;
+  long last_deliver_sample_ = 0;
   std::atomic<long> processed_samples_{0};
   double compute_sec_ = 0.0;
 };

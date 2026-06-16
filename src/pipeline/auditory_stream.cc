@@ -60,7 +60,35 @@ void AuditoryStream::Start() {
 
 void AuditoryStream::StartWorkers() {
   if (diarizer_) {
-    diar_worker_ = std::make_unique<DiarizationWorker>(diarizer_.get(), &timeline_);
+    DiarizationWorker::Params dp;
+    dp.threshold = config_.diar_threshold;
+    dp.merge_gap_sec = config_.diar_merge_gap_sec;
+    dp.sample_rate = config_.sample_rate;
+    diar_worker_ =
+        std::make_unique<DiarizationWorker>(diarizer_.get(), &timeline_, dp);
+    // Spec 004 Step 2: diarization delivers its whole current speaker view
+    // (who/when) to the comprehensive timeline live. The view is the raw diar
+    // track too, so we store it under comp_mutex_ for Serialize and re-project
+    // all text via ReplaceSpeakers, pushing any attribution-change revisions.
+    diar_worker_->set_speaker_sink(
+        [this](const std::vector<core::DiarSegment>& segs) {
+          std::vector<ComprehensiveTimeline::Revision> revs;
+          {
+            std::lock_guard<std::mutex> lk(comp_mutex_);
+            last_segments_ = segs;
+            std::vector<ComprehensiveTimeline::SpeakerInput> spk;
+            spk.reserve(segs.size());
+            for (const auto& s : segs) {
+              const std::string label =
+                  s.speaker_id.empty()
+                      ? ("speaker_" + std::to_string(s.local_speaker))
+                      : s.speaker_id;
+              spk.push_back({s.start_sec, s.end_sec, label, s.confidence});
+            }
+            revs = comp_.ReplaceSpeakers(spk);
+          }
+          for (const auto& r : revs) EmitLocked(SerializeRevision(r));
+        });
     diar_cursor_ = buffer_.AddConsumer();
     diar_thread_ = std::thread([this] {
       std::vector<float> chunk;
@@ -97,6 +125,20 @@ void AuditoryStream::StartWorkers() {
         asr_.get(), &timeline_, p,
         [this](const std::string& json) { EmitLocked(json); },
       asr_stream_, config_.asr_rollback_tokens);
+    // Spec 004 Step 2: deliver each committed text segment to the comprehensive
+    // timeline in real time. The worker reports its segment (what/when on the
+    // common base); the controller upserts it (id-keyed) and pushes any
+    // revisions. Text gets a provisional attribution against the current
+    // speaker set and is revised when diarization refreshes at the next emit.
+    asr_worker_->set_text_sink(
+        [this](double start, double end, const std::string& text) {
+          std::vector<ComprehensiveTimeline::Revision> revs;
+          {
+            std::lock_guard<std::mutex> lk(comp_mutex_);
+            revs = comp_.UpsertText(comp_next_text_id_++, start, end, text);
+          }
+          for (const auto& r : revs) EmitLocked(SerializeRevision(r));
+        });
     asr_cursor_ = buffer_.AddConsumer();
     asr_thread_ = std::thread([this] {
       std::vector<float> chunk;
@@ -213,6 +255,26 @@ void AuditoryStream::EmitTimeline(bool finalize) {
   EmitLocked(Serialize());
 }
 
+std::string AuditoryStream::SerializeRevision(
+    const ComprehensiveTimeline::Revision& r) {
+  char buf[128];
+  std::string out = "{\"type\":\"revision\",";
+  std::snprintf(buf, sizeof(buf),
+                "\"dirty_start\":%.3f,\"dirty_end\":%.3f,\"entries\":[",
+                r.dirty_start, r.dirty_end);
+  out += buf;
+  for (size_t i = 0; i < r.entries.size(); ++i) {
+    const auto& e = r.entries[i];
+    std::snprintf(buf, sizeof(buf), "{\"start\":%.3f,\"end\":%.3f,\"speaker\":\"",
+                  e.start, e.end);
+    out += std::string(buf) + JsonEscape(e.speaker) + "\",\"text\":\"" +
+           JsonEscape(e.text) + "\"}";
+    if (i + 1 < r.entries.size()) out += ",";
+  }
+  out += "]}";
+  return out;
+}
+
 std::string AuditoryStream::Serialize() {
   // Read both result sets from the timeline store under its lock, then build the
   // timeline document. The document has a shared time axis and three parts:
@@ -225,14 +287,19 @@ std::string AuditoryStream::Serialize() {
   //     utterance granularity (the ASR engine does not emit per-word times).
   // A consumer reads whichever part it needs. Adding a future pipeline adds a
   // track and, optionally, a contribution to the comprehensive view.
-  core::DiarizationFrames frames = timeline_.SnapshotDiarFrames();
   core::Transcript transcript = timeline_.SnapshotTranscript();
 
-  last_segments_.clear();
-  if (frames.num_frames > 0 && frames.num_speakers > 0) {
-    auto segs = FramesToSegments(frames, config_.diar_threshold,
-                                 config_.diar_merge_gap_sec);
-    last_segments_ = CoalesceSegments(std::move(segs), config_.diar_merge_gap_sec);
+  // Spec 004 Step 2: the diarization worker is the sole producer of the speaker
+  // view (it delivers live via ReplaceSpeakers + keeps last_segments_ fresh);
+  // the ASR worker delivers text live via UpsertText. So Serialize is a pure
+  // reader: snapshot last_segments_ (diar track) and the comprehensive view
+  // under comp_mutex_. No derivation, no upserts here.
+  std::vector<core::DiarSegment> diar_view;
+  std::vector<ComprehensiveTimeline::Entry> comp_view;
+  {
+    std::lock_guard<std::mutex> lk(comp_mutex_);
+    diar_view = last_segments_;
+    comp_view = comp_.Snapshot();
   }
   last_transcript_ = transcript;
 
@@ -253,13 +320,13 @@ std::string AuditoryStream::Serialize() {
                 "\"compute_sec\":%.3f,\"real_time_factor\":%.3f,\"entries\":[",
                 diar_c, diar_c > 0 ? audio / diar_c : 0.0);
   out += buf;
-  for (size_t i = 0; i < last_segments_.size(); ++i) {
-    const auto& s = last_segments_[i];
+  for (size_t i = 0; i < diar_view.size(); ++i) {
+    const auto& s = diar_view[i];
     std::snprintf(buf, sizeof(buf),
                   "{\"start\":%.3f,\"end\":%.3f,\"speaker\":%d,\"confidence\":%.3f}",
                   s.start_sec, s.end_sec, s.local_speaker, s.confidence);
     out += buf;
-    if (i + 1 < last_segments_.size()) out += ",";
+    if (i + 1 < diar_view.size()) out += ",";
   }
   out += "]}";
 
@@ -284,73 +351,21 @@ std::string AuditoryStream::Serialize() {
   // Comprehensive view: speaker turns with their spoken text, ordered by time.
   // Present only when ASR is enabled (it requires both modalities). Built from
   // the native stateful ComprehensiveTimeline (Spec 004): diarization provides
-  // who/when, ASR provides what/when, and the attribution is by time alignment
-  // on the common base. Diar segments are refreshed here (frame->segment is
-  // global); ASR text is upserted live by the worker. A tie on overlap prefers
-  // the tighter (more specific) speaker segment, fixing the multi-speaker
-  // mis-attribution of the old one-shot merger.
+  // who/when, ASR provides what/when, attribution is by time alignment on the
+  // common base. All three pipelines (diarization, ASR, endpoint) deliver LIVE
+  // to comp_ via their sinks; Serialize is a pure reader and just emits the
+  // snapshot taken above (comp_view). No upserts here.
   out += ",\"comprehensive\":[";
   if (asr_) {
-    std::lock_guard<std::mutex> lk(comp_mutex_);
-    comp_.Clear();
-    comp_next_text_id_ = 0;
-    for (const auto& s : last_segments_) {
-      const std::string label =
-          s.speaker_id.empty() ? ("speaker_" + std::to_string(s.local_speaker))
-                               : s.speaker_id;
-      comp_.UpsertSpeaker(s.start_sec, s.end_sec, label, s.confidence);
-    }
-    for (const auto& t : last_transcript_.tokens)
-      comp_.UpsertText(comp_next_text_id_++, t.start_sec, t.end_sec, t.text);
-
-    auto view = comp_.Snapshot();
-    for (size_t i = 0; i < view.size(); ++i) {
-      const auto& e = view[i];
+    for (size_t i = 0; i < comp_view.size(); ++i) {
+      const auto& e = comp_view[i];
       std::snprintf(buf, sizeof(buf),
                     "{\"start\":%.3f,\"end\":%.3f,\"speaker\":\"",
                     e.start, e.end);
       out += std::string(buf) + JsonEscape(e.speaker) + "\",\"text\":\"" +
              JsonEscape(e.text) + "\"}";
-      if (i + 1 < view.size()) out += ",";
+      if (i + 1 < comp_view.size()) out += ",";
     }
-
-    // Spec 004 T021: revision push. Compare the new comprehensive view against
-    // the one last emitted; if an already-reported region changed (e.g. the
-    // head's "unknown" is now attributed after diarization warmup covered it),
-    // emit a revision so the consumer overwrites those entries. We find the
-    // first index where the view diverges from prev_view_ and send everything
-    // from there as the revised region. No revision on the first emission.
-    if (!prev_view_.empty()) {
-      size_t idx = 0;
-      const size_t common = std::min(prev_view_.size(), view.size());
-      while (idx < common && prev_view_[idx].start == view[idx].start &&
-             prev_view_[idx].end == view[idx].end &&
-             prev_view_[idx].speaker == view[idx].speaker &&
-             prev_view_[idx].text == view[idx].text) {
-        ++idx;
-      }
-      if (idx < view.size()) {
-        const double dirty_start = view[idx].start;
-        const double dirty_end = view.back().end;
-        std::string rev = "{\"type\":\"revision\",";
-        std::snprintf(buf, sizeof(buf),
-                      "\"dirty_start\":%.3f,\"dirty_end\":%.3f,\"entries\":[",
-                      dirty_start, dirty_end);
-        rev += buf;
-        for (size_t i = idx; i < view.size(); ++i) {
-          const auto& e = view[i];
-          std::snprintf(buf, sizeof(buf),
-                        "{\"start\":%.3f,\"end\":%.3f,\"speaker\":\"",
-                        e.start, e.end);
-          rev += std::string(buf) + JsonEscape(e.speaker) + "\",\"text\":\"" +
-                 JsonEscape(e.text) + "\"}";
-          if (i + 1 < view.size()) rev += ",";
-        }
-        rev += "]}";
-        EmitLocked(rev);
-      }
-    }
-    prev_view_ = std::move(view);
   }
   out += "]}";
   return out;
@@ -365,7 +380,6 @@ void AuditoryStream::Reset() {
   {
     std::lock_guard<std::mutex> lk(comp_mutex_);
     comp_.Clear();
-    prev_view_.clear();
     comp_next_text_id_ = 0;
   }
   if (diarizer_) diarizer_->Reset();
