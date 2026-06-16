@@ -1,10 +1,17 @@
 # Spec 004 — Common Time Base + Revisable Comprehensive Timeline
 
 - **Feature**: `004-comprehensive-timeline`
-- **Status**: Implemented, verified, committed (3159b75, 673f95d) and pushed
+- **Status**: Partially implemented. Comprehensive-timeline core + revisions +
+  common time base are implemented, verified, committed (3159b75, 673f95d) and
+  pushed. The **endpoint pipeline (FR6/FR7) is NOT complete**: endpoints are
+  detected on a CPU-only detector and `MarkEndpoint` writes a `endpoints_` vector
+  that is never read or serialized (write-only dead state), so FR7's final
+  timeline does not carry them and FR6's compute violates the GPU-work principle.
+  Phase 5 completes it (GPU detector + serialized endpoint track) and folds in the
+  related dead-code cleanup.
 - **Created**: 2026-06-15
 - **Owner**: project owner
-- **Constitution**: v1.1.0
+- **Constitution**: v1.2.1
 
 > WHAT to change and WHY. The data model and algorithms are in `plan.md`.
 
@@ -108,10 +115,31 @@ in time. Consequences:
 - **FR6 — Endpoint pipeline**: the endpoint detector SHALL be a third buffer
   consumer on its own thread, depositing endpoint markers onto the timeline; the
   ASR worker SHALL consume the continuous audio independently (its internal reset
-  may use these shared endpoints or its own).
+  may use these shared endpoints or its own). Its per-window detection compute
+  (STFT, the convolutional encoder, the LSTM step) SHALL run on the GPU in
+  batches, not on the CPU on the streaming thread; a buffered read SHALL be
+  processed as one batched GPU pass over all ready windows, so the detector never
+  spends a long single-CPU-core stretch with the GPU idle.
 - **FR7 — Final timeline**: on flush/end the server SHALL still send one
   `{"type":"timeline",...}` document (tracks + comprehensive) consistent with the
-  incremental revisions already sent.
+  incremental revisions already sent. The endpoint markers SHALL be a serialized
+  part of this document (an additive endpoint marker track), not a write-only
+  in-memory vector. The endpoint track is a PURE MARKER track: it does not modify,
+  split, or re-segment the ASR or diarization tracks (it never drives their
+  boundaries — that would be one pipeline doing another's job).
+- **FR8 — Endpoint numeric gate**: the GPU detector's per-window speech
+  probability SHALL be validated against a trusted reference (a PyTorch silero-vad
+  dump) and against the prior CPU implementation, within a recorded tolerance,
+  before it is considered done (Constitution Art. II — the detector currently has
+  no numeric gate at all).
+- **FR9 — Dead-code removal**: code made dead by this work or found dead in its
+  vicinity SHALL be removed in the same change: the write-only
+  `ComprehensiveTimeline::endpoints()` accessor (replaced by the serialized
+  track), the unused `AsrWorker` eager Silero load when not used, the unused stub
+  models (`StubAsr`/`StubDiarizer`/`StubEmbedder`) and their registrations, and
+  the never-launched CUDA kernels (`RelAttnKernel`, `FlattenLinearKernel`,
+  `GeluKernel`/`Conv2dKernel` in `asr_audio_tower.cu`). Stale doc comments
+  (e.g. `asr_worker.h` "energy VAD") SHALL be corrected.
 
 ## 6. Acceptance Criteria
 
@@ -134,6 +162,20 @@ in time. Consequences:
   align it without reference to other messages. (G1, FR1)
 - **AC7** Build clean under `-Wall -Wextra`; tests pass; threaded path race-free;
   the final timeline remains schema-compatible (additive only). (Constitution V)
+- **AC8** The endpoint detector's compute runs on the GPU in batches: streaming
+  the full 1-hour `test.mp3` through the real WS path, ASR covers the whole hour
+  with no multi-minute single-CPU-core stall, and the GPU-busy fraction shows no
+  long idle stretch attributable to the detector. (FR6)
+- **AC9** The final `{"type":"timeline"}` document carries the endpoint markers as
+  a serialized track (not a write-only vector), consistent with the
+  `{"type":"endpoint"}` messages already sent; a consumer can read endpoints from
+  the final document. (FR7)
+- **AC10** The GPU detector's per-window probability matches the PyTorch
+  silero-vad reference and the prior CPU implementation within the recorded
+  tolerance; a `test_vad` numeric gate is added and passes. (FR8)
+- **AC11** No dead code remains from FR9: the removed accessor, stubs, and unused
+  kernels are gone; the build emits no `#177-D declared-but-never-referenced`
+  warning for the listed kernels; stale comments are corrected. (FR9)
 
 ## 7. Constitution Check
 

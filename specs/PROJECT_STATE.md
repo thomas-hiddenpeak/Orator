@@ -30,9 +30,14 @@ absolute time base.
 
 ## 2. Current phase
 
-**Specs 003 (incremental KV-cache ASR), 004 (revisable comprehensive timeline),
-and 005 (reusable common time base) are implemented, verified, committed, and
-pushed.** The system now runs **three independent active-producer pipelines** —
+**Specs 003 (incremental KV-cache ASR) and 005 (reusable common time base) are
+implemented, verified, committed, and pushed. Spec 004 (revisable comprehensive
+timeline) is partially implemented**: the timeline core, revisions, and common
+time base are done, but the endpoint pipeline (FR6/FR7) is not complete — its
+detector is CPU-only and its endpoint markers are write-only (never serialized).
+Spec 004 Phase 5 completes the endpoint pipeline (GPU detector + serialized
+endpoint track) and folds in the related dead-code cleanup. The system runs
+**three independent active-producer pipelines** —
 diarization (who/when), ASR (what/when), and speech-endpoint detection — each
 feeding one **native, revisable comprehensive timeline** on a single absolute
 time base. The comprehensive layer is a **pure time-alignment layer**: it never
@@ -84,10 +89,10 @@ longest idle stretch 25 s — no CPU-only stall).
 | WebSocket server (from-scratch POSIX) | ✅ Working | RFC6455 handshake + frame codec, no deps. |
 | ASR + WS integration | Done; threaded, three independent pipelines | `AuditoryStream` is a controller owning a `SharedAudioBuffer`, three worker threads (`DiarizationWorker`, `AsrWorker`, endpoint detector), and a mutex-guarded `ComprehensiveTimeline`. Each pipeline is an active push producer (Spec 004). Sends incremental `asr`/`asr_partial`, `endpoint`, `revision`, and a comprehensive `timeline`. GPU work serialized by `gpu::DeviceLock()`. |
 | Incremental KV-cache ASR streaming (Spec 003) | ✅ Implemented, verified, committed (8cc31ab) | Persistent KV cache + prefix caching + chunk-local windowed encoder; Silero endpoint reset. Full 1hr CER 16.1% / 6.22x; beats production Silero-VAD at every scale. |
-| Revisable comprehensive timeline (Spec 004) | ✅ Implemented, committed (3159b75, 673f95d) | Native stateful PURE time-alignment layer; incremental re-projection + in-place revisions pushed to WS. Owner invariant: no overlap → honest "unknown", never borrowed. |
+| Revisable comprehensive timeline (Spec 004) | ⚠️ Core implemented; endpoint pipeline partial | Native stateful PURE time-alignment layer; incremental re-projection + in-place revisions pushed to WS (3159b75, 673f95d). Owner invariant: no overlap → honest "unknown", never borrowed. **Endpoint pipeline (FR6/FR7) incomplete**: detector is CPU-only (caused the full-hour single-CPU stall) and `MarkEndpoint` writes a vector never read/serialized (write-only). Spec 004 Phase 5 completes it (GPU detector + serialized endpoint track) and folds in dead-code cleanup. |
 | Reusable common time base (Spec 005) | ✅ Implemented, committed (84fba90) | Header-only `core::TimeBase` value type shared by all pipelines; reconciliation check clean (zero gap) at 120s + 600s. |
 | Streaming validation | ✅ Through real WebSocket | `tools/ws_stream_client.py` (stdlib, reader thread) streams PCM through the socket at an accelerated rate and exports the full event log + timeline to JSON. |
-| Test suite | ✅ 19/19 ctests pass | Clean build under `-Wall -Wextra`; `test_shared_buffer` exercises the threaded buffer (deterministic across runs). |
+| Test suite | ✅ 18/18 ctests pass | Clean build under `-Wall -Wextra`. NOTE: ctests are component/oracle gates; full production behavior is validated only through the real `orator_ws` WebSocket path (the `asr_stream_test` harness bypasses the socket). A green ctest run is necessary but not sufficient — the full-hour CPU-stall defect was invisible to ctest. |
 
 ## 4. Measured performance (GPU fixed at 1.3 GHz, power mode MaxN)
 
@@ -154,7 +159,7 @@ Findings:
 - [specs/002-gpu-scheduling/plan.md](002-gpu-scheduling/plan.md) — draft
 - [specs/002-gpu-scheduling/tasks.md](002-gpu-scheduling/tasks.md) — draft
 - [specs/003-sliding-window-asr/spec.md](003-sliding-window-asr/spec.md) — implemented (8cc31ab)
-- [specs/004-comprehensive-timeline/spec.md](004-comprehensive-timeline/spec.md) — implemented (3159b75, 673f95d)
+- [specs/004-comprehensive-timeline/spec.md](004-comprehensive-timeline/spec.md) — partially implemented (core 3159b75, 673f95d; endpoint pipeline Phase 5 pending)
 - [specs/005-time-base/spec.md](005-time-base/spec.md) — implemented (84fba90)
 
 ## 7. Immediate next step
