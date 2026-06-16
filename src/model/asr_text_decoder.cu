@@ -17,6 +17,7 @@ namespace model {
 
 using ::orator::gpu::CheckCudaError;
 using ::orator::gpu::UnifiedBuffer;
+using ::orator::gpu::DeviceBuffer;
 using ::orator::gpu::PinnedBuffer;
 
 namespace {
@@ -412,9 +413,26 @@ void AsrTextDecoder::Forward(float* d_x, int Tq, int pos0, cudaStream_t stream) 
   float* d_gate = Work(6, static_cast<size_t>(Tq) * I);
   float* d_up = Work(7, static_cast<size_t>(Tq) * I);
   int* d_pos = reinterpret_cast<int*>(Work(8, static_cast<size_t>(Tq) + 1));
-  for (int t = 0; t < Tq; ++t) d_pos[t] = pos0 + t;
+  // Spec 002 Phase 7 (T072): the position scalars are written by the HOST and
+  // read by device kernels. Writing them directly into the managed Work(8)
+  // buffer faults on Tegra when the concurrent (lock-free) diarization/VAD
+  // pipelines run a kernel (R1). Instead, write to a pinned host staging buffer
+  // and upload it to Work(8) with an async copy on the stream; kernels then read
+  // Work(8) on the device as before. Values are identical.
+  static thread_local std::shared_ptr<PinnedBuffer> pos_stage;
+  static thread_local size_t pos_cap = 0;
+  const size_t pos_need = static_cast<size_t>(Tq) + 1;
+  if (pos_cap < pos_need) {
+    pos_stage = std::make_shared<PinnedBuffer>(sizeof(int) * pos_need);
+    pos_cap = pos_need;
+  }
+  int* h_pos = static_cast<int*>(pos_stage->data());
+  for (int t = 0; t < Tq; ++t) h_pos[t] = pos0 + t;
+  h_pos[Tq] = pos0;  // base position scalar for KV write + attention
+  CheckCudaError(cudaMemcpyAsync(d_pos, h_pos, sizeof(int) * pos_need,
+                                 cudaMemcpyHostToDevice, stream),
+                 __FILE__, __LINE__);
   int* d_pos0 = d_pos + Tq;  // base position scalar for KV write + attention
-  *d_pos0 = pos0;
 
   // BF16 scratch for the post-norm activation, cast once and shared by the
   // q/k/v projections (and again by gate/up) to cut redundant cast launches.
@@ -494,15 +512,22 @@ void AsrTextDecoder::Prefill(const float* embeds, int T, cudaStream_t stream) {
 void AsrTextDecoder::PrefillAt(const float* embeds, int T, int pos0,
                                cudaStream_t stream) {
   // Dedicated residual-stream buffer so it doesn't collide with Work(0..9).
-  static thread_local std::shared_ptr<UnifiedBuffer> stream_buf;
+  // Spec 002 Phase 7 (T072): this buffer is DEVICE memory, not managed. The host
+  // `embeds` (plain pageable host memory) is uploaded with cudaMemcpyAsync on
+  // the stream instead of a host std::memcpy into managed memory — a host write
+  // to managed pages while the concurrent (lock-free) diarization/VAD pipelines
+  // run a kernel faults on Tegra (R1; this was the observed crash site).
+  static thread_local std::shared_ptr<DeviceBuffer> stream_buf;
   static thread_local size_t stream_cap = 0;
   const size_t need = static_cast<size_t>(T) * config_.hidden_size;
   if (stream_cap < need) {
-    stream_buf = std::make_shared<UnifiedBuffer>(sizeof(float) * need);
+    stream_buf = std::make_shared<DeviceBuffer>(sizeof(float) * need);
     stream_cap = need;
   }
   float* x = static_cast<float*>(stream_buf->data());
-  std::memcpy(x, embeds, sizeof(float) * need);
+  CheckCudaError(cudaMemcpyAsync(x, embeds, sizeof(float) * need,
+                                 cudaMemcpyHostToDevice, stream),
+                 __FILE__, __LINE__);
   // Forward appends KV at [pos0, pos0+T) and sets cache_len_ = pos0 + T.
   Forward(x, T, pos0, stream);
   // Drain before returning: Forward host-writes the persistent Work() d_pos
