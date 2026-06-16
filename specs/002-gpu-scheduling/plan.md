@@ -3,7 +3,7 @@
 - **Feature**: `002-gpu-scheduling`
 - **Spec**: [spec.md](spec.md)
 - **Status**: Draft (awaiting review)
-- **Constitution**: v1.1.0
+- **Constitution**: v1.2.1
 
 > This plan describes HOW to satisfy [spec.md](spec.md). Terminology follows
 > Constitution Article VI. "Stream" means a CUDA stream throughout.
@@ -41,10 +41,18 @@ Two facts follow:
 
 ## 2. Target GPU usage
 
-- Two CUDA streams created at startup with priorities from
-  `cudaDeviceGetStreamPriorityRange`:
-  - `diar_stream_` at the higher priority (latency-critical),
-  - `asr_stream_` at the lower priority (throughput).
+- A small **priority registry** in the `gpu/` layer (depends only on the CUDA
+  runtime, never on `pipeline/` or `model/`): a pipeline registers a name + a
+  declared **priority index** (priority class) and receives a CUDA stream whose
+  concrete priority is derived from that index via
+  `cudaDeviceGetStreamPriorityRange`. This single mapping is the only place that
+  turns an index into a stream priority, so adding a pipeline is a registration
+  change, not a scheduler edit (spec FR1, FR6; Constitution Art. V.4).
+- The three current pipelines register as:
+  - diarization — foreground, latency-critical (highest priority),
+  - ASR — foreground, throughput (lower than diarization),
+  - VAD — background (lowest priority); it yields within a bounded window so a
+    foreground pipeline always makes progress.
 - Each pipeline issues all of its kernels and copies on its own stream and
   synchronizes only that stream (`cudaStreamSynchronize(stream)`), never the
   whole device.
@@ -55,6 +63,11 @@ Two facts follow:
   residual cross-pipeline hazard remains (for example a shared scratch buffer),
   it is fixed by giving each pipeline its own buffer, not by re-introducing a
   device-wide lock.
+- A **telemetry snapshot** (spec FR7) is read from the registry + the per-worker
+  `compute_sec`/real-time-factor already tracked, serialized as an additive
+  `{"type":"gpu_telemetry",...}` WebSocket message. The registry is the single
+  source of truth for both the stream mapping and the telemetry, so the two
+  cannot drift.
 
 ## 3. Work breakdown
 

@@ -4,7 +4,7 @@
 - **Status**: Draft (awaiting review)
 - **Created**: 2026-06-12
 - **Owner**: project owner
-- **Constitution**: v1.1.0
+- **Constitution**: v1.2.1
 
 > This spec describes WHAT to change and WHY. The design (CUDA streams, stream
 > priorities, removal of the global lock, memory-access rules) is in `plan.md`.
@@ -60,10 +60,13 @@ critical pipeline (diarization) priority over the throughput pipeline (ASR).
 ## 3. Goals
 
 - **G1** Replace the single global GPU mutex with per-pipeline CUDA streams so
-  that the two pipelines' kernels are not forced to run one-at-a-time when the
-  GPU has idle capacity.
-- **G2** Give the diarization pipeline higher GPU stream priority than ASR, so
-  diarization latency is protected when both pipelines have work.
+  that the pipelines' kernels are not forced to run one-at-a-time when the GPU
+  has idle capacity.
+- **G2** Assign each pipeline a GPU stream priority from a **priority index it
+  declares when it registers** (not a hard-coded pairwise rule), so the relative
+  ordering generalizes to any number of pipelines. The diarization pipeline
+  registers as latency-critical (foreground), ASR as throughput (foreground,
+  lower than diarization), and the VAD pipeline as background.
 - **G3** Eliminate the host access to device-managed memory that occurs while
   another thread may have a kernel executing, so that concurrent GPU use is
   correct without the global mutex.
@@ -72,6 +75,11 @@ critical pipeline (diarization) priority over the throughput pipeline (ASR).
   already present.
 - **G5** Measure and report the change in per-pipeline real-time factors and in
   total wall time on the streaming path, before and after.
+- **G6** Publish a GPU-scheduling **telemetry snapshot over the WebSocket** so a
+  client can observe per-pipeline scheduling state (registered priority class,
+  stream, and a compute/occupancy summary). The output contract is extended
+  additively (a new message type), consistent with the existing `ready` /
+  `timeline` / `revision` messages.
 
 ## 4. Non-Goals
 
@@ -79,13 +87,20 @@ critical pipeline (diarization) priority over the throughput pipeline (ASR).
   fusion that alters results). Deferred (Constitution II.3).
 - **NG2** ASR endpointing or throughput-parameter changes (Spec 001 NG1).
 - **NG3** Multi-GPU or multi-process execution. One GPU, one process.
-- **NG4** Changing the output contract (the timeline document is unchanged).
+- **NG4** Changing the output contract destructively. The timeline document is
+  unchanged; the only protocol change is the ADDITIVE `gpu_telemetry` message
+  (FR7). No existing message is altered or removed.
 
 ## 5. Functional Requirements
 
-- **FR1 — Per-pipeline streams**: Each pipeline SHALL issue its GPU work on its
-  own CUDA stream. The diarization stream SHALL have higher priority than the
-  ASR stream (using the device's supported priority range).
+- **FR1 — Per-pipeline streams by declared priority index**: Each pipeline SHALL
+  issue its GPU work on its own CUDA stream. Each pipeline SHALL declare a
+  **priority index** (a small integer priority class) when it registers with the
+  controller; the scheduler SHALL map that index onto the device's supported CUDA
+  stream-priority range (`cudaDeviceGetStreamPriorityRange`). A lower-latency
+  class maps to a higher CUDA priority. The mapping SHALL be the single point
+  that converts a declared index to a concrete stream priority, so adding a
+  pipeline is a registration change, not a scheduler edit (Constitution Art. V.4).
 - **FR2 — No host access to in-flight managed memory**: A pipeline SHALL NOT
   read device-managed memory on the host while that memory may be written by a
   kernel that has not completed. Any host read SHALL follow a synchronization of
@@ -102,6 +117,20 @@ critical pipeline (diarization) priority over the throughput pipeline (ASR).
   change and the same measurement after, both on the streaming path under stated
   clock conditions: per-pipeline compute time and real-time factor, GPU-busy
   fraction per pipeline, and total wall time.
+- **FR6 — Priority registry with three classes**: the controller SHALL keep a
+  registry mapping each registered pipeline to its declared priority class.
+  The three current pipelines SHALL register as: diarization = foreground
+  (latency-critical, highest), ASR = foreground (lower than diarization), VAD =
+  background (lowest). The registry SHALL be the single source of truth for the
+  priority-to-stream mapping (FR1) and for the telemetry snapshot (FR7). A
+  background-class pipeline SHALL yield within a bounded window so a
+  foreground pipeline always makes progress.
+- **FR7 — Telemetry over WebSocket**: the server SHALL emit an additive
+  `{"type":"gpu_telemetry",...}` message carrying, per registered pipeline, its
+  declared priority class, its concrete stream priority, and a compute/occupancy
+  summary (for example `compute_sec` and real-time factor already tracked per
+  worker). The message SHALL carry the common time base like the other messages
+  and SHALL be additive (existing messages unchanged, Constitution Art. III.4).
 
 ## 6. Measurement (required before and after)
 
@@ -124,9 +153,11 @@ changed until the baseline exists.
 
 - **AC1** Baseline M1–M3 are recorded and written to `/memories/repo/` and to a
   measurement note before any engine change. (M1–M3)
-- **AC2** Each pipeline issues GPU work on its own stream; diarization uses a
-  higher-priority stream than ASR (verified by inspection and by the stream
-  priority values reported at startup). (FR1)
+- **AC2** Each pipeline issues GPU work on its own stream; each stream's concrete
+  priority is derived from the pipeline's declared priority index, with
+  diarization (foreground) above ASR (foreground) above VAD (background),
+  verified by inspection and by the priority values reported at startup. (FR1,
+  FR6)
 - **AC3** Streaming `test.mp3` through the WebSocket completes without
   segmentation fault across at least five consecutive runs, and the output is
   deterministic within recorded tolerance. (FR2, FR4)
@@ -139,6 +170,13 @@ changed until the baseline exists.
 - **AC6** Build produces no new warnings under `-Wall -Wextra`; the full test
   suite passes; no data race is present in the threaded path (verified). (
   Constitution V)
+- **AC7** Adding a hypothetical fourth pipeline requires only a registration with
+  a declared priority index (no edit to the priority-to-stream mapping or the
+  scheduler), demonstrated by inspection of the registry call site. (FR1, FR6)
+- **AC8** Streaming `test.mp3` through the real WebSocket emits an additive
+  `{"type":"gpu_telemetry"}` message listing each registered pipeline with its
+  priority class, concrete stream priority, and compute/occupancy summary; a
+  client can read it without any change to the existing messages. (FR7)
 
 ## 8. Constitution Check
 
