@@ -6,20 +6,21 @@
 //   1. Parses the reference into utterances {time, speaker, text}.
 //   2. Derives a ground-truth diarization track (speaker turns) AND an
 //      ASR-style transcript that carries text+timing but NO speaker labels.
-//   3. Runs the implemented OverlapTimelineMerger to RE-ATTRIBUTE each
-//      utterance's speaker purely from diarization overlap.
+//   3. Deposits both into the runtime ComprehensiveTimeline (Spec 004), which
+//      re-attributes each text segment to a speaker purely by time overlap.
 //   4. Reports attribution accuracy vs the reference and previews the produced
 //      timeline so it can be compared by hand against the reference file.
 //
-// This exercises the diarization->timeline fusion on real 4-speaker data even
-// though the neural Sortformer weights cannot be loaded in this environment.
+// This exercises the runtime diarization->timeline alignment on real 4-speaker
+// data even though the neural Sortformer weights cannot be loaded in this
+// environment.
 
 #include <iostream>
 #include <string>
 #include <unordered_map>
 
 #include "io/reference_transcript.h"
-#include "pipeline/timeline_merger.h"
+#include "pipeline/comprehensive_timeline.h"
 
 using namespace orator;
 
@@ -51,20 +52,40 @@ int main(int argc, char** argv) {
   auto diar = ref.ToDiarSegments(5.0);
   auto transcript = ref.ToTranscript(5.0);
 
-  // Fuse: the merger must recover speakers from diarization overlap alone.
-  pipeline::OverlapTimelineMerger merger;
-  core::Timeline timeline = merger.Merge(diar, transcript);
+  // Deposit into the runtime ComprehensiveTimeline. Diarization provides the
+  // speaker set (who/when); ASR provides text (what/when); the timeline
+  // attributes each text segment to a speaker purely by time overlap.
+  pipeline::ComprehensiveTimeline timeline;
+  std::vector<pipeline::ComprehensiveTimeline::SpeakerInput> spk;
+  spk.reserve(diar.size());
+  for (const auto& d : diar) {
+    pipeline::ComprehensiveTimeline::SpeakerInput s;
+    s.start = d.start_sec;
+    s.end = d.end_sec;
+    s.speaker = d.speaker_id.empty()
+                    ? ("speaker_" + std::to_string(d.local_speaker))
+                    : d.speaker_id;
+    s.conf = 1.0f;
+    spk.push_back(s);
+  }
+  timeline.ReplaceSpeakers(spk);
+  for (size_t i = 0; i < transcript.tokens.size(); ++i) {
+    const auto& tok = transcript.tokens[i];
+    timeline.UpsertText(static_cast<long>(i), tok.start_sec, tok.end_sec,
+                        tok.text);
+  }
+  std::vector<pipeline::ComprehensiveTimeline::Entry> entries =
+      timeline.Snapshot();
 
-  // Attribution accuracy: re-attribute each utterance independently and compare
-  // to the reference speaker.
+  // Attribution accuracy: each text entry's attributed speaker (by time overlap)
+  // vs the reference speaker. Entries are keyed by text_id = utterance index.
   int correct = 0;
   std::unordered_map<std::string, int> per_speaker_total, per_speaker_correct;
+  std::unordered_map<long, std::string> attributed;
+  for (const auto& e : entries) attributed[e.text_id] = e.speaker;
   for (size_t i = 0; i < ref.utterances.size(); ++i) {
-    core::Transcript one;
-    one.tokens.push_back(transcript.tokens[i]);
-    core::Timeline t = merger.Merge(diar, one);
-    const std::string assigned =
-        t.segments.empty() ? "" : t.segments.front().speaker_id;
+    auto it = attributed.find(static_cast<long>(i));
+    const std::string assigned = it == attributed.end() ? "" : it->second;
     const std::string truth = ref.utterances[i].speaker;
     per_speaker_total[truth]++;
     if (assigned == truth) {
@@ -77,7 +98,7 @@ int main(int argc, char** argv) {
           ? 0.0
           : 100.0 * correct / static_cast<double>(ref.utterances.size());
 
-  std::cout << "=== Timeline-fusion attribution (vs reference) ===\n";
+  std::cout << "=== Timeline-alignment attribution (vs reference) ===\n";
   std::cout << "Overall: " << correct << "/" << ref.utterances.size() << " = "
             << acc << "%\n";
   for (const auto& s : speakers) {
@@ -87,15 +108,14 @@ int main(int argc, char** argv) {
   std::cout << "\n";
 
   std::cout << "=== Produced timeline preview (first " << preview
-            << " turns) ===\n";
-  for (int i = 0; i < preview && i < static_cast<int>(timeline.segments.size());
-       ++i) {
-    const auto& seg = timeline.segments[i];
-    std::string text = seg.text;
+            << " entries) ===\n";
+  for (int i = 0; i < preview && i < static_cast<int>(entries.size()); ++i) {
+    const auto& e = entries[i];
+    std::string text = e.text;
     if (text.size() > 48) text = text.substr(0, 48) + "...";
-    std::printf("[%6.1f-%6.1f] %-10s %s\n", seg.start_sec, seg.end_sec,
-                seg.speaker_id.c_str(), text.c_str());
+    std::printf("[%6.1f-%6.1f] %-10s %s\n", e.start, e.end, e.speaker.c_str(),
+                text.c_str());
   }
-  std::cout << "\nTotal timeline turns: " << timeline.segments.size() << "\n";
+  std::cout << "\nTotal timeline entries: " << entries.size() << "\n";
   return 0;
 }

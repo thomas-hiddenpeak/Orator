@@ -6,7 +6,7 @@ conflicts with the Constitution, the Constitution takes precedence. Amending it
 is a deliberate, recorded action (see *Amendment Process*), not an undocumented
 change.
 
-- **Version**: 1.2.0
+- **Version**: 1.2.1
 - **Ratified**: 2026-06-12
 - **Last amended**: 2026-06-16
 
@@ -66,12 +66,12 @@ binary with a fixed, auditable surface is a hard product requirement.
    the diarization track and, when ASR is enabled, the ASR track.
 4. The timeline is **extensible by adding tracks**. A new pipeline contributes a
    new track; existing tracks and the document schema are unchanged. Combining
-   tracks (for example attributing transcript text to a speaker) is performed by
-   a separate component and does not alter how each pipeline produces its track.
+   tracks (attributing transcript text to a speaker by time alignment) is
+   performed by a separate component (`pipeline::ComprehensiveTimeline`) and does
+   not alter how each pipeline produces its track.
 5. The pipelines are decoupled from concrete models by interfaces
-   (`core::IDiarizer`, `core::IAsr`, `core::ITimelineMerger`, …) plus a registry.
-   Replacing a model is a registration/configuration change, not an edit to a
-   consumer.
+   (`core::IDiarizer`, `core::IAsr`, …) plus a registry. Replacing a model is a
+   registration/configuration change, not an edit to a consumer.
 
 ## Article IV — Streaming Validation Through the Real Transport
 
@@ -245,4 +245,4 @@ state claim:
 - When guidance is silent, Articles II (accuracy) and V (quality) take
   precedence over other considerations.
 
-**Version 1.2.0 · Ratified 2026-06-12 · Last amended 2026-06-16**
+**Version 1.2.1 · Ratified 2026-06-12 · Last amended 2026-06-16**

@@ -54,7 +54,6 @@ set(ORATOR_CORE_SOURCES
     src/model/builtin_registration.cc
     # pipeline orchestration
     src/pipeline/diar_postprocess.cc
-    src/pipeline/timeline_merger.cc
     src/pipeline/auditory_stream.cc
     src/pipeline/asr_preprocessor.cc
     src/pipeline/comprehensive_timeline.cc

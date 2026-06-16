@@ -77,8 +77,8 @@ struct AsrConfig {
 // Automatic speech recognition: turns audio into a timed token Transcript.
 // Generalizes any encoder-decoder ASR (Whisper-family, Qwen3-ASR, etc.); the
 // pipeline depends only on this contract, never on a concrete engine. The
-// Transcript it returns is the input the ITimelineMerger fuses with
-// diarization, so ASR and diarization meet on a single timeline.
+// Transcript it returns is deposited, with diarization, into the
+// ComprehensiveTimeline, so ASR and diarization meet on a single time base.
 class IAsr {
  public:
   virtual ~IAsr() = default;
@@ -93,14 +93,6 @@ class IAsr {
   virtual Transcript Transcribe(const AudioChunk& audio) = 0;
 
   virtual std::string name() const = 0;
-};
-
-// Fuses diarization segments with the ASR transcript into a labeled timeline.
-class ITimelineMerger {
- public:
-  virtual ~ITimelineMerger() = default;
-  virtual Timeline Merge(const std::vector<DiarSegment>& diarization,
-                         const Transcript& transcript) const = 0;
 };
 
 // Terminal consumer of a timeline (e.g. JSON for an LLM, a socket, a file).

@@ -8,7 +8,6 @@
 
 #include "pipeline/diar_postprocess.h"
 #include "pipeline/json_util.h"
-#include "pipeline/timeline_merger.h"
 
 namespace orator {
 namespace pipeline {

@@ -16,7 +16,7 @@ work is specified under [specs/](.).
 
 - **Last updated**: 2026-06-16 (Specs 003, 004, 005 implemented + real-path WS validated)
 - **Branch**: `master`
-- **Constitution**: v1.2.0
+- **Constitution**: v1.2.1
 
 ---
 
@@ -61,8 +61,8 @@ timebase reconciliation check is clean (no gap).
 | Streaming diarization (Sortformer) | ✅ Verified, industrial-grade | Incremental, O(n), persistent identity; matched vs NeMo (forward <5e-3, streaming <1e-2, incremental <1e-4). |
 | Native Qwen3-ASR engine | ✅ Verified vs PyTorch oracle | mel 3.9e-3, encoder 1.3e-3, decoder argmax-match; transcript matches gold. Pure bf16 compute. |
 | WhisperMel / BPE tokenizer / sharded safetensors loader | ✅ Verified | Unit-tested. |
-| Decoupling (interfaces + registry) | ✅ In place | `IDiarizer`, `IAsr`, `ITimelineMerger`; registry-constructed. |
-| `OverlapTimelineMerger` (`pipeline/timeline_merger.*`) | ⚠️ Retained, INACTIVE on runtime path | The old one-shot max-overlap merger. Superseded at runtime by `ComprehensiveTimeline` (Spec 004); `AuditoryStream` no longer uses it. Still compiled into `orator_core` and referenced ONLY by `test/test_timeline.cc` and `test/eval_reference.cc` as a reference. Do not mistake it for live behavior. |
+| Decoupling (interfaces + registry) | ✅ In place | `IDiarizer`, `IAsr`; registry-constructed. Text↔speaker combination is the concrete `ComprehensiveTimeline` (pure time-alignment), not an interface. |
+| `OverlapTimelineMerger` / `ITimelineMerger` | 🗑️ Removed | The old one-shot max-overlap merger and its orphaned interface were deleted (commit pending) — superseded by `ComprehensiveTimeline` (Spec 004). `orator_eval` now evaluates `ComprehensiveTimeline` on the real 4-speaker reference. |
 | WebSocket server (from-scratch POSIX) | ✅ Working | RFC6455 handshake + frame codec, no deps. |
 | ASR + WS integration | Done; threaded, three independent pipelines | `AuditoryStream` is a controller owning a `SharedAudioBuffer`, three worker threads (`DiarizationWorker`, `AsrWorker`, endpoint detector), and a mutex-guarded `ComprehensiveTimeline`. Each pipeline is an active push producer (Spec 004). Sends incremental `asr`/`asr_partial`, `endpoint`, `revision`, and a comprehensive `timeline`. GPU work serialized by `gpu::DeviceLock()`. |
 | Incremental KV-cache ASR streaming (Spec 003) | ✅ Implemented, verified, committed (8cc31ab) | Persistent KV cache + prefix caching + chunk-local windowed encoder; Silero endpoint reset. Full 1hr CER 16.1% / 6.22x; beats production Silero-VAD at every scale. |
@@ -128,7 +128,7 @@ Findings:
 
 ## 6. SDD artifacts
 
-- [.specify/memory/constitution.md](../.specify/memory/constitution.md) — v1.2.0 (Article VIII: documentation–code consistency)
+- [.specify/memory/constitution.md](../.specify/memory/constitution.md) — v1.2.1 (Article VIII: documentation–code consistency)
 - [specs/001-streaming-pipeline/spec.md](001-streaming-pipeline/spec.md) — implemented
 - [specs/001-streaming-pipeline/plan.md](001-streaming-pipeline/plan.md) — implemented
 - [specs/001-streaming-pipeline/tasks.md](001-streaming-pipeline/tasks.md) — implemented
