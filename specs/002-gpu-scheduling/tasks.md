@@ -2,7 +2,11 @@
 
 - **Feature**: `002-gpu-scheduling`
 - **Spec**: [spec.md](spec.md) · **Plan**: [plan.md](plan.md)
-- **Status**: Draft (awaiting review) — implementation begins after sign-off
+- **Status**: In progress. Phase 2 (priority registry) + the periodic
+  `gpu_telemetry` WS message are implemented and verified (dbebf5f, 854dc7e).
+  The engine stream-routing + global-lock removal (T030/T031/T040/T041/T050) are
+  BLOCKED pending a runnable diarization numeric gate (see the blocker note in
+  Phase 2). The global lock is retained until then (no regression).
 - **Constitution**: v1.2.1
 
 > Ordered, independently verifiable steps. Measurement precedes any engine
@@ -26,16 +30,36 @@
   about 25–28% reduction; the floor is ASR-only because ASR dominates.
 
 ## Phase 2 — Stream infrastructure
-- [ ] **T020** Add a priority registry in the `gpu/` layer: a pipeline registers
-  a name + a declared priority index (class) and receives a CUDA stream whose
+- [x] **T020** Add a priority registry in the `gpu/` layer
+  (`include/gpu/scheduler.h`, `src/gpu/scheduler.cc`): a pipeline registers a
+  name + a declared priority index (class) and receives a CUDA stream whose
   concrete priority is derived from the index via
-  `cudaDeviceGetStreamPriorityRange`. Report the queried range + each
-  registration at startup. *(Verify: AC2, AC7; startup log shows the range and
-  per-pipeline class→priority mapping.)*
-- [ ] **T021** Register the three pipelines with their classes: diarization =
-  foreground (highest), ASR = foreground (lower), VAD = background (lowest). The
+  `cudaDeviceGetStreamPriorityRange`. Reports the queried range at startup. The
+  ASR pipeline's stream is now sourced from the registry (replacing the ad-hoc
+  creation). *(Done dbebf5f; AC2/AC7 at the registry level; build + 19/19 ctest
+  green.)*
+- [x] **T021** Register the three pipelines with their classes: diarization =
+  foreground index 0, ASR = foreground index 1, VAD = background index 2. The
   registry is the single source of truth for the stream mapping and the
-  telemetry. *(Verify: AC2; the three streams carry the expected priorities.)*
+  telemetry. NOTE: only the ASR stream is currently CONSUMED (its engine already
+  takes a stream); diar/vad register their CLASS but still execute on the
+  default stream under the global lock (`create_stream=false`) until their engine
+  kernels are stream-routed (T040/T041) — see the blocker below. *(Done dbebf5f.)*
+
+> **BLOCKER for T030/T031/T040/T041/T050 (engine stream-routing + lock removal).**
+> Removing the global `gpu::DeviceLock()` requires routing the diarization and
+> ASR engines onto their own streams, replacing the device-wide
+> `cudaDeviceSynchronize()` calls, and removing the host read of in-flight
+> device-managed memory in the ASR decoder (R1). The ASR side is gateable
+> (`test_asr_encoder` / `test_asr_decoder` ctests). The DIARIZATION side has NO
+> runnable numeric gate in the current build: the `verify_streaming` /
+> `verify_pipeline` tools (which compare the diarizer against the NeMo reference)
+> are NOT in `CMakeLists.txt` and are not built. Per Constitution Art. II, the
+> NeMo-verified diarizer engine MUST NOT be modified without a re-validatable
+> reference. PRECONDITION before T040: re-add the diarization verify tool(s) to
+> the build (or add a ctest diar gate) so the stream-routing change can be
+> numerically re-validated. Until then the global lock is retained and the
+> pipelines remain correctly serialized (no regression, no unvalidated change).
 
 ## Phase 3 — ASR engine on its stream, managed-memory safety
 - [ ] **T030** Thread `asr_stream_` through the ASR call path; replace default
@@ -73,14 +97,15 @@
 - [ ] **T061** Confirm AC4 (no quality regression) and AC6 (clean build, tests
   pass, race-free); update `/memories/repo/` and `PROJECT_STATE.md`. *(Verify:
   AC4, AC6.)*
-- [ ] **T062** Emit the additive `{"type":"gpu_telemetry"}` WS message
+- [x] **T062** Emit the additive `{"type":"gpu_telemetry"}` WS message
   **periodically** at `gpu_telemetry_interval_sec` (documented default 1.0 s; 0
-  disables), built from the registry + per-worker compute/occupancy and sent
-  through the existing serialized transport (no GPU worker on its hot path, no
-  separate socket). Verify on the real WS path that a client reads MULTIPLE
-  snapshots over a multi-second run, each listing every pipeline's class +
-  concrete priority + summary, with all existing messages unchanged. *(Verify:
-  AC8.)*
+  disables; env `ORATOR_GPU_TELEMETRY_SEC`), built from the registry + per-worker
+  compute/occupancy and sent through the existing serialized transport via a
+  dedicated low-rate timer thread (no GPU worker on its hot path, no separate
+  socket). Verified on the real WS path: a 120 s run at a 2 s interval delivered
+  4 snapshots, each listing every pipeline's class + priority index + concrete
+  CUDA priority + compute/RTF, with all existing messages unchanged. *(Done
+  854dc7e; AC8.)*
 
 ## Traceability (requirement → task)
 

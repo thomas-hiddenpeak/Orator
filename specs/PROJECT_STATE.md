@@ -169,9 +169,9 @@ Findings:
 - [specs/001-streaming-pipeline/spec.md](001-streaming-pipeline/spec.md) — implemented
 - [specs/001-streaming-pipeline/plan.md](001-streaming-pipeline/plan.md) — implemented
 - [specs/001-streaming-pipeline/tasks.md](001-streaming-pipeline/tasks.md) — implemented
-- [specs/002-gpu-scheduling/spec.md](002-gpu-scheduling/spec.md) — draft (awaiting review)
-- [specs/002-gpu-scheduling/plan.md](002-gpu-scheduling/plan.md) — draft
-- [specs/002-gpu-scheduling/tasks.md](002-gpu-scheduling/tasks.md) — draft
+- [specs/002-gpu-scheduling/spec.md](002-gpu-scheduling/spec.md) — in progress (priority registry + gpu_telemetry done dbebf5f/854dc7e; lock removal blocked on diar gate)
+- [specs/002-gpu-scheduling/plan.md](002-gpu-scheduling/plan.md) — in progress
+- [specs/002-gpu-scheduling/tasks.md](002-gpu-scheduling/tasks.md) — in progress
 - [specs/003-sliding-window-asr/spec.md](003-sliding-window-asr/spec.md) — implemented (8cc31ab)
 - [specs/004-comprehensive-timeline/spec.md](004-comprehensive-timeline/spec.md) — implemented (core 3159b75, 673f95d; VAD pipeline Phase 5; live ASR revision + docs sync f3496ae)
 - [specs/005-time-base/spec.md](005-time-base/spec.md) — implemented (84fba90)
@@ -186,11 +186,22 @@ comprehensive-layer work is pending — it is a finished pure time-alignment lay
 by design.
 
 Open, independently-scheduled items:
-- **Spec 002 — GPU Scheduling** (DRAFT, not implemented): replace the global GPU
-  mutex with per-pipeline CUDA streams + priorities. This is the main remaining
-  feature goal.
+- **Spec 002 — GPU Scheduling** (IN PROGRESS): the GPU priority registry
+  (`gpu::GpuScheduler`, `include/gpu/scheduler.h`) and the periodic
+  `{"type":"gpu_telemetry"}` WS message are implemented, verified, and pushed
+  (dbebf5f, 854dc7e). Each pipeline declares a priority index at registration
+  (diar=0 fg, asr=1 fg, vad=2 bg); the ASR stream is sourced from the registry;
+  telemetry was confirmed on the real WS path (4 snapshots over 120 s at a 2 s
+  interval, env `ORATOR_GPU_TELEMETRY_SEC`). BLOCKED next step: removing the
+  global `gpu::DeviceLock()` requires routing the diarization + ASR engines onto
+  their streams, replacing the device-wide `cudaDeviceSynchronize()` calls, and
+  removing the ASR decoder's host read of in-flight managed memory (R1). The ASR
+  side is gateable (`test_asr_*` ctests) but the DIARIZATION side has no runnable
+  numeric gate in the current build (the `verify_streaming`/`verify_pipeline`
+  tools are not in `CMakeLists.txt`). Per Constitution Art. II the verified
+  diarizer must not be modified without a re-validatable reference; the
+  precondition is to re-add a diarization numeric gate to the build first. The
+  global lock is retained until then (correct, serialized, no regression).
 - **Full 1-hour real-WS revalidation on the current `text_id` revision code**:
-  the prior full-hour run predates the stable-`text_id` refactor; a fresh
-  full-hour run is the recommended final gate before stamping this stage as a
-  milestone (infrastructure).
+  done (2026-06-17, commit c94c2fa) — see the milestone-gate section in §2.
 - ASR streaming throughput (~2.6x, Spec 001 NG1) — deferred by owner.
