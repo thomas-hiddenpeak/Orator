@@ -21,8 +21,9 @@ tools/venv/
 __pycache__/
 *.pyc
 
-# Test audio (large media)
+# Test audio (large media) + private reference transcript (CER gold)
 test.mp3
+test.txt
 asrTest2Final.txt
 *.pcm
 
