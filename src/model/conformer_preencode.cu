@@ -258,7 +258,9 @@ std::vector<float> ConformerPreEncode::Forward(const float* mel, int n_mels,
                     static_cast<const float*>(bout_->data()),
                     static_cast<float*>(outbuf.data()), H2, Kflat, D, 0);
   CUDA_CHECK(cudaGetLastError());
-  CUDA_CHECK(cudaDeviceSynchronize());
+  // Spec 002: drain the DEFAULT stream only (diarization runs on it), not the
+  // whole device, so concurrent ASR work on its own stream is not waited on.
+  CUDA_CHECK(cudaStreamSynchronize(0));
 
   std::vector<float> result(static_cast<size_t>(H2) * D);
   CUDA_CHECK(cudaMemcpy(result.data(), outbuf.data(), result.size() * sizeof(float),

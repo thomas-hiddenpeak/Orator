@@ -80,7 +80,10 @@ void AsrWorker::EmitUtterance(int begin, int end, bool finalize) {
   const auto t0 = Clock::now();
   std::string continuation;
   {
-    std::lock_guard<std::mutex> gpu(gpu::DeviceLock());
+    // Spec 002: ASR runs on its own non-default stream, so in concurrent mode it
+    // does not take the global lock (its stream orders its work). In serialized
+    // mode this still locks.
+    gpu::DeviceGuard gpu(/*own_stream=*/true);
     if (rollback_tokens_ > 0) {
       continuation = asr_->TranscribeWindow(asr_input, asr_len,
                                             pending_prefix_, stream_);
@@ -216,7 +219,8 @@ void AsrWorker::EmitIncrementalChunk(const float* samples, int n, bool finalize)
 
   const auto t0 = Clock::now();
   {
-    std::lock_guard<std::mutex> gpu(gpu::DeviceLock());
+    // Spec 002: ASR own-stream pipeline -> lock-free in concurrent mode.
+    gpu::DeviceGuard gpu(/*own_stream=*/true);
     if (n > 0) {
       if (!inc_in_segment_) {
         inc_seg_start_sample_ = inc_abs_pos_;

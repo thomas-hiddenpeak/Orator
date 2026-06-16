@@ -25,5 +25,34 @@ namespace gpu {
 // guard(gpu::DeviceLock());` around a GPU-touching region.
 std::mutex& DeviceLock();
 
+// Spec 002: whether concurrent GPU mode is enabled (env ORATOR_GPU_CONCURRENT,
+// read once). In concurrent mode a pipeline that runs on its OWN non-default
+// CUDA stream (currently only ASR) does not take the global lock: its stream and
+// stream-scoped synchronization order its work, so it can overlap another
+// pipeline's GPU work. Pipelines that share the default stream (diarization and
+// VAD) ALWAYS take the lock so their kernels never interleave on stream 0.
+// Default (unset) is serialized mode: every GPU region takes the lock, exactly
+// as before (the safe, validated production behavior).
+bool ConcurrentGpuEnabled();
+
+// RAII GPU-region guard (Spec 002). In serialized mode it always holds
+// DeviceLock() for the region's lifetime. In concurrent mode it skips the lock
+// ONLY when `own_stream` is true (the pipeline runs on its own non-default
+// stream); a default-stream pipeline still locks so its kernels stay ordered.
+class DeviceGuard {
+ public:
+  // own_stream=false (default): shares the default stream -> always lock.
+  // own_stream=true: has a dedicated non-default stream -> lock-free in
+  // concurrent mode.
+  explicit DeviceGuard(bool own_stream = false);
+  ~DeviceGuard();
+
+  DeviceGuard(const DeviceGuard&) = delete;
+  DeviceGuard& operator=(const DeviceGuard&) = delete;
+
+ private:
+  bool locked_;
+};
+
 }  // namespace gpu
 }  // namespace orator

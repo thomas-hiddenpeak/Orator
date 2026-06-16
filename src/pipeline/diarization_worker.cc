@@ -50,8 +50,10 @@ void DiarizationWorker::ProcessSpan(const float* samples, int n) {
   const auto t0 = Clock::now();
   core::DiarizationFrames part;
   {
-    // Serialize GPU access against the ASR worker (one shared device).
-    std::lock_guard<std::mutex> gpu(gpu::DeviceLock());
+    // Spec 002: diarization shares the default stream with VAD, so it always
+    // serializes via the global lock (its kernels must not interleave on
+    // stream 0). Only ASR (own stream) is lock-free in concurrent mode.
+    gpu::DeviceGuard gpu;
     part = diarizer_->StreamAudio(samples, n, false);
   }
   compute_sec_ += Secs(t0, Clock::now());
@@ -64,7 +66,7 @@ void DiarizationWorker::Finalize() {
   const auto t0 = Clock::now();
   core::DiarizationFrames tail;
   {
-    std::lock_guard<std::mutex> gpu(gpu::DeviceLock());
+    gpu::DeviceGuard gpu;
     tail = diarizer_->StreamAudio(nullptr, 0, true);
   }
   compute_sec_ += Secs(t0, Clock::now());

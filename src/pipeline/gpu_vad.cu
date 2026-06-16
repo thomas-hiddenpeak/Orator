@@ -286,7 +286,10 @@ void GpuVad::Push(const float* samples, int n) {
 void GpuVad::RunBatch(const float* ext, int n_windows, std::vector<float>* probs) {
   probs->resize(n_windows);
   const auto t0 = std::chrono::steady_clock::now();
-  std::lock_guard<std::mutex> guard(gpu::DeviceLock());
+  // Spec 002: VAD shares the default stream with diarization, so it always
+  // serializes via the global lock (its kernels must not interleave on stream 0
+  // with diarization's). Only ASR (own stream) is lock-free in concurrent mode.
+  gpu::DeviceGuard guard;
   const int kThreads = 256;
   int done = 0;
   while (done < n_windows) {

@@ -219,7 +219,10 @@ std::vector<float> MelSpectrogram::RunStftMel(const float* sig, int num_samples,
       static_cast<const float*>(d_filters.data()), n_mels, num_frames,
       config_.log_zero_guard, static_cast<float*>(d_mel.data()));
   CUDA_CHECK(cudaGetLastError());
-  CUDA_CHECK(cudaDeviceSynchronize());
+  // Spec 002: drain the DEFAULT stream only (the diarization mel front-end runs
+  // on it), not the whole device, so concurrent ASR work on its own stream is
+  // not waited on.
+  CUDA_CHECK(cudaStreamSynchronize(0));
 
   std::vector<float> mel(static_cast<size_t>(num_frames) * n_mels);
   gpu::GpuMemory::CopyDeviceToHost(mel.data(), d_mel.data(),

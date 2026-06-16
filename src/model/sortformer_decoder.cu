@@ -297,7 +297,11 @@ std::vector<float> SortformerDecoder::Forward(const float* conformer_out, int T,
       W("sortformer_modules.single_hidden_to_spks.weight"),
       W("sortformer_modules.single_hidden_to_spks.bias"), predp, T, D, n_spk_, 2);
   MaskRowsKernel<<<Blocks(T * n_spk_), kThreads>>>(predp, T, n_spk_, valid_len);
-  CUDA_CHECK(cudaDeviceSynchronize());
+  // Spec 002: drain the DEFAULT stream only (all diarization kernels run on it),
+  // not the whole device, so concurrent ASR work on its own stream is not
+  // waited on. Equivalent for diarization's own ordering (gated by
+  // test_diar_stream).
+  CUDA_CHECK(cudaStreamSynchronize(0));
 
   std::vector<float> preds(static_cast<size_t>(T) * n_spk_);
   CUDA_CHECK(cudaMemcpy(preds.data(), predp, preds.size() * sizeof(float),
