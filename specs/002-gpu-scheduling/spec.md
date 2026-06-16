@@ -201,26 +201,45 @@ two pipelines' GPU work overlaps) was tested directly and **confirmed**:
   server crashed before completing one run. The serialized default
   (`ORATOR_GPU_CONCURRENT` unset) completed the same input in 40.6 s with correct
   output (25 diarization + 5 ASR + 45 comprehensive entries).
-- **Root cause**: both verified engines pervasively host-access
-  `cudaMallocManaged` memory (`gpu::UnifiedBuffer`) during steady-state streaming
-  (diarization result `cudaMemcpy` from managed buffers; ASR scalar reads). On
-  Tegra unified memory, a host access to managed pages while another pipeline's
-  kernel executes faults via page migration. Fixing the single named case
-  (`AsrTextDecoder::Embed`, which already reads a plain-host bf16 shadow
-  `embed_host_`) was necessary but **not sufficient**.
-- **Impact / decision**: lock-free concurrency cannot ship safely until BOTH
-  engines are de-coupled from managed memory (device buffers + pinned host
-  staging for every host-visible result). This de-coupling is **retained inside
-  Spec 002 as Phase 7** (plan §3.6, tasks T070–T073), not split into a new spec:
-  the requirement was discovered by this feature's own work, so the attribution
-  is cleanest here, and the lock-removal decision can only be made after the
-  de-coupling is done and measured. The `DeviceGuard` therefore **always takes
-  the global lock** (a compile-time constant `kOwnStreamConcurrencySafe = false`
-  disables the own-stream skip), so `ORATOR_GPU_CONCURRENT=1` is a safe no-op
-  (verified: it now runs serialized at 40.7 s, no crash). The priority registry,
-  the periodic telemetry, and the stream-scoped diarization synchronizations
-  (correct in serialized mode too) are retained as the foundation for Phase 7.
-  The global lock stays the production default; there is no regression.
+- **Root cause**: this Orin reports `concurrentManagedAccess == 0` (confirmed by
+  `cudaDeviceGetAttribute`). On such a device the host may not access ANY
+  `cudaMallocManaged` page while a kernel runs on ANY stream — it faults via page
+  migration. Both verified engines host-access managed memory pervasively during
+  streaming (the diarizer's whole `SortformerState` — spkcache/fifo/spk_perm — and
+  its streaming logic; the ASR decoder's `PrefillAt`/`Forward` residual and
+  position staging). A `gdb` backtrace pinned the first crash to the ASR thread's
+  `PrefillAt` host `memcpy` into a managed buffer while a diarization kernel ran.
+  Fixing the single named `Embed` case (already a plain-host shadow) was necessary
+  but far from sufficient.
+- **The pooling / stream-attach option (evaluated)**: the documented mechanism for
+  multi-stream + managed memory on such a device is
+  `cudaStreamAttachMemAsync(stream, ptr, cudaMemAttachSingle)`, which makes a
+  managed allocation coherent with ONE stream so the host may touch it after
+  synchronizing only that stream, regardless of other streams' kernels (logical
+  per-stream ownership; the pooling idea). An empirical test on this device
+  confirmed: single-attach to a NON-default stream succeeds, but single-attach to
+  the DEFAULT stream (0) returns `invalid argument`. The diarization and VAD
+  engines run on the default stream and take no stream parameter, so the attach
+  approach still requires routing the entire diarizer onto a dedicated non-default
+  stream first — the same large change to the verified engine as de-coupling its
+  managed buffers. The attach mechanism does not avoid touching the verified
+  engine; it relocates the work.
+- **Impact / decision**: lock-free concurrency cannot ship safely until the
+  diarization engine is made managed-memory-safe under concurrent kernels — either
+  by de-coupling its streaming `SortformerState` from managed memory (device +
+  pinned) or by routing it onto a dedicated stream and single-attaching its
+  managed memory. Both are large, accuracy-gated changes to the NeMo-verified
+  diarizer for a bounded measured gain (~25–28% wall on 120 s; §6 M3). The
+  ASR-side host-touch sites WERE de-coupled and gated (`PrefillAt`/`Forward`
+  staging, the encoder reshape path; commits 2c34d20, b4606d9). This work is
+  **retained inside Spec 002 as Phase 7** (plan §3.6, tasks T070–T073). The
+  `DeviceGuard` **always takes the global lock** (`kOwnStreamConcurrencySafe =
+  false`), so `ORATOR_GPU_CONCURRENT=1` is a safe no-op (verified serialized,
+  40.7 s, no crash). The priority registry, the periodic telemetry, the
+  stream-scoped diarization synchronizations, and the ASR-side de-coupling are
+  retained as the foundation. The global lock stays the production default; there
+  is no regression. Whether to undertake the diarizer change is an explicit
+  owner decision, given the risk-to-verified-engine vs. the bounded gain.
 
 ## 8. Constitution Check
 
