@@ -73,10 +73,14 @@
 - [ ] **T061** Confirm AC4 (no quality regression) and AC6 (clean build, tests
   pass, race-free); update `/memories/repo/` and `PROJECT_STATE.md`. *(Verify:
   AC4, AC6.)*
-- [ ] **T062** Emit the additive `{"type":"gpu_telemetry"}` WS message from the
-  registry + per-worker compute/occupancy; verify on the real WS path that a
-  client reads each pipeline's class + concrete priority + summary, with all
-  existing messages unchanged. *(Verify: AC8.)*
+- [ ] **T062** Emit the additive `{"type":"gpu_telemetry"}` WS message
+  **periodically** at `gpu_telemetry_interval_sec` (documented default 1.0 s; 0
+  disables), built from the registry + per-worker compute/occupancy and sent
+  through the existing serialized transport (no GPU worker on its hot path, no
+  separate socket). Verify on the real WS path that a client reads MULTIPLE
+  snapshots over a multi-second run, each listing every pipeline's class +
+  concrete priority + summary, with all existing messages unchanged. *(Verify:
+  AC8.)*
 
 ## Traceability (requirement → task)
 

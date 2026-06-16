@@ -75,11 +75,12 @@ critical pipeline (diarization) priority over the throughput pipeline (ASR).
   already present.
 - **G5** Measure and report the change in per-pipeline real-time factors and in
   total wall time on the streaming path, before and after.
-- **G6** Publish a GPU-scheduling **telemetry snapshot over the WebSocket** so a
-  client can observe per-pipeline scheduling state (registered priority class,
-  stream, and a compute/occupancy summary). The output contract is extended
-  additively (a new message type), consistent with the existing `ready` /
-  `timeline` / `revision` messages.
+- **G6** Publish a GPU-scheduling **telemetry snapshot over the WebSocket**,
+  pushed **periodically** at a bounded interval, so a client can drive a live
+  scheduling dashboard. Each snapshot reports per-pipeline scheduling state
+  (registered priority class, stream, and a compute/occupancy summary). The
+  output contract is extended additively (a new message type), consistent with
+  the existing `ready` / `timeline` / `revision` messages.
 
 ## 4. Non-Goals
 
@@ -125,12 +126,18 @@ critical pipeline (diarization) priority over the throughput pipeline (ASR).
   priority-to-stream mapping (FR1) and for the telemetry snapshot (FR7). A
   background-class pipeline SHALL yield within a bounded window so a
   foreground pipeline always makes progress.
-- **FR7 — Telemetry over WebSocket**: the server SHALL emit an additive
-  `{"type":"gpu_telemetry",...}` message carrying, per registered pipeline, its
-  declared priority class, its concrete stream priority, and a compute/occupancy
-  summary (for example `compute_sec` and real-time factor already tracked per
-  worker). The message SHALL carry the common time base like the other messages
-  and SHALL be additive (existing messages unchanged, Constitution Art. III.4).
+- **FR7 — Periodic telemetry over WebSocket**: the server SHALL emit an additive
+  `{"type":"gpu_telemetry",...}` message **periodically** at a bounded interval
+  (a configurable `gpu_telemetry_interval_sec` with a documented default, e.g.
+  1.0 s; a value of 0 disables it). Each message SHALL carry, per registered
+  pipeline, its declared priority class, its concrete stream priority, and a
+  compute/occupancy summary (for example `compute_sec` and real-time factor
+  already tracked per worker). The message SHALL carry the common time base like
+  the other messages and SHALL be additive (existing messages unchanged,
+  Constitution Art. III.4). Emission SHALL go through the same serialized
+  transport send as the other messages (no separate socket, no unsynchronized
+  write) and SHALL NOT block a pipeline worker (a dedicated low-rate timer or the
+  controller emits it, never a GPU worker thread on its hot path).
 
 ## 6. Measurement (required before and after)
 
@@ -173,10 +180,12 @@ changed until the baseline exists.
 - **AC7** Adding a hypothetical fourth pipeline requires only a registration with
   a declared priority index (no edit to the priority-to-stream mapping or the
   scheduler), demonstrated by inspection of the registry call site. (FR1, FR6)
-- **AC8** Streaming `test.mp3` through the real WebSocket emits an additive
-  `{"type":"gpu_telemetry"}` message listing each registered pipeline with its
-  priority class, concrete stream priority, and compute/occupancy summary; a
-  client can read it without any change to the existing messages. (FR7)
+- **AC8** Streaming `test.mp3` through the real WebSocket emits the additive
+  `{"type":"gpu_telemetry"}` message **repeatedly at the configured interval**
+  (more than one snapshot over a multi-second run), each listing every registered
+  pipeline with its priority class, concrete stream priority, and
+  compute/occupancy summary; setting the interval to 0 suppresses it; a client
+  can read it without any change to the existing messages. (FR7)
 
 ## 8. Constitution Check
 

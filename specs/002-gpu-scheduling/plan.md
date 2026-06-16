@@ -65,9 +65,13 @@ Two facts follow:
   device-wide lock.
 - A **telemetry snapshot** (spec FR7) is read from the registry + the per-worker
   `compute_sec`/real-time-factor already tracked, serialized as an additive
-  `{"type":"gpu_telemetry",...}` WebSocket message. The registry is the single
-  source of truth for both the stream mapping and the telemetry, so the two
-  cannot drift.
+  `{"type":"gpu_telemetry",...}` WebSocket message and pushed **periodically** at
+  a bounded interval (`gpu_telemetry_interval_sec`, documented default 1.0 s; 0
+  disables). A dedicated low-rate timer (or the controller) builds and emits the
+  snapshot through the existing serialized transport send; no GPU worker thread
+  emits it on its hot path, and no separate socket is opened. The registry is the
+  single source of truth for both the stream mapping and the telemetry, so the
+  two cannot drift.
 
 ## 3. Work breakdown
 
