@@ -77,7 +77,7 @@ int main(int argc, char** argv) {
   ReadEnvString("ORATOR_ASR_TFGRIDNET_MODEL", &cfg.asr_tfgridnet_model);
 
   // Spec 003/004 streaming + comprehensive-timeline knobs (real WS path).
-  // The incremental KV-cache ASR path and the endpoint stream are the PRODUCTION
+  // The incremental KV-cache ASR path and the VAD stream are the PRODUCTION
   // DEFAULT (cfg defaults are true). The env vars are explicit opt-OUT switches
   // for regression comparison against the legacy Silero-VAD path:
   //   ORATOR_ASR_INCREMENTAL=0  -> use the legacy Silero-VAD utterance path

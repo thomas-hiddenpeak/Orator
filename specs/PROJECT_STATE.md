@@ -90,7 +90,7 @@ longest idle stretch 25 s — no CPU-only stall).
 | Revisable comprehensive timeline (Spec 004) | ✅ Implemented (core + VAD pipeline + WS conformance) | Native stateful PURE CONTAINER + diarization-driven VIEW. Three tracks (diarization, asr, vad) each carry data + `source` meta + time codes; every pipeline emits its own WS message (`diar`/`asr`/`vad`) and revisions are source-tagged. The comprehensive VIEW splits text at DIARIZATION boundaries (not ASR's coarse segmentation). VAD = batched GPU `GpuVad` publishing speech segments (`test_vad` gate 3.7e-8). Owner invariant: no overlap → "unknown", never borrowed. |
 | Reusable common time base (Spec 005) | ✅ Implemented, committed (84fba90) | Header-only `core::TimeBase` value type shared by all pipelines; reconciliation check clean (zero gap) at 120s + 600s. |
 | Streaming validation | ✅ Through real WebSocket | `tools/ws_stream_client.py` (stdlib, reader thread) streams PCM through the socket at an accelerated rate and exports the full event log + timeline to JSON. |
-| Test suite | ✅ 19/19 ctests pass | Clean build under `-Wall -Wextra`, ZERO warnings (all dead kernels removed). `test_vad` gates the GPU endpoint detector vs the CPU reference. NOTE: ctests are component/oracle gates; full production behavior is validated only through the real `orator_ws` WebSocket path (the `asr_stream_test` harness bypasses the socket). A green ctest run is necessary but not sufficient — the full-hour CPU-stall defect was invisible to ctest. |
+| Test suite | ✅ 19/19 ctests pass | Clean build under `-Wall -Wextra`, ZERO warnings (all dead kernels removed). `test_vad` gates the GPU VAD detector vs the CPU reference. NOTE: ctests are component/oracle gates; full production behavior is validated only through the real `orator_ws` WebSocket path (the `asr_stream_test` harness bypasses the socket). A green ctest run is necessary but not sufficient — the full-hour CPU-stall defect was invisible to ctest. |
 
 ## 4. Measured performance (GPU fixed at 1.3 GHz, power mode MaxN)
 
@@ -157,17 +157,24 @@ Findings:
 - [specs/002-gpu-scheduling/plan.md](002-gpu-scheduling/plan.md) — draft
 - [specs/002-gpu-scheduling/tasks.md](002-gpu-scheduling/tasks.md) — draft
 - [specs/003-sliding-window-asr/spec.md](003-sliding-window-asr/spec.md) — implemented (8cc31ab)
-- [specs/004-comprehensive-timeline/spec.md](004-comprehensive-timeline/spec.md) — implemented (core 3159b75, 673f95d; endpoint pipeline Phase 5)
+- [specs/004-comprehensive-timeline/spec.md](004-comprehensive-timeline/spec.md) — implemented (core 3159b75, 673f95d; VAD pipeline Phase 5; live ASR revision + docs sync f3496ae)
 - [specs/005-time-base/spec.md](005-time-base/spec.md) — implemented (84fba90)
 
 ## 7. Immediate next step
 
-Specs 003, 004, and 005 are complete, verified, committed, and pushed; the full
-three-pipeline path is validated through the real WebSocket. The real-path env
-wiring gap in `orator_ws` (it was not reading the Spec 003/004 streaming knobs)
-is fixed (a823eb9, local). Open, independently-scheduled items: **Spec 002 — GPU
-Scheduling** (replace the global GPU mutex with per-pipeline CUDA streams +
-priorities) and an optional full 1hr real-path stress run. No comprehensive-layer
-work is pending — it is a finished pure time-alignment layer by design.
+Specs 001, 003, 004, and 005 are complete, verified, committed, and pushed; the
+full three-pipeline path is validated through the real WebSocket, including
+in-place ASR self-revision (same `text_id` revised mid-segment, landing in the
+comprehensive view; verified on the real WS path, commit f3496ae). No
+comprehensive-layer work is pending — it is a finished pure time-alignment layer
+by design.
 
-Other known follow-ups (not in Spec 002): ASR streaming throughput (~2.6x, NG1).
+Open, independently-scheduled items:
+- **Spec 002 — GPU Scheduling** (DRAFT, not implemented): replace the global GPU
+  mutex with per-pipeline CUDA streams + priorities. This is the main remaining
+  feature goal.
+- **Full 1-hour real-WS revalidation on the current `text_id` revision code**:
+  the prior full-hour run predates the stable-`text_id` refactor; a fresh
+  full-hour run is the recommended final gate before stamping this stage as a
+  milestone (infrastructure).
+- ASR streaming throughput (~2.6x, Spec 001 NG1) — deferred by owner.

@@ -1,7 +1,8 @@
 # Spec 001 — Real-Time Streaming Dual Pipeline (Diarization + ASR) on a Unified Timeline
 
 - **Feature**: `001-streaming-pipeline`
-- **Status**: Draft (awaiting review)
+- **Status**: Implemented & validated (plan/tasks done; the streaming dual
+  pipeline runs in production via `AuditoryStream` + `orator_ws`)
 - **Created**: 2026-06-12
 - **Owner**: project owner
 - **Constitution**: v1.0.0

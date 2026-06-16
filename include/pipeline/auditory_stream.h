@@ -164,7 +164,7 @@ class AuditoryStream {
   std::thread asr_thread_;
   bool running_ = false;
 
-  // Spec 004 T031: independent endpoint detector (third buffer consumer).
+  // Spec 004: independent VAD detector (third buffer consumer).
   std::unique_ptr<GpuVad> vad_detector_;
   int vad_cursor_ = -1;
   std::thread vad_thread_;
