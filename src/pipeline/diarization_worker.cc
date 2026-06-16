@@ -5,6 +5,7 @@
 
 #include "gpu/gpu_lock.h"
 #include "pipeline/diar_postprocess.h"
+#include "core/time_base.h"
 
 namespace orator {
 namespace pipeline {
@@ -34,6 +35,11 @@ void DiarizationWorker::DeliverSpeakers(bool force) {
   // derivation: boundaries shift as frames arrive), then deliver it.
   core::DiarizationFrames frames = timeline_->SnapshotDiarFrames();
   if (frames.num_frames <= 0 || frames.num_speakers <= 0) return;
+  // The diarization frame stream begins at the common-clock origin (absolute
+  // sample 0). Set the segment time origin explicitly through the common base
+  // so diar segment times are on the same clock as every other pipeline.
+  const core::TimeBase tb(params_.sample_rate, 0);
+  frames.t_start_sec = tb.SecondsAt(0);
   auto segs = FramesToSegments(frames, params_.threshold, params_.merge_gap_sec);
   segs = CoalesceSegments(std::move(segs), params_.merge_gap_sec);
   speaker_sink_(segs);

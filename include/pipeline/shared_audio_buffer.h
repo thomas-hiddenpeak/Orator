@@ -23,6 +23,8 @@
 #include <mutex>
 #include <vector>
 
+#include "core/time_base.h"
+
 namespace orator {
 namespace pipeline {
 
@@ -50,14 +52,23 @@ class SharedAudioBuffer {
   // is closed. On return with `true`, `out` is overwritten with the newly
   // available span and the cursor is advanced past it. Returns `false` only
   // when the stream is closed AND this cursor has consumed everything -- the
-  // signal for the consumer loop to exit.
-  bool WaitAndRead(int cursor, std::vector<float>* out);
+  // signal for the consumer loop to exit. If `span_start_abs` is non-null it
+  // receives the ABSOLUTE sample index (on the common clock) of out->front() --
+  // i.e. the cursor's position before this read -- so a consumer can anchor its
+  // local time codes onto the common time base.
+  bool WaitAndRead(int cursor, std::vector<float>* out,
+                   long* span_start_abs = nullptr);
 
   // Clear all state for a fresh session. Consumers MUST be stopped (joined)
   // first; this resets cursors and re-initializes the buffer.
   void Reset();
 
   int sample_rate() const { return sample_rate_; }
+
+  // The session's common time base (origin = stream start, sample 0). Every
+  // consumer derives its time codes from this so all pipelines align by
+  // construction rather than by each counting from 0 independently.
+  core::TimeBase time_base() const { return core::TimeBase(sample_rate_, 0); }
 
   // Total samples appended this session (absolute clock head). Thread-safe.
   long total_samples() const;

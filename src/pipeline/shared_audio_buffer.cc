@@ -32,12 +32,17 @@ void SharedAudioBuffer::Close() {
   cv_.notify_all();
 }
 
-bool SharedAudioBuffer::WaitAndRead(int cursor, std::vector<float>* out) {
+bool SharedAudioBuffer::WaitAndRead(int cursor, std::vector<float>* out,
+                                    long* span_start_abs) {
   std::unique_lock<std::mutex> lock(mutex_);
   cv_.wait(lock, [&] { return cursors_[cursor] < total_samples_ || closed_; });
 
   if (cursors_[cursor] >= total_samples_)
     return false;  // all samples read and the stream is closed
+
+  // The cursor's absolute position before this read is the absolute index of
+  // the first returned sample (on the common clock).
+  if (span_start_abs != nullptr) *span_start_abs = cursors_[cursor];
 
   const long from = cursors_[cursor] - base_sample_;
   const long count = total_samples_ - cursors_[cursor];

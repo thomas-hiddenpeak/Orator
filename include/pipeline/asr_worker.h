@@ -23,6 +23,7 @@
 #include "pipeline/asr_preprocessor.h"
 #include "pipeline/asr_vad.h"
 #include "pipeline/stream_timeline.h"
+#include "core/time_base.h"
 #include <cuda_runtime.h>
 
 namespace orator {
@@ -105,6 +106,9 @@ class AsrWorker {
   Params params_;
   Emit emit_;
   TextSegmentSink text_sink_;   // Spec 004 Step 2: live delivery to comp timeline
+  // Spec 005: common time base (origin 0). The worker's sample positions are
+  // absolute on the common clock; time codes go through this base.
+  core::TimeBase tb_{params_.vad.sample_rate, 0};
 
   AsrSileroVad vad_;            // ASR-only independent front VAD (Silero)
   AsrPreprocessor preproc_;     // ASR-only enhancement after VAD

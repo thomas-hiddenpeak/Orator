@@ -57,7 +57,6 @@ void AsrWorker::DrainUtterances(bool finalize) {
 
 void AsrWorker::EmitUtterance(int begin, int end, bool finalize) {
   if (end <= begin) return;
-  const int sr = params_.vad.sample_rate;
   std::vector<float> enhanced;
   const float* asr_input = vad_.data() + begin;
   int asr_len = end - begin;
@@ -83,8 +82,8 @@ void AsrWorker::EmitUtterance(int begin, int end, bool finalize) {
 
   if (rollback_tokens_ <= 0) {
     core::AsrToken tok;
-    tok.start_sec = static_cast<double>(vad_.base_sample() + begin) / sr;
-    tok.end_sec = static_cast<double>(vad_.base_sample() + end) / sr;
+    tok.start_sec = tb_.SecondsAt(vad_.base_sample() + begin);
+    tok.end_sec = tb_.SecondsAt(vad_.base_sample() + end);
     tok.text = continuation;
     if (tok.text.empty()) return;
     timeline_->AppendToken(tok);
@@ -119,8 +118,8 @@ void AsrWorker::EmitUtterance(int begin, int end, bool finalize) {
   if (emit_text.empty()) return;
 
   core::AsrToken tok;
-  tok.start_sec = static_cast<double>(vad_.base_sample() + begin) / sr;
-  tok.end_sec = static_cast<double>(vad_.base_sample() + end) / sr;
+  tok.start_sec = tb_.SecondsAt(vad_.base_sample() + begin);
+  tok.end_sec = tb_.SecondsAt(vad_.base_sample() + end);
   tok.text = emit_text;
   timeline_->AppendToken(tok);
   if (text_sink_) text_sink_(tok.start_sec, tok.end_sec, tok.text);
@@ -227,8 +226,8 @@ void AsrWorker::EmitIncrementalChunk(const float* samples, int n, bool finalize)
   const bool segment_closed = !inc_in_segment_ && !inc_live_text_.empty();
   if (segment_closed) {
     core::AsrToken tok;
-    tok.start_sec = static_cast<double>(inc_seg_start_sample_) / sr;
-    tok.end_sec = static_cast<double>(inc_seg_end_sample_) / sr;
+    tok.start_sec = tb_.SecondsAt(inc_seg_start_sample_);
+    tok.end_sec = tb_.SecondsAt(inc_seg_end_sample_);
     tok.text = inc_live_text_;
     timeline_->AppendToken(tok);
     if (text_sink_) text_sink_(tok.start_sec, tok.end_sec, tok.text);
@@ -246,8 +245,8 @@ void AsrWorker::EmitIncrementalChunk(const float* samples, int n, bool finalize)
     std::snprintf(buf, sizeof(buf),
                   "{\"type\":\"asr_partial\",\"start\":%.3f,\"end\":%.3f,"
                   "\"text\":\"",
-                  static_cast<double>(inc_seg_start_sample_) / sr,
-                  static_cast<double>(inc_seg_end_sample_) / sr);
+                  tb_.SecondsAt(inc_seg_start_sample_),
+                  tb_.SecondsAt(inc_seg_end_sample_));
     emit_(std::string(buf) + JsonEscape(inc_live_text_) + "\"}");
   }
 }

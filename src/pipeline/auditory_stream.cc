@@ -1,6 +1,7 @@
 #include "pipeline/auditory_stream.h"
 
 #include <cstdio>
+#include <cstdlib>
 #include <utility>
 
 #include <cuda_runtime.h>
@@ -166,12 +167,13 @@ void AuditoryStream::StartWorkers() {
     endpoint_vad_ = std::make_unique<AsrSileroVad>(vp);
     endpoint_cursor_ = buffer_.AddConsumer();
     endpoint_thread_ = std::thread([this] {
-      const int sr = config_.sample_rate;
+      const core::TimeBase tb = buffer_.time_base();
       std::vector<float> chunk;
-      auto drain = [this, sr](bool finalize) {
+      auto drain = [this, &tb](bool finalize) {
         long ep = 0;
         while (endpoint_vad_->NextEndpoint(finalize, &ep)) {
-          const double t = static_cast<double>(ep) / sr;
+          // `ep` is an absolute sample on the common clock; convert via the base.
+          const double t = tb.SecondsAt(ep);
           {
             std::lock_guard<std::mutex> lk(comp_mutex_);
             comp_.MarkEndpoint(t);
@@ -252,6 +254,24 @@ void AuditoryStream::EmitTimeline(bool finalize) {
   } else {
     WaitForBarrier(buffer_.total_samples());
   }
+
+  // Spec 005 T040: end-point time-base reconciliation (diagnostic, env-gated).
+  // After all buffered audio is processed, each pipeline's processed sample
+  // extent should equal the common clock total. A non-zero gap means a pipeline
+  // drifted from the shared time base. Logged only, never alters behavior.
+  if (const char* c = std::getenv("ORATOR_TIMEBASE_CHECK"); c && c[0] == '1') {
+    const long total = buffer_.total_samples();
+    auto report = [total](const char* who, long processed) {
+      const long gap = core::TimeBase::ReconcileExtent(processed, total);
+      if (gap != 0)
+        std::fprintf(stderr,
+                     "[timebase] %s extent %ld vs common total %ld -> gap %ld\n",
+                     who, processed, total, gap);
+    };
+    if (diar_worker_) report("diarization", diar_worker_->processed_samples());
+    if (asr_worker_) report("asr", asr_worker_->processed_samples());
+  }
+
   EmitLocked(Serialize());
 }
 
