@@ -63,6 +63,22 @@ discontinuities), the comprehensive `timeline` was produced, endpoints reached
 (edits 2162 / ref 13352). GPU stayed busy (GR3D busy fraction 59.8%, mean 41%,
 longest idle stretch 25 s — no CPU-only stall).
 
+**Milestone-gate full-hour revalidation on the stable-`text_id` ASR-revision
+code (2026-06-17):** the full 1-hour `test.mp3` (3615.1 s) was re-streamed
+through the real `orator_ws` WebSocket at the default config to certify the
+ASR self-revision refactor (commit f3496ae) at full scale. Result (evidence in
+`/tmp/fullhour_validate.py`, `/tmp/fullhour_timeline.json`): end-to-end 3.70x
+(wall 975.9 s); ASR covered the entire hour (0 → 3615.12 s, 151 segments, zero
+discontinuities); ASR self-revision fired in place for 149 of 151 `text_id`s
+(same id revised across multiple states); every non-empty revised id's text
+landed in the comprehensive view (151/151 present, 0 missing, 15974 chars);
+diar track 1083, vad track 1454, comprehensive 1893 entries; timebase
+reconciliation clean (no gap). GPU over the active window (0–976 s) busy
+fraction 55.5%, mean load 34.1%, max 99%, longest idle 12 s (no CPU-only
+stall; the 145 s idle in the raw log is post-completion trailing samples). CER
+vs gold 16.2% (edits 2161 / ref 13352, hyp 13254) — unchanged from the prior
+full-hour run, confirming the revision refactor did not regress accuracy.
+
 ### Pipeline responsibility boundaries (ratified, do not re-litigate)
 
 - **ASR** outputs ONLY plain transcript text + its own time codes. It has **no**

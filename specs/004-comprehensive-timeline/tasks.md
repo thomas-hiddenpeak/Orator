@@ -107,6 +107,14 @@
   (`test_comprehensive_timeline`) to assert order-independent final view under
   out-of-order diar updates and ASR in-segment text revisions; validated with
   real WS capture showing `asr_partial` + source-tagged `revision` events.
+- [x] **T069** Milestone-gate full-hour real-WS revalidation on the stable-`text_id`
+  code (2026-06-17): full 3615.1 s through `orator_ws` at the default config.
+  ASR covered the whole hour (151 segments, zero discontinuities); ASR
+  self-revision fired in place for 149/151 `text_id`s; revised text landed in
+  the comprehensive view (151/151, 0 missing); timebase reconcile clean; GPU
+  active-window busy 55.5% (longest idle 12 s, no CPU-only stall); CER 16.2%
+  (unchanged — no accuracy regression). Evidence: `/tmp/fullhour_validate.py`,
+  `/tmp/fullhour_timeline.json`.
 
 ## Traceability
 
