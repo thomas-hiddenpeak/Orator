@@ -76,6 +76,21 @@ int main(int argc, char** argv) {
   ReadEnvString("ORATOR_ASR_FRCRN_MODEL", &cfg.asr_frcrn_model);
   ReadEnvString("ORATOR_ASR_TFGRIDNET_MODEL", &cfg.asr_tfgridnet_model);
 
+  // Spec 003/004 streaming + comprehensive-timeline knobs (real WS path).
+  auto env_on = [](const char* name) {
+    const char* v = std::getenv(name);
+    return v != nullptr && v[0] == '1';
+  };
+  if (env_on("ORATOR_ASR_INCREMENTAL")) {
+    cfg.asr_incremental = true;
+    ReadEnvDouble("ORATOR_ASR_SEGMENT_SEC", &cfg.asr_incremental_segment_sec);
+    if (env_on("ORATOR_ASR_ENDPOINT_RESET"))
+      cfg.asr_incremental_endpoint_reset = true;
+    ReadEnvDouble("ORATOR_ASR_MIN_SEGMENT_SEC",
+                  &cfg.asr_incremental_min_segment_sec);
+  }
+  if (env_on("ORATOR_ENDPOINT_STREAM")) cfg.endpoint_stream = true;
+
   std::signal(SIGPIPE, SIG_IGN);
 
   net::WebSocketServer server(port);
