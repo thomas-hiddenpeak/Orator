@@ -206,9 +206,11 @@ Open, independently-scheduled items:
   no-op (re-verified serialized, 40.7 s, no crash). The registry, telemetry, and
   stream-scoped diar syncs are retained as the foundation. Safe lock-free
   concurrency requires de-coupling BOTH engines from managed memory (device
-  buffers + pinned host staging) — the next, accuracy-gated phase. The global
-  lock stays the production default; no regression. A diarization numeric gate
-  (`test_diar_stream`, d75da36) is in place for that future engine work.
+  buffers + pinned host staging) — retained INSIDE Spec 002 as Phase 7
+  (T070–T073, accuracy-gated per engine), not a new spec, since the requirement
+  arose from this feature. The global lock stays the production default; no
+  regression. A diarization numeric gate (`test_diar_stream`, d75da36) is in
+  place for that engine work.
 - **Full 1-hour real-WS revalidation on the current `text_id` revision code**:
   done (2026-06-17, commit c94c2fa) — see the milestone-gate section in §2.
 - ASR streaming throughput (~2.6x, Spec 001 NG1) — deferred by owner.

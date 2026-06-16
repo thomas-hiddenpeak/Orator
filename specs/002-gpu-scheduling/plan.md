@@ -112,6 +112,51 @@ Two facts follow:
 - Re-run the §3.1 harness and record the same numbers. Compare with the baseline
   and report the total wall-time change (spec AC5).
 
+### 3.6 Managed-memory de-coupling (the R1 precondition for safe concurrency)
+
+The empirical R1 test (spec §7a) proved that routing ASR onto its own stream and
+making it lock-free is NOT sufficient: both verified engines pervasively
+host-access `cudaMallocManaged` memory (`gpu::UnifiedBuffer`) during steady-state
+streaming, which faults on Tegra when the other pipeline's kernels run
+concurrently. Safe concurrency therefore requires removing every host access to
+in-flight managed memory in BOTH engines first. This is kept INSIDE Spec 002
+(not a new spec): the requirement was discovered by this feature's own work, the
+attribution is cleanest here, and the lock-removal decision can only be made
+after this de-coupling is done and measured. It is sequenced AFTER §3.1–3.5 and
+gated so it never regresses a verified engine.
+
+Approach, applied per engine, one host-visible buffer at a time:
+- Classify every `UnifiedBuffer` whose contents the host reads/writes during
+  streaming (not at load time). Load-time managed use is safe (no concurrent
+  kernels) and may stay.
+- For each streaming host-visible result, replace the managed buffer with a
+  device buffer (`gpu::DeviceAllocator`) plus an explicit copy into PINNED host
+  memory (`gpu::PinnedAllocator`) issued on the owning stream, and read the host
+  copy only after `cudaStreamSynchronize(owning_stream)`. Pinned host memory is
+  not subject to the managed-page migration fault.
+- Diarization host-visible streaming results to convert (from the survey): the
+  decoder's per-frame sigmoid copy (`sortformer_decoder.cu` — `predp`/`preds`
+  managed → device + pinned), the pre-encode output copy
+  (`conformer_preencode.cu`), and the mel output copy (`mel_spectrogram.cu`). All
+  diarization kernels already run on the default stream; once the host reads go
+  through pinned staging after a `cudaStreamSynchronize(0)`, the diarizer no
+  longer touches managed pages during a concurrent ASR kernel.
+- ASR host-visible streaming reads to audit: the scalar reads in the decode loop
+  (token id / argmax) — confirm each reads pinned or device-synchronized memory
+  on `asr_stream_`, not managed pages. The named embedding read is already a
+  plain-host shadow (`embed_host_`); verify no other managed host read remains on
+  the hot path.
+- After EACH buffer conversion, the engine's numeric gate MUST stay green
+  (`test_diar_stream` for diarization; `test_asr_encoder`/`test_asr_decoder` for
+  ASR) — the change is to WHERE memory lives and WHEN it is read, never to the
+  math.
+
+Only after both engines are managed-memory-clean on their streaming paths is the
+lock-free path (`gpu::DeviceGuard` own-stream skip, currently disabled by the
+`kOwnStreamConcurrencySafe` compile-time constant) re-enabled and re-tested for
+the SIGSEGV; then the global lock is removed (§3.4) and the 5× stability +
+post-change measurement (§3.5) decide whether concurrency is kept.
+
 ## 4. Concurrency Safety (Constitution V.5)
 
 - Each pipeline owns its stream, its scratch buffers, and its model state. There

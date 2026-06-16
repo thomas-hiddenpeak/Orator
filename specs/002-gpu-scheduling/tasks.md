@@ -109,14 +109,45 @@
   CUDA priority + compute/RTF, with all existing messages unchanged. *(Done
   854dc7e; AC8.)*
 
+## Phase 7 — Managed-memory de-coupling (R1 precondition, retained in Spec 002)
+> The empirical R1 test (spec §7a; commits efa184d → 3b01bbb) proved that
+> ASR-on-its-own-stream + lock-free is NOT safe: both engines host-access
+> `cudaMallocManaged` (`gpu::UnifiedBuffer`) during streaming, which SIGSEGVs on
+> Tegra under concurrent kernels. This phase removes that hazard so the lock-free
+> path can be safely re-enabled. It stays inside Spec 002 (the requirement arose
+> from this feature; attribution is cleanest here). Sequenced BEFORE re-enabling
+> concurrency (the `kOwnStreamConcurrencySafe` constant) and BEFORE T050. Each
+> task keeps its engine's numeric gate green; the global lock stays the default
+> throughout.
+- [ ] **T070** Inventory every streaming host-visible `UnifiedBuffer` in both
+  engines (host read/write while kernels may run), separating it from load-time
+  managed use (safe). Record the list with file:line. *(Verify: the list matches
+  the survey in spec §7a / plan §3.6; no engine change yet.)*
+- [ ] **T071** Diarization: convert the per-frame sigmoid result
+  (`sortformer_decoder.cu` `predp`/`preds`), the pre-encode output
+  (`conformer_preencode.cu`), and the mel output (`mel_spectrogram.cu`) from
+  managed to `gpu::DeviceAllocator` device buffers + `gpu::PinnedAllocator` host
+  staging, read only after `cudaStreamSynchronize(0)`. One buffer at a time.
+  *(Verify after EACH: `test_diar_stream` max_abs < 1e-2 stays green.)*
+- [ ] **T072** ASR: audit the decode-loop scalar reads (token id / argmax) and
+  any other streaming host read; ensure each reads pinned or
+  stream-synchronized memory on `asr_stream_`, never a managed page (the
+  embedding is already a plain-host shadow). Convert any remaining managed host
+  read. *(Verify after EACH: `test_asr_encoder` / `test_asr_decoder` stay
+  green.)*
+- [ ] **T073** Re-enable the lock-free own-stream path
+  (`kOwnStreamConcurrencySafe = true`) and re-run the concurrent stream
+  (`ORATOR_GPU_CONCURRENT=1`): confirm NO SIGSEGV over a 120 s real-WS run.
+  *(Verify: the R1 fault from spec §7a no longer occurs.)*
+
 ## Traceability (requirement → task)
 
 | Requirement | Tasks |
 |---|---|
 | FR1 per-pipeline streams by priority index | T020, T021, T030, T040, T041 |
-| FR2 no host access to in-flight managed memory | T031 |
+| FR2 no host access to in-flight managed memory | T031, T070, T071, T072, T073 |
 | FR3 remove global mutex where streams suffice | T050 |
-| FR4 correctness preserved | T030, T031, T040, T041, T051 |
+| FR4 correctness preserved | T030, T031, T040, T041, T051, T071, T072 |
 | FR5 measurement | T010–T012, T060 |
 | FR6 priority registry, three classes (VAD background) | T020, T021, T041 |
 | FR7 telemetry over WebSocket | T062 |
@@ -137,7 +168,9 @@
 
 ## Definition of Done
 M1–M3 recorded before and after; each pipeline on its own prioritized stream;
-no host access to in-flight device-managed memory; the global mutex removed from
-stream-safe paths; five fault-free streaming runs; diarization and ASR outputs
-unchanged within tolerance; full suite green under `-Wall -Wextra`; total
-wall-time change reported with no regression; memory and PROJECT_STATE updated.
+both engines de-coupled from in-flight device-managed memory (Phase 7) so the
+lock-free own-stream path runs without the R1 SIGSEGV; the global mutex removed
+from stream-safe paths; five fault-free streaming runs; diarization and ASR
+outputs unchanged within tolerance (each engine's numeric gate green); full
+suite green under `-Wall -Wextra`; total wall-time change reported with no
+regression; memory and PROJECT_STATE updated.

@@ -210,14 +210,17 @@ two pipelines' GPU work overlaps) was tested directly and **confirmed**:
   `embed_host_`) was necessary but **not sufficient**.
 - **Impact / decision**: lock-free concurrency cannot ship safely until BOTH
   engines are de-coupled from managed memory (device buffers + pinned host
-  staging for every host-visible result), a separate, accuracy-gated phase. The
-  `DeviceGuard` therefore **always takes the global lock** (a compile-time
-  constant disables the own-stream skip), so `ORATOR_GPU_CONCURRENT=1` is a safe
-  no-op (verified: it now runs serialized at 40.7 s, no crash). The priority
-  registry, the periodic telemetry, and the stream-scoped diarization
-  synchronizations (correct in serialized mode too) are retained as the
-  foundation for that future phase. The global lock stays the production default;
-  there is no regression.
+  staging for every host-visible result). This de-coupling is **retained inside
+  Spec 002 as Phase 7** (plan §3.6, tasks T070–T073), not split into a new spec:
+  the requirement was discovered by this feature's own work, so the attribution
+  is cleanest here, and the lock-removal decision can only be made after the
+  de-coupling is done and measured. The `DeviceGuard` therefore **always takes
+  the global lock** (a compile-time constant `kOwnStreamConcurrencySafe = false`
+  disables the own-stream skip), so `ORATOR_GPU_CONCURRENT=1` is a safe no-op
+  (verified: it now runs serialized at 40.7 s, no crash). The priority registry,
+  the periodic telemetry, and the stream-scoped diarization synchronizations
+  (correct in serialized mode too) are retained as the foundation for Phase 7.
+  The global lock stays the production default; there is no regression.
 
 ## 8. Constitution Check
 
