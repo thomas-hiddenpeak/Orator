@@ -6,9 +6,9 @@ conflicts with the Constitution, the Constitution takes precedence. Amending it
 is a deliberate, recorded action (see *Amendment Process*), not an undocumented
 change.
 
-- **Version**: 1.1.0
+- **Version**: 1.2.0
 - **Ratified**: 2026-06-12
-- **Last amended**: 2026-06-12
+- **Last amended**: 2026-06-16
 
 ---
 
@@ -50,8 +50,6 @@ binary with a fixed, auditable surface is a hard product requirement.
    explicitly scheduled by the project owner.
 4. A change that cannot be validated against a reference is not complete; it is
    an unvalidated experiment, and must be labeled as such.
-
-## Article III — Two Independent Pipelines on One Timeline
 
 ## Article III — Independent Pipelines on a Comprehensive Timeline
 
@@ -192,7 +190,41 @@ rewritten in plain, standard terminology.
 3. Specs are testable: every requirement maps to a way to verify it. Ambiguities
    are resolved (or explicitly marked) before planning.
 4. Memory under `/memories/repo/` records verified facts and lessons; it is kept
-   in sync with reality and consulted before acting.
+   in sync with reality and consulted before acting. The same synchronization
+   duty applies to every state document (`specs/PROJECT_STATE.md`, each spec's
+   and tasks' status line): see Article VIII.
+
+## Article VIII — Documentation–Code Consistency
+
+State documents describe the project; the code IS the project. When the two
+disagree, the code is authoritative and the document is a defect to be corrected
+immediately. The following are enforced in review and before acting on any
+state claim:
+
+1. **Code is the source of truth; state docs are subordinate.** `PROJECT_STATE.md`,
+   spec/tasks status lines, and `/memories/` describe the state of the code. A
+   document that contradicts the code is wrong by definition and is fixed, not
+   trusted. A reader must never act on a documented state claim that the code
+   does not support.
+2. **Every state claim is verifiable, and carries its evidence.** A claim that a
+   capability is implemented states HOW to confirm it against the code: the
+   defining symbol/file, a passing test, and the commit reference that landed
+   it. A claim with no verification path is not allowed in a state document.
+3. **Status advances with the code, in the same change.** When a task or spec's
+   implementation lands, its status line is advanced in that same change
+   (`Draft`/`Revised`/`In progress` → `Implemented`) with the commit reference.
+   A shipped capability left marked `Draft`/`In progress`, or a removed/renamed
+   component still described as live, is a consistency defect.
+4. **Verify before trusting, especially on resume.** Before relying on a state
+   document — at the start of a work session, or whenever a claim drives a
+   testing or coding decision — confirm it against the code (locate the symbol,
+   build, run the relevant test). A clean build with the full test suite passing
+   is the consistency proof. Reasoning from an unverified stale document is the
+   documented cause of avoidable rework and is not acceptable.
+5. **Retained-but-inactive components are labeled as such.** A type that still
+   exists and compiles but is no longer on the runtime path (for example a
+   reference or test-only artifact) is documented explicitly as retained and
+   inactive, so it is not mistaken for live behavior.
 
 ## Governance
 
@@ -213,4 +245,4 @@ rewritten in plain, standard terminology.
 - When guidance is silent, Articles II (accuracy) and V (quality) take
   precedence over other considerations.
 
-**Version 1.1.0 · Ratified 2026-06-12 · Last amended 2026-06-12**
+**Version 1.2.0 · Ratified 2026-06-12 · Last amended 2026-06-16**
