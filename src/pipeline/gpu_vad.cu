@@ -4,6 +4,7 @@
 #include "pipeline/gpu_vad.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <mutex>
 #include <stdexcept>
@@ -30,7 +31,6 @@ constexpr int kInput = 576;     // context + window
 constexpr int kPadded = 640;    // reflect-padded input (pad 64 on the right)
 constexpr int kNfft = 256;
 constexpr int kHop = 128;
-constexpr int kStftOut = 258;   // real+imag interleaved as 129+129 channels
 constexpr int kStftBins = 129;
 constexpr int kStftFrames = 4;
 constexpr int kHidden = 128;
@@ -285,6 +285,7 @@ void GpuVad::Push(const float* samples, int n) {
 
 void GpuVad::RunBatch(const float* ext, int n_windows, std::vector<float>* probs) {
   probs->resize(n_windows);
+  const auto t0 = std::chrono::steady_clock::now();
   std::lock_guard<std::mutex> guard(gpu::DeviceLock());
   const int kThreads = 256;
   int done = 0;
@@ -319,47 +320,65 @@ void GpuVad::RunBatch(const float* ext, int n_windows, std::vector<float>* probs
                           cudaMemcpyDeviceToHost));
     done += nb;
   }
+  compute_sec_ +=
+      std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
 }
 
-void GpuVad::DrainEndpoints(bool finalize, std::vector<long>* endpoints) {
-  (void)finalize;  // a window needs the full 512 samples; no partial tail
-  if (endpoints == nullptr) return;
+void GpuVad::DrainSegments(bool finalize, std::vector<std::pair<long, long>>* segs) {
+  if (segs == nullptr) return;
   const int avail = static_cast<int>(buf_.size()) - win_start_;
   const int n_windows = avail / kWindow;
-  if (n_windows <= 0) return;
-
-  const float* ext = buf_.data() + (win_start_ - kContext);
-  std::vector<float> probs;
-  RunBatch(ext, n_windows, &probs);
-
   const int sr = params_.sample_rate;
   const int min_speech = params_.silero_min_speech_ms * sr / 1000;
   const int min_silence = params_.silero_min_silence_ms * sr / 1000;
-  for (int i = 0; i < n_windows; ++i) {
-    const float p = probs[i];
-    const long win_end_abs = next_window_abs_ + static_cast<long>(i + 1) * kWindow;
-    if (p >= params_.silero_threshold) {
-      silence_samples_ = 0;
-      speech_samples_ += kWindow;
-      if (!in_speech_ && speech_samples_ >= min_speech) in_speech_ = true;
-    } else if (in_speech_) {
-      silence_samples_ += kWindow;
-      if (silence_samples_ >= min_silence) {
-        in_speech_ = false;
+
+  if (n_windows > 0) {
+    const float* ext = buf_.data() + (win_start_ - kContext);
+    std::vector<float> probs;
+    RunBatch(ext, n_windows, &probs);
+
+    for (int i = 0; i < n_windows; ++i) {
+      const float p = probs[i];
+      const long win_end_abs =
+          next_window_abs_ + static_cast<long>(i + 1) * kWindow;
+      if (p >= params_.silero_threshold) {
+        silence_samples_ = 0;
+        speech_samples_ += kWindow;
+        if (!in_speech_ && speech_samples_ >= min_speech) {
+          in_speech_ = true;
+          // Speech began speech_samples_ ago (when the silence counter reset).
+          seg_start_abs_ = win_end_abs - speech_samples_;
+        }
+      } else if (in_speech_) {
+        silence_samples_ += kWindow;
+        if (silence_samples_ >= min_silence) {
+          in_speech_ = false;
+          // Speech actually stopped where this silence run began.
+          const long seg_end = win_end_abs - silence_samples_;
+          if (seg_end > seg_start_abs_) segs->push_back({seg_start_abs_, seg_end});
+          speech_samples_ = 0;
+        }
+      } else {
         speech_samples_ = 0;
-        endpoints->push_back(win_end_abs);
       }
-    } else {
-      speech_samples_ = 0;
+    }
+
+    win_start_ += n_windows * kWindow;
+    next_window_abs_ += static_cast<long>(n_windows) * kWindow;
+    const int drop = win_start_ - kContext;  // keep 64 samples of history
+    if (drop > 0) {
+      buf_.erase(buf_.begin(), buf_.begin() + drop);
+      win_start_ = kContext;
     }
   }
 
-  win_start_ += n_windows * kWindow;
-  next_window_abs_ += static_cast<long>(n_windows) * kWindow;
-  const int drop = win_start_ - kContext;  // keep 64 samples of history
-  if (drop > 0) {
-    buf_.erase(buf_.begin(), buf_.begin() + drop);
-    win_start_ = kContext;
+  if (finalize && in_speech_) {
+    // Flush the open speech segment up to the last processed sample.
+    if (next_window_abs_ > seg_start_abs_)
+      segs->push_back({seg_start_abs_, next_window_abs_});
+    in_speech_ = false;
+    speech_samples_ = 0;
+    silence_samples_ = 0;
   }
 }
 

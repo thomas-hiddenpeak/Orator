@@ -87,11 +87,12 @@ class AuditoryStream {
     // a non-blocking, bounded implementation would be a separate spec.
     bool asr_incremental_endpoint_reset = false;
     double asr_incremental_min_segment_sec = 10.0;  // min segment before an endpoint cut
-    // Spec 004 T031: run the speech-endpoint detector (Silero) as an INDEPENDENT
-    // third buffer consumer that publishes endpoint markers on the common time
-    // base. Independent of the ASR pipeline (which keeps its own internal reset).
-    // Enabled by default so the comprehensive timeline carries endpoint markers.
-    bool endpoint_stream = true;
+    // Spec 004 Phase 5: run the GPU VAD (Silero) as an INDEPENDENT third buffer
+    // consumer that publishes speech segments on the common time base. Its
+    // per-window compute is batched on the GPU. Independent of the ASR pipeline
+    // (which keeps its own internal reset). Enabled by default so the
+    // comprehensive timeline carries the vad track.
+    bool vad_stream = true;
     std::string asr_language = "Chinese";
     std::string asr_preproc_mode = "none";  // none|classical|frcrn|tfgridnet
     std::string asr_frcrn_model = "models/asr_preproc/frcrn.safetensors";
@@ -142,7 +143,8 @@ class AuditoryStream {
   void WaitForBarrier(long target_samples);
   std::string Serialize();       // build the comprehensive timeline JSON
   // Serialize one revision (Spec 004) to a {"type":"revision",...} message.
-  static std::string SerializeRevision(const ComprehensiveTimeline::Revision& r);
+  static std::string SerializeRevision(const ComprehensiveTimeline::Revision& r,
+                                       const char* source);
   void EmitLocked(const std::string& json);  // serialize transport sends
 
   Config config_;
@@ -163,9 +165,9 @@ class AuditoryStream {
   bool running_ = false;
 
   // Spec 004 T031: independent endpoint detector (third buffer consumer).
-  std::unique_ptr<GpuVad> endpoint_vad_;
-  int endpoint_cursor_ = -1;
-  std::thread endpoint_thread_;
+  std::unique_ptr<GpuVad> vad_detector_;
+  int vad_cursor_ = -1;
+  std::thread vad_thread_;
 
     // Per-pipeline GPU stream. diar runs on the default stream (0); asr runs
     // on asr_stream_ so its kernels can overlap with diar's idle intervals.

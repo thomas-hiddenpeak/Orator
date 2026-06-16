@@ -25,6 +25,7 @@
 
 #include <cstdint>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace orator {
@@ -50,12 +51,16 @@ class GpuVad {
   // Append audio to the staging buffer (host side; cheap).
   void Push(const float* samples, int n);
 
-  // Process every ready full window on the GPU in one batch and append the
-  // absolute sample index of each detected speech endpoint (segment end) to
-  // *endpoints. `finalize` has no partial-window effect (a window needs the full
-  // 512 samples, matching the CPU detector). Caller holds no GPU lock; this
-  // method takes gpu::DeviceLock() internally for its batched pass.
-  void DrainEndpoints(bool finalize, std::vector<long>* endpoints);
+  // Process every ready full window on the GPU in one batch and append each
+  // completed SPEECH SEGMENT as an absolute-sample [start,end) pair to *segs
+  // (the VAD pipeline's data: voice-activity regions on the common time base).
+  // `finalize` flushes a still-open speech segment at end of stream. Caller
+  // holds no GPU lock; this method takes gpu::DeviceLock() internally for its
+  // batched pass.
+  void DrainSegments(bool finalize, std::vector<std::pair<long, long>>* segs);
+
+  // Accumulated GPU compute time (for the VAD track's real-time-factor meta).
+  double compute_sec() const { return compute_sec_; }
 
   // Clear streaming state (audio staging, LSTM state, endpoint counters).
   void Reset();
@@ -123,6 +128,8 @@ class GpuVad {
   bool in_speech_ = false;
   int speech_samples_ = 0;
   int silence_samples_ = 0;
+  long seg_start_abs_ = 0;       // absolute sample where the open speech segment began
+  double compute_sec_ = 0.0;
 };
 
 }  // namespace pipeline

@@ -2,10 +2,11 @@
 
 - **Feature**: `004-comprehensive-timeline`
 - **Status**: Implemented. Comprehensive-timeline core + revisions + common time
-  base (3159b75, 673f95d) and the endpoint pipeline (Phase 5: GPU detector +
-  serialized endpoint track + dead-code cleanup) are done and validated on the
-  real WS full-hour run. The endpoint detector now runs batched on the GPU and
-  its markers are a serialized track in the timeline document.
+  base (3159b75, 673f95d), the GPU VAD endpoint pipeline (Phase 5), and the
+  Phase 6 conformance pass (uniform per-pipeline WS output with `source` meta;
+  the VAD pipeline publishes speech SEGMENTS as a `vad` track; the comprehensive
+  VIEW splits text at DIARIZATION boundaries, not by ASR's coarse segmentation)
+  are done and validated on the real WS path.
 - **Created**: 2026-06-15
 - **Owner**: project owner
 - **Constitution**: v1.2.1
@@ -97,13 +98,16 @@ in time. Consequences:
   seconds on the shared base, and the protocol SHALL state the base (sample rate
   + absolute sample origin) so a consumer can align any pipeline's output.
 - **FR2 — Native comprehensive timeline**: the controller SHALL maintain one
-  stateful comprehensive timeline updated by `UpsertSpeaker(start,end,speaker,
-  conf)`, `UpsertText(id,start,end,text)`, and `MarkEndpoint(time)`; it SHALL NOT
-  rebuild the view from a full raw snapshot on each update.
-- **FR3 — Time-alignment attribution**: the comprehensive view SHALL attribute
-  text to speakers by time overlap on the common base; diarization SHALL NOT map
-  text. A text segment overlapping multiple speaker segments SHALL be presented
-  per the plan's projection rule (no forced single-speaker bake).
+  stateful comprehensive timeline updated by `ReplaceSpeakers(segs)`,
+  `UpsertText(id,start,end,text)`, and `AddVad(start,end)`; it SHALL NOT rebuild
+  the view from a full raw snapshot on each update.
+- **FR3 — Diarization-driven view split**: the comprehensive view's boundaries
+  SHALL come from the DIARIZATION track. Each ASR text segment SHALL be placed
+  onto the diarization speaker turns it overlaps, and a text segment crossing a
+  diarization boundary SHALL be SPLIT at that boundary (its characters allocated
+  to each turn proportionally by time). The view SHALL NOT re-segment text by
+  ASR's own coarse segmentation. Diarization SHALL NOT map text; where no
+  diarization covers a span the speaker is honestly "unknown" (never borrowed).
 - **FR4 — Revision events**: when an upsert changes a region already emitted, the
   controller SHALL emit a revision message identifying the changed time range and
   the new entries; committed-and-unchanged entries SHALL NOT be re-emitted.
@@ -138,6 +142,23 @@ in time. Consequences:
   the never-launched CUDA kernels (`RelAttnKernel`, `FlattenLinearKernel`,
   `GeluKernel`/`Conv2dKernel` in `asr_audio_tower.cu`). Stale doc comments
   (e.g. `asr_worker.h` "energy VAD") SHALL be corrected.
+- **FR10 — Uniform per-pipeline WS output**: every registered pipeline SHALL
+  publish its OWN output as a WS message carrying its type, `source` meta, and
+  time codes: diarization `{type:diar, source, segments:[{start,end,speaker,
+  confidence}]}`, ASR `{type:asr|asr_partial, source, start, end, text}`, VAD
+  `{type:vad, source, start, end}`. Revision messages SHALL carry the `source`
+  that triggered them and each entry's `text_id`.
+- **FR11 — VAD pipeline (segments, not endpoints)**: the third pipeline is the
+  VAD pipeline (named `vad`, not `endpoint`). It publishes SPEECH SEGMENTS
+  `[start,end)` (voice-activity regions), its proper data, as a `vad` track in
+  the timeline document with `source`/`compute_sec`/`real_time_factor` meta like
+  the other tracks. It is a pure data track: it does not modify or re-segment the
+  diar/asr tracks, nor drive the view's boundaries.
+- **FR12 — Timeline vs view**: the comprehensive TIMELINE is a pure container of
+  the three tracks (each pipeline's data + meta + time codes). The comprehensive
+  VIEW is a DERIVED product of the timeline for human browsing (diar-driven
+  split, FR3); it is the interactive form of the timeline and SHALL carry the
+  same characteristics (common time base, no invented content).
 
 ## 6. Acceptance Criteria
 
@@ -174,6 +195,14 @@ in time. Consequences:
 - **AC11** No dead code remains from FR9: the removed accessor, stubs, and unused
   kernels are gone; the build emits no `#177-D declared-but-never-referenced`
   warning for the listed kernels; stale comments are corrected. (FR9)
+- **AC12** Every pipeline emits its own WS message with `source` meta + time
+  codes: streaming `test.mp3` produces `diar`, `asr`, `vad`, and `revision`
+  (source-tagged) messages; the timeline carries diarization, asr, and vad
+  tracks each with `source`. (FR10, FR11)
+- **AC13** The comprehensive view splits text at diarization boundaries: a text
+  segment crossing a diarization speaker change appears as multiple view entries
+  whose spans match the diarization turns and whose texts concatenate back to the
+  original; it is not one coarse ASR-segment entry. (FR3, FR12)
 
 ## 7. Constitution Check
 

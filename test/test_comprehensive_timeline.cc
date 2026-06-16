@@ -16,7 +16,7 @@ static int g_fail = 0;
   } while (0)
 
 int main() {
-  std::printf("Testing ComprehensiveTimeline (Spec 004 T011)...\n");
+  std::printf("Testing ComprehensiveTimeline (Spec 004 Phase 5: diar-driven view)...\n");
 
   // ---- 1. Out-of-order upserts: text arrives before its speaker ----
   {
@@ -37,17 +37,25 @@ int main() {
     CHECK(r2.empty(), "unchanged attribution yields no revision");
   }
 
-  // ---- 2. Max-overlap attribution across two speakers ----
+  // ---- 2. A text spanning two speakers is SPLIT at the diarization boundary
+  // (diar-driven view), not attributed wholly to the max-overlap speaker. ----
   {
     ComprehensiveTimeline tl;
     // Speaker_0 [0,3), Speaker_1 [3,10).
     tl.UpsertSpeaker(0.0, 3.0, "speaker_0", 0.9f);
     tl.UpsertSpeaker(3.0, 10.0, "speaker_1", 0.9f);
-    // Text [2,9): overlaps spk0 by 1.0, spk1 by 6.0 -> attributed spk1.
+    // Text [2,9) crosses the boundary at 3.0 -> two pieces: [2,3) spk0, [3,9) spk1.
     auto r = tl.UpsertText(0, 2.0, 9.0, "spanning text");
     CHECK(r.size() == 1, "text yields one revision");
-    CHECK(r[0].entries[0].speaker == "speaker_1",
-          "max-overlap attribution picks speaker_1");
+    CHECK(r[0].entries.size() == 2, "text crossing a diar boundary splits in two");
+    if (r[0].entries.size() == 2) {
+      CHECK(r[0].entries[0].speaker == "speaker_0", "first piece -> speaker_0");
+      CHECK(r[0].entries[1].speaker == "speaker_1", "second piece -> speaker_1");
+      CHECK(r[0].entries[0].end == 3.0 && r[0].entries[1].start == 3.0,
+            "pieces split exactly at the diarization boundary");
+      CHECK(r[0].entries[0].text + r[0].entries[1].text == "spanning text",
+            "the split pieces concatenate back to the original text");
+    }
   }
 
   // ---- 3. A later speaker update flips a prior attribution (revisable) ----
@@ -105,7 +113,7 @@ int main() {
     tl.UpsertText(2, 10.0, 15.0, "three");
     auto snap = tl.Snapshot();
     CHECK(snap.size() == 1, "three same-speaker texts coalesce to one turn");
-    CHECK(snap[0].text == "one two three", "coalesced text joined in order");
+    CHECK(snap[0].text == "onetwothree", "coalesced text joined in order");
     CHECK(snap[0].start == 0.0 && snap[0].end == 15.0, "coalesced span");
   }
 

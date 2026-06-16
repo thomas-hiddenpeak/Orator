@@ -1,6 +1,8 @@
 #include "pipeline/comprehensive_timeline.h"
 
 #include <algorithm>
+#include <cmath>
+#include <cstddef>
 
 namespace orator {
 namespace pipeline {
@@ -9,24 +11,52 @@ namespace {
 double Overlap(double a0, double a1, double b0, double b1) {
   return std::max(0.0, std::min(a1, b1) - std::max(a0, b0));
 }
+
+// Byte offsets of each UTF-8 codepoint start in `s`, plus s.size() at the end.
+// Used to split text on codepoint (character) boundaries, not bytes (Chinese).
+std::vector<std::size_t> Utf8Offsets(const std::string& s) {
+  std::vector<std::size_t> o;
+  for (std::size_t i = 0; i < s.size();) {
+    o.push_back(i);
+    const unsigned char c = static_cast<unsigned char>(s[i]);
+    int adv = 1;
+    if (c >= 0xF0) adv = 4;
+    else if (c >= 0xE0) adv = 3;
+    else if (c >= 0xC0) adv = 2;
+    i += adv;
+  }
+  o.push_back(s.size());
+  return o;
+}
+
+bool EntriesEqual(const std::vector<ComprehensiveTimeline::Entry>& a,
+                  const std::vector<ComprehensiveTimeline::Entry>& b) {
+  if (a.size() != b.size()) return false;
+  for (std::size_t i = 0; i < a.size(); ++i) {
+    if (a[i].speaker != b[i].speaker || a[i].text != b[i].text ||
+        std::abs(a[i].start - b[i].start) > 1e-9 ||
+        std::abs(a[i].end - b[i].end) > 1e-9) {
+      return false;
+    }
+  }
+  return true;
+}
 }  // namespace
 
-std::string ComprehensiveTimeline::AttributeSpeaker(const TextSeg& t) const {
+std::string ComprehensiveTimeline::AttributeInterval(double start,
+                                                     double end) const {
   double best_overlap = 0.0;
   double best_span = 0.0;
   float best_conf = -1.0f;
   const SpeakerSeg* best = nullptr;
   for (const auto& s : speakers_) {
-    const double ov = Overlap(t.start, t.end, s.start, s.end);
+    const double ov = Overlap(start, end, s.start, s.end);
     if (ov <= 0.0) continue;
     const double span = s.end - s.start;
     bool better = ov > best_overlap + 1e-9;
     if (!better && ov > best_overlap - 1e-9 && best != nullptr) {
-      // Near-equal overlap: prefer the more SPECIFIC speaker segment (shorter
-      // span = more tightly localized to this time), then higher confidence.
-      // This makes a tight, high-confidence speaker turn win over a long,
-      // loosely-overlapping one -- the right answer for dense multi-speaker
-      // discussion where a short turn is embedded in a longer one.
+      // Near-equal overlap: prefer the more SPECIFIC (tighter) speaker turn,
+      // then higher confidence -- a short turn embedded in a longer one wins.
       if (span < best_span - 1e-9 ||
           (span < best_span + 1e-9 && s.conf > best_conf)) {
         better = true;
@@ -39,47 +69,92 @@ std::string ComprehensiveTimeline::AttributeSpeaker(const TextSeg& t) const {
       best = &s;
     }
   }
-  if (best != nullptr) return best->speaker;
+  // No diarization covers this interval: honestly "unknown". The comprehensive
+  // layer never borrows a neighbouring speaker (that would be guessing on
+  // diarization's behalf).
+  return best != nullptr ? best->speaker : "unknown";
+}
 
-  // No time overlap with any speaker segment: return "unknown". The
-  // comprehensive layer is a PURE TIME-ALIGNMENT layer (Spec 004 invariant): it
-  // never infers, substitutes, or back-fills another pipeline's content. If
-  // diarization has not covered this time, the speaker is honestly unknown; the
-  // text keeps its accurate time and a later diarization upsert covering the
-  // span revises the attribution. We do NOT borrow the nearest speaker (that
-  // would be the comprehensive layer guessing on diarization's behalf).
-  return "unknown";
+std::vector<ComprehensiveTimeline::Entry> ComprehensiveTimeline::SplitTextByDiar(
+    const TextSeg& t) const {
+  // The comprehensive VIEW's boundaries come from the DIARIZATION TRACK. Collect
+  // the diarization boundary times that fall strictly inside this text segment,
+  // partition [t.start,t.end) by them, attribute each sub-interval to its
+  // max-overlap speaker, merge consecutive same-speaker sub-intervals, then
+  // allocate the text's characters to each resulting turn proportionally by
+  // time (the ASR model emits no per-word timestamps, so a time-proportional
+  // split is the faithful approximation).
+  std::vector<double> bounds = {t.start, t.end};
+  for (const auto& s : speakers_) {
+    if (s.start > t.start + 1e-9 && s.start < t.end - 1e-9) bounds.push_back(s.start);
+    if (s.end > t.start + 1e-9 && s.end < t.end - 1e-9) bounds.push_back(s.end);
+  }
+  std::sort(bounds.begin(), bounds.end());
+  bounds.erase(std::unique(bounds.begin(), bounds.end(),
+                           [](double a, double b) { return std::abs(a - b) < 1e-9; }),
+               bounds.end());
+
+  struct Turn {
+    double start;
+    double end;
+    std::string speaker;
+  };
+  std::vector<Turn> turns;
+  for (std::size_t i = 0; i + 1 < bounds.size(); ++i) {
+    const double s = bounds[i];
+    const double e = bounds[i + 1];
+    if (e - s <= 1e-9) continue;
+    const std::string spk = AttributeInterval(s, e);
+    if (!turns.empty() && turns.back().speaker == spk) {
+      turns.back().end = e;
+    } else {
+      turns.push_back({s, e, spk});
+    }
+  }
+
+  if (turns.empty()) {
+    return {Entry{t.start, t.end, "unknown", t.text, t.id}};
+  }
+  if (turns.size() == 1) {
+    return {Entry{turns[0].start, turns[0].end, turns[0].speaker, t.text, t.id}};
+  }
+
+  // Proportional codepoint allocation across turns (cumulative to avoid drift).
+  const std::vector<std::size_t> offs = Utf8Offsets(t.text);
+  const int ncp = static_cast<int>(offs.size()) - 1;
+  const double total = t.end - t.start;
+  std::vector<Entry> out;
+  int cp_used = 0;
+  for (std::size_t k = 0; k < turns.size(); ++k) {
+    int cp_end;
+    if (k + 1 == turns.size() || total <= 0.0) {
+      cp_end = ncp;
+    } else {
+      const double frac = (turns[k].end - t.start) / total;
+      cp_end = static_cast<int>(std::llround(frac * ncp));
+      cp_end = std::max(cp_used, std::min(ncp, cp_end));
+    }
+    std::string slice =
+        t.text.substr(offs[cp_used], offs[cp_end] - offs[cp_used]);
+    out.push_back({turns[k].start, turns[k].end, turns[k].speaker,
+                   std::move(slice), t.id});
+    cp_used = cp_end;
+  }
+  return out;
 }
 
 void ComprehensiveTimeline::ReprojectText(const TextSeg& t,
                                           std::vector<Revision>* out) {
-  const std::string spk = AttributeSpeaker(t);
-
-  // Find this text's entry in view_ (entries are 1:1 with text ids).
-  auto it = std::find_if(view_.begin(), view_.end(),
-                         [&](const Entry& e) { return e.text_id == t.id; });
-  if (it == view_.end()) {
-    Entry e;
-    e.start = t.start;
-    e.end = t.end;
-    e.speaker = spk;
-    e.text = t.text;
-    e.text_id = t.id;
-    view_.push_back(e);
-    if (out) out->push_back({t.start, t.end, {e}});
-    return;
-  }
-
-  // Existing entry: emit a revision only if the ATTRIBUTED RESULT changed
-  // (speaker, text, or timing), not on every raw update.
-  const bool changed = it->speaker != spk || it->text != t.text ||
-                       it->start != t.start || it->end != t.end;
-  it->start = t.start;
-  it->end = t.end;
-  it->speaker = spk;
-  it->text = t.text;
-  if (changed && out) out->push_back({t.start, t.end, {*it}});
+  std::vector<Entry> pcs = SplitTextByDiar(t);
+  auto it = pieces_.find(t.id);
+  const bool changed = (it == pieces_.end()) || !EntriesEqual(it->second, pcs);
+  pieces_[t.id] = pcs;
+  // Emit a revision only when the projected result changed, not on every raw
+  // update. The revision carries ALL the (possibly multiple) pieces for this
+  // text id, keyed by text_id so the consumer replaces them as a unit.
+  if (changed && out) out->push_back({t.start, t.end, std::move(pcs)});
 }
+
 
 void ComprehensiveTimeline::ReprojectRange(double start, double end,
                                            std::vector<Revision>* out) {
@@ -153,26 +228,30 @@ std::vector<ComprehensiveTimeline::Revision> ComprehensiveTimeline::ReplaceSpeak
   return revs;
 }
 
-void ComprehensiveTimeline::MarkEndpoint(double time) {
-  auto pos = std::lower_bound(endpoints_.begin(), endpoints_.end(), time);
-  endpoints_.insert(pos, time);
+void ComprehensiveTimeline::AddVad(double start, double end) {
+  VadSeg v{start, end};
+  auto pos = std::lower_bound(
+      vad_.begin(), vad_.end(), start,
+      [](const VadSeg& a, double s) { return a.start < s; });
+  vad_.insert(pos, v);
 }
 
 std::vector<ComprehensiveTimeline::Entry> ComprehensiveTimeline::Snapshot()
     const {
-  // Order entries by time, then coalesce consecutive same-speaker entries.
-  std::vector<Entry> ordered = view_;
-  std::sort(ordered.begin(), ordered.end(),
+  // The comprehensive view is the diarization-split projection of every text
+  // segment, time-ordered, with consecutive same-speaker entries coalesced.
+  std::vector<Entry> all;
+  for (const auto& kv : pieces_) {
+    for (const auto& e : kv.second) all.push_back(e);
+  }
+  std::sort(all.begin(), all.end(),
             [](const Entry& a, const Entry& b) { return a.start < b.start; });
 
   std::vector<Entry> out;
-  for (const auto& e : ordered) {
+  for (const auto& e : all) {
     if (!out.empty() && out.back().speaker == e.speaker) {
       out.back().end = std::max(out.back().end, e.end);
-      if (!e.text.empty()) {
-        if (!out.back().text.empty()) out.back().text += " ";
-        out.back().text += e.text;
-      }
+      out.back().text += e.text;
     } else {
       out.push_back(e);
     }
@@ -183,8 +262,8 @@ std::vector<ComprehensiveTimeline::Entry> ComprehensiveTimeline::Snapshot()
 void ComprehensiveTimeline::Clear() {
   speakers_.clear();
   texts_.clear();
-  endpoints_.clear();
-  view_.clear();
+  vad_.clear();
+  pieces_.clear();
 }
 
 }  // namespace pipeline

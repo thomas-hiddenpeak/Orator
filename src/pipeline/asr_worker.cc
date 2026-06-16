@@ -103,7 +103,8 @@ void AsrWorker::EmitUtterance(int begin, int end, bool finalize) {
     if (emit_) {
       char buf[128];
       std::snprintf(buf, sizeof(buf),
-                    "{\"type\":\"asr\",\"start\":%.3f,\"end\":%.3f,\"text\":\"",
+                    "{\"type\":\"asr\",\"source\":\"qwen3_asr\","
+                    "\"start\":%.3f,\"end\":%.3f,\"text\":\"",
                     tok.start_sec, tok.end_sec);
       emit_(std::string(buf) + JsonEscape(tok.text) + "\"}");
     }
@@ -246,7 +247,8 @@ void AsrWorker::EmitIncrementalChunk(const float* samples, int n, bool finalize)
     if (emit_) {
       char buf[128];
       std::snprintf(buf, sizeof(buf),
-                    "{\"type\":\"asr\",\"start\":%.3f,\"end\":%.3f,\"text\":\"",
+                    "{\"type\":\"asr\",\"source\":\"qwen3_asr\","
+                    "\"start\":%.3f,\"end\":%.3f,\"text\":\"",
                     tok.start_sec, tok.end_sec);
       emit_(std::string(buf) + JsonEscape(tok.text) + "\"}");
     }
@@ -255,7 +257,8 @@ void AsrWorker::EmitIncrementalChunk(const float* samples, int n, bool finalize)
     // Partial live update (not yet committed to the timeline).
     char buf[160];
     std::snprintf(buf, sizeof(buf),
-                  "{\"type\":\"asr_partial\",\"start\":%.3f,\"end\":%.3f,"
+                  "{\"type\":\"asr_partial\",\"source\":\"qwen3_asr\","
+                  "\"start\":%.3f,\"end\":%.3f,"
                   "\"text\":\"",
                   tb_.SecondsAt(inc_seg_start_sample_),
                   tb_.SecondsAt(inc_seg_end_sample_));

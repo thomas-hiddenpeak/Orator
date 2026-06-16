@@ -81,7 +81,7 @@ int main(int argc, char** argv) {
   // DEFAULT (cfg defaults are true). The env vars are explicit opt-OUT switches
   // for regression comparison against the legacy Silero-VAD path:
   //   ORATOR_ASR_INCREMENTAL=0  -> use the legacy Silero-VAD utterance path
-  //   ORATOR_ENDPOINT_STREAM=0  -> drop the independent endpoint marker stream
+  //   ORATOR_VAD_STREAM=0       -> drop the independent VAD speech-segment stream
   //   ORATOR_ASR_ENDPOINT_RESET=0 -> incremental resets on a fixed cap only
   auto env_flag = [](const char* name, bool dflt) {
     const char* v = std::getenv(name);
@@ -96,7 +96,7 @@ int main(int argc, char** argv) {
     ReadEnvDouble("ORATOR_ASR_MIN_SEGMENT_SEC",
                   &cfg.asr_incremental_min_segment_sec);
   }
-  cfg.endpoint_stream = env_flag("ORATOR_ENDPOINT_STREAM", cfg.endpoint_stream);
+  cfg.vad_stream = env_flag("ORATOR_VAD_STREAM", cfg.vad_stream);
 
   std::signal(SIGPIPE, SIG_IGN);
 

@@ -73,21 +73,33 @@ void AuditoryStream::StartWorkers() {
     diar_worker_->set_speaker_sink(
         [this](const std::vector<core::DiarSegment>& segs) {
           std::vector<ComprehensiveTimeline::Revision> revs;
+          std::string diar_msg = "{\"type\":\"diar\",\"source\":\"sortformer\",\"segments\":[";
           {
             std::lock_guard<std::mutex> lk(comp_mutex_);
             last_segments_ = segs;
             std::vector<ComprehensiveTimeline::SpeakerInput> spk;
             spk.reserve(segs.size());
-            for (const auto& s : segs) {
+            for (size_t i = 0; i < segs.size(); ++i) {
+              const auto& s = segs[i];
               const std::string label =
                   s.speaker_id.empty()
                       ? ("speaker_" + std::to_string(s.local_speaker))
                       : s.speaker_id;
               spk.push_back({s.start_sec, s.end_sec, label, s.confidence});
+              char b[160];
+              std::snprintf(b, sizeof(b),
+                            "{\"start\":%.3f,\"end\":%.3f,\"speaker\":\"%s\","
+                            "\"confidence\":%.3f}",
+                            s.start_sec, s.end_sec, label.c_str(), s.confidence);
+              diar_msg += b;
+              if (i + 1 < segs.size()) diar_msg += ",";
             }
             revs = comp_.ReplaceSpeakers(spk);
           }
-          for (const auto& r : revs) EmitLocked(SerializeRevision(r));
+          diar_msg += "]}";
+          // The diarization pipeline's own live output (meta + data + time codes).
+          EmitLocked(diar_msg);
+          for (const auto& r : revs) EmitLocked(SerializeRevision(r, "sortformer"));
         });
     diar_cursor_ = buffer_.AddConsumer();
     diar_thread_ = std::thread([this] {
@@ -137,7 +149,7 @@ void AuditoryStream::StartWorkers() {
             std::lock_guard<std::mutex> lk(comp_mutex_);
             revs = comp_.UpsertText(comp_next_text_id_++, start, end, text);
           }
-          for (const auto& r : revs) EmitLocked(SerializeRevision(r));
+          for (const auto& r : revs) EmitLocked(SerializeRevision(r, "qwen3_asr"));
         });
     asr_cursor_ = buffer_.AddConsumer();
     asr_thread_ = std::thread([this] {
@@ -151,13 +163,13 @@ void AuditoryStream::StartWorkers() {
     });
   }
 
-  // Spec 004 T031/Phase 5: independent speech-endpoint detector as a THIRD
-  // buffer consumer. It runs the GPU Silero detector (GpuVad) on the continuous
-  // audio purely to publish endpoint markers on the common time base; it is
+  // Spec 004 Phase 5: independent GPU VAD as a THIRD buffer consumer. It runs
+  // the GPU Silero detector (GpuVad) on the continuous audio purely to publish
+  // speech segments (voice-activity regions) on the common time base; it is
   // independent of the ASR and diarization pipelines (it reads only the shared
   // audio, never their output). Its per-window compute is batched on the GPU, so
   // draining a large buffered span never stalls on a single CPU core.
-  if (config_.endpoint_stream) {
+  if (config_.vad_stream) {
     GpuVad::Params vp;
     vp.sample_rate = config_.sample_rate;
     vp.silero_model_path = config_.asr_vad_model;
@@ -165,30 +177,33 @@ void AuditoryStream::StartWorkers() {
     vp.silero_min_speech_ms = config_.asr_vad_min_speech_ms;
     vp.silero_min_silence_ms = config_.asr_vad_min_silence_ms;
     vp.silero_speech_pad_ms = config_.asr_vad_speech_pad_ms;
-    endpoint_vad_ = std::make_unique<GpuVad>(vp);
-    endpoint_cursor_ = buffer_.AddConsumer();
-    endpoint_thread_ = std::thread([this] {
+    vad_detector_ = std::make_unique<GpuVad>(vp);
+    vad_cursor_ = buffer_.AddConsumer();
+    vad_thread_ = std::thread([this] {
       const core::TimeBase tb = buffer_.time_base();
       std::vector<float> chunk;
-      std::vector<long> eps;
-      auto drain = [this, &tb, &eps](bool finalize) {
-        eps.clear();
-        endpoint_vad_->DrainEndpoints(finalize, &eps);
-        for (long ep : eps) {
-          // `ep` is an absolute sample on the common clock; convert via the base.
-          const double t = tb.SecondsAt(ep);
+      std::vector<std::pair<long, long>> segs;
+      auto drain = [this, &tb, &segs](bool finalize) {
+        segs.clear();
+        vad_detector_->DrainSegments(finalize, &segs);
+        for (const auto& sp : segs) {
+          // sp = absolute [start,end) samples on the common clock.
+          const double s = tb.SecondsAt(sp.first);
+          const double e = tb.SecondsAt(sp.second);
           {
             std::lock_guard<std::mutex> lk(comp_mutex_);
-            comp_.MarkEndpoint(t);
+            comp_.AddVad(s, e);
           }
-          char buf[96];
+          char buf[128];
           std::snprintf(buf, sizeof(buf),
-                        "{\"type\":\"endpoint\",\"time\":%.3f}", t);
+                        "{\"type\":\"vad\",\"source\":\"silero_gpu\","
+                        "\"start\":%.3f,\"end\":%.3f}",
+                        s, e);
           EmitLocked(buf);
         }
       };
-      while (buffer_.WaitAndRead(endpoint_cursor_, &chunk)) {
-        endpoint_vad_->Push(chunk.data(), static_cast<int>(chunk.size()));
+      while (buffer_.WaitAndRead(vad_cursor_, &chunk)) {
+        vad_detector_->Push(chunk.data(), static_cast<int>(chunk.size()));
         drain(/*finalize=*/false);
         progress_cv_.notify_all();
       }
@@ -204,7 +219,7 @@ void AuditoryStream::StopWorkers() {
   buffer_.Close();
   if (diar_thread_.joinable()) diar_thread_.join();
   if (asr_thread_.joinable()) asr_thread_.join();
-  if (endpoint_thread_.joinable()) endpoint_thread_.join();
+  if (vad_thread_.joinable()) vad_thread_.join();
   running_ = false;
 }
 
@@ -279,17 +294,20 @@ void AuditoryStream::EmitTimeline(bool finalize) {
 }
 
 std::string AuditoryStream::SerializeRevision(
-    const ComprehensiveTimeline::Revision& r) {
-  char buf[128];
-  std::string out = "{\"type\":\"revision\",";
+    const ComprehensiveTimeline::Revision& r, const char* source) {
+  char buf[160];
+  std::string out = "{\"type\":\"revision\",\"source\":\"";
+  out += source;
+  out += "\",";
   std::snprintf(buf, sizeof(buf),
                 "\"dirty_start\":%.3f,\"dirty_end\":%.3f,\"entries\":[",
                 r.dirty_start, r.dirty_end);
   out += buf;
   for (size_t i = 0; i < r.entries.size(); ++i) {
     const auto& e = r.entries[i];
-    std::snprintf(buf, sizeof(buf), "{\"start\":%.3f,\"end\":%.3f,\"speaker\":\"",
-                  e.start, e.end);
+    std::snprintf(buf, sizeof(buf),
+                  "{\"start\":%.3f,\"end\":%.3f,\"text_id\":%ld,\"speaker\":\"",
+                  e.start, e.end, e.text_id);
     out += std::string(buf) + JsonEscape(e.speaker) + "\",\"text\":\"" +
            JsonEscape(e.text) + "\"}";
     if (i + 1 < r.entries.size()) out += ",";
@@ -319,12 +337,12 @@ std::string AuditoryStream::Serialize() {
   // under comp_mutex_. No derivation, no upserts here.
   std::vector<core::DiarSegment> diar_view;
   std::vector<ComprehensiveTimeline::Entry> comp_view;
-  std::vector<double> endpoint_view;
+  std::vector<ComprehensiveTimeline::VadSeg> vad_view;
   {
     std::lock_guard<std::mutex> lk(comp_mutex_);
     diar_view = last_segments_;
     comp_view = comp_.Snapshot();
-    endpoint_view = comp_.SnapshotEndpoints();
+    vad_view = comp_.SnapshotVad();
   }
   last_transcript_ = transcript;
 
@@ -372,16 +390,22 @@ std::string AuditoryStream::Serialize() {
     out += "]}";
   }
 
-  // Track: speech endpoints (Spec 004 FR7). A PURE MARKER track on the common
-  // time base: it carries the endpoint times the detector published, and does
-  // not alter the diarization or ASR tracks. Present only when the endpoint
-  // pipeline is enabled.
-  if (config_.endpoint_stream) {
-    out += ",{\"kind\":\"endpoint\",\"source\":\"silero_gpu\",\"entries\":[";
-    for (size_t i = 0; i < endpoint_view.size(); ++i) {
-      std::snprintf(buf, sizeof(buf), "{\"time\":%.3f}", endpoint_view[i]);
+  // Track: voice activity (VAD). The VAD pipeline's data track: speech segments
+  // [start,end) on the common time base. It does not alter the diarization or
+  // ASR tracks, nor drive the comprehensive view's boundaries. Present only when
+  // the VAD pipeline is enabled.
+  if (config_.vad_stream) {
+    const double vad_c = vad_detector_ ? vad_detector_->compute_sec() : 0.0;
+    std::snprintf(buf, sizeof(buf),
+                  ",{\"kind\":\"vad\",\"source\":\"silero_gpu\","
+                  "\"compute_sec\":%.3f,\"real_time_factor\":%.3f,\"entries\":[",
+                  vad_c, vad_c > 0 ? audio / vad_c : 0.0);
+    out += buf;
+    for (size_t i = 0; i < vad_view.size(); ++i) {
+      std::snprintf(buf, sizeof(buf), "{\"start\":%.3f,\"end\":%.3f}",
+                    vad_view[i].start, vad_view[i].end);
       out += buf;
-      if (i + 1 < endpoint_view.size()) out += ",";
+      if (i + 1 < vad_view.size()) out += ",";
     }
     out += "]}";
   }

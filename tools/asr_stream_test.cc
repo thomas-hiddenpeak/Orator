@@ -53,8 +53,8 @@ int main(int argc, char** argv) {
     if (const char* s = std::getenv("ORATOR_ASR_MIN_SEGMENT_SEC"))
       cfg.asr_incremental_min_segment_sec = std::atof(s);
   }
-  // Spec 004 T031: the independent endpoint-detector pipeline (default on).
-  cfg.endpoint_stream = env_flag("ORATOR_ENDPOINT_STREAM", cfg.endpoint_stream);
+  // Spec 004 Phase 5: the independent GPU VAD pipeline (default on).
+  cfg.vad_stream = env_flag("ORATOR_VAD_STREAM", cfg.vad_stream);
   const double start_sec = argc > 4 ? std::atof(argv[4]) : 0.0;
   const double dur_sec = argc > 5 ? std::atof(argv[5]) : 0.0;  // 0 => to end
   const int frame_ms = argc > 6 ? std::atoi(argv[6]) : 100;    // stream granularity
