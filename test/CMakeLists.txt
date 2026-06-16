@@ -16,6 +16,7 @@ orator_add_test(test_comprehensive_timeline test_comprehensive_timeline.cc)
 orator_add_test(test_time_base   test_time_base.cc)
 orator_add_test(test_vad         test_vad.cc)
 orator_add_test(test_speaker_db  test_speaker_db.cc)
+orator_add_test(test_diar_stream test_diar_stream.cc)
 orator_add_test(test_asr_ops     test_asr_ops.cc)
 orator_add_test(test_asr_weights test_asr_weights.cc)
 orator_add_test(test_whisper_mel test_whisper_mel.cc)
@@ -37,6 +38,8 @@ set_tests_properties(test_asr_decoder PROPERTIES
 set_tests_properties(test_bpe PROPERTIES
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_vad PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_diar_stream PROPERTIES
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 orator_add_test(test_mel         test_mel.cc)
 orator_add_test(test_audio       test_audio.cc)
