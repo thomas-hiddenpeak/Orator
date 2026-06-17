@@ -222,9 +222,26 @@ Open, independently-scheduled items:
   (−25.6 %), GPU busy 65.0 %; diarization RTF rose 5.4× → 26× (it no longer waits
   behind ASR). 8+ consecutive runs, zero crashes, output identical to serial
   (asr 5 / diar 25 / comp 45). This hits the Spec 002 M3 target (25–28 %). It is
-  an OPT-IN experiment for now (production default stays serial, lock on). Full
-  concurrency (diarization + VAD also lock-free) still needs their managed
-  `SortformerState`/VAD buffers de-coupled — the remaining Phase 7 work.
+  an OPT-IN experiment for now (production default stays serial, lock on). **Full
+  concurrency landed and measured (2026-06-17, commit 97dd2cc):**
+  `ORATOR_GPU_CONCURRENT=1` drops the lock for diarization + VAD too. It was
+  expected to need a large de-coupling of the diarizer's managed
+  `SortformerState`, but a survey showed that is UNNECESSARY: the diarizer's
+  streaming compute state is pure host `std::vector` (`HostStreamState`), the
+  managed `SortformerState` is retained-but-INACTIVE (allocated + cleared, never
+  read on the streaming path), `GpuVad` is already all-device (`cudaMalloc`), and
+  the diarizer's result copies were already converted to device memory. So full
+  concurrency runs stable (8/8 runs, zero crashes) and correct (asr 5 / diar 25 /
+  comp 45). MEASURED (120 s real-WS, 3-run average): serial 39.9 s, ASR-only
+  concurrent 31.4 s (−21.3 %), full concurrent 31.3 s (−21.6 %). KEY FINDING:
+  ASR-only and full are essentially identical — the entire gain comes from ASR's
+  own stream no longer blocking diarization; dropping the diar↔VAD lock adds
+  nothing because they share the default stream (their kernels serialize on
+  stream 0 regardless). Making diar and VAD truly GPU-parallel would require
+  routing the diarizer's hundreds of kernel launches onto a dedicated non-default
+  stream for no measurable benefit (diar is already ~26× RTF, VAD is tiny;
+  neither is the bottleneck). Both concurrency modes remain OPT-IN; production
+  default stays serial (lock on, no regression).
 - **Full 1-hour real-WS revalidation on the current `text_id` revision code**:
   done (2026-06-17, commit c94c2fa) — see the milestone-gate section in §2.
 - ASR streaming throughput (~2.6x, Spec 001 NG1) — deferred by owner.
