@@ -92,7 +92,7 @@
   through the production `orator_ws` path at the default config. ASR covered the
   whole hour (0 → 3615.1 s, 151 segments, ZERO discontinuities); the timeline
   carries the endpoint track (1454) with diarization (1083) + asr (151);
-  reconcile clean; CER 16.2% (unchanged). GPU stayed busy (59.7%, mean 38%, max
+  reconcile clean; CER 16.2% (unchanged, measured on Jetson Orin). GPU stayed busy (59.7%, mean 38%, max
   100%, longest idle 30 s — no CPU-only stall). *(Done; AC8, AC9 on the real
   transport.)*
 - [x] **T066** Updated `tasks.md` checkboxes, spec status → Implemented,
@@ -112,7 +112,7 @@
   ASR covered the whole hour (151 segments, zero discontinuities); ASR
   self-revision fired in place for 149/151 `text_id`s; revised text landed in
   the comprehensive view (151/151, 0 missing); timebase reconcile clean; GPU
-  active-window busy 55.5% (longest idle 12 s, no CPU-only stall); CER 16.2%
+  active-window busy 55.5% (longest idle 12 s, no CPU-only stall); CER 16.2% (measured on Jetson Orin)
   (unchanged — no accuracy regression). Evidence: `/tmp/fullhour_validate.py`,
   `/tmp/fullhour_timeline.json`.
 

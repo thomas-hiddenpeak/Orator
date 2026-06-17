@@ -8,7 +8,7 @@ Spec 006 implementation broken into ordered, independently verifiable tasks orga
 ## Phase 1: MVP — Basic UI, Real-Time Transcript, Metrics (DRAFT)
 
 ### T001 — Create web/ directory and static assets structure
-**Status**: COMPLETED
+**Status**: ✅ COMPLETED
 **Goal**: Set up directory layout and placeholder files.
 **Steps**:
 1. Create `web/` directory in repository root.
@@ -21,7 +21,7 @@ Spec 006 implementation broken into ordered, independently verifiable tasks orga
 ---
 
 ### T002 — Implement HTTP file server in C++
-**Status**: COMPLETED
+**Status**: ✅ COMPLETED
 **Goal**: Add dedicated HTTP static server for UI while keeping WebSocket on its own port.
 **Steps**:
 1. Create `src/net/http_static_server.cc` and `include/net/http_static_server.h`.
@@ -40,7 +40,7 @@ Spec 006 implementation broken into ordered, independently verifiable tasks orga
 ---
 
 ### T003 — Implement web/index.html with basic layout
-**Status**: COMPLETED
+**Status**: ✅ COMPLETED
 **Goal**: Create the main page structure with placeholders for UI regions.
 **Content**:
 - DOCTYPE, head (title, CSS link), body.
@@ -57,7 +57,7 @@ Spec 006 implementation broken into ordered, independently verifiable tasks orga
 ---
 
 ### T004 — Implement web/style.css with responsive layout
-**Status**: COMPLETED
+**Status**: ✅ COMPLETED
 **Goal**: Style the UI for desktop and tablet.
 **Content**:
 - Base layout: 3-column (input, transcript, metrics) or 2-section (transcript left, metrics right).

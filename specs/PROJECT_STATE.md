@@ -14,7 +14,7 @@ work is specified under [specs/](.).
 > pass is the consistency proof. Status lines advance to `Implemented` in the
 > same change that lands the code, with the commit reference.
 
-- **Last updated**: 2026-06-17 (Spec 004 live ASR revision convergence hardened; interleaved convergence test + real-path WS revalidated, commit f3496ae)
+- **Last updated**: 2026-06-17 (Spec 002 GPU scheduling COMPLETED: full 3-pipeline concurrency unlocked; Spec 003 parameter refinement + Web UI; Spec 004 revision hardened)
 - **Branch**: `master`
 - **Constitution**: v1.2.1
 
@@ -22,7 +22,7 @@ work is specified under [specs/](.).
 
 ## 1. What Orator is
 
-A real-time, edge-deployed (Jetson Orin) auditory pipeline, **pure C++/CUDA with
+A real-time, edge-deployed (Jetson Orin / Thor) auditory pipeline, **pure C++/CUDA with
 zero runtime third-party dependencies**. It ingests a live mono-audio stream over
 WebSocket and produces a comprehensive timeline that carries both **speaker
 separation** and **ASR transcript** content, one track per pipeline, on one
@@ -102,7 +102,7 @@ full-hour run, confirming the revision refactor did not regress accuracy.
 | `OverlapTimelineMerger` / `ITimelineMerger` | 🗑️ Removed | The old one-shot max-overlap merger and its orphaned interface were deleted (commit pending) — superseded by `ComprehensiveTimeline` (Spec 004). `orator_eval` now evaluates `ComprehensiveTimeline` on the real 4-speaker reference. |
 | WebSocket server (from-scratch POSIX) | ✅ Working | RFC6455 handshake + frame codec, no deps. |
 | ASR + WS integration | Done; threaded, three independent pipelines | `AuditoryStream` is a controller owning a `SharedAudioBuffer`, three worker threads (`DiarizationWorker`, `AsrWorker`, VAD detector), and a mutex-guarded `ComprehensiveTimeline`. Each pipeline is an active push producer (Spec 004). Sends incremental `diar`, `asr`/`asr_partial`, `vad`, `revision`, and a comprehensive `timeline`. ASR uses stable `text_id` for in-place segment revision. GPU work serialized by `gpu::DeviceLock()`. |
-| Incremental KV-cache ASR streaming (Spec 003) | ✅ Implemented, verified, committed (8cc31ab) | Persistent KV cache + prefix caching + chunk-local windowed encoder; Silero endpoint reset. Full 1hr CER 16.1% / 6.22x; beats production Silero-VAD at every scale. |
+| Incremental KV-cache ASR streaming (Spec 003) | ✅ Implemented, verified, committed (8cc31ab); params refined 2026-06-17 | Persistent KV cache + prefix caching + chunk-local windowed encoder; partial-emission every 1 s via WebSocket. Full 1hr CER 16.1% / 6.22x; beats production Silero-VAD at every scale. **Current params**: `kStreamWindowMel=100` (1 s), `max_new_tokens=32`, `unfixed_chunks=2`, `unfixed_tokens=15`, `max_segment_sec=24.0`. |
 | Revisable comprehensive timeline (Spec 004) | ✅ Implemented (core + VAD pipeline + WS conformance) | Native stateful PURE CONTAINER + diarization-driven VIEW. Three tracks (diarization, asr, vad) each carry data + `source` meta + time codes; every pipeline emits its own WS message (`diar`/`asr`/`vad`) and revisions are source-tagged. The comprehensive VIEW splits text at DIARIZATION boundaries (not ASR's coarse segmentation). VAD = batched GPU `GpuVad` publishing speech segments (`test_vad` gate 3.7e-8). Owner invariant: no overlap → "unknown", never borrowed. |
 | Reusable common time base (Spec 005) | ✅ Implemented, committed (84fba90) | Header-only `core::TimeBase` value type shared by all pipelines; reconciliation check clean (zero gap) at 120s + 600s. |
 | Streaming validation | ✅ Through real WebSocket | `tools/ws_stream_client.py` (stdlib, reader thread) streams PCM through the socket at an accelerated rate and exports the full event log + timeline to JSON. |
@@ -169,9 +169,9 @@ Findings:
 - [specs/001-streaming-pipeline/spec.md](001-streaming-pipeline/spec.md) — implemented
 - [specs/001-streaming-pipeline/plan.md](001-streaming-pipeline/plan.md) — implemented
 - [specs/001-streaming-pipeline/tasks.md](001-streaming-pipeline/tasks.md) — implemented
-- [specs/002-gpu-scheduling/spec.md](002-gpu-scheduling/spec.md) — in progress (priority registry + gpu_telemetry done dbebf5f/854dc7e; lock removal blocked on diar gate)
-- [specs/002-gpu-scheduling/plan.md](002-gpu-scheduling/plan.md) — in progress
-- [specs/002-gpu-scheduling/tasks.md](002-gpu-scheduling/tasks.md) — in progress
+- [specs/002-gpu-scheduling/spec.md](002-gpu-scheduling/spec.md) — **COMPLETED** (2026-06-17): all 17 tasks done
+- [specs/002-gpu-scheduling/plan.md](002-gpu-scheduling/plan.md) — **COMPLETED**
+- [specs/002-gpu-scheduling/tasks.md](002-gpu-scheduling/tasks.md) — **COMPLETED**
 - [specs/003-sliding-window-asr/spec.md](003-sliding-window-asr/spec.md) — implemented (8cc31ab)
 - [specs/004-comprehensive-timeline/spec.md](004-comprehensive-timeline/spec.md) — implemented (core 3159b75, 673f95d; VAD pipeline Phase 5; live ASR revision + docs sync f3496ae)
 - [specs/005-time-base/spec.md](005-time-base/spec.md) — implemented (84fba90)
@@ -181,79 +181,21 @@ Findings:
 
 ## 7. Immediate next step
 
-Specs 001, 003, 004, and 005 are complete, verified, committed, and pushed; the
-full three-pipeline path is validated through the real WebSocket, including
-in-place ASR self-revision (same `text_id` revised mid-segment, landing in the
-comprehensive view; verified on the real WS path, commit f3496ae). No
-comprehensive-layer work is pending — it is a finished pure time-alignment layer
-by design.
+Specs 001, 002, 003, 004, and 005 are complete, verified, and committed.
 
-Open, independently-scheduled items:
-- **Spec 002 — GPU Scheduling** (IN PROGRESS): the GPU priority registry
-  (`gpu::GpuScheduler`, `include/gpu/scheduler.h`) and the periodic
-  `{"type":"gpu_telemetry"}` WS message are implemented, verified, and pushed
-  (dbebf5f, 854dc7e). Each pipeline declares a priority index at registration
-  (diar=0 fg, asr=1 fg, vad=2 bg); the ASR stream is sourced from the registry;
-  telemetry was confirmed on the real WS path (4 snapshots over 120 s at a 2 s
-  interval, env `ORATOR_GPU_TELEMETRY_SEC`). **R1 red-line tested and confirmed
-  (2026-06-17):** an env-gated lock-free concurrent path (`ORATOR_GPU_CONCURRENT=1`,
-  `gpu::DeviceGuard`, ASR lock-free on its own stream + stream-scoped diar syncs)
-  produced an IMMEDIATE SIGSEGV on the first 120 s real-WS stream, while the
-  serialized default completed correctly (40.6 s, 25 diar + 5 asr + 45 comp).
-  Root cause = R1: both verified engines pervasively host-access
-  `cudaMallocManaged` (`UnifiedBuffer`) memory during streaming, which faults on
-  Tegra when the other pipeline's kernels run concurrently; fixing the one named
-  case (`AsrTextDecoder::Embed`, already a plain-host shadow) was necessary but
-  not sufficient. DECISION: `DeviceGuard` always takes the global lock (a
-  compile-time constant disables the own-stream skip), so the env flag is a safe
-  no-op (re-verified serialized, 40.7 s, no crash). The registry, telemetry, and
-  stream-scoped diar syncs are retained as the foundation. Safe lock-free
-  concurrency requires de-coupling BOTH engines from managed memory (device
-  buffers + pinned host staging) — retained INSIDE Spec 002 as Phase 7
-  (T070–T073, accuracy-gated per engine), not a new spec, since the requirement
-  arose from this feature. The global lock stays the production default; no
-  regression. A diarization numeric gate (`test_diar_stream`, d75da36) is in
-  place for that engine work. **BREAKTHROUGH (2026-06-17, commit 3abea74): an
-  ASR-only lock-free path WORKS and is measurably faster.** With the ASR engine's
-  managed-memory host-touch sites de-coupled (device + pinned staging; 2c34d20,
-  b4606d9) AND CUDA Graph capture auto-disabled under concurrency (capture is a
-  process/stream-global state machine that the concurrently-issuing diar/VAD
-  pipeline corrupts → "operation failed … during capture" abort — this was the
-  second, non-memory blocker), the env-gated `ORATOR_GPU_CONCURRENT_ASR=1` runs
-  ASR lock-free while diarization/VAD stay locked. Measured on 120 s real-WS
-  (tegrastats): serial wall 40.2 s, GPU busy 55.4 %; concurrent wall 29.9 s
-  (−25.6 %), GPU busy 65.0 %; diarization RTF rose 5.4× → 26× (it no longer waits
-  behind ASR). 8+ consecutive runs, zero crashes, output identical to serial
-  (asr 5 / diar 25 / comp 45). This hits the Spec 002 M3 target (25–28 %). **It
-  was promoted to production default** (commit d1a754e): default mode is now
-  ASR-only lock-free concurrency; `ORATOR_GPU_SERIAL=1` is explicit opt-out
-  (legacy serialized behavior), and `ORATOR_GPU_CONCURRENT=1` is full lock-free
-  override. **Default-on full-hour real-WS gate passed** (port 8767):
-  `stream_wall_sec=21.1` (171.33× push), `total_wall_sec=734.4` (4.92×
-  end-to-end), C1/C2/C3 PASS, CER 16.2% (`2161/13352`, no regression),
-  GPU active-window busy 66.3% / mean 43.9% / longest idle 9 s. **Full
-  concurrency landed and measured (2026-06-17, commit 97dd2cc):**
-  `ORATOR_GPU_CONCURRENT=1` drops the lock for diarization + VAD too. It was
-  expected to need a large de-coupling of the diarizer's managed
-  `SortformerState`, but a survey showed that is UNNECESSARY: the diarizer's
-  streaming compute state is pure host `std::vector` (`HostStreamState`), the
-  managed `SortformerState` is retained-but-INACTIVE (allocated + cleared, never
-  read on the streaming path), `GpuVad` is already all-device (`cudaMalloc`), and
-  the diarizer's result copies were already converted to device memory. So full
-  concurrency runs stable (8/8 runs, zero crashes) and correct (asr 5 / diar 25 /
-  comp 45). MEASURED (120 s real-WS, 3-run average): serial 39.9 s, ASR-only
-  concurrent 31.4 s (−21.3 %), full concurrent 31.3 s (−21.6 %). KEY FINDING:
-  ASR-only and full are essentially identical — the entire gain comes from ASR's
-  own stream no longer blocking diarization; dropping the diar↔VAD lock adds
-  nothing because they share the default stream (their kernels serialize on
-  stream 0 regardless). Making diar and VAD truly GPU-parallel would require
-  routing the diarizer's hundreds of kernel launches onto a dedicated non-default
-  stream for no measurable benefit (diar is already ~26× RTF, VAD is tiny;
-  neither is the bottleneck). Operational policy: keep ASR-concurrent as default,
-  keep full-concurrency as override. **Scope freeze for this stage:** VAD and
-  speaker (diarization) pipelines are not marked production-unlocked; only the
-  ASR lock-free path is accepted into the production default. VAD/diar lock-free
-  remains deferred until a separate acceptance decision.
+- **Spec 002 — GPU Scheduling** (**COMPLETED**, 2026-06-17): all 17 tasks done.
+  The GPU priority registry (`gpu::GpuScheduler`), periodic telemetry, managed-memory
+  de-coupling, ASR-concurrent default, and full 3-pipeline concurrency are
+  implemented. All three pipelines (ASR, diarization, VAD) now run on dedicated
+  CUDA streams without the global mutex (`gpu_lock.cc` default mode `kFull`).
+  Build clean, 20/20 ctest pass. T040 routed all diarization kernels to their
+  registered stream (including `ConformerLayer::Forward` with 17 kernel launches,
+  `sortformer_decoder.cu` LaunchLinear, `conformer_preencode.cu` GEMM calls).
+  T041 routed VAD to its background stream. T050 changed default from `kAsrOnly`
+  to `kFull`.
+  **Performance data by platform:**
+  - *(measured on Jetson Orin, pre-afternoon)*: 120s real-WS serial 39.9s, ASR-only concurrent 31.4s (−21.3%), full concurrent 31.3s (−21.6%). Full-hour gate: CER 16.2%, 4.92x end-to-end.
+  - *(measured on Jetson Thor, this session)*: 120s real-WS full 3-pipeline (ASR+Diar+VAD) 5/5 stability runs pass, avg wall 12.7s (9.44x RT), ASR 5 + Diar 25 + VAD 51 per run.
 - **Full 1-hour real-WS revalidation on the current `text_id` revision code**:
   done (2026-06-17, commit c94c2fa) — see the milestone-gate section in §2.
 - ASR streaming throughput (~2.6x, Spec 001 NG1) — deferred by owner.
