@@ -125,39 +125,42 @@ __global__ void MultiplyKernel(const float* a, float scalar, int n,
   }
 }
 
-void Kernels::NormalizeVector(const float* input, int n, float* output) {
+void Kernels::NormalizeVector(const float* input, int n, float* output,
+                              cudaStream_t stream) {
   int block_size = 256;
   int grid_size = (n + block_size - 1) / block_size;
-  NormalizeKernel<<<grid_size, block_size>>>(input, n, output);
+  NormalizeKernel<<<grid_size, block_size, 0, stream>>>(input, n, output);
   CUDA_CHECK(cudaGetLastError());
-  CUDA_CHECK(cudaDeviceSynchronize());
+  CUDA_CHECK(cudaStreamSynchronize(stream));
 }
 
 void Kernels::BatchCosineSimilarity(const float* query, const float* keys,
                                     int num_keys, int vec_dim,
-                                    float* output) {
+                                    float* output, cudaStream_t stream) {
   // One block per key, threads for vector dimension
   int block_size = std::min(vec_dim, 256);
-  BatchCosineSimilarityKernel<<<num_keys, block_size>>>(query, keys, num_keys,
-                                                         vec_dim, output);
+  BatchCosineSimilarityKernel<<<num_keys, block_size, 0, stream>>>(
+      query, keys, num_keys, vec_dim, output);
   CUDA_CHECK(cudaGetLastError());
-  CUDA_CHECK(cudaDeviceSynchronize());
+  CUDA_CHECK(cudaStreamSynchronize(stream));
 }
 
-void Kernels::Add(const float* a, const float* b, int n, float* output) {
+void Kernels::Add(const float* a, const float* b, int n, float* output,
+                  cudaStream_t stream) {
   int block_size = 256;
   int grid_size = (n + block_size - 1) / block_size;
-  AddKernel<<<grid_size, block_size>>>(a, b, n, output);
+  AddKernel<<<grid_size, block_size, 0, stream>>>(a, b, n, output);
   CUDA_CHECK(cudaGetLastError());
-  CUDA_CHECK(cudaDeviceSynchronize());
+  CUDA_CHECK(cudaStreamSynchronize(stream));
 }
 
-void Kernels::Multiply(const float* a, float scalar, int n, float* output) {
+void Kernels::Multiply(const float* a, float scalar, int n, float* output,
+                       cudaStream_t stream) {
   int block_size = 256;
   int grid_size = (n + block_size - 1) / block_size;
-  MultiplyKernel<<<grid_size, block_size>>>(a, scalar, n, output);
+  MultiplyKernel<<<grid_size, block_size, 0, stream>>>(a, scalar, n, output);
   CUDA_CHECK(cudaGetLastError());
-  CUDA_CHECK(cudaDeviceSynchronize());
+  CUDA_CHECK(cudaStreamSynchronize(stream));
 }
 
 }  // namespace gpu

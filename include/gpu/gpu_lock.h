@@ -25,14 +25,10 @@ namespace gpu {
 // guard(gpu::DeviceLock());` around a GPU-touching region.
 std::mutex& DeviceLock();
 
-// Spec 002: GPU concurrency mode. The PRODUCTION DEFAULT is ASR-only
-// concurrency: the ASR pipeline runs on its own CUDA stream WITHOUT the global
-// lock, while diarization and VAD still hold it (they share the default stream
-// and serialize on it regardless). This captures the full measured speedup
-// (~21% wall on 120 s; the gain is ASR no longer blocking diarization) at the
-// smaller-risk surface. Env overrides: ORATOR_GPU_SERIAL=1 forces the legacy
-// fully-serialized mode (every region locks); ORATOR_GPU_CONCURRENT=1 selects
-// full concurrency (diar/VAD also lock-free — validated but no faster).
+// Spec 002: GPU concurrency mode. The PRODUCTION DEFAULT is full concurrency:
+// all pipelines (ASR, diarization, VAD) run lock-free. Env overrides:
+// ORATOR_GPU_SERIAL=1 forces the legacy fully-serialized mode (every region
+// locks).
 //
 // ConcurrentGpuEnabled() is true only in full mode.
 bool ConcurrentGpuEnabled();

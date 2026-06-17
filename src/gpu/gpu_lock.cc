@@ -14,23 +14,20 @@ bool EnvTrue(const char* name) {
 }
 
 // GPU concurrency mode (resolved once at first use). Spec 002:
-//   kSerial   — every GPU region takes the global lock (legacy behavior).
-//   kAsrOnly  — ONLY the ASR own-stream pipeline is lock-free; diarization + VAD
-//               still hold the lock (they share the default stream). This is the
-//               PRODUCTION DEFAULT: it captures the full measured speedup (the
-//               gain is ASR's stream no longer blocking diarization; making
-//               diar/VAD lock-free too adds ~0 because they serialize on stream
-//               0 regardless) while keeping the smaller-risk surface.
-//   kFull     — all pipelines drop the lock (validated, but no faster than
-//               kAsrOnly; available via ORATOR_GPU_CONCURRENT=1).
+//   kSerial  — every GPU region takes the global lock (legacy behavior).
+//   kFull    — all pipelines (ASR, diarization, VAD) drop the lock. This is the
+//              PRODUCTION DEFAULT: all three pipelines run lock-free by default
+//              after stream routing is complete.
+//   kAsrOnly — ONLY the ASR own-stream pipeline is lock-free; diarization + VAD
+//              still hold the lock. Intermediate/legacy option.
 // Resolution: ORATOR_GPU_SERIAL=1 forces kSerial; ORATOR_GPU_CONCURRENT=1 selects
-// kFull; otherwise kAsrOnly (default).
+// kFull; otherwise kFull (default).
 enum class GpuMode { kSerial, kAsrOnly, kFull };
 
 GpuMode ResolveMode() {
   if (EnvTrue("ORATOR_GPU_SERIAL")) return GpuMode::kSerial;
   if (EnvTrue("ORATOR_GPU_CONCURRENT")) return GpuMode::kFull;
-  return GpuMode::kAsrOnly;
+  return GpuMode::kFull;
 }
 
 GpuMode Mode() {
