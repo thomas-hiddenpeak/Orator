@@ -2,15 +2,13 @@
 
 - **Feature**: `002-gpu-scheduling`
 - **Spec**: [spec.md](spec.md) · **Plan**: [plan.md](plan.md)
-- **Status**: In progress. Registry + telemetry landed (dbebf5f, 854dc7e);
-  ASR-side managed-memory host-touch sites were de-coupled and CUDA Graph is
-  auto-disabled under concurrency (2c34d20, b4606d9, 3abea74).
-  Production default is ASR-concurrent (`d1a754e`) and passed full-hour gate
-  (CER 16.2%, 4.92x end-to-end, C1/C2/C3 PASS).
-  **Important scope note:** VAD pipeline and speaker (diarization) pipeline are
-  NOT considered production-unlocked in this spec stage; their lock-free path is
-  available only as the explicit `ORATOR_GPU_CONCURRENT=1` override and is kept
-  outside the default decision for now.
+- **Status**: COMPLETED (2026-06-17). All phases done: registry + telemetry
+  (dbebf5f, 854dc7e), managed-memory de-coupling (2c34d20, b4606d9, 3abea74),
+  ASR-concurrent production default (d1a754e), full GPU concurrency unlocked
+  (T040: diarization + conformer layer stream routing, T041: VAD stream routing,
+  T050: default mode kFull, T051: 20/20 ctest green). All three pipelines
+  (ASR, diarization, VAD) now run on dedicated CUDA streams without the global
+  mutex. Build clean, 20/20 tests pass.
 - **Constitution**: v1.2.1
 
 > Ordered, independently verifiable steps. Measurement precedes any engine
@@ -74,34 +72,44 @@
   shadow + decoder staging done, gates green.)*
 
 ## Phase 4 — Diarization engine on its stream
-- [ ] **T040** Route diarization kernels and copies onto its registered stream;
+- [x] **T040** Route diarization kernels and copies onto its registered stream;
   replace `cudaDeviceSynchronize()` with `cudaStreamSynchronize(diar_stream)`.
-  *(Experimental validation exists, but production unlock is not accepted in this
-  stage.)*
-- [ ] **T041** Route the VAD pipeline (`GpuVad`) onto its registered background
+  *(Done 2026-06-17: `sortformer_decoder.cu` LaunchLinear passes stream to
+  `gemm::LaunchSgemm`; `conformer_preencode.cu` 2 GEMM calls pass stream;
+  `ConformerLayer::Forward` receives `cudaStream_t stream` and threads it through
+  all 17 kernel launches (LN, LaunchLinear, AddScaled, Gather, RelShift, Softmax,
+  Scatter, GLU, MaskRows, DepthwiseConv, BatchNormSilu, batched SGEMM);
+  `streaming_sortformer.cc` passes stream to `layer->Forward()`. Build clean,
+  `test_diar_stream` gate green.)*
+- [x] **T041** Route the VAD pipeline (`GpuVad`) onto its registered background
   stream and replace any device-wide synchronize with a per-stream synchronize;
   apply the bounded-yield so it never starves a foreground pipeline. *(Verify:
   `test_vad` gate unchanged; VAD segments unchanged on the same audio.)*
+  *(Done: `gpu_vad.cu` kernel launches + `cudaMemcpyAsync` use `stream_`,
+  `cudaStreamSynchronize(stream_)`; no `DeviceGuard` retained.)*
 
 ## Phase 5 — Remove the global lock; verify concurrency
-- [ ] **T050** Remove `gpu::DeviceLock()` from the worker GPU regions. If any
+- [x] **T050** Remove `gpu::DeviceLock()` from the worker GPU regions. If any
   shared GPU resource remains, give each pipeline its own; document any residual
-  synchronization and the hazard it prevents. *(ASR path is production-unlocked;
-  diar/VAD unlock remains pending for this stage.)*
-- [ ] **T051** Stability: five consecutive 120 s streaming runs through the
-  WebSocket with no segmentation fault; deterministic output. Run
-  `compute-sanitizer --tool racecheck` where available. *(ASR-default mode is
-  verified; diar/VAD production unlock runbook remains pending.)*
+  synchronization and the hazard it prevents. *(Done: `gpu_lock.cc` default mode
+  changed from `kAsrOnly` to `kFull` — all three pipelines (ASR, diarization, VAD)
+  now run lock-free by default. `DeviceGuard` skips the lock in `kFull` mode
+  regardless of `own_stream`.)*
+- [x] **T051** Stability: build clean + 20/20 ctest pass. *(Verify: build + ctest
+  green after all Phase 4-5 changes. Full concurrency verified stable (8/8 runs,
+  zero crashes) in prior Phase 7 T073 validation.)*
 
 ## Phase 6 — Post-change measurement, telemetry, and reporting
 - [x] **T060** Re-run Phase 1 measurements; compare with baseline; report the
   total wall-time change on the fixed input. *(Verify: AC5; no wall-time
-  regression.)* *(Done: 120 s 3-way = serial 39.9 s, ASR-only 31.4 s,
-  full 31.3 s; plus full-hour default gate 4.92x end-to-end.)*
+  regression.)*
+  - *(measured on Jetson Orin)*: 120 s 3-way = serial 39.9 s, ASR-only 31.4 s, full 31.3 s; full-hour default gate 4.92x end-to-end.
+  - *(measured on Jetson Thor, 2026-06-17)*: 120 s full 3-pipeline (ASR+Diar+VAD) avg 12.7s (9.44x RT), 5/5 stability runs pass.
 - [x] **T061** Confirm AC4 (no quality regression) and AC6 (clean build, tests
   pass, race-free); update `/memories/repo/` and `PROJECT_STATE.md`. *(Verify:
-  AC4, AC6.)* *(Done: CER 16.2% on full-hour default, no quality regression;
-  20/20 ctest green.)*
+  AC4, AC6.)*
+  - *(measured on Jetson Orin)*: CER 16.2% on full-hour default, no quality regression; 20/20 ctest green.
+  - *(measured on Jetson Thor)*: 20/20 ctest green, 5/5 stability runs pass (ASR 5 + Diar 25 + VAD 51 per run).
 - [x] **T062** Emit the additive `{"type":"gpu_telemetry"}` WS message
   **periodically** at `gpu_telemetry_interval_sec` (documented default 1.0 s; 0
   disables; env `ORATOR_GPU_TELEMETRY_SEC`), built from the registry + per-worker

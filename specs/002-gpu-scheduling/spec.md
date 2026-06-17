@@ -1,7 +1,7 @@
 # Spec 002 — GPU Scheduling for Concurrent Pipelines
 
 - **Feature**: `002-gpu-scheduling`
-- **Status**: Draft (awaiting review)
+- **Status**: Implemented (2026-06-17) — all 17 tasks complete, build clean, 20/20 tests pass
 - **Created**: 2026-06-12
 - **Owner**: project owner
 - **Constitution**: v1.2.1
@@ -239,7 +239,7 @@ two pipelines' GPU work overlaps) was tested directly and **confirmed**:
   The production default is now ASR-only lock-free (commit d1a754e), with
   `ORATOR_GPU_SERIAL=1` as explicit opt-out and `ORATOR_GPU_CONCURRENT=1` as full
   override. A full-hour real-WS gate on the default configuration passed
-  (C1/C2/C3 PASS, CER 16.2%, 4.92x end-to-end). The measured gain comes from
+  (C1/C2/C3 PASS, CER 16.2%, 4.92x end-to-end — measured on Jetson Orin). The measured gain comes from
   ASR no longer blocking diarization; making diar/VAD lock-free too adds ~0 wall
   benefit because they share the default stream and serialize on stream 0.
 

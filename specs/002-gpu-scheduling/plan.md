@@ -2,7 +2,7 @@
 
 - **Feature**: `002-gpu-scheduling`
 - **Spec**: [spec.md](spec.md)
-- **Status**: Draft (awaiting review)
+- **Status**: Implemented (2026-06-17) — all phases complete
 - **Constitution**: v1.2.1
 
 > This plan describes HOW to satisfy [spec.md](spec.md). Terminology follows
