@@ -2,14 +2,15 @@
 
 - **Feature**: `002-gpu-scheduling`
 - **Spec**: [spec.md](spec.md) · **Plan**: [plan.md](plan.md)
-- **Status**: Implemented. Registry + telemetry landed (dbebf5f, 854dc7e);
+- **Status**: In progress. Registry + telemetry landed (dbebf5f, 854dc7e);
   ASR-side managed-memory host-touch sites were de-coupled and CUDA Graph is
-  auto-disabled under concurrency (2c34d20, b4606d9, 3abea74);
-  full-concurrency lock removal is validated and landed (97dd2cc);
-  production default is now ASR-concurrent with opt-out/override knobs
-  (`ORATOR_GPU_SERIAL=1`, `ORATOR_GPU_CONCURRENT=1`) (d1a754e).
-  Full-hour real-WS gate on the default configuration passed with no quality
-  regression (CER 16.2%, 4.92x end-to-end, C1/C2/C3 PASS).
+  auto-disabled under concurrency (2c34d20, b4606d9, 3abea74).
+  Production default is ASR-concurrent (`d1a754e`) and passed full-hour gate
+  (CER 16.2%, 4.92x end-to-end, C1/C2/C3 PASS).
+  **Important scope note:** VAD pipeline and speaker (diarization) pipeline are
+  NOT considered production-unlocked in this spec stage; their lock-free path is
+  available only as the explicit `ORATOR_GPU_CONCURRENT=1` override and is kept
+  outside the default decision for now.
 - **Constitution**: v1.2.1
 
 > Ordered, independently verifiable steps. Measurement precedes any engine
@@ -73,23 +74,24 @@
   shadow + decoder staging done, gates green.)*
 
 ## Phase 4 — Diarization engine on its stream
-- [x] **T040** Route diarization kernels and copies onto its registered stream;
+- [ ] **T040** Route diarization kernels and copies onto its registered stream;
   replace `cudaDeviceSynchronize()` with `cudaStreamSynchronize(diar_stream)`.
-  *(Default-stream scoped syncs landed where required; diar gate remains green.)*
-- [x] **T041** Route the VAD pipeline (`GpuVad`) onto its registered background
+  *(Experimental validation exists, but production unlock is not accepted in this
+  stage.)*
+- [ ] **T041** Route the VAD pipeline (`GpuVad`) onto its registered background
   stream and replace any device-wide synchronize with a per-stream synchronize;
   apply the bounded-yield so it never starves a foreground pipeline. *(Verify:
   `test_vad` gate unchanged; VAD segments unchanged on the same audio.)*
 
 ## Phase 5 — Remove the global lock; verify concurrency
-- [x] **T050** Remove `gpu::DeviceLock()` from the worker GPU regions. If any
+- [ ] **T050** Remove `gpu::DeviceLock()` from the worker GPU regions. If any
   shared GPU resource remains, give each pipeline its own; document any residual
-  synchronization and the hazard it prevents. *(Done in two validated modes:
-  production default ASR-only lock-free and full lock-free override.)*
-- [x] **T051** Stability: five consecutive 120 s streaming runs through the
+  synchronization and the hazard it prevents. *(ASR path is production-unlocked;
+  diar/VAD unlock remains pending for this stage.)*
+- [ ] **T051** Stability: five consecutive 120 s streaming runs through the
   WebSocket with no segmentation fault; deterministic output. Run
-  `compute-sanitizer --tool racecheck` where available. *(8+ full-concurrency
-  runs + 8+ ASR-concurrent runs passed; deterministic output preserved.)*
+  `compute-sanitizer --tool racecheck` where available. *(ASR-default mode is
+  verified; diar/VAD production unlock runbook remains pending.)*
 
 ## Phase 6 — Post-change measurement, telemetry, and reporting
 - [x] **T060** Re-run Phase 1 measurements; compare with baseline; report the

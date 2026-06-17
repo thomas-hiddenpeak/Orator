@@ -247,7 +247,10 @@ Open, independently-scheduled items:
   routing the diarizer's hundreds of kernel launches onto a dedicated non-default
   stream for no measurable benefit (diar is already ~26× RTF, VAD is tiny;
   neither is the bottleneck). Operational policy: keep ASR-concurrent as default,
-  keep full-concurrency as override.
+  keep full-concurrency as override. **Scope freeze for this stage:** VAD and
+  speaker (diarization) pipelines are not marked production-unlocked; only the
+  ASR lock-free path is accepted into the production default. VAD/diar lock-free
+  remains deferred until a separate acceptance decision.
 - **Full 1-hour real-WS revalidation on the current `text_id` revision code**:
   done (2026-06-17, commit c94c2fa) — see the milestone-gate section in §2.
 - ASR streaming throughput (~2.6x, Spec 001 NG1) — deferred by owner.
