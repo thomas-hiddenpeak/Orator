@@ -6,6 +6,7 @@ You are working in the Orator repository. Follow Spec-Driven Development (SDD) a
 - Constitution: `.specify/memory/constitution.md`
 - Project state: `specs/PROJECT_STATE.md`
 - Active SDD artifacts: `specs/NNN-feature-name/spec.md`, `plan.md`, `tasks.md`
+- Test review protocol artifact: `specs/006-test-review-protocol/spec.md`
 
 If any instruction conflicts, the Constitution wins. **The code is authoritative
 over every state document** (Constitution Article VIII): when a doc and the code
