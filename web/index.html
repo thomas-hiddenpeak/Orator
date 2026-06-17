@@ -25,9 +25,15 @@
     </section>
 
     <main class="grid">
-      <section class="card">
-        <h2>Realtime ASR</h2>
+      <section class="card col-wide">
+        <h2>ASR</h2>
+        <div id="asrDraft" class="asr-draft"><span class="asr-draft-placeholder">Waiting for speech&hellip;</span></div>
         <div id="asrList" class="log"></div>
+      </section>
+
+      <section class="card">
+        <h2>Diarization</h2>
+        <div id="diarList" class="log diar-log"></div>
       </section>
 
       <section class="card">
@@ -39,12 +45,15 @@
           <dt>asr_rtf</dt><dd>-</dd>
           <dt>ws_ready</dt><dd>0</dd>
           <dt>asr_events</dt><dd>0</dd>
+          <dt>asr_partial</dt><dd>0</dd>
+          <dt>revision</dt><dd>0</dd>
+          <dt>diar_events</dt><dd>0</dd>
           <dt>timeline_events</dt><dd>0</dd>
           <dt>last_event</dt><dd>-</dd>
         </dl>
       </section>
 
-      <section class="card span-2">
+      <section class="card span-all">
         <div class="timeline-header">
           <h2>Timeline (raw)</h2>
           <label class="auto-flush-label">
@@ -55,7 +64,7 @@
           </label>
           <span id="timelineSummary" class="timeline-summary">-</span>
         </div>
-        <pre id="timelineRaw" class="raw">Click Flush or End — or enable Auto-flush — to receive timeline data.</pre>
+        <pre id="timelineRaw" class="raw">Click Flush or End &mdash; or enable Auto-flush &mdash; to receive timeline data.</pre>
       </section>
     </main>
 

@@ -15,6 +15,8 @@
   const autoFlushChk = document.getElementById("autoFlushChk");
   const autoFlushSec = document.getElementById("autoFlushSec");
   const timelineSummary = document.getElementById("timelineSummary");
+  const asrDraft = document.getElementById("asrDraft");
+  const diarList = document.getElementById("diarList");
 
   let ws = null;
   let targetSampleRate = 16000;
@@ -22,7 +24,11 @@
   let shouldReconnect = true;
   let reconnectTimer = null;
   let reconnectAttempt = 0;
-  const eventCounters = { ready: 0, asr: 0, timeline: 0 };
+  // text_id -> DOM element for in-progress and confirmed ASR segments
+  const asrRows = new Map();
+  // text_id -> DOM element for comprehensive revision entries
+  const compRows = new Map();
+  const eventCounters = { ready: 0, asr: 0, asr_partial: 0, revision: 0, diar: 0, timeline: 0 };
   let micContext = null;
   let micStream = null;
   let micSource = null;
@@ -69,24 +75,30 @@
   function resetEventCounters() {
     eventCounters.ready = 0;
     eventCounters.asr = 0;
+    eventCounters.asr_partial = 0;
+    eventCounters.revision = 0;
+    eventCounters.diar = 0;
     eventCounters.timeline = 0;
     updateMetric("ws_ready", "0");
     updateMetric("asr_events", "0");
+    updateMetric("asr_partial", "0");
+    updateMetric("revision", "0");
+    updateMetric("diar_events", "0");
     updateMetric("timeline_events", "0");
     updateMetric("last_event", "-");
+    asrRows.clear();
+    compRows.clear();
+    if (asrDraft) asrDraft.innerHTML = '<span class="asr-draft-placeholder">Waiting for speech…</span>';
+    if (diarList) diarList.innerHTML = "";
   }
 
   function markEvent(type) {
-    if (type === "ready") {
-      eventCounters.ready += 1;
-      updateMetric("ws_ready", String(eventCounters.ready));
-    } else if (type === "asr") {
-      eventCounters.asr += 1;
-      updateMetric("asr_events", String(eventCounters.asr));
-    } else if (type === "timeline") {
-      eventCounters.timeline += 1;
-      updateMetric("timeline_events", String(eventCounters.timeline));
-    }
+    if (type === "ready") { eventCounters.ready += 1; updateMetric("ws_ready", String(eventCounters.ready)); }
+    else if (type === "asr") { eventCounters.asr += 1; updateMetric("asr_events", String(eventCounters.asr)); }
+    else if (type === "asr_partial") { eventCounters.asr_partial += 1; updateMetric("asr_partial", String(eventCounters.asr_partial)); }
+    else if (type === "revision") { eventCounters.revision += 1; updateMetric("revision", String(eventCounters.revision)); }
+    else if (type === "diar") { eventCounters.diar += 1; updateMetric("diar_events", String(eventCounters.diar)); }
+    else if (type === "timeline") { eventCounters.timeline += 1; updateMetric("timeline_events", String(eventCounters.timeline)); }
     updateMetric("last_event", type + " @ " + new Date().toLocaleTimeString());
   }
 
@@ -202,14 +214,87 @@
     }
   }
 
-  function appendAsr(msg) {
-    const div = document.createElement("div");
-    div.className = "log-item";
-    const start = typeof msg.start === "number" ? msg.start.toFixed(2) : "?";
-    const end = typeof msg.end === "number" ? msg.end.toFixed(2) : "?";
-    div.textContent = "[" + start + "-" + end + "] " + (msg.text || "");
-    asrList.appendChild(div);
+  function fmtTime(sec) {
+    if (typeof sec !== "number") return "?";
+    const m = Math.floor(sec / 60);
+    const s = (sec % 60).toFixed(1);
+    return m > 0 ? m + ":" + (s < 10 ? "0" : "") + s : s + "s";
+  }
+
+  // asr_partial: engine has a running draft for the current segment.
+  // We show it in the draft bar and also maintain a row in the list.
+  function handleAsrPartial(msg) {
+    const id = msg.text_id != null ? msg.text_id : "__partial__";
+    const label = "[" + fmtTime(msg.start) + "\u2013" + fmtTime(msg.end) + "] ";
+    const text = label + (msg.text || "");
+    // Update draft bar
+    if (asrDraft) asrDraft.textContent = "\u270f\ufe0f " + text;
+    // Update or create the in-progress list row
+    let row = asrRows.get(id);
+    if (!row) {
+      row = document.createElement("div");
+      row.className = "log-item partial";
+      asrList.appendChild(row);
+      asrRows.set(id, row);
+    }
+    row.textContent = "\u270f\ufe0f " + text;
+    row.className = "log-item partial";
     asrList.scrollTop = asrList.scrollHeight;
+  }
+
+  // asr: segment is committed and final.
+  function handleAsrFinal(msg) {
+    const id = msg.text_id != null ? msg.text_id : ("__final_" + Date.now() + "__");
+    const label = "[" + fmtTime(msg.start) + "\u2013" + fmtTime(msg.end) + "] ";
+    const text = label + (msg.text || "");
+    // Clear draft bar
+    if (asrDraft) asrDraft.innerHTML = '<span class="asr-draft-placeholder">Waiting for speech\u2026</span>';
+    // Confirm or create the row
+    let row = asrRows.get(id);
+    if (!row) {
+      row = document.createElement("div");
+      asrList.appendChild(row);
+      asrRows.set(id, row);
+    }
+    row.textContent = "\u2713 " + text;
+    row.className = "log-item confirmed";
+    asrList.scrollTop = asrList.scrollHeight;
+  }
+
+  // revision: comprehensive timeline entry updated (text or speaker attribution).
+  // Entries are keyed by text_id; if a row exists in the list, update in place.
+  function handleRevision(msg) {
+    const entries = Array.isArray(msg.entries) ? msg.entries : [];
+    for (let i = 0; i < entries.length; ++i) {
+      const e = entries[i];
+      const id = e.text_id != null ? e.text_id : null;
+      const label = "[" + fmtTime(e.start) + "\u2013" + fmtTime(e.end) + "] ";
+      const spk = e.speaker ? e.speaker + ": " : "";
+      const text = label + spk + (e.text || "");
+      // Try to update existing ASR row with revised text+speaker
+      if (id != null && asrRows.has(id)) {
+        const row = asrRows.get(id);
+        const wasConfirmed = row.className.includes("confirmed");
+        row.textContent = (wasConfirmed ? "\u21bb " : "\u270f\ufe0f ") + text;
+        row.className = "log-item revised";
+      }
+    }
+  }
+
+  // diar: live speaker segments from sortformer.
+  function handleDiar(msg) {
+    if (!diarList) return;
+    const segs = Array.isArray(msg.segments) ? msg.segments : [];
+    diarList.innerHTML = "";
+    for (let i = 0; i < segs.length; ++i) {
+      const s = segs[i];
+      const row = document.createElement("div");
+      row.className = "log-item";
+      const conf = typeof s.confidence === "number" ? " (" + (s.confidence * 100).toFixed(0) + "%)" : "";
+      row.textContent = "[" + fmtTime(s.start) + "\u2013" + fmtTime(s.end) + "] " + (s.speaker || "?") + conf;
+      diarList.appendChild(row);
+    }
+    diarList.scrollTop = diarList.scrollHeight;
   }
 
   function handleTimeline(msg) {
@@ -316,9 +401,12 @@
       }
       if (!msg || typeof msg.type !== "string") return;
       markEvent(msg.type);
-      if (msg.type === "asr") appendAsr(msg);
-      if (msg.type === "timeline") handleTimeline(msg);
-      if (msg.type === "ready") {
+      if (msg.type === "asr_partial") handleAsrPartial(msg);
+      else if (msg.type === "asr") handleAsrFinal(msg);
+      else if (msg.type === "revision") handleRevision(msg);
+      else if (msg.type === "diar") handleDiar(msg);
+      else if (msg.type === "timeline") handleTimeline(msg);
+      else if (msg.type === "ready") {
         targetSampleRate = typeof msg.sample_rate === "number" ? msg.sample_rate : 16000;
         updateMetric("sample_rate", String(msg.sample_rate ?? "-"));
       }
@@ -352,6 +440,8 @@
   });
   resetBtn.addEventListener("click", function () {
     asrList.innerHTML = "";
+    if (diarList) diarList.innerHTML = "";
+    if (asrDraft) asrDraft.innerHTML = '<span class="asr-draft-placeholder">Waiting for speech\u2026</span>';
     timelineRaw.textContent = "Click Flush or End \u2014 or enable Auto-flush \u2014 to receive timeline data.";
     if (timelineSummary) timelineSummary.textContent = "-";
     resetEventCounters();

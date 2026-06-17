@@ -103,12 +103,16 @@ button:not(:disabled):hover {
 .grid {
   margin: 0 18px 18px;
   display: grid;
-  grid-template-columns: 2fr 1fr;
+  grid-template-columns: 2fr 1fr 1fr;
   gap: 12px;
 }
 
-.span-2 {
+.col-wide {
   grid-column: span 2;
+}
+
+.span-all {
+  grid-column: 1 / -1;
 }
 
 .log {
@@ -118,11 +122,51 @@ button:not(:disabled):hover {
   gap: 6px;
 }
 
+.asr-draft {
+  min-height: 36px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  padding: 6px 10px;
+  margin-bottom: 8px;
+  font-size: 14px;
+  color: var(--muted);
+  background: #f9fbff;
+  word-break: break-word;
+}
+
+.asr-draft-placeholder {
+  opacity: 0.45;
+  font-style: italic;
+}
+
 .log-item {
   border-left: 3px solid var(--accent);
   padding: 6px 8px;
   background: #f7fbff;
   font-size: 14px;
+  word-break: break-word;
+}
+
+.log-item.partial {
+  border-left-color: #b0c4d8;
+  background: #f3f6fb;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.log-item.confirmed {
+  border-left-color: var(--ok);
+  background: #f7fdf9;
+}
+
+.log-item.revised {
+  border-left-color: var(--warn);
+  background: #fffbf4;
+}
+
+.diar-log .log-item {
+  border-left-color: #8b5cf6;
+  background: #faf7ff;
 }
 
 .metrics {
