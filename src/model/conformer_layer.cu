@@ -19,8 +19,9 @@ constexpr int kThreads = 256;
 inline int Blocks(int n) { return (n + kThreads - 1) / kThreads; }
 
 inline void LaunchLinear(const float* in, const float* W, const float* bias,
-                         float* out, int M, int K, int N, int act) {
-  gemm::LaunchSgemm(in, W, bias, out, M, K, N, act);  // act: 0 none, 1 SiLU
+                          float* out, int M, int K, int N, int act,
+                          cudaStream_t stream) {
+  gemm::LaunchSgemm(in, W, bias, out, M, K, N, act, stream);
 }
 
 // LayerNorm over last dim D for each of M rows.
@@ -333,7 +334,8 @@ void ConformerLayer::Scratch::Ensure(int T, int D, int Dff, int H) {
   cap_T = T;
 }
 
-void ConformerLayer::Forward(float* x, int T, int valid_len, const float* pos_emb) {
+void ConformerLayer::Forward(float* x, int T, int valid_len, const float* pos_emb,
+                              cudaStream_t stream) {
   const int D = d_model_, H = n_heads_, Dk = d_k_, Dff = d_ff_;
   const float eps = 1e-5f;
   size_t TD = static_cast<size_t>(T) * D;
@@ -343,18 +345,18 @@ void ConformerLayer::Forward(float* x, int T, int valid_len, const float* pos_em
   float* tmpp = static_cast<float*>(scr_.tmp.data());
 
   auto LN = [&](const float* in, const float* g, const float* b, float* out) {
-    LayerNormKernel<<<T, kThreads>>>(in, g, b, out, T, D, eps);
+    LayerNormKernel<<<T, kThreads, 0, stream>>>(in, g, b, out, T, D, eps);
   };
 
   // ---- FFN1 ----
   LN(x, W("norm_feed_forward1.weight"), W("norm_feed_forward1.bias"), lnp);
   LaunchLinear(lnp, W("feed_forward1.linear1.weight"),
-                                              W("feed_forward1.linear1.bias"), ffp,
-                                              T, D, Dff, 1);
+                                               W("feed_forward1.linear1.bias"), ffp,
+                                               T, D, Dff, 1, stream);
   LaunchLinear(ffp, W("feed_forward1.linear2.weight"),
-                                            W("feed_forward1.linear2.bias"), tmpp,
-                                            T, Dff, D, 0);
-  AddScaledKernel<<<Blocks(T * D), kThreads>>>(x, tmpp, 0.5f, T * D);
+                                             W("feed_forward1.linear2.bias"), tmpp,
+                                             T, Dff, D, 0, stream);
+  AddScaledKernel<<<Blocks(T * D), kThreads, 0, stream>>>(x, tmpp, 0.5f, T * D);
 
   // ---- Self-attention ----
   LN(x, W("norm_self_att.weight"), W("norm_self_att.bias"), lnp);
@@ -365,13 +367,13 @@ void ConformerLayer::Forward(float* x, int T, int valid_len, const float* pos_em
   float* pp = static_cast<float*>(scr_.pb.data());
   float* cp = static_cast<float*>(scr_.cb.data());
   LaunchLinear(lnp, W("self_attn.linear_q.weight"),
-                                            W("self_attn.linear_q.bias"), qp, T, D, D, 0);
+                                             W("self_attn.linear_q.bias"), qp, T, D, D, 0, stream);
   LaunchLinear(lnp, W("self_attn.linear_k.weight"),
-                                            W("self_attn.linear_k.bias"), kp, T, D, D, 0);
+                                             W("self_attn.linear_k.bias"), kp, T, D, D, 0, stream);
   LaunchLinear(lnp, W("self_attn.linear_v.weight"),
-                                            W("self_attn.linear_v.bias"), vp, T, D, D, 0);
+                                             W("self_attn.linear_v.bias"), vp, T, D, D, 0, stream);
   LaunchLinear(pos_emb, W("self_attn.linear_pos.weight"),
-                                            nullptr, pp, P, D, D, 0);
+                                             nullptr, pp, P, D, D, 0, stream);
   float scale = 1.0f / std::sqrt(static_cast<float>(Dk));
 
   // ---- GEMM-decomposed relative-position attention ----
@@ -387,31 +389,31 @@ void ConformerLayer::Forward(float* x, int T, int valid_len, const float* pos_em
   const float* buw = W("self_attn.pos_bias_u");
   const float* bvw = W("self_attn.pos_bias_v");
 
-  GatherAddHeadMajorKernel<<<Blocks(H * T * Dk), kThreads>>>(qp, buw, qbu, T, H, Dk);
-  GatherAddHeadMajorKernel<<<Blocks(H * T * Dk), kThreads>>>(qp, bvw, qbv, T, H, Dk);
-  GatherAddHeadMajorKernel<<<Blocks(H * T * Dk), kThreads>>>(kp, nullptr, kh, T, H, Dk);
-  GatherVtHeadMajorKernel<<<Blocks(H * Dk * T), kThreads>>>(vp, vt, T, H, Dk);
-  GatherPHeadMajorKernel<<<Blocks(H * P * Dk), kThreads>>>(pp, ph, P, H, Dk);
+  GatherAddHeadMajorKernel<<<Blocks(H * T * Dk), kThreads, 0, stream>>>(qp, buw, qbu, T, H, Dk);
+  GatherAddHeadMajorKernel<<<Blocks(H * T * Dk), kThreads, 0, stream>>>(qp, bvw, qbv, T, H, Dk);
+  GatherAddHeadMajorKernel<<<Blocks(H * T * Dk), kThreads, 0, stream>>>(kp, nullptr, kh, T, H, Dk);
+  GatherVtHeadMajorKernel<<<Blocks(H * Dk * T), kThreads, 0, stream>>>(vp, vt, T, H, Dk);
+  GatherPHeadMajorKernel<<<Blocks(H * P * Dk), kThreads, 0, stream>>>(pp, ph, P, H, Dk);
 
   // AC[h,i,j] = (q_i+bu)·k_j ; BD[h,i,m] = (q_i+bv)·p_m
   gemm::LaunchSgemmBatched(qbu, kh, acm, T, Dk, T, 0, H,
-                           static_cast<long>(T) * Dk, static_cast<long>(T) * Dk,
-                           static_cast<long>(T) * T);
+                            static_cast<long>(T) * Dk, static_cast<long>(T) * Dk,
+                            static_cast<long>(T) * T, stream);
   gemm::LaunchSgemmBatched(qbv, ph, bdm, T, Dk, P, 0, H,
-                           static_cast<long>(T) * Dk, static_cast<long>(P) * Dk,
-                           static_cast<long>(T) * P);
-  RelShiftScoresKernel<<<Blocks(H * T * T), kThreads>>>(acm, bdm, scm, T, H,
-                                                        valid_len, scale);
-  AttnSoftmaxKernel<<<H * T, kThreads>>>(scm, T, valid_len);
+                            static_cast<long>(T) * Dk, static_cast<long>(P) * Dk,
+                            static_cast<long>(T) * P, stream);
+  RelShiftScoresKernel<<<Blocks(H * T * T), kThreads, 0, stream>>>(acm, bdm, scm, T, H,
+                                                         valid_len, scale);
+  AttnSoftmaxKernel<<<H * T, kThreads, 0, stream>>>(scm, T, valid_len);
   // ctx[h,i,d] = sum_j scores[h,i,j] * v[j,d]  (vt is [H,Dk,T] => W^T form)
   gemm::LaunchSgemmBatched(scm, vt, acm, T, T, Dk, 0, H, static_cast<long>(T) * T,
-                           static_cast<long>(Dk) * T, static_cast<long>(T) * Dk);
-  ScatterHeadMajorKernel<<<Blocks(H * T * Dk), kThreads>>>(acm, cp, T, H, Dk);
+                            static_cast<long>(Dk) * T, static_cast<long>(T) * Dk, stream);
+  ScatterHeadMajorKernel<<<Blocks(H * T * Dk), kThreads, 0, stream>>>(acm, cp, T, H, Dk);
   // linear_out on context [T,D] -> tmp
   LaunchLinear(cp, W("self_attn.linear_out.weight"),
-                                            W("self_attn.linear_out.bias"), tmpp,
-                                            T, D, D, 0);
-  AddScaledKernel<<<Blocks(T * D), kThreads>>>(x, tmpp, 1.0f, T * D);
+                                             W("self_attn.linear_out.bias"), tmpp,
+                                             T, D, D, 0, stream);
+  AddScaledKernel<<<Blocks(T * D), kThreads, 0, stream>>>(x, tmpp, 1.0f, T * D);
 
   // ---- Conv module ----
   LN(x, W("norm_conv.weight"), W("norm_conv.bias"), lnp);
@@ -419,31 +421,31 @@ void ConformerLayer::Forward(float* x, int T, int valid_len, const float* pos_em
   float* glup = static_cast<float*>(scr_.glu.data());
   float* dwp = static_cast<float*>(scr_.dw.data());
   LaunchLinear(lnp,
-      W("conv.pointwise_conv1.weight"), W("conv.pointwise_conv1.bias"), pw1p, T, D, 2 * D, 0);
-  GluKernel<<<Blocks(T * D), kThreads>>>(pw1p, glup, T, D);
-  MaskRowsKernel<<<Blocks(T * D), kThreads>>>(glup, T, D, valid_len);
-  DepthwiseConvKernel<<<Blocks(T * D), kThreads>>>(glup,
+      W("conv.pointwise_conv1.weight"), W("conv.pointwise_conv1.bias"), pw1p, T, D, 2 * D, 0, stream);
+  GluKernel<<<Blocks(T * D), kThreads, 0, stream>>>(pw1p, glup, T, D);
+  MaskRowsKernel<<<Blocks(T * D), kThreads, 0, stream>>>(glup, T, D, valid_len);
+  DepthwiseConvKernel<<<Blocks(T * D), kThreads, 0, stream>>>(glup,
       W("conv.depthwise_conv.weight"), W("conv.depthwise_conv.bias"), dwp, T, D, conv_kernel_);
-  BatchNormSiluKernel<<<Blocks(T * D), kThreads>>>(dwp, W("conv.batch_norm.running_mean"),
+  BatchNormSiluKernel<<<Blocks(T * D), kThreads, 0, stream>>>(dwp, W("conv.batch_norm.running_mean"),
       W("conv.batch_norm.running_var"), W("conv.batch_norm.weight"),
       W("conv.batch_norm.bias"), T, D, eps);
   LaunchLinear(dwp,
-      W("conv.pointwise_conv2.weight"), W("conv.pointwise_conv2.bias"), tmpp, T, D, D, 0);
-  AddScaledKernel<<<Blocks(T * D), kThreads>>>(x, tmpp, 1.0f, T * D);
+      W("conv.pointwise_conv2.weight"), W("conv.pointwise_conv2.bias"), tmpp, T, D, D, 0, stream);
+  AddScaledKernel<<<Blocks(T * D), kThreads, 0, stream>>>(x, tmpp, 1.0f, T * D);
 
   // ---- FFN2 ----
   LN(x, W("norm_feed_forward2.weight"), W("norm_feed_forward2.bias"), lnp);
   LaunchLinear(lnp, W("feed_forward2.linear1.weight"),
-                                              W("feed_forward2.linear1.bias"), ffp,
-                                              T, D, Dff, 1);
+                                               W("feed_forward2.linear1.bias"), ffp,
+                                               T, D, Dff, 1, stream);
   LaunchLinear(ffp, W("feed_forward2.linear2.weight"),
-                                            W("feed_forward2.linear2.bias"), tmpp,
-                                            T, Dff, D, 0);
-  AddScaledKernel<<<Blocks(T * D), kThreads>>>(x, tmpp, 0.5f, T * D);
+                                             W("feed_forward2.linear2.bias"), tmpp,
+                                             T, Dff, D, 0, stream);
+  AddScaledKernel<<<Blocks(T * D), kThreads, 0, stream>>>(x, tmpp, 0.5f, T * D);
 
   // ---- norm_out ----
   LN(x, W("norm_out.weight"), W("norm_out.bias"), lnp);
-  CUDA_CHECK(cudaMemcpy(x, lnp, TD * sizeof(float), cudaMemcpyDeviceToDevice));
+  CUDA_CHECK(cudaMemcpyAsync(x, lnp, TD * sizeof(float), cudaMemcpyDeviceToDevice, stream));
 }
 
 }  // namespace model

@@ -14,6 +14,8 @@
 // Weights are copied from a SafeTensorReader into unified memory. The same
 // instance type is reused for all 17 layers (different prefixes).
 
+#include <cuda_runtime.h>
+
 #include <map>
 #include <memory>
 #include <string>
@@ -35,7 +37,8 @@ class ConformerLayer {
   // x: [T, d_model] device/unified, modified in place to the layer output.
   // pos_emb: [2T-1, d_model] relative positional encoding (device/unified).
   // valid_len: number of valid (non-padded) frames; rest masked like NeMo.
-  void Forward(float* x, int T, int valid_len, const float* pos_emb);
+  void Forward(float* x, int T, int valid_len, const float* pos_emb,
+               cudaStream_t stream = nullptr);
 
   // Builds the RelPositionalEncoding pos_emb [2T-1, d_model] on host.
   static std::vector<float> BuildPosEmb(int T, int d_model);
