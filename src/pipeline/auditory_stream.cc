@@ -131,6 +131,9 @@ void AuditoryStream::StartWorkers() {
     AsrWorker::Params p;
     p.sample_rate = config_.sample_rate;
     p.segment_sec = config_.asr_segment_sec;
+    p.asr_vad_gate = config_.asr_vad_gate;
+    p.asr_vad_lead_ms = config_.asr_vad_lead_ms;
+    p.asr_vad_trail_sec = config_.asr_vad_trail_sec;
     asr_worker_ = std::make_unique<AsrWorker>(
         asr_.get(), &timeline_, p,
         [this](const std::string& json) { EmitLocked(json); },
@@ -151,6 +154,11 @@ void AuditoryStream::StartWorkers() {
             revs = comp_.UpsertText(id, start, end, text);
           }
           for (const auto& r : revs) EmitLocked(SerializeRevision(r, "qwen3_asr"));
+        });
+    asr_worker_->set_vad_update(
+        [this](const std::vector<VadSpeechSegment>& segs) {
+          std::lock_guard<std::mutex> lk(*asr_worker_->vad_mutex());
+          asr_worker_->vad_segments() = segs;
         });
     asr_cursor_ = buffer_.AddConsumer();
     asr_thread_ = std::thread([this] {
@@ -195,7 +203,6 @@ void AuditoryStream::StartWorkers() {
         segs.clear();
         vad_detector_->DrainSegments(finalize, &segs);
         for (const auto& sp : segs) {
-          // sp = absolute [start,end) samples on the common clock.
           const double s = tb.SecondsAt(sp.first);
           const double e = tb.SecondsAt(sp.second);
           {
@@ -208,6 +215,18 @@ void AuditoryStream::StartWorkers() {
                         "\"start\":%.3f,\"end\":%.3f}",
                         s, e);
           EmitLocked(buf);
+        }
+        // Spec 003 revision: notify ASR worker of updated VAD track snapshot.
+        if (asr_worker_) {
+          std::vector<VadSpeechSegment> segs_in;
+          {
+            std::lock_guard<std::mutex> clk(comp_mutex_);
+            const auto& vad_view = comp_.SnapshotVad();
+            segs_in.reserve(vad_view.size());
+            for (const auto& v : vad_view) segs_in.push_back({v.start, v.end});
+          }
+          std::lock_guard<std::mutex> lk(*asr_worker_->vad_mutex());
+          asr_worker_->vad_segments() = std::move(segs_in);
         }
       };
       while (buffer_.WaitAndRead(vad_cursor_, &chunk)) {

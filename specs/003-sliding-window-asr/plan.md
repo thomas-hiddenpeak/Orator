@@ -67,16 +67,23 @@ it is short and bounded.
 ### 1.4 Boundary reset (bounded growth)
 
 N, the audio-block KV, and per-token attention cost grow within a segment. To
-bound them over a long stream, the session resets on a natural boundary:
+bound them over a long stream, the session resets on a natural boundary.
 
-- a speech endpoint (silence ≥ `endpoint_sec`), or
-- a hard cap `max_segment_sec`.
+**Primary trigger** (2026-06-17 revision): VAD-gated segment boundaries (§8).
+When VAD detects the end of a speech region and the trailing window
+(`asr_vad_trail_sec`) elapses without VAD returning to speech, the segment is
+committed and reset. See §8 for the state machine.
+
+**Safety fallback**: `max_segment_sec` (24.0 s) remains as a hard upper bound.
+If VAD fails to detect silence or produces continuous false-speech, the segment
+resets on the safety cap. This protects against VAD pipeline failure.
 
 On reset: commit the whole running transcript of the segment to the timeline with
 absolute times derived from `seg_base_sample_` and the segment audio length,
 `decoder.ResetCache()`, clear the session state, and start a new segment at the
 current sample. Per-step cost is therefore O(chunk) within a segment and the
-segment length is bounded by `max_segment_sec` (FR5, AC5).
+segment length is bounded by VAD speech regions (or `max_segment_sec` as safety
+cap) (FR5, AC5).
 
 ### 1.5 Why this is incremental
 
@@ -195,7 +202,10 @@ kStreamWindowMel       = 100     (1 s per streaming step)
 max_new_tokens         = 32      (per-chunk decode budget)
 stream_unfixed_chunks  = 2       (first 2 steps: no prefix)
 stream_unfixed_tokens  = 15      (rollback last 15 tokens per step)
-max_segment_sec        = 24.0    (hard segment cap)
+max_segment_sec        = 24.0    (safety cap; primary reset is VAD-gated)
+asr_vad_gate           = true    (VAD-gated segment boundaries)
+asr_vad_lead_ms        = 200     (lead buffer for speech onset)
+asr_vad_trail_sec      = 1.5     (trailing window before commit)
 ```
 
 Reset cadence (endpoint/cap) trades context (accuracy) against bounded per-step
@@ -228,3 +238,96 @@ cost, unchanged from the initial design.
 
 Quantization, per-word timestamps, GPU scheduling (Spec 002), diarization
 changes.
+
+## 8. VAD-Gated Segment Boundaries
+
+### 8.1 Architecture
+
+The ASR worker queries VAD speech regions through `ComprehensiveTimeline`, not
+through `GpuVad` directly. This preserves the dual-pipeline independence
+(Constitution Art. III). The data path:
+
+```
+GpuVad → ComprehensiveTimeline::AddVad() → ComprehensiveTimeline::vad_ track
+                                                        ↓
+                          AsrWorker queries SnapshotVad() → VAD event channel
+```
+
+`ComprehensiveTimeline::SnapshotVad()` returns a vector of VAD segments (start,
+end on the shared clock). The ASR worker receives updates via a channel from the
+AuditoryStream (or polls the timeline at chunk boundaries). The channel delivers
+new VAD segments as they are appended, so ASR never blocks the VAD pipeline.
+
+### 8.2 Ring buffer for lead buffer
+
+When VAD detects the onset of a speech region, the ASR worker needs audio that
+preceded the VAD event (the lead buffer). Because `SharedAudioBuffer` cursors
+only move forward, the worker cannot seek backward. Instead, `AsrWorker`
+maintains a ring buffer:
+
+- **Size**: ~500 ms at 16 kHz mono = 8000 samples = ~128 KB float32.
+- **Purpose**: captures the tail of incoming audio so that when VAD signals
+  speech onset, the worker can pop `asr_vad_lead_ms` (200 ms) of preceding
+  audio and prepend it to the segment.
+- **Lifetime**: the ring buffer is active during IDLE state. Once PROCESSING
+  begins, the ring buffer is flushed into the segment audio buffer and the
+  worker feeds audio directly.
+
+### 8.3 State machine
+
+The ASR worker transitions through three states:
+
+```
+                    VAD speech onset                VAD silence
+  (IDLE) ──────────────► (PROCESSING) ──────────────────────► (TRAILING)
+       │                     │                                    │
+       │  lead_ms prepended   │  ring buffer → segment buffer      │  trail_sec
+       │                     │                                    │  elapsed
+       └── TRAILING timeout ─┘                                    │
+                                                                  │
+                    TRAILING ─────────────► IDLE (reset + commit)
+                              safety cap exceeded
+                              (max_segment_sec exceeded)
+```
+
+**IDLE**: No active speech. Audio arrives but is not encoded. The ring buffer
+accumulates the tail (~500 ms). On VAD-speech entry:
+
+1. Pop `asr_vad_lead_ms` (200 ms) from the ring buffer.
+2. Prepend to segment audio.
+3. Call `StreamReset(base_sample)` with the prepended audio's start sample.
+4. Transition to PROCESSING.
+
+**PROCESSING**: VAD indicates active speech. Feed audio to `StreamChunk` as
+usual (encode, prefill, decode, truncate). Ring buffer is inactive. On VAD
+silence, transition to TRAILING.
+
+**TRAILING**: VAD indicates silence. No new audio is encoded. The worker waits
+`asr_vad_trail_sec` (1.5 s). Two outcomes:
+
+1. **VAD returns to speech**: resume PROCESSING within the same segment. No
+   reset occurred. The trailing period is transparent.
+2. **Trailing timeout**: commit the segment transcript, `ResetCache()`, clear
+   session state, transition to IDLE.
+3. **Safety cap exceeded**: if `max_segment_sec` (24.0 s) is exceeded while in
+   TRAILING (continuous VAD speech that somehow did not produce a silence),
+   force the same commit + reset as timeout.
+
+### 8.4 VAD data coupling
+
+The ASR worker's VAD dependency is through `ComprehensiveTimeline::SnapshotVad()`
+only. It does not link to `GpuVad` or include `GpuVad` headers. The
+AuditoryStream wires the connection: when the VAD pipeline appends to the
+timeline, it signals the ASR worker through the existing VAD event channel (the
+same channel used to drive energy-VAD in the original pipeline, now repurposed).
+The channel carries `(vad_start, vad_end)` pairs on the shared clock. The ASR
+worker reads these events and maps them to its current audio position.
+
+### 8.5 Parameter defaults
+
+| Parameter | Default | Role in state machine |
+|---|---|---|
+| `asr_vad_gate` | `true` | Enable/disable the entire mechanism |
+| `asr_vad_lead_ms` | `200` | Amount of pre-onset audio popped from ring on IDLE → PROCESSING |
+| `asr_vad_trail_sec` | `1.5` | Time to wait in TRAILING before committing segment |
+| `max_segment_sec` | `24.0` | Hard cap — forces commit in any state if exceeded |

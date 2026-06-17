@@ -22,16 +22,63 @@ double Secs(Clock::time_point a, Clock::time_point b) {
 AsrWorker::AsrWorker(model::Qwen3Asr* asr, StreamTimeline* timeline,
                       const Params& params, Emit emit, cudaStream_t stream)
     : asr_(asr), timeline_(timeline), params_(params), emit_(std::move(emit)),
-      tb_(params.sample_rate, 0), stream_(stream) {
+      tb_(params.sample_rate, 0), stream_(stream),
+      ring_buffer_(kRingBufferSamples) {
 }
 
 void AsrWorker::ProcessSpan(const float* samples, int n) {
   if (samples == nullptr || n <= 0) return;
+
+  // Push into ring buffer regardless of VAD state (for lead buffer on speech onset)
+  RingPush(samples, n, inc_abs_pos_);
+
+  if (params_.asr_vad_gate) {
+    const double current_sec = tb_.SecondsAt(inc_abs_pos_ + n);
+
+    if (vad_state_ == VadState::IDLE) {
+      // Check if current position entered a VAD speech region
+      if (IsInVadSpeech(current_sec)) {
+        // Speech detected — pop lead_ms from ring buffer and start processing
+        const int lead_samples = std::max(0, params_.asr_vad_lead_ms * params_.sample_rate / 1000);
+        std::vector<float> lead;
+        RingPop(lead_samples, &lead);
+        ProcessIncremental(lead.data(), static_cast<int>(lead.size()), /*finalize=*/false);
+        vad_state_ = VadState::PROCESSING;
+      }
+      // Otherwise stay IDLE — audio skipped, cursor still advances
+      inc_abs_pos_ += n;
+      processed_samples_.fetch_add(n);
+      return;
+    }
+
+    if (vad_state_ == VadState::PROCESSING) {
+      // Check if we've exited the VAD speech region
+      if (!IsInVadSpeech(current_sec)) {
+        vad_state_ = VadState::TRAILING;
+        vad_trail_start_sec_ = current_sec;
+      }
+    }
+
+    if (vad_state_ == VadState::TRAILING) {
+      // Check if trail window expired → commit segment
+      if (current_sec - vad_trail_start_sec_ >= params_.asr_vad_trail_sec) {
+        // Trail expired — finalize current segment
+        ProcessIncremental(nullptr, 0, /*finalize=*/true);
+        vad_state_ = VadState::IDLE;
+        inc_abs_pos_ += n;
+        processed_samples_.fetch_add(n);
+        return;
+      }
+      // Still trailing — continue processing
+    }
+  }
+
   ProcessIncremental(samples, n, /*finalize=*/false);
   processed_samples_.fetch_add(n);
 }
 
 void AsrWorker::Finalize() {
+  vad_state_ = VadState::IDLE;
   ProcessIncremental(nullptr, 0, /*finalize=*/true);
 }
 
@@ -139,6 +186,55 @@ void AsrWorker::Reset() {
   processed_samples_.store(0);
   compute_sec_ = 0.0;
   asr_->Reset();
+
+  // Reset VAD state
+  vad_state_ = VadState::IDLE;
+  vad_trail_start_sec_ = 0.0;
+  ring_write_pos_ = 0;
+  ring_count_ = 0;
+  ring_base_abs_pos_ = 0;
+  std::fill(ring_buffer_.begin(), ring_buffer_.end(), 0.0f);
+}
+
+void AsrWorker::RingPush(const float* samples, int n, long abs_pos) {
+  if (n <= 0) return;
+  for (int i = 0; i < n; ++i) {
+    ring_buffer_[ring_write_pos_] = samples[i];
+    ring_write_pos_ = (ring_write_pos_ + 1) % kRingBufferSamples;
+    if (ring_count_ < kRingBufferSamples) {
+      ring_count_++;
+    }
+  }
+  ring_base_abs_pos_ = abs_pos;
+}
+
+void AsrWorker::RingPop(int n, std::vector<float>* out) {
+  if (n <= 0 || ring_count_ == 0) return;
+  const int pop = std::min(n, ring_count_);
+  out->reserve(out->size() + pop);
+
+  int read_pos;
+  if (ring_count_ == kRingBufferSamples) {
+    read_pos = ring_write_pos_;
+  } else {
+    read_pos = (ring_write_pos_ - ring_count_ + kRingBufferSamples) % kRingBufferSamples;
+  }
+
+  for (int i = 0; i < pop; ++i) {
+    out->push_back(ring_buffer_[read_pos]);
+    read_pos = (read_pos + 1) % kRingBufferSamples;
+  }
+  ring_count_ -= pop;
+}
+
+bool AsrWorker::IsInVadSpeech(double sec) const {
+  std::lock_guard<std::mutex> lock(vad_mutex_);
+  for (const auto& seg : vad_segments_) {
+    if (sec >= seg.start_sec && sec < seg.end_sec) {
+      return true;
+    }
+  }
+  return false;
 }
 
 }  // namespace pipeline

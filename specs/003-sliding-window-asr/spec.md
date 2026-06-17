@@ -1,9 +1,9 @@
 # Spec 003 — Incremental KV-Cache Real-Time ASR
 
 - **Feature**: `003-sliding-window-asr`
-- **Status**: Implemented, verified, committed (8cc31ab) and pushed; parameters refined 2026-06-17
+- **Status**: Revised 2026-06-17 (VAD gating + trailing window)
 - **Created**: 2026-06-12
-- **Revised**: 2026-06-15 (pivot), 2026-06-17 (parameter refinement)
+- **Revised**: 2026-06-15 (pivot), 2026-06-17 (parameter refinement), 2026-06-17 (VAD gating + trailing window)
 - **Owner**: project owner
 - **Constitution**: v1.2.1
 
@@ -267,7 +267,7 @@ ensuring the rollback is effective. The decode overhead is minimal
 | Parameter | Value | Status |
 |---|---|---|
 | `stream_unfixed_chunks_` | 2 | Unchanged — first 2 chunks use no prefix |
-| `max_segment_sec` | 24.0 s | Unchanged — 24 s hard cap per segment |
+| `max_segment_sec` | 24.0 s | Safety cap only — primary reset now driven by VAD gating (§10) |
 | `min_silence_sec_` | 3.50 s | Unchanged — VAD endpoint threshold |
 | `min_speech_sec_` | 0.20 s | Unchanged — drop spans < 200 ms |
 
@@ -280,5 +280,86 @@ kStreamWindowMel       = 100     (1 s per streaming step)
 max_new_tokens         = 32      (per-chunk decode budget)
 stream_unfixed_chunks  = 2       (first 2 steps: no prefix)
 stream_unfixed_tokens  = 15      (rollback last 15 tokens per step)
-max_segment_sec        = 24.0    (hard segment cap)
+max_segment_sec        = 24.0    (safety cap only; primary reset is VAD-gated)
+asr_vad_gate           = true    (VAD-gated segment boundaries enabled)
+asr_vad_lead_ms        = 200     (lead buffer for speech onset)
+asr_vad_trail_sec      = 1.5     (trailing window before commit)
 ```
+
+## 10. VAD-Gated Segment Boundaries (2026-06-17 revision)
+
+### Problem
+
+The fixed `max_segment_sec = 24.0` cap terminates ASR segments on elapsed time
+regardless of speech content. Two defects follow:
+
+1. **Arbitrary cuts during continuous speech.** A 30-second monologue is split at
+   24 s, mid-sentence. The decoder loses the leading context of the resumed
+   segment, producing incomplete or garbled output at the splice point.
+2. **Hallucination during non-speech.** Silence, music, and ambient noise still
+   trigger ASR encoding and decoding because the segment timer keeps advancing.
+   The model generates text for audio that contains no speech, degrading the
+   transcript and wasting GPU cycles.
+
+Both stem from the same root: the segment boundary timer is blind to the actual
+presence or absence of speech in the audio stream.
+
+### Solution
+
+Replace the fixed timer with **VAD-gated segment boundaries**. The ASR worker
+consults the VAD track to decide when speech is present, when it has ended, and
+when enough silence has elapsed to commit a segment. The mechanism:
+
+- **VAD-gated processing (FR9)**: ASR only processes audio that falls within
+  VAD-marked speech regions. Non-speech audio is forwarded but not fed to the
+  encoder, so silence produces no hallucinated text and no wasted compute.
+- **Trailing window (FR10)**: When VAD transitions from speech to silence, the
+  ASR worker enters a trailing window (`asr_vad_trail_sec`, default 1.5 s)
+  before committing the segment. This guards against premature termination when
+  VAD emits a brief false silence (breath, cough, or VAD miss). If VAD returns
+  to speech within the trailing window, the worker resumes processing without
+  resetting.
+- **Lead buffer (FR11)**: When VAD transitions from silence to speech, the ASR
+  worker prepends a short lead buffer (`asr_vad_lead_ms`, default 200 ms) of the
+  audio that immediately preceded the VAD-speech onset. This prevents missing the
+  first phoneme when VAD is late detecting onset.
+
+The VAD signal source is `ComprehensiveTimeline::SnapshotVad()`, not `GpuVad`
+directly. This preserves the dual-pipeline independence: ASR reads the timeline
+(its declared dependency) rather than reaching into the VAD pipeline. The
+ComprehensiveTimeline already has `AddVad()` and `SnapshotVad()` methods
+populated by the independent GpuVad worker.
+
+### New Functional Requirements
+
+- **FR9 — VAD-gated processing**: When `asr_vad_gate` is true, the ASR worker
+  SHALL query the VAD track from `ComprehensiveTimeline::SnapshotVad()` to
+  determine whether the current audio position falls within a speech region.
+  Audio outside VAD-speech regions SHALL NOT be fed to the encoder/decoder,
+  regardless of elapsed segment time.
+
+- **FR10 — Trailing window**: When VAD transitions from speech to silence, the
+  ASR worker SHALL enter a trailing window of `asr_vad_trail_sec` seconds before
+  committing the current segment and resetting the cache. If VAD returns to
+  speech within the trailing window, the worker SHALL resume processing the
+  current segment (no reset). The trailing window is a commit guard, not an
+  encoding window — no new audio is encoded during trailing.
+
+- **FR11 — Lead buffer**: When VAD transitions from silence to speech (IDLE to
+  PROCESSING), the ASR worker SHALL prepend `asr_vad_lead_ms` milliseconds of
+  audio preceding the VAD-speech onset. The lead buffer is stored in a ring
+  buffer (~500 ms, ~128 KB float32 at 16 kHz) in `AsrWriter` so it captures
+  audio that arrived before VAD's speech event.
+
+### Parameter changes
+
+| Parameter | Value | Role |
+|---|---|---|
+| `asr_vad_gate` | `true` | Enable VAD-gated segment boundaries |
+| `asr_vad_lead_ms` | `200` | Lead buffer size in milliseconds |
+| `asr_vad_trail_sec` | `1.5` | Trailing window in seconds |
+| `max_segment_sec` | `24.0` | Retained as hard safety cap only (see §9.4) |
+
+`max_segment_sec` remains as a hard upper bound: if the trailing window and VAD
+speech span exceed 24 s continuously, the segment resets on the safety cap. This
+protects against VAD failure (missing silence, false continuous speech).

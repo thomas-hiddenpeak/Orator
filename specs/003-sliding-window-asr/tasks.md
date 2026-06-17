@@ -84,6 +84,28 @@
   *(Verify: docs match reality.)*
 - [ ] **T082** Commit.
 
+## Phase 5 — VAD-Gated Segment Boundaries (2026-06-17 revision)
+
+- [ ] **T090** Add config parameters: `asr_vad_gate` (bool, default `true`),
+  `asr_vad_lead_ms` (int, default 200), `asr_vad_trail_sec` (double, default
+  1.5). Wire into ASR worker configuration. *(Verify: build clean; params
+  reflected in worker state.)*
+- [ ] **T091** Implement `AsrWriter` ring buffer (~500 ms, ~128 KB float32 at
+  16 kHz) and VAD state machine: IDLE → PROCESSING (pop lead_ms from ring),
+  PROCESSING → TRAILING (on VAD silence), TRAILING → IDLE (on trail_sec timeout
+  or safety cap). *(Verify: state machine transitions correct with injected VAD
+  events; ring buffer does not drop audio.)*
+- [ ] **T092** Wire `ComprehensiveTimeline::SnapshotVad()` → ASR worker VAD event
+  channel. ASR worker receives `(vad_start, vad_end)` pairs on the shared clock
+  without linking to `GpuVad`. *(Verify: ASR worker compiles without `GpuVad`
+  headers; VAD events arrive in order.)*
+- [ ] **T093** `AuditoryStream` wiring: connect
+  `comp_.SnapshotVad()` to `AsrWriter` VAD event channel. Ensure the channel
+  does not block the VAD pipeline. *(Verify: full WebSocket path streams audio,
+  VAD events reach ASR, segments commit on VAD silence + trailing.)*
+- [ ] **T094** Build + `ctest` verification. *(Verify: AC7 — clean build, tests
+  pass, no new races.)*
+
 ## Traceability (requirement → task)
 
 | Requirement | Tasks |
@@ -96,6 +118,9 @@
 | FR6 timeline output | T060 |
 | FR7 finalize | T061 |
 | FR8 CER measurement | T000, T040 |
+| FR9 VAD-gated processing | T090, T091, T092 |
+| FR10 trailing window | T090, T091 |
+| FR11 lead buffer | T090, T091, T093 |
 
 | Acceptance | Tasks |
 |---|---|
@@ -109,7 +134,8 @@
 
 ## Definition of Done
 Incremental KV-cache streaming implemented; chunk-local encode equivalence
-verified; per-step cost incremental and bounded with boundary resets; RTF and
-CER at or better than the Silero-VAD baseline on the same span with chosen
-defaults; deterministic committed text; output contract unchanged; build + tests
-green; docs updated; committed.
+verified; per-step cost incremental and bounded with boundary resets; VAD-gated
+segment boundaries operational (FR9-11) with trailing window and lead buffer;
+RTF and CER at or better than the Silero-VAD baseline on the same span with
+chosen defaults; deterministic committed text; output contract unchanged; build
++ tests green; docs updated; committed.
