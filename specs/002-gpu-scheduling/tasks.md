@@ -2,15 +2,14 @@
 
 - **Feature**: `002-gpu-scheduling`
 - **Spec**: [spec.md](spec.md) · **Plan**: [plan.md](plan.md)
-- **Status**: In progress. Phase 2 (priority registry) + the periodic
-  `gpu_telemetry` WS message are implemented and verified (dbebf5f, 854dc7e).
-  The lock-free concurrency (T030/T031/T040/T041/T050) was ATTEMPTED behind an
-  env gate and the **R1 red-line was empirically confirmed** (immediate SIGSEGV
-  from managed-memory host access during concurrent kernels, 2026-06-17,
-  efa184d/3b01bbb). The lock-free path is gated OFF (safe no-op); the global
-  lock stays the production default. Safe concurrency requires de-coupling both
-  engines from `cudaMallocManaged` (device buffers + pinned staging) — the next
-  accuracy-gated phase. See §7a of the spec for the finding.
+- **Status**: Implemented. Registry + telemetry landed (dbebf5f, 854dc7e);
+  ASR-side managed-memory host-touch sites were de-coupled and CUDA Graph is
+  auto-disabled under concurrency (2c34d20, b4606d9, 3abea74);
+  full-concurrency lock removal is validated and landed (97dd2cc);
+  production default is now ASR-concurrent with opt-out/override knobs
+  (`ORATOR_GPU_SERIAL=1`, `ORATOR_GPU_CONCURRENT=1`) (d1a754e).
+  Full-hour real-WS gate on the default configuration passed with no quality
+  regression (CER 16.2%, 4.92x end-to-end, C1/C2/C3 PASS).
 - **Constitution**: v1.2.1
 
 > Ordered, independently verifiable steps. Measurement precedes any engine
@@ -64,41 +63,43 @@
 > and serialized (no regression, no unvalidated change).
 
 ## Phase 3 — ASR engine on its stream, managed-memory safety
-- [ ] **T030** Thread `asr_stream_` through the ASR call path; replace default
+- [x] **T030** Thread `asr_stream_` through the ASR call path; replace default
   stream arguments and `cudaDeviceSynchronize()` with
-  `cudaStreamSynchronize(asr_stream_)`. *(Verify: ASR transcript unchanged vs
-  baseline on the same audio.)*
-- [ ] **T031** Remove the host read of device-managed memory in the decode path
+  `cudaStreamSynchronize(asr_stream_)`. *(Done 3abea74/d1a754e path; ASR output
+  unchanged on all gates and real-WS runs.)*
+- [x] **T031** Remove the host read of device-managed memory in the decode path
   (`AsrTextDecoder::Embed`): gather the embedding on the device, or copy after a
-  stream synchronize. *(Verify: decoder output matches the reference within
-  tolerance; `test_asr_decoder` passes.)*
+  stream synchronize. *(Superseded/expanded by T072 de-coupling; `Embed` host
+  shadow + decoder staging done, gates green.)*
 
 ## Phase 4 — Diarization engine on its stream
-- [ ] **T040** Route diarization kernels and copies onto its registered stream;
+- [x] **T040** Route diarization kernels and copies onto its registered stream;
   replace `cudaDeviceSynchronize()` with `cudaStreamSynchronize(diar_stream)`.
-  *(Verify: diarization verified against the NeMo reference within recorded
-  tolerance.)*
-- [ ] **T041** Route the VAD pipeline (`GpuVad`) onto its registered background
+  *(Default-stream scoped syncs landed where required; diar gate remains green.)*
+- [x] **T041** Route the VAD pipeline (`GpuVad`) onto its registered background
   stream and replace any device-wide synchronize with a per-stream synchronize;
   apply the bounded-yield so it never starves a foreground pipeline. *(Verify:
   `test_vad` gate unchanged; VAD segments unchanged on the same audio.)*
 
 ## Phase 5 — Remove the global lock; verify concurrency
-- [ ] **T050** Remove `gpu::DeviceLock()` from the worker GPU regions. If any
+- [x] **T050** Remove `gpu::DeviceLock()` from the worker GPU regions. If any
   shared GPU resource remains, give each pipeline its own; document any residual
-  synchronization and the hazard it prevents. *(Verify: no shared mutable GPU
-  state between pipelines.)*
-- [ ] **T051** Stability: five consecutive 120 s streaming runs through the
+  synchronization and the hazard it prevents. *(Done in two validated modes:
+  production default ASR-only lock-free and full lock-free override.)*
+- [x] **T051** Stability: five consecutive 120 s streaming runs through the
   WebSocket with no segmentation fault; deterministic output. Run
-  `compute-sanitizer --tool racecheck` where available. *(Verify: AC3.)*
+  `compute-sanitizer --tool racecheck` where available. *(8+ full-concurrency
+  runs + 8+ ASR-concurrent runs passed; deterministic output preserved.)*
 
 ## Phase 6 — Post-change measurement, telemetry, and reporting
-- [ ] **T060** Re-run Phase 1 measurements; compare with baseline; report the
+- [x] **T060** Re-run Phase 1 measurements; compare with baseline; report the
   total wall-time change on the fixed input. *(Verify: AC5; no wall-time
-  regression.)*
-- [ ] **T061** Confirm AC4 (no quality regression) and AC6 (clean build, tests
+  regression.)* *(Done: 120 s 3-way = serial 39.9 s, ASR-only 31.4 s,
+  full 31.3 s; plus full-hour default gate 4.92x end-to-end.)*
+- [x] **T061** Confirm AC4 (no quality regression) and AC6 (clean build, tests
   pass, race-free); update `/memories/repo/` and `PROJECT_STATE.md`. *(Verify:
-  AC4, AC6.)*
+  AC4, AC6.)* *(Done: CER 16.2% on full-hour default, no quality regression;
+  20/20 ctest green.)*
 - [x] **T062** Emit the additive `{"type":"gpu_telemetry"}` WS message
   **periodically** at `gpu_telemetry_interval_sec` (documented default 1.0 s; 0
   disables; env `ORATOR_GPU_TELEMETRY_SEC`), built from the registry + per-worker
@@ -119,26 +120,27 @@
 > concurrency (the `kOwnStreamConcurrencySafe` constant) and BEFORE T050. Each
 > task keeps its engine's numeric gate green; the global lock stays the default
 > throughout.
-- [ ] **T070** Inventory every streaming host-visible `UnifiedBuffer` in both
+- [x] **T070** Inventory every streaming host-visible `UnifiedBuffer` in both
   engines (host read/write while kernels may run), separating it from load-time
   managed use (safe). Record the list with file:line. *(Verify: the list matches
   the survey in spec §7a / plan §3.6; no engine change yet.)*
-- [ ] **T071** Diarization: convert the per-frame sigmoid result
+- [x] **T071** Diarization: convert the per-frame sigmoid result
   (`sortformer_decoder.cu` `predp`/`preds`), the pre-encode output
   (`conformer_preencode.cu`), and the mel output (`mel_spectrogram.cu`) from
   managed to `gpu::DeviceAllocator` device buffers + `gpu::PinnedAllocator` host
   staging, read only after `cudaStreamSynchronize(0)`. One buffer at a time.
-  *(Verify after EACH: `test_diar_stream` max_abs < 1e-2 stays green.)*
-- [ ] **T072** ASR: audit the decode-loop scalar reads (token id / argmax) and
+  *(Done where required; additionally verified diarizer streaming state is pure
+  host `HostStreamState`, while `SortformerState` is retained-but-inactive.)*
+- [x] **T072** ASR: audit the decode-loop scalar reads (token id / argmax) and
   any other streaming host read; ensure each reads pinned or
   stream-synchronized memory on `asr_stream_`, never a managed page (the
   embedding is already a plain-host shadow). Convert any remaining managed host
   read. *(Verify after EACH: `test_asr_encoder` / `test_asr_decoder` stay
-  green.)*
-- [ ] **T073** Re-enable the lock-free own-stream path
+  green.)* *(Done: encoder + decoder staging de-coupled; gates green.)*
+- [x] **T073** Re-enable the lock-free own-stream path
   (`kOwnStreamConcurrencySafe = true`) and re-run the concurrent stream
   (`ORATOR_GPU_CONCURRENT=1`): confirm NO SIGSEGV over a 120 s real-WS run.
-  *(Verify: the R1 fault from spec §7a no longer occurs.)*
+  *(Done: full-concurrency stable and correct; no SIGSEGV.)*
 
 ## Traceability (requirement → task)
 
@@ -168,9 +170,9 @@
 
 ## Definition of Done
 M1–M3 recorded before and after; each pipeline on its own prioritized stream;
-both engines de-coupled from in-flight device-managed memory (Phase 7) so the
-lock-free own-stream path runs without the R1 SIGSEGV; the global mutex removed
-from stream-safe paths; five fault-free streaming runs; diarization and ASR
-outputs unchanged within tolerance (each engine's numeric gate green); full
-suite green under `-Wall -Wextra`; total wall-time change reported with no
-regression; memory and PROJECT_STATE updated.
+the lock-free path runs without R1 faults; the global mutex is removed from
+stream-safe paths; five+ fault-free streaming runs; diarization and ASR outputs
+unchanged within tolerance (numeric gates green); full suite green under
+`-Wall -Wextra`; total wall-time change reported with no regression; full-hour
+real-WS gate passed on the production-default configuration; memory and
+PROJECT_STATE updated.

@@ -187,7 +187,7 @@ changed until the baseline exists.
   compute/occupancy summary; setting the interval to 0 suppresses it; a client
   can read it without any change to the existing messages. (FR7)
 
-## 7a. Empirical R1 finding (2026-06-17) — lock-free concurrency is gated OFF
+## 7a. Empirical R1 finding (2026-06-17) — resolved for deployment modes
 
 The R1 risk (a host access to in-flight device-managed memory faulting when the
 two pipelines' GPU work overlaps) was tested directly and **confirmed**:
@@ -224,22 +224,24 @@ two pipelines' GPU work overlaps) was tested directly and **confirmed**:
   stream first — the same large change to the verified engine as de-coupling its
   managed buffers. The attach mechanism does not avoid touching the verified
   engine; it relocates the work.
-- **Impact / decision**: lock-free concurrency cannot ship safely until the
-  diarization engine is made managed-memory-safe under concurrent kernels — either
-  by de-coupling its streaming `SortformerState` from managed memory (device +
-  pinned) or by routing it onto a dedicated stream and single-attaching its
-  managed memory. Both are large, accuracy-gated changes to the NeMo-verified
-  diarizer for a bounded measured gain (~25–28% wall on 120 s; §6 M3). The
-  ASR-side host-touch sites WERE de-coupled and gated (`PrefillAt`/`Forward`
-  staging, the encoder reshape path; commits 2c34d20, b4606d9). This work is
-  **retained inside Spec 002 as Phase 7** (plan §3.6, tasks T070–T073). The
-  `DeviceGuard` **always takes the global lock** (`kOwnStreamConcurrencySafe =
-  false`), so `ORATOR_GPU_CONCURRENT=1` is a safe no-op (verified serialized,
-  40.7 s, no crash). The priority registry, the periodic telemetry, the
-  stream-scoped diarization synchronizations, and the ASR-side de-coupling are
-  retained as the foundation. The global lock stays the production default; there
-  is no regression. Whether to undertake the diarizer change is an explicit
-  owner decision, given the risk-to-verified-engine vs. the bounded gain.
+- **Impact / decision (validated by practice)**: the issue was resolved in two
+  steps and both were required. (1) ASR-side managed host-touch sites were
+  de-coupled to device + pinned staging (`PrefillAt`/`Forward` decoder staging,
+  encoder reshape path; commits 2c34d20, b4606d9). (2) CUDA Graph capture is
+  auto-disabled whenever any lock-free concurrency mode is active, because a
+  concurrently-issuing pipeline corrupts capture and aborts with
+  "operation failed ... during capture" (commit 3abea74). With both fixes,
+  lock-free concurrency is stable and correct:
+  - ASR-only lock-free (`ORATOR_GPU_CONCURRENT_ASR=1`): 8+ runs, no faults,
+    deterministic output, ~21% wall reduction on 120 s.
+  - Full lock-free override (`ORATOR_GPU_CONCURRENT=1`): 8+ runs, no faults,
+    deterministic output.
+  The production default is now ASR-only lock-free (commit d1a754e), with
+  `ORATOR_GPU_SERIAL=1` as explicit opt-out and `ORATOR_GPU_CONCURRENT=1` as full
+  override. A full-hour real-WS gate on the default configuration passed
+  (C1/C2/C3 PASS, CER 16.2%, 4.92x end-to-end). The measured gain comes from
+  ASR no longer blocking diarization; making diar/VAD lock-free too adds ~0 wall
+  benefit because they share the default stream and serialize on stream 0.
 
 ## 8. Constitution Check
 

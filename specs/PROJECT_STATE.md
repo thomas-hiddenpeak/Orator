@@ -221,8 +221,14 @@ Open, independently-scheduled items:
   (tegrastats): serial wall 40.2 s, GPU busy 55.4 %; concurrent wall 29.9 s
   (−25.6 %), GPU busy 65.0 %; diarization RTF rose 5.4× → 26× (it no longer waits
   behind ASR). 8+ consecutive runs, zero crashes, output identical to serial
-  (asr 5 / diar 25 / comp 45). This hits the Spec 002 M3 target (25–28 %). It is
-  an OPT-IN experiment for now (production default stays serial, lock on). **Full
+  (asr 5 / diar 25 / comp 45). This hits the Spec 002 M3 target (25–28 %). **It
+  was promoted to production default** (commit d1a754e): default mode is now
+  ASR-only lock-free concurrency; `ORATOR_GPU_SERIAL=1` is explicit opt-out
+  (legacy serialized behavior), and `ORATOR_GPU_CONCURRENT=1` is full lock-free
+  override. **Default-on full-hour real-WS gate passed** (port 8767):
+  `stream_wall_sec=21.1` (171.33× push), `total_wall_sec=734.4` (4.92×
+  end-to-end), C1/C2/C3 PASS, CER 16.2% (`2161/13352`, no regression),
+  GPU active-window busy 66.3% / mean 43.9% / longest idle 9 s. **Full
   concurrency landed and measured (2026-06-17, commit 97dd2cc):**
   `ORATOR_GPU_CONCURRENT=1` drops the lock for diarization + VAD too. It was
   expected to need a large de-coupling of the diarizer's managed
@@ -240,8 +246,8 @@ Open, independently-scheduled items:
   stream 0 regardless). Making diar and VAD truly GPU-parallel would require
   routing the diarizer's hundreds of kernel launches onto a dedicated non-default
   stream for no measurable benefit (diar is already ~26× RTF, VAD is tiny;
-  neither is the bottleneck). Both concurrency modes remain OPT-IN; production
-  default stays serial (lock on, no regression).
+  neither is the bottleneck). Operational policy: keep ASR-concurrent as default,
+  keep full-concurrency as override.
 - **Full 1-hour real-WS revalidation on the current `text_id` revision code**:
   done (2026-06-17, commit c94c2fa) — see the milestone-gate section in §2.
 - ASR streaming throughput (~2.6x, Spec 001 NG1) — deferred by owner.

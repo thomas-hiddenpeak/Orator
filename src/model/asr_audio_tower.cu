@@ -18,6 +18,7 @@ namespace model {
 using ::orator::gpu::CheckCudaError;
 using ::orator::gpu::UnifiedBuffer;
 using ::orator::gpu::DeviceBuffer;
+using ::orator::gpu::PinnedBuffer;
 
 namespace {
 
@@ -308,17 +309,26 @@ std::vector<float> AsrAudioTower::Forward(const float* mel, int n_frames,
   const int CF = config_.downsample_hidden * Hc3;                      // 7680
 
   // ---- Build padded conv input [chunks, 1, F, max_cl] (freq=H, time=W) ----
-  UnifiedBuffer d_in(sizeof(float) * static_cast<size_t>(chunks) * F * max_cl);
-  std::memset(d_in.data(), 0, sizeof(float) * static_cast<size_t>(chunks) * F * max_cl);
-  float* in_p = static_cast<float*>(d_in.data());
+  // Spec 002 Phase 7 (T072): the host fills this from `mel` then a GEMM reads it.
+  // The host fill runs on PINNED memory (never page-faults under concurrent
+  // kernels, unlike managed); the GEMM reads a DEVICE copy. Identical values.
+  const size_t in_elems = static_cast<size_t>(chunks) * F * max_cl;
+  PinnedBuffer h_in(sizeof(float) * in_elems);
+  std::memset(h_in.data(), 0, sizeof(float) * in_elems);
+  float* hin_p = static_cast<float*>(h_in.data());
   // mel is [F, n_frames]; chunk c covers mel frames [c*win, c*win+chunk_len[c]).
   for (int c = 0; c < chunks; ++c) {
     const int off = c * win;
     for (int f = 0; f < F; ++f)
       for (int t = 0; t < chunk_len[c]; ++t)
-        in_p[(static_cast<size_t>(c) * F + f) * max_cl + t] =
+        hin_p[(static_cast<size_t>(c) * F + f) * max_cl + t] =
             mel[static_cast<size_t>(f) * n_frames + (off + t)];
   }
+  DeviceBuffer d_in(sizeof(float) * in_elems);
+  CheckCudaError(cudaMemcpyAsync(d_in.data(), hin_p, sizeof(float) * in_elems,
+                                 cudaMemcpyHostToDevice, stream),
+                 __FILE__, __LINE__);
+  float* in_p = static_cast<float*>(d_in.data());
 
   // ---- Conv2d x3 + GELU via im2col + bf16 tensor-core GEMM ----
   // For each conv: col[B*Ho*Wo, Cin*9] (bf16) = im2col(in); out_rows[rows, Cout]
@@ -329,7 +339,10 @@ std::vector<float> AsrAudioTower::Forward(const float* mel, int n_frames,
     const int K = Cin * 9;
     UnifiedBuffer col(sizeof(uint16_t) * rows * K);
     UnifiedBuffer outrows(sizeof(float) * rows * Cout);
-    auto out = std::make_shared<UnifiedBuffer>(
+    // Spec 002 Phase 7 (T072): conv outputs are DEVICE memory. c1/c2 chain as
+    // GEMM inputs (device); c3 is additionally host-reshaped below via pinned
+    // staging. Device memory never page-faults under concurrent kernels.
+    auto out = std::make_shared<DeviceBuffer>(
         sizeof(float) * static_cast<size_t>(chunks) * Cout * Ho * Wo);
     dim3 blk(32, 8);
     dim3 grd((K + 31) / 32, static_cast<unsigned>((rows + 7) / 8));
@@ -356,28 +369,48 @@ std::vector<float> AsrAudioTower::Forward(const float* mel, int n_frames,
     CheckCudaError(cudaStreamSynchronize(stream), __FILE__, __LINE__);
 
   // ---- Reshape [chunks, dh, Hc3, Wc] -> [chunks*Wc, dh*Hc3] (permute b,t,c,f) ----
+  // Spec 002 Phase 7 (T072): the permute runs on the HOST. Stage c3 (device) to
+  // PINNED host memory, permute there, then upload to a DEVICE buffer for the
+  // conv_out GEMM. The host only touches pinned memory (R1-safe); the math is
+  // identical to the prior managed-memory permute.
   const int rows = chunks * Wc;
-  UnifiedBuffer d_feat(sizeof(float) * static_cast<size_t>(rows) * CF);
-  float* feat = static_cast<float*>(d_feat.data());
-  const float* c3p = static_cast<const float*>(c3->data());
+  const size_t c3_elems = static_cast<size_t>(chunks) * dh * Hc3 * Wc;
+  PinnedBuffer h_c3(sizeof(float) * c3_elems);
+  CheckCudaError(cudaMemcpyAsync(h_c3.data(), c3->data(), sizeof(float) * c3_elems,
+                                 cudaMemcpyDeviceToHost, stream),
+                 __FILE__, __LINE__);
+  CheckCudaError(cudaStreamSynchronize(stream), __FILE__, __LINE__);
+  const size_t feat_elems = static_cast<size_t>(rows) * CF;
+  PinnedBuffer h_feat(sizeof(float) * feat_elems);
+  float* feat = static_cast<float*>(h_feat.data());
+  const float* c3p = static_cast<const float*>(h_c3.data());
   for (int b = 0; b < chunks; ++b)
     for (int t = 0; t < Wc; ++t)
       for (int co = 0; co < dh; ++co)
         for (int f = 0; f < Hc3; ++f)
           feat[(static_cast<size_t>(b) * Wc + t) * CF + (co * Hc3 + f)] =
               c3p[((static_cast<size_t>(b) * dh + co) * Hc3 + f) * Wc + t];
+  DeviceBuffer d_feat(sizeof(float) * feat_elems);
+  CheckCudaError(cudaMemcpyAsync(d_feat.data(), feat, sizeof(float) * feat_elems,
+                                 cudaMemcpyHostToDevice, stream),
+                 __FILE__, __LINE__);
 
 
   // ---- conv_out Linear [rows, 7680] -> [rows, 1024] (no bias) ----
-  UnifiedBuffer d_h(sizeof(float) * static_cast<size_t>(rows) * D);
-  asr_gemm::Linear(feat, conv_out_w_.p, nullptr, static_cast<float*>(d_h.data()),
-                     rows, CF, D, 0, stream);
+  DeviceBuffer d_h(sizeof(float) * static_cast<size_t>(rows) * D);
+  asr_gemm::Linear(static_cast<float*>(d_feat.data()), conv_out_w_.p, nullptr,
+                     static_cast<float*>(d_h.data()), rows, CF, D, 0, stream);
   CheckCudaError(cudaGetLastError(), __FILE__, __LINE__);
     CheckCudaError(cudaStreamSynchronize(stream), __FILE__, __LINE__);
 
   // ---- Add positional embedding (per chunk, PE[0:Wc]) ----
-  UnifiedBuffer d_pe(sizeof(float) * static_cast<size_t>(Wc) * D);
-  std::memcpy(d_pe.data(), pe_.data(), sizeof(float) * static_cast<size_t>(Wc) * D);
+  // Spec 002 Phase 7 (T072): d_pe is DEVICE memory uploaded from the host PE
+  // table; the host never touches managed memory here.
+  DeviceBuffer d_pe(sizeof(float) * static_cast<size_t>(Wc) * D);
+  CheckCudaError(cudaMemcpyAsync(d_pe.data(), pe_.data(),
+                                 sizeof(float) * static_cast<size_t>(Wc) * D,
+                                 cudaMemcpyHostToDevice, stream),
+                 __FILE__, __LINE__);
     AddPeChunkedKernel<<<Blocks(static_cast<long>(rows) * D), kThreads, 0, stream>>>(
       static_cast<float*>(d_h.data()), static_cast<float*>(d_pe.data()), chunks, Wc, D);
   CheckCudaError(cudaGetLastError(), __FILE__, __LINE__);
@@ -387,14 +420,28 @@ std::vector<float> AsrAudioTower::Forward(const float* mel, int n_frames,
   std::vector<int> valid(chunks);
   int N = 0;
   for (int c = 0; c < chunks; ++c) { valid[c] = OutputLength(chunk_len[c]); N += valid[c]; }
-  UnifiedBuffer d_hid(sizeof(float) * static_cast<size_t>(N) * D);
-  float* hid = static_cast<float*>(d_hid.data());
-  const float* hp = static_cast<const float*>(d_h.data());
+  // Spec 002 Phase 7 (T072): the drop-padding gather runs on the HOST. Stage
+  // d_h (device) to PINNED host memory, gather there, then upload the result to
+  // a DEVICE buffer for the transformer layers. Host touches only pinned memory.
+  PinnedBuffer h_h(sizeof(float) * static_cast<size_t>(rows) * D);
+  CheckCudaError(cudaMemcpyAsync(h_h.data(), d_h.data(),
+                                 sizeof(float) * static_cast<size_t>(rows) * D,
+                                 cudaMemcpyDeviceToHost, stream),
+                 __FILE__, __LINE__);
+  CheckCudaError(cudaStreamSynchronize(stream), __FILE__, __LINE__);
+  PinnedBuffer h_hid(sizeof(float) * static_cast<size_t>(N) * D);
+  float* hid = static_cast<float*>(h_hid.data());
+  const float* hp = static_cast<const float*>(h_h.data());
   int row = 0;
   for (int c = 0; c < chunks; ++c)
     for (int t = 0; t < valid[c]; ++t, ++row)
       std::memcpy(hid + static_cast<size_t>(row) * D,
                   hp + (static_cast<size_t>(c) * Wc + t) * D, sizeof(float) * D);
+  DeviceBuffer d_hid(sizeof(float) * static_cast<size_t>(N) * D);
+  CheckCudaError(cudaMemcpyAsync(d_hid.data(), hid,
+                                 sizeof(float) * static_cast<size_t>(N) * D,
+                                 cudaMemcpyHostToDevice, stream),
+                 __FILE__, __LINE__);
 
   // ---- Attention windows (cu_seqlens) ----
   const int window_aftercnn = Wc * (config_.n_window_infer / win);  // 13*8=104
@@ -420,9 +467,15 @@ std::vector<float> AsrAudioTower::Forward(const float* mel, int n_frames,
   if (const char* w = std::getenv("ORATOR_ASR_WINDOWED"); !w || w[0] != '1') {
     for (int i = 0; i < N; ++i) { h_seg_start[i] = 0; h_seg_end[i] = N; }
   }
-  UnifiedBuffer d_ss(sizeof(int) * N), d_se(sizeof(int) * N);
-  std::memcpy(d_ss.data(), h_seg_start.data(), sizeof(int) * N);
-  std::memcpy(d_se.data(), h_seg_end.data(), sizeof(int) * N);
+  // Spec 002 Phase 7 (T072): segment bounds are DEVICE memory uploaded from the
+  // host vectors; the host never writes managed memory here.
+  DeviceBuffer d_ss(sizeof(int) * N), d_se(sizeof(int) * N);
+  CheckCudaError(cudaMemcpyAsync(d_ss.data(), h_seg_start.data(), sizeof(int) * N,
+                                 cudaMemcpyHostToDevice, stream),
+                 __FILE__, __LINE__);
+  CheckCudaError(cudaMemcpyAsync(d_se.data(), h_seg_end.data(), sizeof(int) * N,
+                                 cudaMemcpyHostToDevice, stream),
+                 __FILE__, __LINE__);
 
   // ---- 24 transformer layers ----
   UnifiedBuffer d_norm(sizeof(float) * static_cast<size_t>(N) * D);
