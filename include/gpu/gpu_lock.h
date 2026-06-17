@@ -25,23 +25,22 @@ namespace gpu {
 // guard(gpu::DeviceLock());` around a GPU-touching region.
 std::mutex& DeviceLock();
 
-// Spec 002: whether concurrent GPU mode is enabled (env ORATOR_GPU_CONCURRENT,
-// read once). In concurrent mode a pipeline that runs on its OWN non-default
-// CUDA stream (currently only ASR) does not take the global lock: its stream and
-// stream-scoped synchronization order its work, so it can overlap another
-// pipeline's GPU work. Pipelines that share the default stream (diarization and
-// VAD) ALWAYS take the lock so their kernels never interleave on stream 0.
-// Default (unset) is serialized mode: every GPU region takes the lock, exactly
-// as before (the safe, validated production behavior).
+// Spec 002: GPU concurrency mode. The PRODUCTION DEFAULT is ASR-only
+// concurrency: the ASR pipeline runs on its own CUDA stream WITHOUT the global
+// lock, while diarization and VAD still hold it (they share the default stream
+// and serialize on it regardless). This captures the full measured speedup
+// (~21% wall on 120 s; the gain is ASR no longer blocking diarization) at the
+// smaller-risk surface. Env overrides: ORATOR_GPU_SERIAL=1 forces the legacy
+// fully-serialized mode (every region locks); ORATOR_GPU_CONCURRENT=1 selects
+// full concurrency (diar/VAD also lock-free — validated but no faster).
+//
+// ConcurrentGpuEnabled() is true only in full mode.
 bool ConcurrentGpuEnabled();
 
-// Spec 002: whether ANY lock-free concurrency mode is active (full
-// ORATOR_GPU_CONCURRENT or the ASR-only experiment ORATOR_GPU_CONCURRENT_ASR).
-// When true, the ASR pipeline's GPU work runs WITHOUT the global lock while the
-// diarization/VAD pipelines may run kernels concurrently. CUDA Graph capture is
-// unsafe in this state (capture is a process/stream-global state machine that a
-// concurrently-issuing pipeline corrupts -> "operation failed ... during
-// capture" abort), so the ASR decoder disables graph capture when this is true.
+// True if ANY lock-free concurrency mode is active (the ASR-only default or
+// full). The ASR decoder uses this to disable CUDA Graph capture, which a
+// concurrently-issuing pipeline corrupts ("operation failed ... during capture"
+// abort). It is therefore true by default now.
 bool ConcurrentGpuActive();
 
 // RAII GPU-region guard (Spec 002). In serialized mode it always holds

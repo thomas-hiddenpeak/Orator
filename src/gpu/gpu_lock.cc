@@ -5,75 +5,78 @@
 namespace orator {
 namespace gpu {
 
+namespace {
+// Parse a boolean-ish env var (set + leading 1/t/T/y/Y => true).
+bool EnvTrue(const char* name) {
+  const char* v = std::getenv(name);
+  return v != nullptr && (v[0] == '1' || v[0] == 't' || v[0] == 'T' ||
+                          v[0] == 'y' || v[0] == 'Y');
+}
+
+// GPU concurrency mode (resolved once at first use). Spec 002:
+//   kSerial   — every GPU region takes the global lock (legacy behavior).
+//   kAsrOnly  — ONLY the ASR own-stream pipeline is lock-free; diarization + VAD
+//               still hold the lock (they share the default stream). This is the
+//               PRODUCTION DEFAULT: it captures the full measured speedup (the
+//               gain is ASR's stream no longer blocking diarization; making
+//               diar/VAD lock-free too adds ~0 because they serialize on stream
+//               0 regardless) while keeping the smaller-risk surface.
+//   kFull     — all pipelines drop the lock (validated, but no faster than
+//               kAsrOnly; available via ORATOR_GPU_CONCURRENT=1).
+// Resolution: ORATOR_GPU_SERIAL=1 forces kSerial; ORATOR_GPU_CONCURRENT=1 selects
+// kFull; otherwise kAsrOnly (default).
+enum class GpuMode { kSerial, kAsrOnly, kFull };
+
+GpuMode ResolveMode() {
+  if (EnvTrue("ORATOR_GPU_SERIAL")) return GpuMode::kSerial;
+  if (EnvTrue("ORATOR_GPU_CONCURRENT")) return GpuMode::kFull;
+  return GpuMode::kAsrOnly;
+}
+
+GpuMode Mode() {
+  static const GpuMode m = ResolveMode();
+  return m;
+}
+}  // namespace
+
 std::mutex& DeviceLock() {
   static std::mutex lock;
   return lock;
 }
 
 bool ConcurrentGpuEnabled() {
-  // Read the env once. ORATOR_GPU_CONCURRENT in {1,t,T,y,Y} enables the
-  // concurrent path; anything else (including unset) keeps serialized mode.
-  static const bool enabled = [] {
-    const char* v = std::getenv("ORATOR_GPU_CONCURRENT");
-    return v != nullptr &&
-           (v[0] == '1' || v[0] == 't' || v[0] == 'T' || v[0] == 'y' ||
-            v[0] == 'Y');
-  }();
-  return enabled;
+  // True when full concurrency (all pipelines lock-free) is selected.
+  return Mode() == GpuMode::kFull;
 }
 
 bool ConcurrentGpuActive() {
-  // True if any lock-free concurrency mode is on: the full path (currently still
-  // gated off at the DeviceGuard) OR the ASR-only experiment knob. Used by the
-  // ASR decoder to disable CUDA Graph capture, which a concurrently-issuing
-  // pipeline corrupts.
-  static const bool active = [] {
-    const char* a = std::getenv("ORATOR_GPU_CONCURRENT_ASR");
-    const bool asr_only = a != nullptr && (a[0] == '1' || a[0] == 't' ||
-                                           a[0] == 'T' || a[0] == 'y' ||
-                                           a[0] == 'Y');
-    return asr_only || ConcurrentGpuEnabled();
-  }();
-  return active;
+  // True if ANY lock-free concurrency mode is active (ASR-only default or full).
+  // The ASR decoder uses this to disable CUDA Graph capture, which a
+  // concurrently-issuing pipeline corrupts ("operation failed ... during
+  // capture" abort).
+  return Mode() != GpuMode::kSerial;
 }
 
 DeviceGuard::DeviceGuard(bool own_stream) : locked_(false) {
-  // EMPIRICAL R1 RESULT (Spec 002, 2026-06-17): the lock-free own-stream path is
-  // gated OFF BY DEFAULT. This Orin reports concurrentManagedAccess == 0
-  // (verified by device query), so the host may not touch ANY cudaMallocManaged
-  // (`UnifiedBuffer`) memory while a kernel runs on any stream — it faults via
-  // page migration. The ASR-side host-touch sites WERE de-coupled (device +
-  // pinned staging); the diarizer's managed host access (the whole streaming
-  // SortformerState) is large and lives in the NeMo-verified engine and is NOT
-  // yet de-coupled.
+  // Spec 002 concurrency (validated 2026-06-17). This Orin reports
+  // concurrentManagedAccess == 0, so the host must not touch managed memory
+  // while any kernel runs. The ASR engine's streaming host-touch sites were
+  // de-coupled to device + pinned memory, and CUDA Graph capture is auto-disabled
+  // under concurrency, so the ASR own-stream pipeline is safe to run lock-free.
+  // The diarizer's streaming compute state is pure host memory (HostStreamState)
+  // and GpuVad is all-device, so the full mode is also safe; it is simply no
+  // faster than ASR-only (diar/VAD share the default stream).
   //
-  // CONTROLLED EXPERIMENT KNOB (ORATOR_GPU_CONCURRENT_ASR): when set, ONLY the
-  // ASR own-stream pipeline skips the lock, while diarization and VAD continue
-  // to hold it (they still serialize against each other on the default stream).
-  // This isolates whether the completed ASR-side de-coupling is sufficient for
-  // ASR to run concurrently with the (locked) diar/VAD work. It is an experiment
-  // gate, not a production default; ORATOR_GPU_CONCURRENT (full) stays OFF until
-  // the diarizer is also de-coupled.
-  static const bool asr_only_concurrent = [] {
-    const char* v = std::getenv("ORATOR_GPU_CONCURRENT_ASR");
-    return v != nullptr && (v[0] == '1' || v[0] == 't' || v[0] == 'T' ||
-                            v[0] == 'y' || v[0] == 'Y');
-  }();
-  // FULL concurrency experiment (ORATOR_GPU_CONCURRENT): ALL pipelines skip the
-  // lock — ASR on its own stream, diarization + VAD sharing the default stream
-  // (their kernels still serialize on stream 0, but the host-side lock is
-  // dropped). This is gated to a controlled experiment because it requires every
-  // pipeline's host-touched memory to be R1-safe (device/pinned): GpuVad is
-  // already all-device (cudaMalloc); the diarizer's streaming compute uses pure
-  // host vectors (HostStreamState) and its result copies were converted to
-  // device; the managed SortformerState is retained-but-inactive (never read on
-  // the streaming path). Validated empirically before any production use.
-  constexpr bool kOwnStreamConcurrencySafe = false;
-  const bool full_skip = own_stream && kOwnStreamConcurrencySafe &&
-                         ConcurrentGpuEnabled();
-  const bool full_all_skip = ConcurrentGpuEnabled();  // full mode: skip for all
-  const bool asr_skip = own_stream && asr_only_concurrent;
-  const bool skip = full_skip || full_all_skip || asr_skip;
+  //   kSerial : everyone locks.
+  //   kAsrOnly: ASR (own_stream) is lock-free; diar/VAD lock. PRODUCTION DEFAULT.
+  //   kFull   : everyone is lock-free.
+  const GpuMode mode = Mode();
+  bool skip = false;
+  switch (mode) {
+    case GpuMode::kSerial: skip = false; break;
+    case GpuMode::kAsrOnly: skip = own_stream; break;
+    case GpuMode::kFull: skip = true; break;
+  }
   if (!skip) {
     DeviceLock().lock();
     locked_ = true;
