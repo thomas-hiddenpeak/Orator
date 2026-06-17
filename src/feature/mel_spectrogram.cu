@@ -163,7 +163,8 @@ std::vector<float> MelSpectrogram::Compute(const float* samples, int num_samples
     }
   }
 
-  return RunStftMel(sig.data(), num_samples, /*input_offset=*/0, num_frames);
+  return RunStftMel(sig.data(), num_samples, /*input_offset=*/0, num_frames,
+                    /*stream=*/nullptr);
 }
 
 // Streaming frame producer: computes `num_frames` log-mel frames from an
@@ -172,16 +173,18 @@ std::vector<float> MelSpectrogram::Compute(const float* samples, int num_samples
 // final-tail) read as zero, matching torch.stft(center=True, pad="constant").
 // Returns frame-major [num_frames * n_mels], bit-identical to the offline path.
 std::vector<float> MelSpectrogram::ComputeStreamFrames(const float* sig,
-                                                       int num_samples,
-                                                       int input_offset,
-                                                       int num_frames) const {
+                                                        int num_samples,
+                                                        int input_offset,
+                                                        int num_frames,
+                                                        cudaStream_t stream) const {
   if (num_frames <= 0) return {};
-  return RunStftMel(sig, num_samples, input_offset, num_frames);
+  return RunStftMel(sig, num_samples, input_offset, num_frames, stream);
 }
 
 std::vector<float> MelSpectrogram::RunStftMel(const float* sig, int num_samples,
                                               int input_offset,
-                                              int num_frames) const {
+                                              int num_frames,
+                                              cudaStream_t stream) const {
   const int n_freqs = this->n_freqs();
   const int n_mels = config_.n_mels;
   const int pad_left = config_.center ? config_.n_fft / 2 : 0;
@@ -196,16 +199,16 @@ std::vector<float> MelSpectrogram::RunStftMel(const float* sig, int num_samples,
                           sizeof(float));
 
   gpu::GpuMemory::CopyHostToDevice(d_samples.data(), sig,
-                                   static_cast<size_t>(num_samples) * sizeof(float));
+                                    static_cast<size_t>(num_samples) * sizeof(float));
   gpu::GpuMemory::CopyHostToDevice(d_win.data(), hann_.data(),
-                                   hann_.size() * sizeof(float));
+                                    hann_.size() * sizeof(float));
   gpu::GpuMemory::CopyHostToDevice(d_filters.data(), mel_filters_.data(),
-                                   mel_filters_.size() * sizeof(float));
+                                    mel_filters_.size() * sizeof(float));
 
   const int block = 256;
   const long power_total = static_cast<long>(num_frames) * n_freqs;
   const int power_grid = static_cast<int>((power_total + block - 1) / block);
-  PowerSpectrumKernel<<<power_grid, block>>>(
+  PowerSpectrumKernel<<<power_grid, block, 0, stream>>>(
       static_cast<const float*>(d_samples.data()), num_samples,
       static_cast<const float*>(d_win.data()), config_.win_length,
       config_.hop_length, config_.n_fft, n_freqs, num_frames, pad_left, win_off,
@@ -214,19 +217,18 @@ std::vector<float> MelSpectrogram::RunStftMel(const float* sig, int num_samples,
 
   const long mel_total = static_cast<long>(num_frames) * n_mels;
   const int mel_grid = static_cast<int>((mel_total + block - 1) / block);
-  MelLogKernel<<<mel_grid, block>>>(
+  MelLogKernel<<<mel_grid, block, 0, stream>>>(
       static_cast<const float*>(d_power.data()), n_freqs,
       static_cast<const float*>(d_filters.data()), n_mels, num_frames,
       config_.log_zero_guard, static_cast<float*>(d_mel.data()));
   CUDA_CHECK(cudaGetLastError());
-  // Spec 002: drain the DEFAULT stream only (the diarization mel front-end runs
-  // on it), not the whole device, so concurrent ASR work on its own stream is
-  // not waited on.
-  CUDA_CHECK(cudaStreamSynchronize(0));
+  CUDA_CHECK(cudaStreamSynchronize(stream));
 
   std::vector<float> mel(static_cast<size_t>(num_frames) * n_mels);
-  gpu::GpuMemory::CopyDeviceToHost(mel.data(), d_mel.data(),
-                                   mel.size() * sizeof(float));
+  CUDA_CHECK(cudaMemcpyAsync(mel.data(), d_mel.data(),
+                              mel.size() * sizeof(float), cudaMemcpyDeviceToHost,
+                              stream));
+  CUDA_CHECK(cudaStreamSynchronize(stream));
   return mel;
 }
 

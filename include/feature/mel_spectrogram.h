@@ -1,5 +1,9 @@
 #pragma once
 
+#include <cuda_runtime.h>
+
+#include <vector>
+
 // Log-mel spectrogram: the real Streaming Sortformer audio front-end.
 //
 // Matches the model's preprocessor config (model_config.yaml):
@@ -8,8 +12,6 @@
 //
 // Computation runs on the GPU (direct DFT + triangular mel filterbank), keeping
 // with the project's GPU-first rule and avoiding any external FFT dependency.
-
-#include <vector>
 
 namespace orator {
 namespace feature {
@@ -53,8 +55,9 @@ class MelSpectrogram {
   // frame-major [num_frames * n_mels], bit-identical to Compute over the same
   // underlying samples. Pre-emphasis continuity is the caller's responsibility.
   std::vector<float> ComputeStreamFrames(const float* sig, int num_samples,
-                                         int input_offset,
-                                         int num_frames) const;
+                                          int input_offset,
+                                          int num_frames,
+                                          cudaStream_t stream = nullptr) const;
 
   int n_mels() const { return config_.n_mels; }
   int n_freqs() const { return config_.n_fft / 2 + 1; }
@@ -78,8 +81,10 @@ class MelSpectrogram {
   void BuildHannWindow();
   void BuildMelFilterbank();
   // Shared GPU STFT+mel core (used by both Compute and ComputeStreamFrames).
+  // `stream` is the CUDA stream for kernel launches and synchronization.
   std::vector<float> RunStftMel(const float* sig, int num_samples,
-                                int input_offset, int num_frames) const;
+                                int input_offset, int num_frames,
+                                cudaStream_t stream) const;
 };
 
 }  // namespace feature
