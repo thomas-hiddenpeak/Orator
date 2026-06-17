@@ -59,11 +59,21 @@ DeviceGuard::DeviceGuard(bool own_stream) : locked_(false) {
     return v != nullptr && (v[0] == '1' || v[0] == 't' || v[0] == 'T' ||
                             v[0] == 'y' || v[0] == 'Y');
   }();
+  // FULL concurrency experiment (ORATOR_GPU_CONCURRENT): ALL pipelines skip the
+  // lock — ASR on its own stream, diarization + VAD sharing the default stream
+  // (their kernels still serialize on stream 0, but the host-side lock is
+  // dropped). This is gated to a controlled experiment because it requires every
+  // pipeline's host-touched memory to be R1-safe (device/pinned): GpuVad is
+  // already all-device (cudaMalloc); the diarizer's streaming compute uses pure
+  // host vectors (HostStreamState) and its result copies were converted to
+  // device; the managed SortformerState is retained-but-inactive (never read on
+  // the streaming path). Validated empirically before any production use.
   constexpr bool kOwnStreamConcurrencySafe = false;
   const bool full_skip = own_stream && kOwnStreamConcurrencySafe &&
                          ConcurrentGpuEnabled();
+  const bool full_all_skip = ConcurrentGpuEnabled();  // full mode: skip for all
   const bool asr_skip = own_stream && asr_only_concurrent;
-  const bool skip = full_skip || asr_skip;
+  const bool skip = full_skip || full_all_skip || asr_skip;
   if (!skip) {
     DeviceLock().lock();
     locked_ = true;
