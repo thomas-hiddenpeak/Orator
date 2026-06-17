@@ -142,6 +142,34 @@ button:not(:disabled):hover {
   font-weight: 600;
 }
 
+.timeline-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.timeline-header h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.auto-flush-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--muted);
+  user-select: none;
+}
+
+.timeline-summary {
+  font-size: 12px;
+  color: var(--muted);
+  margin-left: auto;
+}
+
 .raw {
   margin: 0;
   max-height: 360px;

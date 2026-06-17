@@ -12,6 +12,10 @@
   const timelineRaw = document.getElementById("timelineRaw");
   const metrics = document.getElementById("metrics");
 
+  const autoFlushChk = document.getElementById("autoFlushChk");
+  const autoFlushSec = document.getElementById("autoFlushSec");
+  const timelineSummary = document.getElementById("timelineSummary");
+
   let ws = null;
   let targetSampleRate = 16000;
   let micRunning = false;
@@ -23,6 +27,7 @@
   let micStream = null;
   let micSource = null;
   let micProcessor = null;
+  let autoFlushTimer = null;
 
   function setStatus(text, online) {
     connStatus.textContent = text;
@@ -33,6 +38,24 @@
     resetBtn.disabled = !online;
     micBtn.disabled = !online;
     if (!online && micRunning) stopMic();
+  }
+
+  function startAutoFlush() {
+    stopAutoFlush();
+    if (!autoFlushChk || !autoFlushChk.checked) return;
+    const sec = Math.max(5, parseInt(autoFlushSec ? autoFlushSec.value : "30", 10) || 30);
+    autoFlushTimer = setInterval(function () {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        sendText('{"flush":1}');
+      }
+    }, sec * 1000);
+  }
+
+  function stopAutoFlush() {
+    if (autoFlushTimer) {
+      clearInterval(autoFlushTimer);
+      autoFlushTimer = null;
+    }
   }
 
   function setMicState(text) {
@@ -117,6 +140,7 @@
     micRunning = false;
     micBtn.textContent = "Start Mic";
     setMicState("idle");
+    stopAutoFlush();
   }
 
   async function startMic() {
@@ -143,6 +167,7 @@
       micRunning = true;
       micBtn.textContent = "Stop Mic";
       setMicState("streaming");
+      startAutoFlush();
     } catch (err) {
       setMicState("permission denied");
       console.error(err);
@@ -196,6 +221,14 @@
     const asr = tracks.find((t) => t.kind === "asr");
     updateMetric("diar_rtf", diar && diar.real_time_factor != null ? String(diar.real_time_factor) : "-");
     updateMetric("asr_rtf", asr && asr.real_time_factor != null ? String(asr.real_time_factor) : "-");
+    const nDiar = diar ? (diar.entries || []).length : 0;
+    const nAsr = asr ? (asr.entries || []).length : 0;
+    const comp = msg.comprehensive || [];
+    const ts = new Date().toLocaleTimeString();
+    if (timelineSummary) {
+      timelineSummary.textContent =
+        "diar: " + nDiar + " seg, asr: " + nAsr + " utt, comp: " + comp.length + " turns @ " + ts;
+    }
   }
 
   function scheduleReconnect() {
@@ -319,10 +352,23 @@
   });
   resetBtn.addEventListener("click", function () {
     asrList.innerHTML = "";
-    timelineRaw.textContent = "-";
+    timelineRaw.textContent = "Click Flush or End \u2014 or enable Auto-flush \u2014 to receive timeline data.";
+    if (timelineSummary) timelineSummary.textContent = "-";
     resetEventCounters();
     sendText('{"reset":1}');
   });
+
+  if (autoFlushChk) {
+    autoFlushChk.addEventListener("change", function () {
+      if (micRunning && autoFlushChk.checked) startAutoFlush();
+      else stopAutoFlush();
+    });
+  }
+  if (autoFlushSec) {
+    autoFlushSec.addEventListener("change", function () {
+      if (micRunning && autoFlushChk && autoFlushChk.checked) startAutoFlush();
+    });
+  }
 
   // Auto-connect on page load to reduce manual steps during test cycles.
   connect(true);

@@ -45,8 +45,17 @@
       </section>
 
       <section class="card span-2">
-        <h2>Timeline (raw)</h2>
-        <pre id="timelineRaw" class="raw">-</pre>
+        <div class="timeline-header">
+          <h2>Timeline (raw)</h2>
+          <label class="auto-flush-label">
+            <input type="checkbox" id="autoFlushChk" checked />
+            Auto-flush every
+            <input type="number" id="autoFlushSec" value="30" min="5" max="300" style="width:54px" />
+            s
+          </label>
+          <span id="timelineSummary" class="timeline-summary">-</span>
+        </div>
+        <pre id="timelineRaw" class="raw">Click Flush or End — or enable Auto-flush — to receive timeline data.</pre>
       </section>
     </main>
 
