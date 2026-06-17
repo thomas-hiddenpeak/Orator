@@ -11,7 +11,6 @@
 
 #include <cuda_runtime.h>
 
-#include "gpu/gpu_lock.h"
 #include "gpu/memory.h"
 #include "io/safetensor.h"
 
@@ -191,7 +190,8 @@ float* DeviceUpload(const std::vector<float>& host) {
 
 }  // namespace
 
-GpuVad::GpuVad(const Params& params) : params_(params) {
+GpuVad::GpuVad(const Params& params)
+    : params_(params), stream_(params.stream) {
   InitModel();
   UploadWeights();
   buf_.assign(kContext, 0.0f);
@@ -286,41 +286,42 @@ void GpuVad::Push(const float* samples, int n) {
 void GpuVad::RunBatch(const float* ext, int n_windows, std::vector<float>* probs) {
   probs->resize(n_windows);
   const auto t0 = std::chrono::steady_clock::now();
-  // Spec 002: VAD shares the default stream with diarization, so it always
-  // serializes via the global lock (its kernels must not interleave on stream 0
-  // with diarization's). Only ASR (own stream) is lock-free in concurrent mode.
-  gpu::DeviceGuard guard;
+  // Spec 002: VAD runs on its own dedicated CUDA stream (lock-free).
+  // Stream is owned by the scheduler; we only hold a handle.
   const int kThreads = 256;
   int done = 0;
   while (done < n_windows) {
     const int nb = std::min(n_windows - done, kMaxBatch);
-    CUDA_CHECK(cudaMemcpy(d_ext_, ext + done * kWindow,
-                          (kContext + nb * kWindow) * sizeof(float),
-                          cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpyAsync(d_ext_, ext + done * kWindow,
+                               (kContext + nb * kWindow) * sizeof(float),
+                               cudaMemcpyHostToDevice, stream_));
 
-    BuildPaddedKernel<<<CeilDiv(nb * kPadded, kThreads), kThreads>>>(
+    BuildPaddedKernel<<<CeilDiv(nb * kPadded, kThreads), kThreads, 0, stream_>>>(
         d_ext_, d_padded_, nb);
-    StftMagKernel<<<CeilDiv(nb * kStftBins * kStftFrames, kThreads), kThreads>>>(
+    StftMagKernel<<<CeilDiv(nb * kStftBins * kStftFrames, kThreads), kThreads, 0, stream_>>>(
         d_padded_, d_stft_basis_, d_mag_, nb);
     // enc0: Cin=129 Lin=4 -> Cout=128 Lout=4, K3 s1 p1, relu
-    Conv1dReluKernel<<<CeilDiv(nb * 128 * 4, kThreads), kThreads>>>(
+    Conv1dReluKernel<<<CeilDiv(nb * 128 * 4, kThreads), kThreads, 0, stream_>>>(
         d_mag_, d_enc_w_[0], d_enc_b_[0], d_enc0_, nb, 129, 4, 128, 3, 1, 1, 4, 1);
     // enc1: Cin=128 Lin=4 -> Cout=64 Lout=2, K3 s2 p1, relu
-    Conv1dReluKernel<<<CeilDiv(nb * 64 * 2, kThreads), kThreads>>>(
+    Conv1dReluKernel<<<CeilDiv(nb * 64 * 2, kThreads), kThreads, 0, stream_>>>(
         d_enc0_, d_enc_w_[1], d_enc_b_[1], d_enc1_, nb, 128, 4, 64, 3, 2, 1, 2, 1);
     // enc2: Cin=64 Lin=2 -> Cout=64 Lout=1, K3 s2 p1, relu
-    Conv1dReluKernel<<<CeilDiv(nb * 64 * 1, kThreads), kThreads>>>(
+    Conv1dReluKernel<<<CeilDiv(nb * 64 * 1, kThreads), kThreads, 0, stream_>>>(
         d_enc1_, d_enc_w_[2], d_enc_b_[2], d_enc2_, nb, 64, 2, 64, 3, 2, 1, 1, 1);
     // enc3: Cin=64 Lin=1 -> Cout=128 Lout=1, K3 s1 p1, relu
-    Conv1dReluKernel<<<CeilDiv(nb * 128 * 1, kThreads), kThreads>>>(
+    Conv1dReluKernel<<<CeilDiv(nb * 128 * 1, kThreads), kThreads, 0, stream_>>>(
         d_enc2_, d_enc_w_[3], d_enc_b_[3], d_enc3_, nb, 64, 1, 128, 3, 1, 1, 1, 1);
     // LSTM scan + decoder (one block, carried state).
-    LstmDecoderKernel<<<1, kHidden>>>(d_enc3_, d_lstm_wih_, d_lstm_whh_,
-                                      d_lstm_bih_, d_lstm_bhh_, d_dec_w_, dec_b_,
-                                      d_h_, d_c_, d_prob_, nb);
+    LstmDecoderKernel<<<1, kHidden, 0, stream_>>>(d_enc3_, d_lstm_wih_, d_lstm_whh_,
+                                                  d_lstm_bih_, d_lstm_bhh_, d_dec_w_, dec_b_,
+                                                  d_h_, d_c_, d_prob_, nb);
     CUDA_CHECK(cudaGetLastError());
-    CUDA_CHECK(cudaMemcpy(probs->data() + done, d_prob_, nb * sizeof(float),
-                          cudaMemcpyDeviceToHost));
+    CUDA_CHECK(cudaMemcpyAsync(probs->data() + done, d_prob_, nb * sizeof(float),
+                               cudaMemcpyDeviceToHost, stream_));
+    // Wait for this sub-batch's probs to be ready before the host reads them
+    // in the endpoint state machine (DrainSegments).
+    CUDA_CHECK(cudaStreamSynchronize(stream_));
     done += nb;
   }
   compute_sec_ +=

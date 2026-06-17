@@ -28,6 +28,8 @@
 #include <utility>
 #include <vector>
 
+#include <cuda_runtime.h>
+
 namespace orator {
 namespace pipeline {
 
@@ -40,6 +42,7 @@ class GpuVad {
     int silero_min_speech_ms = 250;
     int silero_min_silence_ms = 120;
     int silero_speech_pad_ms = 60;  // accepted for parity; unused for endpoints
+    cudaStream_t stream = nullptr;  // Spec 002: dedicated CUDA stream (lock-free)
   };
 
   explicit GpuVad(const Params& params);
@@ -54,9 +57,8 @@ class GpuVad {
   // Process every ready full window on the GPU in one batch and append each
   // completed SPEECH SEGMENT as an absolute-sample [start,end) pair to *segs
   // (the VAD pipeline's data: voice-activity regions on the common time base).
-  // `finalize` flushes a still-open speech segment at end of stream. Caller
-  // holds no GPU lock; this method takes gpu::DeviceLock() internally for its
-  // batched pass.
+  // `finalize` flushes a still-open speech segment at end of stream. Runs on its
+  // own dedicated CUDA stream (Spec 002); no GPU lock is acquired.
   void DrainSegments(bool finalize, std::vector<std::pair<long, long>>* segs);
 
   // Accumulated GPU compute time (for the VAD track's real-time-factor meta).
@@ -82,6 +84,7 @@ class GpuVad {
   void RunBatch(const float* ext, int n_windows, std::vector<float>* probs);
 
   Params params_;
+  cudaStream_t stream_;
 
   // Host weights (loaded from safetensors, then uploaded to device).
   std::vector<float> stft_basis_;     // [258*256]

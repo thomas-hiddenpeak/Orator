@@ -1,9 +1,7 @@
 #include "pipeline/diarization_worker.h"
 
 #include <chrono>
-#include <mutex>
 
-#include "gpu/gpu_lock.h"
 #include "pipeline/diar_postprocess.h"
 #include "core/time_base.h"
 
@@ -18,9 +16,10 @@ double Secs(Clock::time_point a, Clock::time_point b) {
 }  // namespace
 
 DiarizationWorker::DiarizationWorker(model::SortformerDiarizer* diarizer,
-                                     StreamTimeline* timeline,
-                                     Params params)
-    : diarizer_(diarizer), timeline_(timeline), params_(params) {}
+                                      StreamTimeline* timeline,
+                                      Params params, cudaStream_t stream)
+    : diarizer_(diarizer), timeline_(timeline), params_(params),
+      stream_(stream) {}
 
 void DiarizationWorker::DeliverSpeakers(bool force) {
   if (!speaker_sink_) return;
@@ -48,14 +47,8 @@ void DiarizationWorker::DeliverSpeakers(bool force) {
 void DiarizationWorker::ProcessSpan(const float* samples, int n) {
   if (samples == nullptr || n <= 0) return;
   const auto t0 = Clock::now();
-  core::DiarizationFrames part;
-  {
-    // Spec 002: diarization shares the default stream with VAD, so it always
-    // serializes via the global lock (its kernels must not interleave on
-    // stream 0). Only ASR (own stream) is lock-free in concurrent mode.
-    gpu::DeviceGuard gpu;
-    part = diarizer_->StreamAudio(samples, n, false);
-  }
+  core::DiarizationFrames part =
+      diarizer_->StreamAudio(samples, n, false, stream_);
   compute_sec_ += Secs(t0, Clock::now());
   timeline_->AppendDiarFrames(part);
   processed_samples_.fetch_add(n);
@@ -64,11 +57,8 @@ void DiarizationWorker::ProcessSpan(const float* samples, int n) {
 
 void DiarizationWorker::Finalize() {
   const auto t0 = Clock::now();
-  core::DiarizationFrames tail;
-  {
-    gpu::DeviceGuard gpu;
-    tail = diarizer_->StreamAudio(nullptr, 0, true);
-  }
+  core::DiarizationFrames tail =
+      diarizer_->StreamAudio(nullptr, 0, true, stream_);
   compute_sec_ += Secs(t0, Clock::now());
   timeline_->AppendDiarFrames(tail);
   DeliverSpeakers(/*force=*/true);

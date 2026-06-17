@@ -1,13 +1,6 @@
 #pragma once
 
-// DiarizationWorker: the speaker-separation pipeline as an independent unit.
-//
-// It owns a streaming diarizer and consumes audio spans handed to it (by the
-// controller's worker thread, pulled from the SharedAudioBuffer). It keeps the
-// diarizer's persistent streaming state, deposits newly produced frames into
-// the shared StreamTimeline, and tracks how much audio it has committed (so the
-// controller can implement flush barriers) plus its own compute time (for
-// honest per-pipeline real-time factors). It never reads ASR state.
+#include <cuda_runtime.h>
 
 #include <atomic>
 #include <functional>
@@ -16,6 +9,15 @@
 #include "core/types.h"
 #include "model/streaming_sortformer.h"
 #include "pipeline/stream_timeline.h"
+
+// DiarizationWorker: the speaker-separation pipeline as an independent unit.
+//
+// It owns a streaming diarizer and consumes audio spans handed to it (by the
+// controller's worker thread, pulled from the SharedAudioBuffer). It keeps the
+// diarizer's persistent streaming state, deposits newly produced frames into
+// the shared StreamTimeline, and tracks how much audio it has committed (so the
+// controller can implement flush barriers) plus its own compute time (for
+// honest per-pipeline real-time factors). It never reads ASR state.
 
 namespace orator {
 namespace pipeline {
@@ -39,8 +41,9 @@ class DiarizationWorker {
 
   // `diarizer` and `timeline` are owned by the controller and must outlive the
   // worker. The diarizer must already be initialized + weight-loaded.
+  // `stream` is the CUDA stream for all GPU work (kernels, copies, sync).
   DiarizationWorker(model::SortformerDiarizer* diarizer, StreamTimeline* timeline,
-                    Params params);
+                    Params params, cudaStream_t stream);
 
   // Set the comprehensive-timeline speaker-view sink (Spec 004). Optional.
   void set_speaker_sink(SpeakerSink sink) { speaker_sink_ = std::move(sink); }
@@ -67,6 +70,7 @@ class DiarizationWorker {
   model::SortformerDiarizer* diarizer_;
   StreamTimeline* timeline_;
   Params params_;
+  cudaStream_t stream_;
   SpeakerSink speaker_sink_;
   long last_deliver_sample_ = 0;
   std::atomic<long> processed_samples_{0};
