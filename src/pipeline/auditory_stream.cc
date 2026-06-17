@@ -213,6 +213,13 @@ void AuditoryStream::StartWorkers() {
       while (buffer_.WaitAndRead(vad_cursor_, &chunk)) {
         vad_detector_->Push(chunk.data(), static_cast<int>(chunk.size()));
         drain(/*finalize=*/false);
+        {
+          char buf[64];
+          std::snprintf(buf, sizeof(buf),
+                        "{\"type\":\"vad_state\",\"speech\":%s}",
+                        vad_detector_->is_in_speech() ? "true" : "false");
+          EmitLocked(buf);
+        }
         progress_cv_.notify_all();
       }
       drain(/*finalize=*/true);

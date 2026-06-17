@@ -253,6 +253,50 @@ body {
   min-height: 180px;
 }
 
+/* VAD LED */
+.vad-led-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+.vad-led {
+  font-size: 14px;
+  color: var(--border);
+  transition: color 0.15s, text-shadow 0.15s;
+}
+.vad-led.active {
+  color: var(--green);
+  text-shadow: 0 0 8px rgba(52, 211, 153, 0.6);
+}
+.vad-led-label {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+/* VAD LED */
+.vad-led-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+.vad-led {
+  font-size: 14px;
+  color: var(--border);
+  transition: color 0.15s, text-shadow 0.15s;
+}
+.vad-led.active {
+  color: var(--green);
+  text-shadow: 0 0 8px rgba(52, 211, 153, 0.6);
+}
+.vad-led-label {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }

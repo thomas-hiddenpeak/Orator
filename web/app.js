@@ -156,6 +156,9 @@
         case "reset_ok":
           handleResetOk();
           break;
+        case "vad_state":
+          handleVadState(msg);
+          break;
         default:
           console.warn("[Orator] Unknown WS message type:", msg.type, msg);
           break;
@@ -233,8 +236,16 @@
   }
 
   function handleVad(msg) {
-    // VAD events — could show voice activity indicator
-    // For now, just log
+    // VAD segment events — used by timeline
+  }
+
+  function handleVadState(msg) {
+    const led = $("vadLed");
+    if (msg.speech) {
+      led.classList.add("active");
+    } else {
+      led.classList.remove("active");
+    }
   }
 
   /* ── GPU Telemetry handler ── */

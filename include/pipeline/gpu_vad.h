@@ -69,6 +69,10 @@ class GpuVad {
 
   long base_sample() const { return next_window_abs_; }
 
+  // Real-time VAD state: true when the endpoint state machine is currently
+  // inside a speech segment (after min_speech confirmation).
+  bool is_in_speech() const { return in_speech_; }
+
   // Numeric-gate probe: from a fresh state, return the per-window speech
   // probability for every full window in [pcm, pcm+n). Used by test_vad to
   // compare against the CPU reference. Does not affect streaming state of a
