@@ -9,6 +9,7 @@
 
 #include <csignal>
 #include <cstdlib>
+#include <exception>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -55,15 +56,27 @@ void ReadEnvString(const char* name, std::string* out) {
   *out = v;
 }
 
+bool ReadEnvFlag(const char* name, bool dflt) {
+  const char* v = std::getenv(name);
+  if (v == nullptr || v[0] == '\0') return dflt;
+  return v[0] == '1' || v[0] == 't' || v[0] == 'T' || v[0] == 'y' || v[0] == 'Y';
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
   int port = argc > 1 ? std::atoi(argv[1]) : 8765;
   int ui_port = 0;
   pipeline::AuditoryStream::Config cfg;
+  const bool asr_arg_provided = argc > 3;
   if (argc > 2) cfg.diarizer_weights = argv[2];
-  if (argc > 3) cfg.asr_model_dir = argv[3];
+  if (asr_arg_provided) cfg.asr_model_dir = argv[3];
   if (argc > 4) cfg.asr_vad_model = argv[4];
+
+  // Default startup policy: bring all pipelines to standby for production-like
+  // readiness. Keep explicit CLI override behavior: passing an empty third
+  // argument still disables ASR intentionally.
+  if (!asr_arg_provided) cfg.asr_model_dir = "models/asr/Qwen/Qwen3-ASR-1.7B";
 
   // Runtime tuning knobs for automated sweeps (keep CLI stable).
   ReadEnvDouble("ORATOR_ASR_MAX_UTTERANCE_SEC", &cfg.asr_max_utterance_sec);
@@ -78,10 +91,14 @@ int main(int argc, char** argv) {
   ReadEnvString("ORATOR_ASR_PREPROC_MODE", &cfg.asr_preproc_mode);
   ReadEnvString("ORATOR_ASR_FRCRN_MODEL", &cfg.asr_frcrn_model);
   ReadEnvString("ORATOR_ASR_TFGRIDNET_MODEL", &cfg.asr_tfgridnet_model);
+  ReadEnvString("ORATOR_ASR_MODEL_DIR", &cfg.asr_model_dir);
+  const bool asr_disable = std::getenv("ORATOR_ASR_DISABLE") != nullptr;
+  if (asr_disable) cfg.asr_model_dir.clear();
   ReadEnvInt("ORATOR_UI_PORT", &ui_port);
   if (ui_port <= 0) ui_port = port + 1;
   std::string ui_root = "web";
   ReadEnvString("ORATOR_UI_ROOT", &ui_root);
+  const bool prewarm_on_boot = ReadEnvFlag("ORATOR_PREWARM_ON_BOOT", true);
 
   // Spec 003/004 streaming + comprehensive-timeline knobs (real WS path).
   // The incremental KV-cache ASR path and the VAD stream are the PRODUCTION
@@ -91,9 +108,7 @@ int main(int argc, char** argv) {
   //   ORATOR_VAD_STREAM=0       -> drop the independent VAD speech-segment stream
   //   ORATOR_ASR_ENDPOINT_RESET=0 -> incremental resets on a fixed cap only
   auto env_flag = [](const char* name, bool dflt) {
-    const char* v = std::getenv(name);
-    if (v == nullptr || v[0] == '\0') return dflt;
-    return v[0] == '1' || v[0] == 't' || v[0] == 'T' || v[0] == 'y' || v[0] == 'Y';
+    return ReadEnvFlag(name, dflt);
   };
   cfg.asr_incremental = env_flag("ORATOR_ASR_INCREMENTAL", cfg.asr_incremental);
   if (cfg.asr_incremental) {
@@ -109,6 +124,18 @@ int main(int argc, char** argv) {
   ReadEnvDouble("ORATOR_GPU_TELEMETRY_SEC", &cfg.gpu_telemetry_interval_sec);
 
   std::signal(SIGPIPE, SIG_IGN);
+
+  if (prewarm_on_boot) {
+    try {
+      std::cout << "prewarm: loading pipelines on boot ..." << std::endl;
+      pipeline::AuditoryStream warm(cfg, [](const std::string&) {});
+      warm.Start();
+      std::cout << "prewarm: ready" << std::endl;
+    } catch (const std::exception& e) {
+      std::cerr << "prewarm failed: " << e.what() << std::endl;
+      return 1;
+    }
+  }
 
   net::WebSocketServer server(port);
   if (!server.Start()) {

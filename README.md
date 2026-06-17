@@ -68,6 +68,20 @@ cmake --build build -j
 
 服务启动后，可向 `ws://<host>:<port>` 发送 `int16le mono 16k` PCM 二进制流，最后发送 `{"end"}` 或 `{"flush"}` 获取时间线结果。
 
+当前默认行为（便于联调）：
+
+- WebSocket：`<port>`（默认 `8765`）
+- Web UI：`<port+1>`（默认 `8766`）
+- 进程启动时默认预热全管线（diar + asr + vad）进入待命；若未显式传 `asr_model_dir`，默认使用 `models/asr/Qwen/Qwen3-ASR-1.7B`
+
+可选环境变量：
+
+- `ORATOR_UI_PORT`：覆盖 UI 端口
+- `ORATOR_UI_ROOT`：覆盖静态页面目录（默认 `web`）
+- `ORATOR_ASR_MODEL_DIR`：覆盖 ASR 模型目录
+- `ORATOR_ASR_DISABLE=1`：显式禁用 ASR
+- `ORATOR_PREWARM_ON_BOOT=0`：关闭启动预热
+
 ## 主要可执行目标
 
 - `orator_ws`：实时 WebSocket 服务（主入口）
