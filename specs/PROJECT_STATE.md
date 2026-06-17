@@ -210,7 +210,21 @@ Open, independently-scheduled items:
   (T070–T073, accuracy-gated per engine), not a new spec, since the requirement
   arose from this feature. The global lock stays the production default; no
   regression. A diarization numeric gate (`test_diar_stream`, d75da36) is in
-  place for that engine work.
+  place for that engine work. **BREAKTHROUGH (2026-06-17, commit 3abea74): an
+  ASR-only lock-free path WORKS and is measurably faster.** With the ASR engine's
+  managed-memory host-touch sites de-coupled (device + pinned staging; 2c34d20,
+  b4606d9) AND CUDA Graph capture auto-disabled under concurrency (capture is a
+  process/stream-global state machine that the concurrently-issuing diar/VAD
+  pipeline corrupts → "operation failed … during capture" abort — this was the
+  second, non-memory blocker), the env-gated `ORATOR_GPU_CONCURRENT_ASR=1` runs
+  ASR lock-free while diarization/VAD stay locked. Measured on 120 s real-WS
+  (tegrastats): serial wall 40.2 s, GPU busy 55.4 %; concurrent wall 29.9 s
+  (−25.6 %), GPU busy 65.0 %; diarization RTF rose 5.4× → 26× (it no longer waits
+  behind ASR). 8+ consecutive runs, zero crashes, output identical to serial
+  (asr 5 / diar 25 / comp 45). This hits the Spec 002 M3 target (25–28 %). It is
+  an OPT-IN experiment for now (production default stays serial, lock on). Full
+  concurrency (diarization + VAD also lock-free) still needs their managed
+  `SortformerState`/VAD buffers de-coupled — the remaining Phase 7 work.
 - **Full 1-hour real-WS revalidation on the current `text_id` revision code**:
   done (2026-06-17, commit c94c2fa) — see the milestone-gate section in §2.
 - ASR streaming throughput (~2.6x, Spec 001 NG1) — deferred by owner.
