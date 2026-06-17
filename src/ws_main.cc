@@ -98,7 +98,8 @@ int main(int argc, char** argv) {
   if (ui_port <= 0) ui_port = port + 1;
   std::string ui_root = "web";
   ReadEnvString("ORATOR_UI_ROOT", &ui_root);
-  const bool prewarm_on_boot = ReadEnvFlag("ORATOR_PREWARM_ON_BOOT", true);
+  // prewarm_on_boot removed: stream is always loaded before listening.
+  (void)ReadEnvFlag;  // suppress unused-warning
 
   // Spec 003/004 streaming + comprehensive-timeline knobs (real WS path).
   // The incremental KV-cache ASR path and the VAD stream are the PRODUCTION
@@ -125,16 +126,19 @@ int main(int argc, char** argv) {
 
   std::signal(SIGPIPE, SIG_IGN);
 
-  if (prewarm_on_boot) {
-    try {
-      std::cout << "prewarm: loading pipelines on boot ..." << std::endl;
-      pipeline::AuditoryStream warm(cfg, [](const std::string&) {});
-      warm.Start();
-      std::cout << "prewarm: ready" << std::endl;
-    } catch (const std::exception& e) {
-      std::cerr << "prewarm failed: " << e.what() << std::endl;
-      return 1;
-    }
+  // Create the shared emit target and stream ONCE. Models are loaded here and
+  // reused across all client connections. This avoids repeated GPU model loads
+  // which would exhaust device memory on Jetson.
+  auto emit_target = std::make_shared<net::SessionEmit>();
+  auto stream = std::make_shared<pipeline::AuditoryStream>(
+      cfg, [emit_target](const std::string& json) { emit_target->Send(json); });
+  try {
+    std::cout << "loading pipelines ..." << std::endl;
+    stream->Start();
+    std::cout << "pipelines ready" << std::endl;
+  } catch (const std::exception& e) {
+    std::cerr << "pipeline init failed: " << e.what() << std::endl;
+    return 1;
   }
 
   net::WebSocketServer server(port);
@@ -173,8 +177,8 @@ int main(int argc, char** argv) {
   std::cout << "  send binary PCM (int16le mono 16k); text {\"flush\"} or "
                "{\"end\"} to get the timeline." << std::endl;
 
-  server.Serve([&cfg]() -> std::unique_ptr<net::WebSocketHandler> {
-    return std::make_unique<net::AuditoryWsHandler>(cfg);
+  server.Serve([stream, emit_target]() -> std::unique_ptr<net::WebSocketHandler> {
+    return std::make_unique<net::AuditoryWsHandler>(stream, emit_target);
   });
 
   ui.Stop();

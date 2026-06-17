@@ -6,8 +6,8 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-#include <cstring>
 #include <cctype>
+#include <cstring>
 #include <vector>
 
 namespace orator {
@@ -278,6 +278,11 @@ bool WebSocketServer::Handshake(int fd) {
 void WebSocketServer::RunConnection(int fd, WebSocketHandler& handler) {
   int one = 1;
   ::setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one));
+  // Keepalive: detect dead peers in ~30 s (10 idle + 3 probes × 5 s).
+  ::setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &one, sizeof(one));
+  int idle = 10;  ::setsockopt(fd, IPPROTO_TCP, TCP_KEEPIDLE,  &idle,  sizeof(idle));
+  int intvl = 5;  ::setsockopt(fd, IPPROTO_TCP, TCP_KEEPINTVL, &intvl, sizeof(intvl));
+  int cnt = 3;    ::setsockopt(fd, IPPROTO_TCP, TCP_KEEPCNT,   &cnt,   sizeof(cnt));
   WebSocketConnection conn(fd);
   handler.OnOpen(conn);
 

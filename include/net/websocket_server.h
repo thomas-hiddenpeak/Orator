@@ -7,9 +7,11 @@
 // only libc / OS sockets, consistent with the project's "pure C++, only CUDA"
 // constraint (networking is OS/libc, not a third-party dependency).
 //
-// The server handles one connection at a time, which matches the real-time
-// single-stream ingestion use case on Jetson. Each connection is served by a
-// fresh WebSocketHandler produced by the factory.
+// The server accepts connections sequentially: one active connection at a time.
+// Each connection gets a fresh WebSocketHandler from the factory. The server
+// returns to accept() immediately after a handler completes, so short-lived
+// clients (browser refresh) see the server available again within milliseconds.
+// TCP keepalive is enabled per connection to detect dead peers quickly.
 
 #include <cstdint>
 #include <functional>

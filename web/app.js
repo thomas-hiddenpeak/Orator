@@ -6,6 +6,7 @@
   const endBtn = document.getElementById("endBtn");
   const resetBtn = document.getElementById("resetBtn");
   const micState = document.getElementById("micState");
+  const wsState = document.getElementById("wsState");
   const connStatus = document.getElementById("connStatus");
   const asrList = document.getElementById("asrList");
   const timelineRaw = document.getElementById("timelineRaw");
@@ -14,6 +15,10 @@
   let ws = null;
   let targetSampleRate = 16000;
   let micRunning = false;
+  let shouldReconnect = true;
+  let reconnectTimer = null;
+  let reconnectAttempt = 0;
+  const eventCounters = { ready: 0, asr: 0, timeline: 0 };
   let micContext = null;
   let micStream = null;
   let micSource = null;
@@ -32,6 +37,34 @@
 
   function setMicState(text) {
     micState.textContent = "Mic: " + text;
+  }
+
+  function setWsState(text) {
+    wsState.textContent = "WS: " + text;
+  }
+
+  function resetEventCounters() {
+    eventCounters.ready = 0;
+    eventCounters.asr = 0;
+    eventCounters.timeline = 0;
+    updateMetric("ws_ready", "0");
+    updateMetric("asr_events", "0");
+    updateMetric("timeline_events", "0");
+    updateMetric("last_event", "-");
+  }
+
+  function markEvent(type) {
+    if (type === "ready") {
+      eventCounters.ready += 1;
+      updateMetric("ws_ready", String(eventCounters.ready));
+    } else if (type === "asr") {
+      eventCounters.asr += 1;
+      updateMetric("asr_events", String(eventCounters.asr));
+    } else if (type === "timeline") {
+      eventCounters.timeline += 1;
+      updateMetric("timeline_events", String(eventCounters.timeline));
+    }
+    updateMetric("last_event", type + " @ " + new Date().toLocaleTimeString());
   }
 
   function f32ToInt16Buffer(float32Array) {
@@ -165,26 +198,78 @@
     updateMetric("asr_rtf", asr && asr.real_time_factor != null ? String(asr.real_time_factor) : "-");
   }
 
-  function connect() {
+  function scheduleReconnect() {
+    if (!shouldReconnect) return;
+    if (reconnectTimer) return;
+    reconnectAttempt += 1;
+    const delayMs = Math.min(10000, 500 * Math.pow(2, Math.min(5, reconnectAttempt - 1)));
+    setWsState("reconnect in " + Math.round(delayMs / 1000) + "s");
+    reconnectTimer = setTimeout(function () {
+      reconnectTimer = null;
+      connect(false);
+    }, delayMs);
+  }
+
+  function disconnect(manual) {
+    shouldReconnect = !manual;
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
+    if (ws) {
+      try {
+        ws.close();
+      } catch (_err) {
+      }
+      ws = null;
+    }
+    if (manual) {
+      setStatus("Disconnected", false);
+      setWsState("manual");
+      connectBtn.textContent = "Connect";
+    }
+  }
+
+  function connect(manual) {
     if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
       return;
+    }
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
     }
     const url = wsUrlInput.value.trim();
     if (!url) return;
 
+    if (manual) {
+      shouldReconnect = true;
+      reconnectAttempt = 0;
+      resetEventCounters();
+    }
+
     setStatus("Connecting", false);
+    setWsState("connecting");
     ws = new WebSocket(url);
 
     ws.onopen = function () {
+      reconnectAttempt = 0;
       setStatus("Connected", true);
+      setWsState("open");
+      connectBtn.textContent = "Disconnect";
     };
 
     ws.onclose = function () {
       setStatus("Disconnected", false);
+      setWsState("closed");
+      connectBtn.textContent = "Connect";
+      const needReconnect = shouldReconnect;
+      ws = null;
+      if (needReconnect) scheduleReconnect();
     };
 
     ws.onerror = function () {
       setStatus("Error", false);
+      setWsState("error");
     };
 
     ws.onmessage = function (ev) {
@@ -193,9 +278,11 @@
       try {
         msg = JSON.parse(ev.data);
       } catch (_err) {
+        updateMetric("last_event", "non-json @ " + new Date().toLocaleTimeString());
         return;
       }
       if (!msg || typeof msg.type !== "string") return;
+      markEvent(msg.type);
       if (msg.type === "asr") appendAsr(msg);
       if (msg.type === "timeline") handleTimeline(msg);
       if (msg.type === "ready") {
@@ -213,8 +300,16 @@
   wsUrlInput.value = defaultWsUrl();
   setStatus("Disconnected", false);
   setMicState("idle");
+  setWsState("idle");
+  resetEventCounters();
 
-  connectBtn.addEventListener("click", connect);
+  connectBtn.addEventListener("click", function () {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      disconnect(true);
+      return;
+    }
+    connect(true);
+  });
   micBtn.addEventListener("click", toggleMic);
   flushBtn.addEventListener("click", function () {
     sendText('{"flush":1}');
@@ -225,6 +320,10 @@
   resetBtn.addEventListener("click", function () {
     asrList.innerHTML = "";
     timelineRaw.textContent = "-";
+    resetEventCounters();
     sendText('{"reset":1}');
   });
+
+  // Auto-connect on page load to reduce manual steps during test cycles.
+  connect(true);
 })();

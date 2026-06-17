@@ -6,25 +6,27 @@
 namespace orator {
 namespace net {
 
-AuditoryWsHandler::AuditoryWsHandler(const pipeline::AuditoryStream::Config& config)
-    : config_(config) {}
+AuditoryWsHandler::AuditoryWsHandler(
+    std::shared_ptr<pipeline::AuditoryStream> stream,
+    std::shared_ptr<SessionEmit> emit_target)
+    : stream_(std::move(stream)), emit_target_(std::move(emit_target)) {}
 
 void AuditoryWsHandler::OnOpen(WebSocketConnection& conn) {
   conn_ = &conn;
-  // The stream emits JSON result events; forward each straight to the client.
-  stream_ = std::make_unique<pipeline::AuditoryStream>(
-      config_, [this](const std::string& json) {
-        if (conn_) conn_->SendText(json);
-      });
-  stream_->Start();
+  float_format_ = false;
 
-  // Session-open metadata. Declares the COMMON TIME BASE (Spec 004 FR1): all
-  // result messages (diar, asr, endpoint, timeline, revision) carry start/end in
-  // seconds on this absolute base, where t_sec = absolute_sample / sample_rate
-  // and the origin is sample 0 of the session. A consumer can align any
-  // pipeline's output using only this declaration.
+  // Route emitted events to this connection. Previous connection has already
+  // cleared the pointer in OnClose(); we take ownership here under the lock.
+  {
+    std::lock_guard<std::mutex> lk(emit_target_->mu);
+    emit_target_->conn = &conn;
+  }
+
+  // Reset the shared stream for a fresh session (models stay loaded).
+  stream_->Reset();
+
   std::string ready = "{\"type\":\"ready\",\"sample_rate\":" +
-                      std::to_string(config_.sample_rate) +
+                      std::to_string(16000) +  // config is embedded in stream
                       ",\"asr\":" + (stream_->asr_enabled() ? "true" : "false") +
                       ",\"time_base\":\"absolute_samples\",\"origin_sample\":0}";
   conn.SendText(ready);
@@ -48,8 +50,7 @@ void AuditoryWsHandler::OnBinary(WebSocketConnection& conn, const uint8_t* data,
       p += 2;
     }
   }
-  if (!in.empty() && stream_)
-    stream_->PushAudio(in.data(), static_cast<int>(in.size()));
+  if (!in.empty()) stream_->PushAudio(in.data(), static_cast<int>(in.size()));
 }
 
 void AuditoryWsHandler::OnText(WebSocketConnection& conn, const std::string& text) {
@@ -58,23 +59,31 @@ void AuditoryWsHandler::OnText(WebSocketConnection& conn, const std::string& tex
     float_format_ = true;
   }
   if (text.find("reset") != std::string::npos) {
-    if (stream_) stream_->Reset();
+    stream_->Reset();
     conn.SendText("{\"type\":\"reset_ok\"}");
     return;
   }
   if (text.find("end") != std::string::npos) {
-    if (stream_) {
-      stream_->EmitTimeline(/*finalize=*/true);
-      stream_->Reset();
-    }
+    stream_->EmitTimeline(/*finalize=*/true);
+    stream_->Reset();
     return;
   }
   if (text.find("flush") != std::string::npos) {
-    if (stream_) stream_->EmitTimeline(/*finalize=*/false);
+    stream_->EmitTimeline(/*finalize=*/false);
   }
 }
 
-void AuditoryWsHandler::OnClose() { conn_ = nullptr; }
+void AuditoryWsHandler::OnClose() {
+  // Deregister this connection as the emit target so in-flight worker events
+  // are silently dropped (not sent to a dead socket).
+  {
+    std::lock_guard<std::mutex> lk(emit_target_->mu);
+    if (emit_target_->conn == conn_) emit_target_->conn = nullptr;
+  }
+  conn_ = nullptr;
+  float_format_ = false;
+  // stream_ is shared; do NOT reset or destroy it here.
+}
 
 }  // namespace net
 }  // namespace orator
