@@ -35,25 +35,11 @@ int main(int argc, char** argv) {
   pipeline::AuditoryStream::Config cfg;
   cfg.asr_model_dir = argv[2];
   if (argc > 3) cfg.diarizer_weights = argv[3];
-  // The incremental KV-cache session is the production default (cfg defaults to
-  // true). The env vars are explicit opt-OUT switches so this harness can still
-  // measure the legacy Silero-VAD baseline (ORATOR_ASR_INCREMENTAL=0) against the
-  // default incremental path.
   auto env_flag = [](const char* name, bool dflt) {
     const char* v = std::getenv(name);
     if (v == nullptr || v[0] == '\0') return dflt;
     return v[0] == '1' || v[0] == 't' || v[0] == 'T' || v[0] == 'y' || v[0] == 'Y';
   };
-  cfg.asr_incremental = env_flag("ORATOR_ASR_INCREMENTAL", cfg.asr_incremental);
-  if (cfg.asr_incremental) {
-    if (const char* s = std::getenv("ORATOR_ASR_SEGMENT_SEC"))
-      cfg.asr_incremental_segment_sec = std::atof(s);
-    cfg.asr_incremental_endpoint_reset =
-        env_flag("ORATOR_ASR_ENDPOINT_RESET", cfg.asr_incremental_endpoint_reset);
-    if (const char* s = std::getenv("ORATOR_ASR_MIN_SEGMENT_SEC"))
-      cfg.asr_incremental_min_segment_sec = std::atof(s);
-  }
-  // Spec 004 Phase 5: the independent GPU VAD pipeline (default on).
   cfg.vad_stream = env_flag("ORATOR_VAD_STREAM", cfg.vad_stream);
   const double start_sec = argc > 4 ? std::atof(argv[4]) : 0.0;
   const double dur_sec = argc > 5 ? std::atof(argv[5]) : 0.0;  // 0 => to end

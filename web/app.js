@@ -27,6 +27,8 @@
   const mDiarRtf   = $("mDiarRtf");
   const mAsrSeg    = $("mAsrSeg");
   const mDiarSeg   = $("mDiarSeg");
+  const mVadRtf    = $("mVadRtf");
+  const mGpuStatus = $("mGpuStatus");
 
   /* ── State ── */
   let ws = null;
@@ -148,6 +150,15 @@
         case "timeline":
           handleTimeline(msg);
           break;
+        case "gpu_telemetry":
+          handleGpuTelemetry(msg);
+          break;
+        case "reset_ok":
+          handleResetOk();
+          break;
+        default:
+          console.warn("[Orator] Unknown WS message type:", msg.type, msg);
+          break;
       }
     };
   }
@@ -224,6 +235,54 @@
   function handleVad(msg) {
     // VAD events — could show voice activity indicator
     // For now, just log
+  }
+
+  /* ── GPU Telemetry handler ── */
+  function handleGpuTelemetry(msg) {
+    if (!Array.isArray(msg.pipelines)) return;
+
+    // Reset to defaults
+    mVadRtf.textContent = "-";
+    mGpuStatus.textContent = "-";
+
+    let asrRtf = null, diarRtf = null, vadRtf = null;
+    let activePipelines = [];
+
+    for (const p of msg.pipelines) {
+      const name = p.name || "?";
+      const rtf = p.real_time_factor;
+      const active = p.stream_active;
+
+      if (rtf != null) {
+        if (name === "asr") asrRtf = rtf;
+        else if (name === "diarization") diarRtf = rtf;
+        else if (name === "vad") vadRtf = rtf;
+      }
+      if (active) activePipelines.push(name);
+    }
+
+    // Update RTF metrics from live telemetry (more granular than timeline)
+    if (vadRtf != null) mVadRtf.textContent = vadRtf.toFixed(1) + "x";
+    if (asrRtf != null) mAsrRtf.textContent = asrRtf.toFixed(1) + "x";
+    if (diarRtf != null) mDiarRtf.textContent = diarRtf.toFixed(1) + "x";
+
+    // GPU status shows active pipelines
+    mGpuStatus.textContent = activePipelines.length > 0
+      ? activePipelines.join(", ")
+      : "idle";
+  }
+
+  /* ── Reset OK handler ── */
+  function handleResetOk() {
+    // Visual feedback: flash the badge briefly
+    const orig = connBadge.textContent;
+    const origClass = connBadge.className;
+    connBadge.textContent = "✓ Reset";
+    connBadge.className = "badge online";
+    setTimeout(function () {
+      connBadge.textContent = orig;
+      connBadge.className = origClass;
+    }, 800);
   }
 
   function createTranscriptRow(id, start, end, speaker, text, cls) {
@@ -680,6 +739,8 @@
     mDiarRtf.textContent = "-";
     mAsrSeg.textContent = "0";
     mDiarSeg.textContent = "0";
+    mVadRtf.textContent = "-";
+    mGpuStatus.textContent = "-";
     progressRow.hidden = true;
     progressFill.style.width = "0%";
     durationLabel.textContent = "00:00";

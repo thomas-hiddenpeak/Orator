@@ -1,4 +1,4 @@
-#include "pipeline/asr_vad.h"
+#include "asr_vad_cpu.h"
 
 #include <algorithm>
 #include <cassert>

@@ -129,28 +129,12 @@ void AuditoryStream::StartWorkers() {
 
   if (asr_) {
     AsrWorker::Params p;
-    p.vad.sample_rate = config_.sample_rate;
-    p.vad.max_utterance_sec = config_.asr_max_utterance_sec;
-    p.vad.min_utterance_sec = config_.asr_min_utterance_sec;
-    p.vad.silero_model_path = config_.asr_vad_model;
-    p.vad.silero_threshold = config_.asr_vad_threshold;
-    p.vad.silero_min_speech_ms = config_.asr_vad_min_speech_ms;
-    p.vad.silero_min_silence_ms = config_.asr_vad_min_silence_ms;
-    p.vad.silero_speech_pad_ms = config_.asr_vad_speech_pad_ms;
-    p.preproc.sample_rate = config_.sample_rate;
-    p.preproc.mode = config_.asr_preproc_mode;
-    p.preproc.frcrn_model_path = config_.asr_frcrn_model;
-    p.preproc.tfgridnet_model_path = config_.asr_tfgridnet_model;
-    p.incremental = config_.asr_incremental;
-    p.segment_sec = config_.asr_incremental_segment_sec;
-    p.endpoint_reset = config_.asr_incremental_endpoint_reset;
-    p.endpoint_min_segment_sec = config_.asr_incremental_min_segment_sec;
-    // Wrap the transport emit so worker-thread events are serialized with the
-    // controller's timeline emit.
+    p.sample_rate = config_.sample_rate;
+    p.segment_sec = config_.asr_segment_sec;
     asr_worker_ = std::make_unique<AsrWorker>(
         asr_.get(), &timeline_, p,
         [this](const std::string& json) { EmitLocked(json); },
-      asr_stream_, config_.asr_rollback_tokens);
+      asr_stream_);
     // Spec 004 Step 2: deliver each committed text segment to the comprehensive
     // timeline in real time. The worker reports its segment (what/when on the
     // common base); the controller upserts it (id-keyed) and pushes any
@@ -196,11 +180,10 @@ void AuditoryStream::StartWorkers() {
                                       /*create_stream=*/true);
     GpuVad::Params vp;
     vp.sample_rate = config_.sample_rate;
-    vp.silero_model_path = config_.asr_vad_model;
-    vp.silero_threshold = config_.asr_vad_threshold;
-    vp.silero_min_speech_ms = config_.asr_vad_min_speech_ms;
-    vp.silero_min_silence_ms = config_.asr_vad_min_silence_ms;
-    vp.silero_speech_pad_ms = config_.asr_vad_speech_pad_ms;
+    vp.silero_model_path = config_.vad_model;
+    vp.silero_threshold = config_.vad_threshold;
+    vp.silero_min_speech_ms = config_.vad_min_speech_ms;
+    vp.silero_min_silence_ms = config_.vad_min_silence_ms;
     vp.stream = vad_stream_;
     vad_detector_ = std::make_unique<GpuVad>(vp);
     vad_cursor_ = buffer_.AddConsumer();

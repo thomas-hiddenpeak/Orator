@@ -10,7 +10,7 @@
 #include <cstdio>
 #include <vector>
 
-#include "pipeline/asr_vad.h"
+#include "asr_vad_cpu.h"
 #include "pipeline/gpu_vad.h"
 
 using namespace orator;

@@ -34,7 +34,6 @@
 #include "model/qwen3_asr.h"
 #include "model/streaming_sortformer.h"
 #include "pipeline/asr_worker.h"
-#include "pipeline/asr_vad.h"
 #include "pipeline/gpu_vad.h"
 #include "pipeline/comprehensive_timeline.h"
 #include "pipeline/diarization_worker.h"
@@ -54,50 +53,14 @@ class AuditoryStream {
     float diar_threshold = 0.5f;
     double diar_merge_gap_sec = 0.5;
 
-    // ASR streaming endpointing (independent of diarization):
-    // NOTE: the fields below configure the LEGACY Silero-VAD utterance path.
-    // That path is DEACTIVATED by default (asr_incremental = true) because it was
-    // measured worse on both accuracy and speed than the incremental KV-cache
-    // path: 600 s CER 26.4% / asr 3.50x (Silero) vs 11.6% / 4.78x (incremental),
-    // and 120 s 30.8% vs 17.6%. The Silero front VAD fragments speech into many
-    // short, context-poor utterances (it dropped openings and once flipped a
-    // negation). These fields are RETAINED for regression comparison only
-    // (ORATOR_ASR_INCREMENTAL=0 re-enables the legacy path).
-    double asr_max_utterance_sec = 28.0;     // force-flush cap (bounded decode context)
-    double asr_min_utterance_sec = 0.20;     // ignore shorter speech blips
-    std::string asr_vad_model = "models/asr/silero_vad.safetensors";
-    float asr_vad_threshold = 0.5f;
-    int asr_vad_min_speech_ms = 250;
-    int asr_vad_min_silence_ms = 120;
-    int asr_vad_speech_pad_ms = 60;
     int asr_max_new_tokens = 32;
-    int asr_rollback_tokens = 0;
-    // Spec 003 incremental KV-cache session: the PRODUCTION DEFAULT ASR path.
-    // Persistent KV cache + prefix caching + chunk-local windowed encoder; beats
-    // the legacy Silero-VAD path on accuracy and speed at every measured scale.
-    bool asr_incremental = true;
-    double asr_incremental_segment_sec = 24.0;  // commit/reset cadence (cap)
-    // DEFAULT OFF. When on, the ASR worker runs a Silero VAD pass (CPU) over its
-    // input to place segment resets on natural pauses. This is NOT the validated
-    // configuration (the measured incremental win — 600 s CER 11.6% / 4.78x — used
-    // the fixed segment cap, endpoint_reset off). It is also unsafe under backlog:
-    // the Silero detector is CPU-only and runs synchronously in the ASR thread
-    // before any GPU work, so when ASR falls behind and drains a large buffered
-    // span, the worker spends minutes on a single CPU core running VAD with the
-    // GPU idle. Kept as an opt-in (ORATOR_ASR_ENDPOINT_RESET=1) for evaluation;
-    // a non-blocking, bounded implementation would be a separate spec.
-    bool asr_incremental_endpoint_reset = false;
-    double asr_incremental_min_segment_sec = 10.0;  // min segment before an endpoint cut
-    // Spec 004 Phase 5: run the GPU VAD (Silero) as an INDEPENDENT third buffer
-    // consumer that publishes speech segments on the common time base. Its
-    // per-window compute is batched on the GPU. Independent of the ASR pipeline
-    // (which keeps its own internal reset). Enabled by default so the
-    // comprehensive timeline carries the vad track.
+    double asr_segment_sec = 24.0;
     bool vad_stream = true;
+    std::string vad_model = "models/asr/silero_vad.safetensors";
+    float vad_threshold = 0.5f;
+    int vad_min_speech_ms = 250;
+    int vad_min_silence_ms = 120;
     std::string asr_language = "Chinese";
-    std::string asr_preproc_mode = "none";  // none|classical|frcrn|tfgridnet
-    std::string asr_frcrn_model = "models/asr_preproc/frcrn.safetensors";
-    std::string asr_tfgridnet_model = "models/asr_preproc/tfgridnet.safetensors";
     // Spec 002 FR7: interval (seconds) for the periodic GPU-scheduling telemetry
     // message ({"type":"gpu_telemetry"}). A dedicated low-rate timer thread
     // emits it through the serialized transport. 0 disables it.

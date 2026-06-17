@@ -55,7 +55,6 @@ set(ORATOR_CORE_SOURCES
     src/pipeline/auditory_stream.cc
     src/pipeline/asr_preprocessor.cc
     src/pipeline/comprehensive_timeline.cc
-        src/pipeline/asr_vad.cc
     src/pipeline/gpu_vad.cu
     src/pipeline/shared_audio_buffer.cc
     src/pipeline/stream_timeline.cc

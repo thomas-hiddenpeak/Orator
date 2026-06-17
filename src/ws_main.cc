@@ -2,7 +2,6 @@
 // independent pipelines over one streamed audio source.
 //
 // Usage: orator_ws [port] [diar_weights.safetensors] [asr_model_dir]
-//                 [asr_vad_model.safetensors]
 // Streams a unified timeline (diarization segments + transcript) back to
 // clients that push PCM audio. If asr_model_dir is omitted, ASR is disabled and
 // only diarization runs.
@@ -71,26 +70,16 @@ int main(int argc, char** argv) {
   const bool asr_arg_provided = argc > 3;
   if (argc > 2) cfg.diarizer_weights = argv[2];
   if (asr_arg_provided) cfg.asr_model_dir = argv[3];
-  if (argc > 4) cfg.asr_vad_model = argv[4];
 
   // Default startup policy: bring all pipelines to standby for production-like
   // readiness. Keep explicit CLI override behavior: passing an empty third
   // argument still disables ASR intentionally.
   if (!asr_arg_provided) cfg.asr_model_dir = "models/asr/Qwen/Qwen3-ASR-1.7B";
 
-  // Runtime tuning knobs for automated sweeps (keep CLI stable).
-  ReadEnvDouble("ORATOR_ASR_MAX_UTTERANCE_SEC", &cfg.asr_max_utterance_sec);
-  ReadEnvDouble("ORATOR_ASR_MIN_UTTERANCE_SEC", &cfg.asr_min_utterance_sec);
-  ReadEnvFloat("ORATOR_ASR_VAD_THRESHOLD", &cfg.asr_vad_threshold);
-  ReadEnvInt("ORATOR_ASR_VAD_MIN_SPEECH_MS", &cfg.asr_vad_min_speech_ms);
-  ReadEnvInt("ORATOR_ASR_VAD_MIN_SILENCE_MS", &cfg.asr_vad_min_silence_ms);
-  ReadEnvInt("ORATOR_ASR_VAD_SPEECH_PAD_MS", &cfg.asr_vad_speech_pad_ms);
+  // Runtime tuning knobs
   ReadEnvInt("ORATOR_ASR_MAX_NEW_TOKENS", &cfg.asr_max_new_tokens);
-  ReadEnvInt("ORATOR_ASR_ROLLBACK_TOKENS", &cfg.asr_rollback_tokens);
+  ReadEnvDouble("ORATOR_ASR_SEGMENT_SEC", &cfg.asr_segment_sec);
   ReadEnvString("ORATOR_ASR_LANGUAGE", &cfg.asr_language);
-  ReadEnvString("ORATOR_ASR_PREPROC_MODE", &cfg.asr_preproc_mode);
-  ReadEnvString("ORATOR_ASR_FRCRN_MODEL", &cfg.asr_frcrn_model);
-  ReadEnvString("ORATOR_ASR_TFGRIDNET_MODEL", &cfg.asr_tfgridnet_model);
   ReadEnvString("ORATOR_ASR_MODEL_DIR", &cfg.asr_model_dir);
   const bool asr_disable = std::getenv("ORATOR_ASR_DISABLE") != nullptr;
   if (asr_disable) cfg.asr_model_dir.clear();
@@ -98,35 +87,20 @@ int main(int argc, char** argv) {
   if (ui_port <= 0) ui_port = port + 1;
   std::string ui_root = "web";
   ReadEnvString("ORATOR_UI_ROOT", &ui_root);
-  // prewarm_on_boot removed: stream is always loaded before listening.
-  (void)ReadEnvFlag;  // suppress unused-warning
-
-  // Spec 003/004 streaming + comprehensive-timeline knobs (real WS path).
-  // The incremental KV-cache ASR path and the VAD stream are the PRODUCTION
-  // DEFAULT (cfg defaults are true). The env vars are explicit opt-OUT switches
-  // for regression comparison against the legacy Silero-VAD path:
-  //   ORATOR_ASR_INCREMENTAL=0  -> use the legacy Silero-VAD utterance path
-  //   ORATOR_VAD_STREAM=0       -> drop the independent VAD speech-segment stream
-  //   ORATOR_ASR_ENDPOINT_RESET=0 -> incremental resets on a fixed cap only
   auto env_flag = [](const char* name, bool dflt) {
-    return ReadEnvFlag(name, dflt);
+    const char* v = std::getenv(name);
+    if (v == nullptr || v[0] == '\0') return dflt;
+    return v[0] == '1' || v[0] == 't' || v[0] == 'T' || v[0] == 'y' || v[0] == 'Y';
   };
-  cfg.asr_incremental = env_flag("ORATOR_ASR_INCREMENTAL", cfg.asr_incremental);
-  if (cfg.asr_incremental) {
-    ReadEnvDouble("ORATOR_ASR_SEGMENT_SEC", &cfg.asr_incremental_segment_sec);
-    cfg.asr_incremental_endpoint_reset =
-        env_flag("ORATOR_ASR_ENDPOINT_RESET", cfg.asr_incremental_endpoint_reset);
-    ReadEnvDouble("ORATOR_ASR_MIN_SEGMENT_SEC",
-                  &cfg.asr_incremental_min_segment_sec);
-  }
   cfg.vad_stream = env_flag("ORATOR_VAD_STREAM", cfg.vad_stream);
+  ReadEnvString("ORATOR_VAD_MODEL", &cfg.vad_model);
+  ReadEnvFloat("ORATOR_VAD_THRESHOLD", &cfg.vad_threshold);
+  ReadEnvInt("ORATOR_VAD_MIN_SPEECH_MS", &cfg.vad_min_speech_ms);
+  ReadEnvInt("ORATOR_VAD_MIN_SILENCE_MS", &cfg.vad_min_silence_ms);
 
   // Spec 002 FR7: periodic GPU-scheduling telemetry interval (seconds). 0 off.
   ReadEnvDouble("ORATOR_GPU_TELEMETRY_SEC", &cfg.gpu_telemetry_interval_sec);
 
-  std::signal(SIGPIPE, SIG_IGN);
-
-  // Create the shared emit target and stream ONCE. Models are loaded here and
   // reused across all client connections. This avoids repeated GPU model loads
   // which would exhaust device memory on Jetson.
   auto emit_target = std::make_shared<net::SessionEmit>();
@@ -162,17 +136,10 @@ int main(int argc, char** argv) {
             << "  asr:      "
             << (cfg.asr_model_dir.empty() ? "(disabled)" : cfg.asr_model_dir)
             << "\n"
-            << "  asr_vad:  " << cfg.asr_vad_model << "\n"
-            << "  asr_cfg:  max_utt=" << cfg.asr_max_utterance_sec
-            << "s min_utt=" << cfg.asr_min_utterance_sec
-            << "s thr=" << cfg.asr_vad_threshold
-            << " min_speech=" << cfg.asr_vad_min_speech_ms
-            << "ms min_silence=" << cfg.asr_vad_min_silence_ms
-            << "ms pad=" << cfg.asr_vad_speech_pad_ms
-            << "ms max_new=" << cfg.asr_max_new_tokens
-            << " rollback=" << cfg.asr_rollback_tokens
-            << "ms lang=" << cfg.asr_language
-            << " preproc=" << cfg.asr_preproc_mode
+            << "  vad:      " << cfg.vad_model << "\n"
+            << "  asr_cfg:  max_new=" << cfg.asr_max_new_tokens
+            << " segment=" << cfg.asr_segment_sec
+            << "s lang=" << cfg.asr_language
             << std::endl;
   std::cout << "  send binary PCM (int16le mono 16k); text {\"flush\"} or "
                "{\"end\"} to get the timeline." << std::endl;
