@@ -35,6 +35,15 @@ std::mutex& DeviceLock();
 // as before (the safe, validated production behavior).
 bool ConcurrentGpuEnabled();
 
+// Spec 002: whether ANY lock-free concurrency mode is active (full
+// ORATOR_GPU_CONCURRENT or the ASR-only experiment ORATOR_GPU_CONCURRENT_ASR).
+// When true, the ASR pipeline's GPU work runs WITHOUT the global lock while the
+// diarization/VAD pipelines may run kernels concurrently. CUDA Graph capture is
+// unsafe in this state (capture is a process/stream-global state machine that a
+// concurrently-issuing pipeline corrupts -> "operation failed ... during
+// capture" abort), so the ASR decoder disables graph capture when this is true.
+bool ConcurrentGpuActive();
+
 // RAII GPU-region guard (Spec 002). In serialized mode it always holds
 // DeviceLock() for the region's lifetime. In concurrent mode it skips the lock
 // ONLY when `own_stream` is true (the pipeline runs on its own non-default

@@ -11,6 +11,7 @@
 
 #include "model/asr_gemm.h"
 #include "model/asr_ops.cuh"
+#include "gpu/gpu_lock.h"
 
 namespace orator {
 namespace model {
@@ -690,7 +691,15 @@ std::vector<int> AsrTextDecoder::DecodeGreedy(int start_pos, int max_new,
   auto t_seed1 = clk();
 
   int emitted = 0;
-  const bool use_graph = std::getenv("ORATOR_ASR_NOGRAPH") == nullptr;
+  // CUDA Graph capture is disabled when (a) explicitly via ORATOR_ASR_NOGRAPH,
+  // or (b) any lock-free GPU concurrency mode is active (Spec 002): capture is a
+  // process/stream-global state machine that the concurrently-issuing
+  // diarization/VAD pipeline corrupts, aborting with "operation failed ...
+  // during capture". In concurrent mode the eager per-batch path is used (it was
+  // measured stable and still faster end-to-end because diarization no longer
+  // waits behind ASR).
+  const bool use_graph = std::getenv("ORATOR_ASR_NOGRAPH") == nullptr &&
+                         !gpu::ConcurrentGpuActive();
 
   // If a previously captured banned graph baked different EOS ids, it is stale.
   if (graph_ready_ && (graph_ban0_ != eos0 || graph_ban1_ != eos1)) {
