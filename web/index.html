@@ -3,70 +3,112 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Orator Web UI</title>
+    <title>Orator — Real-Time Transcription</title>
     <link rel="stylesheet" href="/style.css" />
   </head>
   <body>
     <header class="topbar">
-      <h1>Orator Web UI</h1>
-      <div id="connStatus" class="status offline">Disconnected</div>
+      <div class="brand">
+        <h1>Orator</h1>
+        <span class="subtitle">Real-Time Transcription</span>
+      </div>
+      <div class="topbar-right">
+        <span id="connBadge" class="badge offline">● Disconnected</span>
+      </div>
     </header>
 
-    <section class="connect-panel card">
-      <label for="wsUrl">WS URL</label>
-      <input id="wsUrl" type="text" placeholder="ws://127.0.0.1:8765" />
-      <button id="connectBtn">Connect</button>
-      <button id="micBtn" disabled>Start Mic</button>
-      <button id="flushBtn" disabled>Flush</button>
-      <button id="endBtn" disabled>End</button>
-      <button id="resetBtn" disabled>Reset</button>
-      <span id="micState" class="mic-state">Mic: idle</span>
-      <span id="wsState" class="ws-state">WS: idle</span>
-    </section>
-
-    <main class="grid">
-      <section class="card col-wide">
-        <h2>ASR</h2>
-        <div id="asrDraft" class="asr-draft"><span class="asr-draft-placeholder">Waiting for speech&hellip;</span></div>
-        <div id="asrList" class="log"></div>
-      </section>
-
-      <section class="card">
-        <h2>Diarization</h2>
-        <div id="diarList" class="log diar-log"></div>
-      </section>
-
-      <section class="card">
-        <h2>Metrics</h2>
-        <dl id="metrics" class="metrics">
-          <dt>audio_sec</dt><dd>-</dd>
-          <dt>sample_rate</dt><dd>-</dd>
-          <dt>diar_rtf</dt><dd>-</dd>
-          <dt>asr_rtf</dt><dd>-</dd>
-          <dt>ws_ready</dt><dd>0</dd>
-          <dt>asr_events</dt><dd>0</dd>
-          <dt>asr_partial</dt><dd>0</dd>
-          <dt>revision</dt><dd>0</dd>
-          <dt>diar_events</dt><dd>0</dd>
-          <dt>timeline_events</dt><dd>0</dd>
-          <dt>last_event</dt><dd>-</dd>
-        </dl>
-      </section>
-
-      <section class="card span-all">
-        <div class="timeline-header">
-          <h2>Timeline (raw)</h2>
-          <label class="auto-flush-label">
-            <input type="checkbox" id="autoFlushChk" checked />
-            Auto-flush every
-            <input type="number" id="autoFlushSec" value="30" min="5" max="300" style="width:54px" />
-            s
+    <div class="container">
+      <!-- Input Control Panel -->
+      <section class="panel input-panel">
+        <div class="input-row">
+          <button id="micBtn" class="btn btn-primary" disabled>
+            <span class="btn-icon">&#x1F3A4;</span> Start Mic
+          </button>
+          <label class="btn btn-secondary" id="uploadBtn" disabled>
+            <span class="btn-icon">&#x1F4C2;</span> Upload File
+            <input type="file" id="fileInput" accept="audio/*" hidden />
           </label>
-          <span id="timelineSummary" class="timeline-summary">-</span>
+          <button id="flushBtn" class="btn btn-outline" disabled>
+            <span class="btn-icon">&#x1F4A4;</span> Flush
+          </button>
+          <button id="endBtn" class="btn btn-warning" disabled>
+            <span class="btn-icon">&#x23F9;</span> End
+          </button>
+          <button id="clearBtn" class="btn btn-outline" disabled>
+            <span class="btn-icon">&#x1F5D1;</span> Clear
+          </button>
         </div>
-        <pre id="timelineRaw" class="raw">Click Flush or End &mdash; or enable Auto-flush &mdash; to receive timeline data.</pre>
+        <div class="progress-row" id="progressRow" hidden>
+          <span class="progress-label" id="durationLabel">00:00</span>
+          <div class="progress-bar">
+            <div class="progress-fill" id="progressFill"></div>
+          </div>
+          <span class="progress-label" id="statusLabel">Streaming...</span>
+        </div>
       </section>
-    </main>
+
+      <!-- Main Content -->
+      <div class="main-grid">
+        <!-- Transcript Panel (Left) -->
+        <section class="panel transcript-panel">
+          <h2 class="panel-title">Transcript</h2>
+          <div id="transcriptList" class="transcript-list"></div>
+          <div id="liveDraft" class="live-draft hidden">
+            <span class="draft-pulse">&#x270F;</span>
+            <span id="draftText"></span>
+          </div>
+        </section>
+
+        <!-- Metrics Panel (Right) -->
+        <section class="panel metrics-panel">
+          <h2 class="panel-title">Metrics</h2>
+          <div class="metrics-grid">
+            <div class="metric-card">
+              <span class="metric-label">Audio</span>
+              <span class="metric-value" id="mAudio">-</span>
+            </div>
+            <div class="metric-card">
+              <span class="metric-label">Sample Rate</span>
+              <span class="metric-value" id="mSampleRate">-</span>
+            </div>
+            <div class="metric-card">
+              <span class="metric-label">ASR RTF</span>
+              <span class="metric-value" id="mAsrRtf">-</span>
+            </div>
+            <div class="metric-card">
+              <span class="metric-label">Diar RTF</span>
+              <span class="metric-value" id="mDiarRtf">-</span>
+            </div>
+            <div class="metric-card">
+              <span class="metric-label">ASR Segments</span>
+              <span class="metric-value" id="mAsrSeg">0</span>
+            </div>
+            <div class="metric-card">
+              <span class="metric-label">Diar Segments</span>
+              <span class="metric-value" id="mDiarSeg">0</span>
+            </div>
+          </div>
+          <button id="downloadBtn" class="btn btn-outline btn-full hidden">
+            <span class="btn-icon">&#x1F4E5;</span> Download JSON
+          </button>
+        </section>
+      </div>
+
+      <!-- Timeline Visualization -->
+      <section class="panel timeline-panel">
+        <div class="timeline-header">
+          <h2 class="panel-title">Timeline</h2>
+          <div class="timeline-controls">
+            <button id="zoomInBtn" class="btn btn-sm" title="Zoom In">&#x1F50D;+</button>
+            <button id="zoomOutBtn" class="btn btn-sm" title="Zoom Out">&#x1F50D;-</button>
+            <button id="resetZoomBtn" class="btn btn-sm" title="Reset">&#x21BB;</button>
+          </div>
+        </div>
+        <div class="timeline-canvas-wrap">
+          <canvas id="timelineCanvas"></canvas>
+        </div>
+      </section>
+    </div>
 
     <script src="/app.js"></script>
   </body>
