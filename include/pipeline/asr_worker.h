@@ -59,6 +59,10 @@ class AsrWorker {
   std::mutex* vad_mutex() { return &vad_mutex_; }
   std::vector<VadSpeechSegment>& vad_segments() { return vad_segments_; }
 
+  // Pointer to VAD cursor's atomic position for synchronization.
+  // When non-null, ProcessSpan waits for VAD to reach at least this span's position.
+  void set_vad_cursor_pos(std::atomic<long>* pos) { vad_cursor_pos_ = pos; }
+
   void ProcessSpan(const float* samples, int n);
   void Finalize();
   void Reset();
@@ -99,11 +103,11 @@ class AsrWorker {
 
   // --- VAD gating ---
   VadUpdateCallback vad_update_;
-  std::vector<VadSpeechSegment> vad_segments_;  // snapshot of vad track
-  mutable std::mutex vad_mutex_;                // guards vad_segments_ (mutable for const IsInVadSpeech)
+  std::vector<VadSpeechSegment> vad_segments_;
+  mutable std::mutex vad_mutex_;
+  std::atomic<long>* vad_cursor_pos_ = nullptr;
 
-  // Ring buffer: ~500ms of float32 @ 16kHz for lead buffer
-  static constexpr int kRingBufferSamples = 8000;  // 500ms @ 16kHz
+  static constexpr int kRingBufferSamples = 8000;
   std::vector<float> ring_buffer_;
   int ring_write_pos_ = 0;
   int ring_count_ = 0;

@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstdio>
 #include <mutex>
+#include <thread>
 
 #include "gpu/gpu_lock.h"
 #include "pipeline/json_util.h"
@@ -33,6 +34,13 @@ void AsrWorker::ProcessSpan(const float* samples, int n) {
   RingPush(samples, n, inc_abs_pos_);
 
   if (params_.asr_vad_gate) {
+    // Wait for VAD to process this span so vad_segments_ is up-to-date.
+    if (vad_cursor_pos_ != nullptr) {
+      const long target = inc_abs_pos_ + n;
+      while (vad_cursor_pos_->load(std::memory_order_relaxed) < target) {
+        std::this_thread::yield();
+      }
+    }
     const double current_sec = tb_.SecondsAt(inc_abs_pos_ + n);
 
     if (vad_state_ == VadState::IDLE) {
@@ -44,11 +52,18 @@ void AsrWorker::ProcessSpan(const float* samples, int n) {
         RingPop(lead_samples, &lead);
         ProcessIncremental(lead.data(), static_cast<int>(lead.size()), /*finalize=*/false);
         vad_state_ = VadState::PROCESSING;
+        // Fall through to ProcessIncremental below
+      } else {
+        // IDLE and not in speech — skip, but only if VAD segments are available.
+        // When vad_segments_ is empty (VAD hasn't pushed yet due to consumer race),
+        // we process normally to avoid losing audio.
+        if (!vad_segments_.empty()) {
+          inc_abs_pos_ += n;
+          processed_samples_.fetch_add(n);
+          return;
+        }
+        // VAD empty — fallback: process audio normally
       }
-      // Otherwise stay IDLE — audio skipped, cursor still advances
-      inc_abs_pos_ += n;
-      processed_samples_.fetch_add(n);
-      return;
     }
 
     if (vad_state_ == VadState::PROCESSING) {

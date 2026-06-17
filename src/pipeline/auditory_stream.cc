@@ -160,6 +160,8 @@ void AuditoryStream::StartWorkers() {
           std::lock_guard<std::mutex> lk(*asr_worker_->vad_mutex());
           asr_worker_->vad_segments() = segs;
         });
+    // VAD gating: ASR waits for VAD cursor to lead before processing.
+    asr_worker_->set_vad_cursor_pos(&vad_cursor_pos_);
     asr_cursor_ = buffer_.AddConsumer();
     asr_thread_ = std::thread([this] {
       std::vector<float> chunk;
@@ -232,6 +234,8 @@ void AuditoryStream::StartWorkers() {
       while (buffer_.WaitAndRead(vad_cursor_, &chunk)) {
         vad_detector_->Push(chunk.data(), static_cast<int>(chunk.size()));
         drain(/*finalize=*/false);
+        // Publish VAD cursor position for ASR synchronization.
+        vad_cursor_pos_.store(buffer_.cursor_position(vad_cursor_), std::memory_order_relaxed);
         {
           char buf[64];
           std::snprintf(buf, sizeof(buf),

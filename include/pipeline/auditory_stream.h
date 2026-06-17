@@ -176,6 +176,9 @@ class AuditoryStream {
   // ASR worker thread and the controller both touch it.
   ComprehensiveTimeline comp_;
   std::mutex comp_mutex_;
+
+  // VAD cursor position for ASR synchronization.
+  std::atomic<long> vad_cursor_pos_{0};
 };
 
 }  // namespace pipeline

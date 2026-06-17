@@ -76,6 +76,9 @@ class SharedAudioBuffer {
   // Absolute index of the oldest sample still retained.
   long base_sample() const;
 
+  // Returns the absolute read position of cursor `idx`. Thread-safe.
+  long cursor_position(int idx) const;
+
  private:
   // Remove the leading samples that every consumer has already read. The caller
   // holds `mutex_`.

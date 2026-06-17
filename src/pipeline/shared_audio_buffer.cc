@@ -81,5 +81,11 @@ long SharedAudioBuffer::base_sample() const {
   return base_sample_;
 }
 
+long SharedAudioBuffer::cursor_position(int idx) const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  if (idx < 0 || idx >= static_cast<int>(cursors_.size())) return 0;
+  return cursors_[idx];
+}
+
 }  // namespace pipeline
 }  // namespace orator
