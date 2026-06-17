@@ -68,7 +68,7 @@ int main(int argc, char** argv) {
     int n = std::min(step, total - off_i);
     bool final = (off_i + n >= total);
     core::DiarizationFrames part =
-        diar.StreamAudio(audio.samples.data() + off_i, n, final);
+        diar.StreamAudio(audio.samples.data() + off_i, n, final, /*stream=*/nullptr);
     if (part.num_frames > 0) {
       stream_probs.insert(stream_probs.end(), part.probs.begin(),
                           part.probs.end());
