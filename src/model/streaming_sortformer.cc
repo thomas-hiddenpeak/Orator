@@ -1,5 +1,7 @@
 #include "model/streaming_sortformer.h"
 
+#include <cuda_runtime.h>
+
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -9,8 +11,12 @@
 #include <numeric>
 #include <stdexcept>
 
+#include "gpu/memory.h"
+
 namespace orator {
 namespace model {
+
+using ::orator::gpu::CheckCudaError;
 
 namespace {
 
@@ -343,25 +349,28 @@ void SortformerDiarizer::Reset() {
 }
 
 std::vector<float> SortformerDiarizer::ForwardEncoderDecoder(
-    const std::vector<float>& emb_seq, int T, int valid) {
+    const std::vector<float>& emb_seq, int T, int valid,
+    cudaStream_t stream) {
   const int D = config_.encoder_d_model;
   const float xscale = std::sqrt(static_cast<float>(D));
   std::vector<float> xin(emb_seq.size());
   for (size_t i = 0; i < emb_seq.size(); ++i) xin[i] = emb_seq[i] * xscale;
 
   gpu::DeviceBuffer dx(xin.size() * sizeof(float));
-  gpu::GpuMemory::CopyHostToDevice(dx.data(), xin.data(),
-                                   xin.size() * sizeof(float));
+  CUDA_CHECK(cudaMemcpyAsync(dx.data(), xin.data(),
+                              xin.size() * sizeof(float), cudaMemcpyHostToDevice,
+                              stream));
   std::vector<float> posemb = ConformerLayer::BuildPosEmb(T, D);
   gpu::DeviceBuffer dpe(posemb.size() * sizeof(float));
-  gpu::GpuMemory::CopyHostToDevice(dpe.data(), posemb.data(),
-                                   posemb.size() * sizeof(float));
+  CUDA_CHECK(cudaMemcpyAsync(dpe.data(), posemb.data(),
+                              posemb.size() * sizeof(float), cudaMemcpyHostToDevice,
+                              stream));
   for (auto& layer : conformer_layers_) {
     layer->Forward(static_cast<float*>(dx.data()), T, valid,
-                   static_cast<const float*>(dpe.data()));
+                    static_cast<const float*>(dpe.data()), stream);
   }
   std::vector<float> preds =
-      decoder_->Forward(static_cast<float*>(dx.data()), T, valid);
+      decoder_->Forward(static_cast<float*>(dx.data()), T, valid, stream);
 
   // apply_mask_to_preds: zero frames at/after the valid length.
   const int n_spk = config_.max_num_speakers;
@@ -422,11 +431,12 @@ core::DiarizationFrames SortformerDiarizer::RunStreaming(const float* mel_fm,
 // RunStreaming loop and the incremental StreamAudio path, so the two are
 // bit-identical for identical mel content.
 void SortformerDiarizer::StreamMelChunk(const float* mel_buf, int n_mels,
-                                        int buf_len, long buf_base_frame,
-                                        long stt_abs, long valid_abs,
-                                        long avail_abs,
-                                        std::vector<float>& out_preds,
-                                        int& out_frames) {
+                                         int buf_len, long buf_base_frame,
+                                         long stt_abs, long valid_abs,
+                                         long avail_abs,
+                                         std::vector<float>& out_preds,
+                                         int& out_frames,
+                                         cudaStream_t stream) {
   const int D = config_.encoder_d_model;
   const int n_spk = config_.max_num_speakers;
   const int sub = config_.encoder_subsampling_factor;
@@ -457,7 +467,7 @@ void SortformerDiarizer::StreamMelChunk(const float* mel_buf, int n_mels,
   // pre_encode -> chunk embeddings [chunk_T, D].
   int chunk_T = 0, chunk_valid = 0;
   std::vector<float> chunk_embs = pre_encode_->Forward(
-      slice.data(), n_mels, mlen, feat_len, &chunk_T, &chunk_valid);
+      slice.data(), n_mels, mlen, feat_len, &chunk_T, &chunk_valid, stream);
 
   const int lc_sub = static_cast<int>(std::lround(static_cast<double>(lc) / sub));
   const int rc_sub = static_cast<int>(std::ceil(static_cast<double>(rc) / sub));
@@ -476,7 +486,7 @@ void SortformerDiarizer::StreamMelChunk(const float* mel_buf, int n_mels,
   const int valid_cat = spk_len + chunk_valid;
 
   // encoder + decoder -> preds [Tcat, n_spk].
-  std::vector<float> preds = ForwardEncoderDecoder(enc_in, Tcat, valid_cat);
+  std::vector<float> preds = ForwardEncoderDecoder(enc_in, Tcat, valid_cat, stream);
 
   // chunk_preds = preds[spk_len + lc_sub : spk_len + lc_sub + chunk_center_len]
   const int cp_start = spk_len + lc_sub;
@@ -590,7 +600,7 @@ void SortformerDiarizer::AppendRaw(const float* samples, int num_samples) {
   }
 }
 
-void SortformerDiarizer::EnsureMel(bool final) {
+void SortformerDiarizer::EnsureMel(bool final, cudaStream_t stream) {
   const int n_mels = config_.mel_features;
   const auto& mc = mel_->config();
   const int hop = mc.hop_length;
@@ -614,7 +624,7 @@ void SortformerDiarizer::EnsureMel(bool final) {
   const int k = static_cast<int>(target - mel_avail_);
   const int input_offset = static_cast<int>(mel_avail_ * hop - sig_abs_);
   std::vector<float> fm = mel_->ComputeStreamFrames(
-      sig_.data(), static_cast<int>(sig_.size()), input_offset, k);
+      sig_.data(), static_cast<int>(sig_.size()), input_offset, k, stream);
 
   // Append the k frame-major rows as freq-major columns to mel_seq_.
   const int newW = mel_w_ + k;
@@ -670,8 +680,9 @@ void SortformerDiarizer::TrimStreamingBuffers() {
 }
 
 core::DiarizationFrames SortformerDiarizer::StreamAudio(const float* samples,
-                                                        int num_samples,
-                                                        bool final) {
+                                                         int num_samples,
+                                                         bool final,
+                                                         cudaStream_t stream) {
   if (!initialized_)
     throw std::runtime_error("SortformerDiarizer not initialized");
   if (!weights_loaded_)
@@ -713,7 +724,7 @@ core::DiarizationFrames SortformerDiarizer::StreamAudio(const float* samples,
     }
   }
 
-  EnsureMel(final);
+  EnsureMel(final, stream);
 
   while (stt_feat_ < mel_avail_) {
     const long end_abs = std::min<long>(stt_feat_ + chunk_mel, mel_avail_);
@@ -724,8 +735,8 @@ core::DiarizationFrames SortformerDiarizer::StreamAudio(const float* samples,
       if (!full || end_abs + rc_max > mel_avail_) break;
     }
     StreamMelChunk(mel_seq_.data(), n_mels, mel_w_, mel_base_, stt_feat_,
-                   /*valid_abs=*/mel_avail_, /*avail_abs=*/mel_avail_, out_preds,
-                   out_frames);
+                    /*valid_abs=*/mel_avail_, /*avail_abs=*/mel_avail_, out_preds,
+                    out_frames, stream);
     stt_feat_ = end_abs;
     TrimStreamingBuffers();
   }

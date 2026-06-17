@@ -1,5 +1,13 @@
 #pragma once
 
+#include <cuda_runtime.h>
+
+#include <memory>
+#include <vector>
+
+#include "gpu/memory.h"
+#include "io/safetensor.h"
+
 // Conformer pre-encode (dw_striding subsampling, factor 8) for Sortformer.
 //
 // Replicates NeMo's ConvSubsampling(subsampling="dw_striding", factor=8):
@@ -12,12 +20,6 @@
 //
 // Weights are loaded (copied) from a SafeTensorReader into unified memory so
 // the kernels can read them on the Jetson unified architecture.
-
-#include <memory>
-#include <vector>
-
-#include "gpu/memory.h"
-#include "io/safetensor.h"
 
 namespace orator {
 namespace model {
@@ -33,10 +35,12 @@ class ConformerPreEncode {
   // Runs the subsampling. `mel` is [n_mels, n_frames] row-major (channel/freq
   // is the first dim = NeMo's feat dim). `valid_len` is the number of valid
   // input frames (<= n_frames); the rest are masked to zero like NeMo.
+  // `stream` is the CUDA stream for kernel launches and synchronization.
   // Returns [out_frames, 512] row-major in a host-readable vector and sets
   // out_frames / out_valid_len.
   std::vector<float> Forward(const float* mel, int n_mels, int n_frames,
-                             int valid_len, int* out_frames, int* out_valid_len);
+                              int valid_len, int* out_frames, int* out_valid_len,
+                              cudaStream_t stream = nullptr);
 
  private:
   // Each weight copied into unified memory for GPU access.

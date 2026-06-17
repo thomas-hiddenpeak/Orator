@@ -116,8 +116,9 @@ class SortformerDiarizer final : public core::IDiarizer {
   // O(total audio) and memory is bounded regardless of session length, and the
   // emitted frames are bit-identical to the offline ProcessChunk over the same
   // audio. The returned frames' t_start_sec is the absolute stream time.
+  // `stream` is the CUDA stream for all GPU work in this call.
   core::DiarizationFrames StreamAudio(const float* samples, int num_samples,
-                                      bool final);
+                                       bool final, cudaStream_t stream);
 
   int max_speakers() const override { return config_.max_num_speakers; }
   double frame_period_sec() const override { return config_.FramePeriodSec(); }
@@ -133,11 +134,12 @@ class SortformerDiarizer final : public core::IDiarizer {
                                        int t_mel, int valid_mel,
                                        double t_start_sec);
 
- private:
+  private:
   // Runs xscale -> 17 Conformer layers -> decoder on a host emb sequence
   // [T, fc_d_model] and returns masked per-frame sigmoids [T, n_spk].
   std::vector<float> ForwardEncoderDecoder(const std::vector<float>& emb_seq,
-                                           int T, int valid);
+                                            int T, int valid,
+                                            cudaStream_t stream = nullptr);
 
   // One streaming chunk step over a freq-major mel buffer covering absolute
   // frames [buf_base_frame, buf_base_frame+buf_len). Advances the persistent
@@ -146,7 +148,7 @@ class SortformerDiarizer final : public core::IDiarizer {
   void StreamMelChunk(const float* mel_buf, int n_mels, int buf_len,
                       long buf_base_frame, long stt_abs, long valid_abs,
                       long avail_abs, std::vector<float>& out_preds,
-                      int& out_frames);
+                      int& out_frames, cudaStream_t stream = nullptr);
 
   SortformerConfig config_;
   bool initialized_ = false;
@@ -183,7 +185,7 @@ class SortformerDiarizer final : public core::IDiarizer {
   void AppendRaw(const float* samples, int num_samples);
   // Computes newly-stable mel frames up to the current stable horizon (or all
   // floor(total/hop) frames when final). Batched: called at chunk granularity.
-  void EnsureMel(bool final);
+  void EnsureMel(bool final, cudaStream_t stream = nullptr);
   // Drops mel columns / signal samples no longer needed for future chunks.
   void TrimStreamingBuffers();
 };
