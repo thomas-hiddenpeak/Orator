@@ -4,7 +4,7 @@
 
 ### Frontend–Backend Boundary
 
-The UI is a **single-page application (SPA)** served as static files from the same HTTP server that handles WebSocket. No client-side state is persisted; all application state lives in:
+The UI is a **single-page application (SPA)** served as static files from a dedicated HTTP port. WebSocket streaming remains on the existing WS port. No client-side state is persisted; all application state lives in:
 - **Browser memory** (during the session): DOM state, current transcript, latest metrics.
 - **Server-side** (during streaming): the `AuditoryStream` and its pipelines (unchanged from Spec 001).
 
@@ -49,14 +49,14 @@ User Browser                          orator_ws (C++)
 
 **Current State**:
 - `orator_ws` runs a WebSocket server on port 8765 (default).
-- Clients connect, send binary PCM, receive JSON events.
-- No HTTP server; WebSocket is the only transport.
+- `orator_ws` now also runs a static HTTP UI server on a separate UI port (default 8766, configurable by `ORATOR_UI_PORT`).
+- Clients connect over WebSocket for streaming and over HTTP for UI assets.
 
 **Changes Required**:
-1. **Extend `net/websocket_server.h`** (or create `net/http_server.h`):
-   - Add HTTP request parsing alongside WebSocket upgrade handshake.
-   - Serve static files from `web/` directory for `GET /`, `GET /style.css`, `GET /ui_controller.js`, etc.
-   - Keep WebSocket upgrade logic intact.
+1. **Add `net/http_static_server.h/.cc`**:
+  - Implement minimal GET-only static file serving.
+  - Serve static files from `web/` directory for `GET /`, `GET /style.css`, `GET /app.js`, etc.
+  - Keep WebSocket server independent on its own port.
 
 2. **File serving strategy**:
    - **Option A (Embedded)**: Compile HTML/CSS/JS into binary as string literals (using `xxd` or CMake magic).
@@ -73,11 +73,11 @@ User Browser                          orator_ws (C++)
    - Serve file content with appropriate headers.
    - Non-existent files → 404 or fallback to `index.html` (SPA pattern).
 
-4. **Port conflict**: HTTP and WebSocket share port 8765. The upgrade handshake (`Upgrade: websocket` header) differentiates them.
+4. **Port separation**: HTTP UI and WebSocket use different ports by default (`ws=8765`, `ui=8766`) to simplify test tooling.
 
 **Code location**:
-- `src/net/http_websocket_server.cc` (replaces/extends existing `websocket_server.h` logic).
-- `include/net/http_websocket_server.h`.
+- `src/net/http_static_server.cc`.
+- `include/net/http_static_server.h`.
 
 ---
 
@@ -229,8 +229,8 @@ User Browser                          orator_ws (C++)
 - **Backend**: HTTP file serving (test 200, 404 responses); WebSocket upgrade logic unchanged.
 
 ### Integration Tests
-1. Start `orator_ws` on port 8765.
-2. Open browser to `http://localhost:8765` → page loads.
+1. Start `orator_ws` on WS port 8765 (UI defaults to 8766).
+2. Open browser to `http://localhost:8766` → page loads.
 3. Send audio over WebSocket (existing `ws_client_test.py` or new HTTP client).
 4. Verify transcript panel updates in real time.
 5. Verify timeline renders correctly on completion.
@@ -250,7 +250,7 @@ User Browser                          orator_ws (C++)
 
 ### Risk 1: Cross-origin security (CORS)
 - **Problem**: If UI is served from one origin and WebSocket is expected from another, browsers block it.
-- **Mitigation**: Serve UI and WebSocket from same origin (port 8765). No CORS needed.
+- **Mitigation**: Keep UI and WS on localhost; allow explicit WS URL override in UI. No browser CORS issue for WebSocket in this model.
 
 ### Risk 2: Audio codec compatibility
 - **Problem**: Different browsers support different audio formats natively.
@@ -291,7 +291,7 @@ User Browser                          orator_ws (C++)
 3. No new external CMake dependencies; static file serving is minimal C++.
 
 ### Deployment
-- **Development**: `./build/orator_ws 8765 <models>...` with `web/` in the same directory tree.
+- **Development**: `./build/orator_ws 8765 <models>...` with UI at `http://localhost:8766` by default (override via `ORATOR_UI_PORT`).
 - **Production**: Bundle `web/` into binary (future, Spec 006 Phase 3) or deploy alongside binary.
 
 ---
@@ -312,9 +312,9 @@ The UI is a **visualization layer** and does not modify protocol semantics. New 
 ## 11. Summary of New Code
 
 ### Backend (C++)
-- `src/net/http_websocket_server.cc` (~200 lines): HTTP request parsing, static file serving.
-- `include/net/http_websocket_server.h` (~50 lines): Header.
-- Changes to `src/ws_main.cc` (~10 lines): Instantiate HTTP server, configure web root.
+- `src/net/http_static_server.cc` (~200 lines): HTTP request parsing, static file serving.
+- `include/net/http_static_server.h` (~50 lines): Header.
+- Changes to `src/ws_main.cc` (~20 lines): instantiate UI server, separate UI port, configure web root.
 
 ### Frontend (JavaScript)
 - `web/index.html` (~100 lines): Page structure.
@@ -354,7 +354,7 @@ The UI is a **visualization layer** and does not modify protocol semantics. New 
 
 ## 13. Validation Checklist
 
-- [ ] Static HTML page loads from `http://localhost:8765` without external requests.
+- [ ] Static HTML page loads from `http://localhost:8766` without external requests.
 - [ ] WebSocket connection status displayed accurately.
 - [ ] Incremental ASR utterances appear in transcript panel within 200 ms of arrival.
 - [ ] Final timeline renders with diarization and ASR tracks aligned on time axis.

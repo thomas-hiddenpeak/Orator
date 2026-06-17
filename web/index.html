@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Orator Web UI</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <h1>Orator Web UI</h1>
+      <div id="connStatus" class="status offline">Disconnected</div>
+    </header>
+
+    <section class="connect-panel card">
+      <label for="wsUrl">WS URL</label>
+      <input id="wsUrl" type="text" placeholder="ws://127.0.0.1:8765" />
+      <button id="connectBtn">Connect</button>
+      <button id="flushBtn" disabled>Flush</button>
+      <button id="endBtn" disabled>End</button>
+      <button id="resetBtn" disabled>Reset</button>
+    </section>
+
+    <main class="grid">
+      <section class="card">
+        <h2>Realtime ASR</h2>
+        <div id="asrList" class="log"></div>
+      </section>
+
+      <section class="card">
+        <h2>Metrics</h2>
+        <dl id="metrics" class="metrics">
+          <dt>audio_sec</dt><dd>-</dd>
+          <dt>sample_rate</dt><dd>-</dd>
+          <dt>diar_rtf</dt><dd>-</dd>
+          <dt>asr_rtf</dt><dd>-</dd>
+        </dl>
+      </section>
+
+      <section class="card span-2">
+        <h2>Timeline (raw)</h2>
+        <pre id="timelineRaw" class="raw">-</pre>
+      </section>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

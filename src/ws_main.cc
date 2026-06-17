@@ -12,8 +12,10 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <thread>
 
 #include "net/auditory_ws_handler.h"
+#include "net/http_static_server.h"
 #include "net/websocket_server.h"
 
 using namespace orator;
@@ -57,6 +59,7 @@ void ReadEnvString(const char* name, std::string* out) {
 
 int main(int argc, char** argv) {
   int port = argc > 1 ? std::atoi(argv[1]) : 8765;
+  int ui_port = 0;
   pipeline::AuditoryStream::Config cfg;
   if (argc > 2) cfg.diarizer_weights = argv[2];
   if (argc > 3) cfg.asr_model_dir = argv[3];
@@ -75,6 +78,10 @@ int main(int argc, char** argv) {
   ReadEnvString("ORATOR_ASR_PREPROC_MODE", &cfg.asr_preproc_mode);
   ReadEnvString("ORATOR_ASR_FRCRN_MODEL", &cfg.asr_frcrn_model);
   ReadEnvString("ORATOR_ASR_TFGRIDNET_MODEL", &cfg.asr_tfgridnet_model);
+  ReadEnvInt("ORATOR_UI_PORT", &ui_port);
+  if (ui_port <= 0) ui_port = port + 1;
+  std::string ui_root = "web";
+  ReadEnvString("ORATOR_UI_ROOT", &ui_root);
 
   // Spec 003/004 streaming + comprehensive-timeline knobs (real WS path).
   // The incremental KV-cache ASR path and the VAD stream are the PRODUCTION
@@ -108,7 +115,18 @@ int main(int argc, char** argv) {
     std::cerr << "failed to bind port " << port << std::endl;
     return 1;
   }
+  net::HttpStaticServer ui(ui_port, ui_root);
+  if (!ui.Start()) {
+    std::cerr << "failed to bind UI port " << ui_port
+              << " (set ORATOR_UI_PORT to override)" << std::endl;
+    return 1;
+  }
+
+  std::thread ui_thread([&ui]() { ui.Serve(); });
+
   std::cout << "orator_ws listening on ws://0.0.0.0:" << server.port() << "\n"
+            << "orator_ui listening on http://0.0.0.0:" << ui.port() << "\n"
+            << "  ui_root:  " << ui.web_root() << "\n"
             << "  diarizer: " << cfg.diarizer_weights << "\n"
             << "  asr:      "
             << (cfg.asr_model_dir.empty() ? "(disabled)" : cfg.asr_model_dir)
@@ -131,5 +149,8 @@ int main(int argc, char** argv) {
   server.Serve([&cfg]() -> std::unique_ptr<net::WebSocketHandler> {
     return std::make_unique<net::AuditoryWsHandler>(cfg);
   });
+
+  ui.Stop();
+  if (ui_thread.joinable()) ui_thread.join();
   return 0;
 }

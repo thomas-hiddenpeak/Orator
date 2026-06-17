@@ -20,7 +20,7 @@ A browser-based web UI that provides **live visualization and interaction** with
 ## 3. User Scenarios
 
 ### Scenario A — Live Transcription with Visualization
-A user opens `http://localhost:8765` in a browser, starts recording their microphone or uploads an audio file. As audio streams to the server, they see:
+A user opens `http://localhost:<ui_port>` in a browser, starts recording their microphone or uploads an audio file. The UI connects to `ws://localhost:<ws_port>` for streaming data. As audio streams to the server, they see:
 - ASR utterances appear and update in real time.
 - Speaker segments appear below, color-coded by speaker ID.
 - A horizontal timeline shows progress and speaker activity.
@@ -38,11 +38,11 @@ A developer or operator views the real-time performance dashboard: wall-clock ti
 
 ### FR1 — Web Server Integration
 - The UI is served as static HTML/CSS/JavaScript from a built-in HTTP server within `orator_ws`.
-- Serve static assets at root path `/`; WebSocket remains at the same port.
+- Serve static assets at root path `/` on a dedicated UI port (default `ws_port + 1`).
 - No external web framework required (use minimal C++ HTTP library or built-in socket).
 
 ### FR2 — WebSocket Client Connection
-- Client detects the server's WebSocket address automatically (same host/port) when the page loads.
+- Client pre-fills the server's WebSocket address automatically and allows manual override for testing.
 - Auto-reconnect on network loss; display connection status to the user.
 
 ### FR3 — Audio Input
@@ -278,9 +278,9 @@ web/
 ## 9. Acceptance Criteria
 
 ### AC1 — UI Served from `orator_ws`
-- Start `./build/orator_ws 8765 <models>...` and navigate to `http://localhost:8765`.
+- Start `./build/orator_ws 8765 <models>...` and navigate to `http://localhost:8766` (or `ORATOR_UI_PORT`).
 - Page loads with no external network requests (all assets are local).
-- Connection status displayed; WebSocket connects to same host/port.
+- Connection status displayed; WebSocket connects to configured WS URL.
 
 ### AC2 — Real-Time ASR Display
 - Send audio over WebSocket (binary PCM).

@@ -8,40 +8,39 @@ Spec 006 implementation broken into ordered, independently verifiable tasks orga
 ## Phase 1: MVP — Basic UI, Real-Time Transcript, Metrics (DRAFT)
 
 ### T001 — Create web/ directory and static assets structure
-**Status**: DRAFT
+**Status**: COMPLETED
 **Goal**: Set up directory layout and placeholder files.
 **Steps**:
 1. Create `web/` directory in repository root.
-2. Create placeholder files: `index.html`, `style.css`, `ws_client.js`, `ui_controller.js`, `audio_input.js`, `timeline_renderer.js`.
+2. Create MVP files: `index.html`, `style.css`, `app.js`.
 3. Add `.web/` reference to `.gitignore` if needed (or commit all files).
 **Verification**:
-- `ls web/` shows 6 files.
+- `ls web/` shows the MVP files.
 - `git status` includes new web files.
 
 ---
 
 ### T002 — Implement HTTP file server in C++
-**Status**: DRAFT
-**Goal**: Extend `orator_ws` to serve static files over HTTP alongside WebSocket.
+**Status**: COMPLETED
+**Goal**: Add dedicated HTTP static server for UI while keeping WebSocket on its own port.
 **Steps**:
-1. Create `src/net/http_websocket_server.cc` and `include/net/http_websocket_server.h`.
-   - Extend existing WebSocket server to parse HTTP GET requests.
-   - Detect `Upgrade: websocket` header; route to WebSocket upgrade logic (existing).
-   - For plain GET: parse path, map to `web/` file, read from disk, return with correct MIME type.
+1. Create `src/net/http_static_server.cc` and `include/net/http_static_server.h`.
+   - Parse HTTP GET requests.
+   - Map path to `web/` file, read from disk, return with correct MIME type.
    - Handle 404 (file not found), 400 (bad request).
-2. Modify `src/ws_main.cc` to use new HTTP+WebSocket server.
-3. Configure web root path (relative to binary or environment variable).
+2. Modify `src/ws_main.cc` to launch both servers.
+3. Configure web root and UI port via environment variables.
 **Verification**:
 - `./build/orator_ws 8765 <models>...` starts without error.
-- `curl http://localhost:8765/index.html` returns HTML (placeholder file).
-- `curl http://localhost:8765/nonexistent` returns 404.
-- `curl http://localhost:8765/` serves `index.html` or index redirect.
+- `curl http://localhost:8766/index.html` returns HTML.
+- `curl http://localhost:8766/nonexistent` returns 404.
+- `curl http://localhost:8766/` serves `index.html`.
 - Build produces no new warnings (`-Wall -Wextra`).
 
 ---
 
 ### T003 — Implement web/index.html with basic layout
-**Status**: DRAFT
+**Status**: COMPLETED
 **Goal**: Create the main page structure with placeholders for UI regions.
 **Content**:
 - DOCTYPE, head (title, CSS link), body.
@@ -58,7 +57,7 @@ Spec 006 implementation broken into ordered, independently verifiable tasks orga
 ---
 
 ### T004 — Implement web/style.css with responsive layout
-**Status**: DRAFT
+**Status**: COMPLETED
 **Goal**: Style the UI for desktop and tablet.
 **Content**:
 - Base layout: 3-column (input, transcript, metrics) or 2-section (transcript left, metrics right).
@@ -144,7 +143,7 @@ Spec 006 implementation broken into ordered, independently verifiable tasks orga
 **Goal**: End-to-end test: start server, send audio via WebSocket, verify UI updates.
 **Steps**:
 1. Start `./build/orator_ws 8765 <models>...`.
-2. Open `http://localhost:8765` in browser.
+2. Open `http://localhost:8766` in browser.
 3. Verify page loads, connection status shows "Ready".
 4. Use existing `ws_client_test.py` or a new minimal Python client to send PCM frames.
 5. Observe transcript panel updates in real time (utterances appear as they arrive).

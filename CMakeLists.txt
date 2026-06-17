@@ -63,6 +63,7 @@ set(ORATOR_CORE_SOURCES
     src/pipeline/asr_worker.cc
     # networking (dependency-free WebSocket over POSIX sockets)
     src/net/websocket_server.cc
+    src/net/http_static_server.cc
     src/net/auditory_ws_handler.cc
 )
 
