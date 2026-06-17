@@ -264,18 +264,13 @@ void AsrWorker::EmitIncrementalChunk(const float* samples, int n, bool finalize)
       emit_(std::string(buf) + JsonEscape(tok.text) + "\"}");
     }
     inc_live_text_.clear();
-  } else if (n > 0 && !inc_live_text_.empty()) {
-    // In-segment revision: the engine has revised the segment's text (vLLM-style
-    // unfixed-tail rollback every window). Deliver it to the comprehensive
-    // timeline under the SAME stable id so the entry is revised in place (ASR
-    // self-revision, Spec 004 G3) -- only when the text actually changed, to
-    // bound revision volume. Also emit the live preview message.
+  } else if (inc_in_segment_) {
     if (text_sink_ && inc_live_text_ != inc_delivered_text_) {
       text_sink_(inc_text_id_, tb_.SecondsAt(inc_seg_start_sample_),
                  tb_.SecondsAt(inc_seg_end_sample_), inc_live_text_);
       inc_delivered_text_ = inc_live_text_;
     }
-    if (emit_) {
+    if (emit_ && !inc_live_text_.empty()) {
       char buf[160];
       std::snprintf(buf, sizeof(buf),
                     "{\"type\":\"asr_partial\",\"source\":\"qwen3_asr\","

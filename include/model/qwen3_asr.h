@@ -65,7 +65,7 @@ class Qwen3Asr final : public core::IAsr {
   // bound the cache length over a long stream.
   //
   // Number of mel frames per 8 s encoder window and the audio tokens it yields.
-  static constexpr int kStreamWindowMel = 800;   // 8 s at hop 160 (n_window_infer)
+  static constexpr int kStreamWindowMel = 100;   // 1 s at hop 160 (n_window_infer)
 
   // Begin a new segment. `base_sample` is the absolute sample index of the
   // first sample fed after this call (for timeline anchoring by the caller).
@@ -114,7 +114,7 @@ class Qwen3Asr final : public core::IAsr {
 
   core::AsrConfig cfg_;
   std::string language_ = "Chinese";
-  int max_new_tokens_ = 384;
+  int max_new_tokens_ = 32;
   bool loaded_ = false;
 
   // VAD / segmentation knobs (energy-based, dependency-free).

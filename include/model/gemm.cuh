@@ -155,10 +155,18 @@ static __global__ void SgemmKernel(const float* __restrict__ in,
 
 // act: 0 none, 1 SiLU, 2 ReLU, 3 sigmoid.
 inline void LaunchSgemm(const float* in, const float* W, const float* bias,
-                        float* out, int M, int K, int N, int act) {
+                         float* out, int M, int K, int N, int act) {
   dim3 block(kThreadsGemm);
   dim3 grid((N + BN - 1) / BN, (M + BM - 1) / BM);
   SgemmKernel<<<grid, block>>>(in, W, bias, out, M, K, N, act);
+}
+
+inline void LaunchSgemm(const float* in, const float* W, const float* bias,
+                         float* out, int M, int K, int N, int act,
+                         cudaStream_t stream) {
+  dim3 block(kThreadsGemm);
+  dim3 grid((N + BN - 1) / BN, (M + BM - 1) / BM);
+  SgemmKernel<<<grid, block, 0, stream>>>(in, W, bias, out, M, K, N, act);
 }
 
 // Strided-batched variant. Batch index comes from blockIdx.z; each batch b uses
@@ -237,12 +245,22 @@ static __global__ void SgemmBatchedKernel(const float* __restrict__ in,
 }
 
 inline void LaunchSgemmBatched(const float* in, const float* W, float* out,
-                               int M, int K, int N, int act, int batch,
-                               long strideIn, long strideW, long strideOut) {
+                                int M, int K, int N, int act, int batch,
+                                long strideIn, long strideW, long strideOut) {
   dim3 block(kThreadsGemm);
   dim3 grid((N + BN - 1) / BN, (M + BM - 1) / BM, batch);
   SgemmBatchedKernel<<<grid, block>>>(in, W, out, M, K, N, act, strideIn,
-                                      strideW, strideOut);
+                                       strideW, strideOut);
+}
+
+inline void LaunchSgemmBatched(const float* in, const float* W, float* out,
+                                int M, int K, int N, int act, int batch,
+                                long strideIn, long strideW, long strideOut,
+                                cudaStream_t stream) {
+  dim3 block(kThreadsGemm);
+  dim3 grid((N + BN - 1) / BN, (M + BM - 1) / BM, batch);
+  SgemmBatchedKernel<<<grid, block, 0, stream>>>(in, W, out, M, K, N, act,
+                                                  strideIn, strideW, strideOut);
 }
 
 }  // namespace gemm

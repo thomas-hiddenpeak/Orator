@@ -70,7 +70,7 @@ class AuditoryStream {
     int asr_vad_min_speech_ms = 250;
     int asr_vad_min_silence_ms = 120;
     int asr_vad_speech_pad_ms = 60;
-    int asr_max_new_tokens = 384;
+    int asr_max_new_tokens = 32;
     int asr_rollback_tokens = 0;
     // Spec 003 incremental KV-cache session: the PRODUCTION DEFAULT ASR path.
     // Persistent KV cache + prefix caching + chunk-local windowed encoder; beats
@@ -182,10 +182,11 @@ class AuditoryStream {
   // prioritized CUDA stream owned by the scheduler. It is also the single source
   // of truth for the GPU-scheduling telemetry snapshot.
   gpu::GpuScheduler scheduler_;
-  // ASR pipeline GPU stream, sourced from the scheduler (owned by it, not here).
-  // diar/vad currently run on the default stream (their engine stream-routing is
-  // a later, separately-gated task); the scheduler still records their class.
+  // Per-pipeline GPU streams sourced from the scheduler (owned by it).
+  cudaStream_t diar_stream_ = nullptr;
   cudaStream_t asr_stream_ = nullptr;
+  // VAD pipeline GPU stream, sourced from the scheduler (owned by it, not here).
+  cudaStream_t vad_stream_ = nullptr;
 
   // Wakes WaitForBarrier whenever a worker advances or finishes.
   std::mutex progress_mutex_;

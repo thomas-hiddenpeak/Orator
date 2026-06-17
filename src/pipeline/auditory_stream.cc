@@ -34,13 +34,12 @@ void AuditoryStream::Start() {
     diarizer_->Initialize(dc);
     diarizer_->LoadWeights(config_.diarizer_weights);
     // Spec 002: register the diarization pipeline as foreground priority index 0
-    // (the latency-critical pipeline). Its engine is not yet stream-routed (it
-    // runs on the default stream under the global GPU lock); the registry still
-    // records its class so the scheduling telemetry reports it. create_stream is
-    // false until the engine's kernels are threaded onto the stream (a later,
-    // numerically-gated task).
-    scheduler_.Register("diarization", /*priority_index=*/0,
-                        /*background=*/false, /*create_stream=*/false);
+    // (the latency-critical pipeline). Its kernels are now fully stream-routed
+    // (mel, pre-encode, conformer, decoder all use the dedicated stream), so
+    // create_stream=true — the worker no longer holds the global GPU lock.
+    diar_stream_ = scheduler_.Register("diarization", /*priority_index=*/0,
+                                       /*background=*/false,
+                                       /*create_stream=*/true);
   }
 
   if (!config_.asr_model_dir.empty()) {
@@ -79,7 +78,8 @@ void AuditoryStream::StartWorkers() {
     dp.merge_gap_sec = config_.diar_merge_gap_sec;
     dp.sample_rate = config_.sample_rate;
     diar_worker_ =
-        std::make_unique<DiarizationWorker>(diarizer_.get(), &timeline_, dp);
+        std::make_unique<DiarizationWorker>(diarizer_.get(), &timeline_, dp,
+                                            diar_stream_);
     // Spec 004 Step 2: diarization delivers its whole current speaker view
     // (who/when) to the comprehensive timeline live. The view is the raw diar
     // track too, so we store it under comp_mutex_ for Serialize and re-project
@@ -187,6 +187,13 @@ void AuditoryStream::StartWorkers() {
   // audio, never their output). Its per-window compute is batched on the GPU, so
   // draining a large buffered span never stalls on a single CPU core.
   if (config_.vad_stream) {
+    // Spec 002: register the VAD pipeline as BACKGROUND (priority index 2). It
+    // only publishes speech segments and is not latency-critical, so it yields
+    // to the foreground pipelines. Its kernels are now stream-routed to their
+    // own dedicated CUDA stream (lock-free).
+    vad_stream_ = scheduler_.Register("vad", /*priority_index=*/2,
+                                      /*background=*/true,
+                                      /*create_stream=*/true);
     GpuVad::Params vp;
     vp.sample_rate = config_.sample_rate;
     vp.silero_model_path = config_.asr_vad_model;
@@ -194,14 +201,8 @@ void AuditoryStream::StartWorkers() {
     vp.silero_min_speech_ms = config_.asr_vad_min_speech_ms;
     vp.silero_min_silence_ms = config_.asr_vad_min_silence_ms;
     vp.silero_speech_pad_ms = config_.asr_vad_speech_pad_ms;
+    vp.stream = vad_stream_;
     vad_detector_ = std::make_unique<GpuVad>(vp);
-    // Spec 002: register the VAD pipeline as BACKGROUND (priority index 2). It
-    // only publishes speech segments and is not latency-critical, so it yields
-    // to the foreground pipelines. Its engine runs on the default stream under
-    // the global GPU lock for now; the registry records its class for telemetry
-    // (create_stream is false until its kernels are stream-routed).
-    scheduler_.Register("vad", /*priority_index=*/2, /*background=*/true,
-                        /*create_stream=*/false);
     vad_cursor_ = buffer_.AddConsumer();
     vad_thread_ = std::thread([this] {
       const core::TimeBase tb = buffer_.time_base();
