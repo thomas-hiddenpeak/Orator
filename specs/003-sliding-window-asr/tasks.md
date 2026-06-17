@@ -51,10 +51,21 @@
 - [x] **T040** CER (AC3): `tools/cer.py` on the incremental output vs gold
   less-or-equal the Silero-VAD baseline on the same span. MEASURED: incremental
   17.6% vs Silero-VAD 30.8% on 120 s (-13.2pp). *(Verify: AC3 met.)*
-- [ ] **T050** Sweep `chunk_sec` in {1,2}, `unfixed_token_num` in {3,5,8},
+- [x] **T050** Sweep `chunk_sec` in {1,2}, `unfixed_token_num` in {3,5,8},
   `endpoint_sec` in {0.6,1.0}, `max_segment_sec` in {20,30}; record RTF + CER;
   choose defaults (CER <= baseline, highest sustained RTF). *(Verify: sweep table
-  recorded; defaults set.)*
+  recorded; defaults set; refined 2026-06-17 for Web UI partial streaming.)*
+
+  **Initial sweep range**: `chunk_sec` ∈ {8, 16}, `unfixed_token_num` ∈ {3, 5, 8}.
+  **Refined production defaults (2026-06-17)**:
+
+  | Parameter | Sweep range | Chosen | Reason |
+  |---|---|---|---|
+  | `kStreamWindowMel` | 800 (8 s) | **100 (1 s)** | Web UI partial-emission latency |
+  | `max_new_tokens` | N/A (384) | **32** | Official vLLM default, 12× decode savings |
+  | `unfixed_tokens_` | {3, 5, 8} | **15** | High-speed speech (10-12 chars/s) coverage |
+  | `unfixed_chunks_` | N/A | **2** | Unchanged |
+  | `max_segment_sec` | {20, 24, 30, 32} | **24.0** | Unchanged |
 
 ## Phase 4 — Integration and cleanup
 - [ ] **T060** Wire the session into `AsrWorker` (plan §2.4): public surface

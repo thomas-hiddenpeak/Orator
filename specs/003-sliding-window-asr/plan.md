@@ -148,6 +148,8 @@ segment length is bounded by `max_segment_sec` (FR5, AC5).
 
 ## 4. Parameter sweep (decide defaults from data, not assumption)
 
+### 4.1 Initial design (pre-2026-06-17)
+
 The encoder fixes the chunk granularity: windowed attention is block-diagonal
 over `window_aftercnn = Wc * (n_window_infer/win) = 13*8 = 104` tokens = 8 s of
 audio. T011 verified a standalone 8 s window encode equals its slice of a full
@@ -160,9 +162,44 @@ require recomputing the trailing partial window, deferred). Sweep on 120 s of
 - `endpoint_sec` in {0.6, 1.0} and `max_segment_sec` in {24, 32} (multiples of
   the 8 s window).
 
-Pick the settings with CER <= baseline and the highest sustained RTF; record the
-chosen defaults and the sweep table. Reset cadence (endpoint/cap) trades context
-(accuracy) against bounded per-step cost.
+### 4.2 Refined defaults (2026-06-17, Web UI partial streaming)
+
+The initial sweep constraints (8 s minimum chunk) were a design-time tradeoff
+between encoder-window alignment and partial-emission latency. After integration
+with the Web UI (Spec 006), the 8 s partial-emission interval was deemed
+unacceptably slow for live microphone use. The parameters were refined:
+
+**`kStreamWindowMel`: 800 (8 s) → 100 (1 s)** — the 1 s boundary (100 mel
+frames at hop 160) is a clean sample boundary. AC2 chunk-local encode equivalence
+still holds: the windowed encoder processes 100 mel frames standalone without
+drifting from the full-encode reference (block-diagonal attention does not span
+across chunks). Total segment cost is unchanged (same audio encoded once);
+per-step prefill is 1/8 the original size; partial-emission latency improved
+from 8 s to 1 s.
+
+**`max_new_tokens`: 384 → 32** — the original value was inherited from the
+non-streaming `Transcribe` path. With 1 s chunks producing ~6-18 tokens,
+32 provides sufficient upper bound with early-EOS termination. Reduces
+worst-case decode steps by 12× per chunk. Mirrors the official Qwen3-ASR
+vLLM `max_new_tokens` default.
+
+**`stream_unfixed_tokens_`: 5 → 15** — the original value (5) covered the
+last ~3-4 Chinese characters. For high-speed speech (10-12 chars/s) with
+1 s chunks, 5 tokens left most of the previous chunk unrevised. 15 tokens
+covers the entire previous chunk's output, ensuring effective rollback.
+
+**Chosen production defaults**:
+
+```
+kStreamWindowMel       = 100     (1 s per streaming step)
+max_new_tokens         = 32      (per-chunk decode budget)
+stream_unfixed_chunks  = 2       (first 2 steps: no prefix)
+stream_unfixed_tokens  = 15      (rollback last 15 tokens per step)
+max_segment_sec        = 24.0    (hard segment cap)
+```
+
+Reset cadence (endpoint/cap) trades context (accuracy) against bounded per-step
+cost, unchanged from the initial design.
 
 ## 5. Constitution Check
 

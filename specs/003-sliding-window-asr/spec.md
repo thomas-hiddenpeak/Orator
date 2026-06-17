@@ -1,11 +1,11 @@
 # Spec 003 — Incremental KV-Cache Real-Time ASR
 
 - **Feature**: `003-sliding-window-asr`
-- **Status**: Implemented, verified, committed (8cc31ab) and pushed
+- **Status**: Implemented, verified, committed (8cc31ab) and pushed; parameters refined 2026-06-17
 - **Created**: 2026-06-12
-- **Revised**: 2026-06-15
+- **Revised**: 2026-06-15 (pivot), 2026-06-17 (parameter refinement)
 - **Owner**: project owner
-- **Constitution**: v1.1.0
+- **Constitution**: v1.2.1
 
 > This spec describes WHAT to change and WHY. The incremental decode design and
 > parameters are in `plan.md`. Terminology is standard.
@@ -187,3 +187,98 @@ it bounded for an arbitrarily long stream.
   the suffix prefix. The rollback must not cut a multi-byte UTF-8 character\n  (mirror the official `\\ufffd` guard). Validated by AC3/AC7.
 - **R5** Gold alignment for CER: the gold transcript covers a known span; the
   CER harness compares normalized text over the same span. Defined in `plan.md`.
+
+## 9. Parameter Refinement (2026-06-17)
+
+The following parameters were refined after the initial implementation
+(8cc31ab), driven by Web UI partial-streaming integration and high-speed
+speech scenario requirements. All changes are verified on the real WebSocket
+path and production `orator_ws` binary.
+
+### 9.1 `kStreamWindowMel`: 800 (8 s) → 100 (1 s)
+
+**Before**: 800 mel frames = 8 s per streaming step — one full encoder window.
+**After**: 100 mel frames = 1 s per streaming step.
+
+**Reasoning**:
+
+The original 8 s window was inherited from plan §4's requirement that each
+chunk must be a complete encoder window (104 tokens, verified by AC2 chunk-local
+encode equivalence). However, the 8 s granularity was not a correctness
+requirement — it was a parameter sweep constraint from the initial design.
+
+The AC2 verification (T011) confirmed that the encoder's chunk-local windowed
+mode produces numerically equivalent embeddings for any clean boundary (max abs
+diff 4.5e-3). A 1 s boundary (100 mel frames at hop 160) is a clean sample
+boundary in the WhisperMel pipeline. The encoder processes 100 mel frames
+standalone without drifting from the full-encode reference, because the
+windowed attention only spans within each chunk — there is no cross-chunk
+dependency violated by a shorter chunk.
+
+The motivation is the **Web UI partial streaming** requirement (Spec 006):
+users expect draft text to appear every ~1 s during live microphone input,
+not every 8 s. With 8 s windows, the `asr_partial` WebSocket message had an
+8 s latency, making the UI feel unresponsive.
+
+**Impact on AC2**: the chunk-local encode equivalence still holds because
+100 mel frames is an integer number of hop steps (160-sample hop), and the
+windowed encoder's block-diagonal attention is not violated by a shorter
+chunk — it simply processes fewer tokens per append.
+
+**Impact on AC1 (per-step incremental cost)**: each step's prefill now handles
+~1/8 the audio tokens, making per-step cost even smaller. The number of steps
+per segment increases 8×, but total segment cost is unchanged (same audio is
+encoded once). The 1 s partial-emission cadence is a user-facing latency
+improvement without throughput regression.
+
+### 9.2 `max_new_tokens`: 384 → 32
+
+**Before**: 384 tokens — generous but allows the model to over-generate
+relative to the audio information available per chunk.
+**After**: 32 tokens — mirrors the official Qwen3-ASR vLLM streaming
+`max_new_tokens` default.
+
+**Reasoning**: With a 1 s chunk, a speaker produces ~4-12 Chinese characters
+(~6-18 tokens with BPE). `max_new_tokens = 32` provides sufficient upper
+bound with early-EOS termination. The previous value (384) allowed the model
+to generate far more text than the audio content supports, wasting decode
+cycles and increasing the chance of hallucination in partial drafts.
+
+32 tokens reduces worst-case decode steps by 12× per chunk (from 384 to 32).
+
+### 9.3 `stream_unfixed_tokens_`: 5 → 15
+
+**Before**: 5 — mirrors the official vLLM default for 2 s chunks.
+**After**: 15 — adapted for high-speed speech (10+ chars/s) with 1 s chunks.
+
+**Reasoning**: The official `unfixed_token_num = 5` was designed for
+2 s chunks at normal speech rate (~6-8 chars/s), where 5 tokens covers
+approximately the last 1 s of generated text. With 1 s chunks at high
+speech rate (10-12 chars/s, "激情演讲"), one chunk can produce 12-18 tokens.
+Rolling back only 5 tokens left 7-13 tokens of the previous chunk's output
+unrevised when new audio context arrives.
+
+15 tokens covers the entire previous 1 s chunk's output in most cases,
+ensuring the rollback is effective. The decode overhead is minimal
+(~10 extra tokens per step, negligible on GPU).
+
+### 9.4 Unchanged Parameters
+
+| Parameter | Value | Status |
+|---|---|---|
+| `stream_unfixed_chunks_` | 2 | Unchanged — first 2 chunks use no prefix |
+| `max_segment_sec` | 24.0 s | Unchanged — 24 s hard cap per segment |
+| `min_silence_sec_` | 3.50 s | Unchanged — VAD endpoint threshold |
+| `min_speech_sec_` | 0.20 s | Unchanged — drop spans < 200 ms |
+
+### 9.5 Updated Default Configuration
+
+Current production defaults (2026-06-17):
+
+```
+kStreamWindowMel       = 100     (1 s per streaming step)
+max_new_tokens         = 32      (per-chunk decode budget)
+stream_unfixed_chunks  = 2       (first 2 steps: no prefix)
+stream_unfixed_tokens  = 15      (rollback last 15 tokens per step)
+max_segment_sec        = 24.0    (hard segment cap)
+```
