@@ -175,6 +175,9 @@ Findings:
 - [specs/003-sliding-window-asr/spec.md](003-sliding-window-asr/spec.md) — implemented (8cc31ab)
 - [specs/004-comprehensive-timeline/spec.md](004-comprehensive-timeline/spec.md) — implemented (core 3159b75, 673f95d; VAD pipeline Phase 5; live ASR revision + docs sync f3496ae)
 - [specs/005-time-base/spec.md](005-time-base/spec.md) — implemented (84fba90)
+- [specs/006-web-ui/spec.md](006-web-ui/spec.md) — draft (WebSocket client UI, real-time visualization, Phase 1 MVP scope)
+- [specs/006-web-ui/plan.md](006-web-ui/plan.md) — draft
+- [specs/006-web-ui/tasks.md](006-web-ui/tasks.md) — draft
 
 ## 7. Immediate next step
 

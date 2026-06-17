@@ -1,0 +1,353 @@
+# Spec 006 — Web UI Client for Real-Time Dual-Pipeline Transcription
+
+## 1. Summary
+
+A browser-based web UI that provides **live visualization and interaction** with the Orator WebSocket service. The client connects to a running `orator_ws` server, uploads or streams audio (microphone/file), and renders the dual-pipeline output (diarization + ASR) on a unified timeline in real time. The UI is launched as an HTTP server integrated into the main Orator binary (`orator_ws`), eliminating the need for separate client setup.
+
+---
+
+## 2. Goals
+
+- **G1** Provide an accessible, modern interface for end users to transcribe audio with speaker separation without writing code.
+- **G2** Display ASR and diarization results **live** (incremental updates) and final (comprehensive timeline), aligned on one shared time base.
+- **G3** Support **multiple input methods**: file upload, real-time microphone capture, and URL-based test data.
+- **G4** Visualize **speaker activity** (segments with confidence) and **utterance text** (with timing and speaker attribution).
+- **G5** Expose **pipeline performance metrics** (real-time factors, compute time) for debugging and optimization.
+- **G6** Serve the UI from a simple HTTP endpoint (e.g., `/`), launched by the main `orator_ws` binary without external dependencies.
+
+---
+
+## 3. User Scenarios
+
+### Scenario A — Live Transcription with Visualization
+A user opens `http://localhost:8765` in a browser, starts recording their microphone or uploads an audio file. As audio streams to the server, they see:
+- ASR utterances appear and update in real time.
+- Speaker segments appear below, color-coded by speaker ID.
+- A horizontal timeline shows progress and speaker activity.
+After transcription completes, the final comprehensive timeline is displayed with full diarization/ASR alignment.
+
+### Scenario B — Batch File Processing
+A user uploads a pre-recorded MP3 or WAV file. The system decodes it client-side (or via server) to PCM, streams it to Orator over WebSocket, and presents the full timeline with performance metrics (RTF, compute time) once complete.
+
+### Scenario C — Performance Monitoring
+A developer or operator views the real-time performance dashboard: wall-clock time, pipeline compute time, real-time factors per pipeline, and GPU telemetry. This aids in identifying bottlenecks and validating concurrency settings.
+
+---
+
+## 4. Functional Requirements
+
+### FR1 — Web Server Integration
+- The UI is served as static HTML/CSS/JavaScript from a built-in HTTP server within `orator_ws`.
+- Serve static assets at root path `/`; WebSocket remains at the same port.
+- No external web framework required (use minimal C++ HTTP library or built-in socket).
+
+### FR2 — WebSocket Client Connection
+- Client detects the server's WebSocket address automatically (same host/port) when the page loads.
+- Auto-reconnect on network loss; display connection status to the user.
+
+### FR3 — Audio Input
+- **Microphone**: Real-time capture using Web Audio API; stream to WebSocket as int16LE PCM at 16 kHz.
+- **File upload**: Accept MP3, WAV, FLAC; decode client-side using a web audio library or server-side and re-stream.
+- **Test URL**: Load a test recording from a configurable endpoint for reproducible demos.
+
+### FR4 — Incremental Result Display
+- **ASR events**: Display each completed utterance as it arrives (`{"type":"asr",...}`); append to a transcript panel with timestamp and speaker attribution.
+- **Diarization hints**: Show speaker activity predictions before the final timeline (from periodic diarization snapshots if available).
+
+### FR5 — Timeline Visualization
+- Render the final `{"type":"timeline",...}` as a horizontal scrollable timeline with:
+  - **Diarization track**: colored horizontal bars per speaker with confidence overlay.
+  - **ASR track**: text utterances positioned at their (start, end) on the time axis.
+  - **Comprehensive track** (if present): speaker turns with combined text.
+- Synchronize all tracks on one time axis; allow scrubbing and seeking.
+
+### FR6 — Performance Metrics Panel
+- Display alongside the timeline:
+  - Audio duration (seconds).
+  - Wall-clock time (seconds).
+  - Real-time factor (audio/wall).
+  - Per-pipeline compute time and RTF (diarization, ASR).
+  - GPU telemetry if available (occupancy, stream priority).
+
+### FR7 — Controls
+- **Start/Stop Recording**: Toggle microphone capture.
+- **Flush**: Send `{"flush"}` to emit the timeline so far; streaming continues.
+- **End**: Send `{"end"}` to finalize and show the complete result.
+- **Download**: Export the final timeline as JSON.
+- **Clear**: Reset state and start a fresh session.
+
+### FR8 — Error Handling
+- Display connection errors, audio input permission failures, and server errors in a user-facing alert.
+- Retry logic for transient failures.
+- Graceful fallback if WebSocket is unavailable.
+
+### FR9 — Accessibility & Responsive Design
+- Responsive layout (desktop, tablet, mobile).
+- Keyboard navigation (play/pause, export).
+- ARIA labels for screen reader support.
+- High contrast for readability on various displays.
+
+---
+
+## 5. UI Layout & Components
+
+### 5.1 Main Layout (Desktop)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Orator Transcription UI                        [Connection] │
+├─────────────────────────────────────────────────────────────┤
+│                                                               │
+│  Input Control Panel                                         │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │ [🎤 Start Mic] [📁 Upload File] [⏹ End Session]    │    │
+│  │ Duration: 00:00  |  Progress: [════════░░░░░░░░]   │    │
+│  └─────────────────────────────────────────────────────┘    │
+│                                                               │
+│  Transcript Panel (Left, scrollable)        Metrics (Right)  │
+│  ┌──────────────────────────┐  ┌───────────────────────┐    │
+│  │ Real-time ASR:           │  │ Performance Metrics:  │    │
+│  │                          │  │ ─────────────────────│    │
+│  │ [12s] Speaker_0:         │  │ Audio: 120.0s         │    │
+│  │ "Hello, how are you"     │  │ Wall: 25.3s           │    │
+│  │                          │  │ RTF: 4.75x            │    │
+│  │ [15s] Speaker_1:         │  │ ─────────────────────│    │
+│  │ "I'm fine, thanks"       │  │ Diar RTF: 9.2x        │    │
+│  │                          │  │ ASR RTF: 4.1x         │    │
+│  └──────────────────────────┘  │ GPU Occ: 45%          │    │
+│                                │ ─────────────────────│    │
+│  Timeline Visualization        │ [📥 Download JSON]    │    │
+│  ┌──────────────────────────────────────────────────┐      │
+│  │ Diarization ┌─Speaker_0──┐┌─Speaker_1─┐         │      │
+│  │             │conf:0.94   ││conf:0.87  │         │      │
+│  │             └───────────┘└──────────┘         │      │
+│  │                                               │      │
+│  │ ASR         │Hello, how are you│I'm fine...│ │      │
+│  │             └──────────────────┘────────────┘ │      │
+│  │ ┴─────────┬──────────┬──────────┬──────────┘ │      │
+│  │ 0s        30s       60s        90s   120s    │      │
+│  │ [◀  ▶]  [⏸ ⏯]  [🔍+]              [🔍-]     │      │
+│  └──────────────────────────────────────────────────┘      │
+│                                                               │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 5.2 Core Components
+
+#### Input Control Panel
+- **Microphone toggle**: Real-time PCM stream with visual level meter.
+- **File upload**: Drag-and-drop or file picker for audio files.
+- **Progress bar**: Shows audio duration, current playback/encoding position.
+- **Session controls**: Flush, End, Clear buttons.
+
+#### Transcript Panel
+- **Incremental display**: Each ASR event appended with timestamp and speaker label.
+- **Scrollable history**: Full conversation transcript.
+- **Copy/export**: Ability to select and copy text, or export as plain text or JSON.
+
+#### Timeline Visualization
+- **Horizontal scrollbar**: Pan across long recordings.
+- **Zoom controls**: Zoom in/out on time axis.
+- **Playback sync** (optional, future): Seek and replay audio at selected position.
+- **Color legend**: Speaker IDs mapped to distinct colors (auto-assigned, customizable).
+
+#### Metrics Panel
+- **Real-time updates**: Display latest compute/RTF values as they arrive.
+- **Collapsible sections**: Summary view (primary metrics) vs. detailed view (GPU, per-pipeline).
+- **History graph** (optional, future): Plot RTF over time to detect variability.
+
+---
+
+## 6. Technical Architecture
+
+### 6.1 Frontend (Browser)
+
+**Technology Stack**:
+- **HTML5 + CSS3** (no CSS framework required; custom CSS for layout).
+- **Vanilla JavaScript** (no jQuery or framework; Web APIs only).
+- **Web Audio API**: Microphone access, client-side audio processing.
+- **Canvas or SVG**: Timeline rendering.
+- **WebSocket API**: Real-time communication with server.
+
+**Key Modules**:
+- `ws_client.js`: WebSocket connection, event dispatch.
+- `ui_controller.js`: DOM updates, state management.
+- `timeline_renderer.js`: Canvas/SVG rendering of diarization/ASR tracks.
+- `audio_input.js`: Microphone and file upload handlers.
+
+### 6.2 Backend (C++)
+
+**Changes to `orator_ws`**:
+1. **Embedded HTTP server** (using `net/websocket_server.h` base or minimal extension):
+   - Serve static files (HTML, CSS, JS) at root `/`.
+   - Keep WebSocket at existing port.
+2. **UI directory**: `web/` folder bundled into the binary (as embedded strings or files, or served from disk if present).
+3. **No new network dependencies**: Reuse existing WebSocket infrastructure.
+
+**File Structure**:
+```
+web/
+  ├── index.html       (main UI page)
+  ├── style.css        (layout, theming)
+  ├── ui_controller.js (state, DOM updates)
+  ├── ws_client.js     (WebSocket handler)
+  ├── timeline_renderer.js (canvas rendering)
+  └── audio_input.js   (microphone, file upload)
+```
+
+---
+
+## 7. Data Flow
+
+### 7.1 Streaming Lifecycle
+
+```
+[User Opens Browser]
+        ↓
+[Page loads; ws_client.js connects to ws://host:port]
+        ↓
+[{"type":"ready",...} received → UI enables input controls]
+        ↓
+[User starts microphone OR uploads file]
+        ↓
+[Audio frames sent to server over WebSocket (binary)]
+        ↓
+[Server processes; sends {"type":"asr",...} incremental updates]
+        ↓
+[UI appends utterances to transcript panel in real time]
+        ↓
+[User clicks "End" or sends {"end"} message]
+        ↓
+[Server sends {"type":"timeline",...} final result]
+        ↓
+[UI renders full timeline; displays metrics]
+        ↓
+[User can download JSON, clear, and start a new session]
+```
+
+### 7.2 Event Messages (from WebSocket)
+
+**Inbound (Server → Client)**:
+```json
+{"type":"ready","sample_rate":16000,"asr":true,"time_base":"absolute_samples","origin_sample":0}
+
+{"type":"asr","start":12.34,"end":15.67,"text":"Hello, how are you"}
+
+{"type":"timeline","schema_version":1,"audio_sec":120.0,"sample_rate":16000,"tracks":[
+  {"kind":"diarization","source":"sortformer","compute_sec":12.5,"real_time_factor":9.6,"entries":[{"start":0.0,"end":4.32,"speaker":0,"confidence":0.94}]},
+  {"kind":"asr","source":"qwen3_asr","compute_sec":28.5,"real_time_factor":4.2,"entries":[{"start":12.34,"end":15.67,"text":"Hello, how are you"}]}
+]}
+
+{"type":"gpu_telemetry","gpu_mode":"ASR-concurrent","streams":[...]}  [optional Spec 002 metric]
+```
+
+**Outbound (Client → Server)**:
+```json
+{"format":"f32"}  [optional; switch to float32 PCM]
+
+{"flush"}
+
+{"end"}
+
+{"reset"}
+```
+
+---
+
+## 8. Implementation Plan
+
+### Phase 1: MVP (Minimum Viable Product)
+1. Create `web/` directory with skeleton HTML/JS.
+2. Implement `ws_client.js`: connect to WebSocket, parse JSON events.
+3. Implement `ui_controller.js`: update DOM with ASR utterances and final timeline summary.
+4. Extend `orator_ws` to serve HTTP (wrap existing socket with a simple file-serving layer).
+5. Render timeline as a simple **text-based summary** (no canvas initially).
+
+### Phase 2: Enhanced Visualization
+1. Implement `timeline_renderer.js` using Canvas or SVG for graphical timeline.
+2. Add **color-coded speakers**, **confidence bars**, and **time axis**.
+3. Add zoom/pan controls.
+
+### Phase 3: Full-Featured
+1. Microphone capture (Web Audio API) and real-time streaming.
+2. File upload with client-side decoding (using a codec library if needed, or server-side re-encoding).
+3. Performance metrics dashboard with live updates and (optional) history graphs.
+
+---
+
+## 9. Acceptance Criteria
+
+### AC1 — UI Served from `orator_ws`
+- Start `./build/orator_ws 8765 <models>...` and navigate to `http://localhost:8765`.
+- Page loads with no external network requests (all assets are local).
+- Connection status displayed; WebSocket connects to same host/port.
+
+### AC2 — Real-Time ASR Display
+- Send audio over WebSocket (binary PCM).
+- Each completed utterance appears in the transcript panel within 200 ms of server receipt (user-perceivable latency acceptable for live transcription).
+- Utterances are labeled with speaker and timestamp.
+
+### AC3 — Timeline Visualization
+- Upon flush/end, the final `{"type":"timeline",...}` is parsed and rendered.
+- Diarization and ASR tracks are visible and synchronized on a shared time axis.
+- Speaker segments are distinct (color or pattern).
+
+### AC4 — File Upload
+- User can drag-and-drop or select an audio file.
+- File is decoded to PCM (client or server) and streamed at the requested frame rate.
+- Final timeline is correctly generated and displayed.
+
+### AC5 — Metrics Display
+- Real-time factors, compute times, and audio duration are displayed accurately.
+- Metrics update when new events arrive and are correct in the final timeline JSON.
+
+### AC6 — Controls Functional
+- **Start/Stop Mic**, **Upload**, **Flush**, **End**, **Download**, **Clear** buttons all work as intended.
+- Session state is properly reset between runs.
+
+### AC7 — Error Handling
+- Closed WebSocket or network loss does not crash the UI; appropriate message displayed.
+- Microphone permission denial is handled gracefully.
+- Malformed JSON or server errors are logged and user-informed.
+
+### AC8 — Quality & Compatibility
+- Build produces no new compiler warnings (`-Wall -Wextra`).
+- UI is responsive on desktop and tablet (mobile optional for MVP).
+- Tested on Chrome, Firefox, Safari (modern versions).
+- No new runtime dependencies in C++ or JavaScript.
+
+### AC9 — SDD Consistency
+- All code changes documented with evidence in spec, plan, and tasks.
+- Final timeline JSON is identical to that produced by the command-line client.
+- Performance metrics are consistent with other measurement tools (Spec 002 telemetry).
+
+---
+
+## 10. Out of Scope (for Spec 006)
+
+- **HTTPS/TLS**: UI assumes localhost development setup (can be added later).
+- **User authentication**: No login or multi-user support.
+- **Audio playback**: No built-in audio player; timeline is visualization only.
+- **Mobile app**: Web is mobile-responsive but not a native app.
+- **Persistent storage**: No database; session data exists only in-memory during connection.
+- **Advanced features**: Speaker re-identification, keyword highlighting, export to subtitles (future specs).
+
+---
+
+## 11. Constraints & Dependencies
+
+- **Runtime**: Pure C++17/CUDA runtime; embedded web server must use only standard C++ or Orator's existing dependencies.
+- **Frontend deps**: Vanilla JavaScript, Web APIs only (no npm/build step).
+- **Network**: Assumes HTTP and WebSocket on the same host and port (or easily configurable).
+- **Accuracy**: UI is a visualization layer; no changes to pipeline accuracy expectations (Spec 001–005 unchanged).
+
+---
+
+## 12. References
+
+- **Spec 001** — Real-Time Streaming Dual Pipeline: Defines WebSocket protocol, JSON schemas, and timeline structure.
+- **Spec 002** — GPU Scheduling: Defines GPU telemetry messages (optional for UI, but displayed if present).
+- **Spec 004** — ASR Live Revision: Defines revision messages (optional display in UI).
+- **net/websocket_server.h** — Existing WebSocket server; can be extended with HTTP serving.
+- **Web Audio API** — MDN spec for microphone access and PCM streaming.
+- **RFC 6455** — WebSocket protocol (already implemented server-side).
