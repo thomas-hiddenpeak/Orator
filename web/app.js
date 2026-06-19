@@ -40,6 +40,10 @@
 
   // Transcript rows keyed by text_id
   const asrRows = new Map();
+
+  // Timeline data for download
+  let timelineData = null;
+
   const MIN_ZOOM = 0.5;
   const MAX_ZOOM = 20;
 
@@ -142,6 +146,9 @@
         case "vad":
           handleVad(msg);
           break;
+        case "timeline":
+          handleTimeline(msg);
+          break;
         case "gpu_telemetry":
           handleGpuTelemetry(msg);
           break;
@@ -228,7 +235,7 @@
   }
 
   function handleVad(msg) {
-    // VAD segment events — used by timeline
+    // VAD segment events
   }
 
   function handleVadState(msg) {
@@ -238,6 +245,52 @@
     } else {
       led.classList.remove("active");
     }
+  }
+
+  /* ── Timeline handler (updates transcript speaker labels + metrics) ── */
+  function handleTimeline(msg) {
+    timelineData = msg;
+    // Update metrics
+    mAudio.textContent = fmtSec(msg.audio_sec);
+    mSampleRate.textContent = msg.sample_rate || "-";
+
+    const tracks = Array.isArray(msg.tracks) ? msg.tracks : [];
+    const asrTrack = tracks.find(function (t) { return t.kind === "asr"; });
+    const diarTrack = tracks.find(function (t) { return t.kind === "diarization"; });
+    const vadTrack = tracks.find(function (t) { return t.kind === "vad"; });
+
+    if (asrTrack) {
+      mAsrRtf.textContent = asrTrack.real_time_factor != null ? asrTrack.real_time_factor.toFixed(1) + "x" : "-";
+      mAsrSeg.textContent = (asrTrack.entries || []).length;
+    }
+    if (diarTrack) {
+      mDiarRtf.textContent = diarTrack.real_time_factor != null ? diarTrack.real_time_factor.toFixed(1) + "x" : "-";
+      mDiarSeg.textContent = (diarTrack.entries || []).length;
+    }
+    if (vadTrack) {
+      mVadRtf.textContent = vadTrack.real_time_factor != null ? vadTrack.real_time_factor.toFixed(1) + "x" : "-";
+    }
+
+    // Update transcript with speaker labels from comprehensive timeline
+    const comprehensive = msg.comprehensive || [];
+    for (const entry of comprehensive) {
+      const id = entry.text_id;
+      if (!id) continue;
+      const row = asrRows.get(id);
+      if (!row) continue;
+      const spk = entry.speaker;
+      if (spk != null) {
+        const spkEl = row.querySelector(".t-speaker");
+        if (spkEl) {
+          spkEl.textContent = "S" + spk;
+          spkEl.style.background = SPEAKER_COLORS[spk % SPEAKER_COLORS.length];
+          spkEl.style.color = "#000";
+        }
+      }
+    }
+
+    // Show download button
+    downloadBtn.classList.remove("hidden");
   }
 
   /* ── GPU Telemetry handler ── */
@@ -497,6 +550,7 @@
     transcriptList.innerHTML = "";
     asrRows.clear();
     liveDraft.classList.add("hidden");
+    timelineData = null;
     downloadBtn.classList.add("hidden");
     mAudio.textContent = "-";
     mSampleRate.textContent = "-";
@@ -511,6 +565,18 @@
     durationLabel.textContent = "00:00";
     statusLabel.textContent = "Streaming...";
     sendCmd({ reset: 1 });
+  }
+
+  /* ── Download JSON ── */
+  function downloadTimeline() {
+    if (!timelineData) return;
+    const blob = new Blob([JSON.stringify(timelineData, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "orator_timeline_" + Date.now() + ".json";
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   /* ── Event Listeners ── */
@@ -546,6 +612,7 @@
     sendCmd({ end: 1 });
   });
   clearBtn.addEventListener("click", clearAll);
+  downloadBtn.addEventListener("click", downloadTimeline);
 
   /* ── Init ── */
   setStatus(false);
