@@ -18,8 +18,6 @@
   const transcriptList= $("transcriptList");
   const liveDraft     = $("liveDraft");
   const draftText     = $("draftText");
-  const canvas        = $("timelineCanvas");
-  const ctx           = canvas.getContext("2d");
 
   const mAudio     = $("mAudio");
   const mSampleRate= $("mSampleRate");
@@ -42,12 +40,6 @@
 
   // Transcript rows keyed by text_id
   const asrRows = new Map();
-
-  // Timeline data (from server)
-  let timelineData = null;
-
-  // Timeline zoom
-  let zoomLevel = 1; // px per second
   const MIN_ZOOM = 0.5;
   const MAX_ZOOM = 20;
 
@@ -149,9 +141,6 @@
           break;
         case "vad":
           handleVad(msg);
-          break;
-        case "timeline":
-          handleTimeline(msg);
           break;
         case "gpu_telemetry":
           handleGpuTelemetry(msg);
@@ -343,312 +332,6 @@
     transcriptList.scrollTop = transcriptList.scrollHeight;
   }
 
-  /* ── Timeline ── */
-  function handleTimeline(msg) {
-    timelineData = msg;
-
-    // Update metrics
-    mAudio.textContent = fmtSec(msg.audio_sec);
-    mSampleRate.textContent = msg.sample_rate || "-";
-
-    const tracks = Array.isArray(msg.tracks) ? msg.tracks : [];
-    const asrTrack = tracks.find(function (t) { return t.kind === "asr"; });
-    const diarTrack = tracks.find(function (t) { return t.kind === "diarization"; });
-
-    if (asrTrack) {
-      mAsrRtf.textContent = asrTrack.real_time_factor != null ? asrTrack.real_time_factor.toFixed(1) + "x" : "-";
-      mAsrSeg.textContent = (asrTrack.entries || []).length;
-    }
-    if (diarTrack) {
-      mDiarRtf.textContent = diarTrack.real_time_factor != null ? diarTrack.real_time_factor.toFixed(1) + "x" : "-";
-      mDiarSeg.textContent = (diarTrack.entries || []).length;
-    }
-
-    // Update transcript with speaker labels from comprehensive timeline
-    updateTranscriptFromTimeline(msg);
-
-    // Show download button
-    downloadBtn.classList.remove("hidden");
-
-    // Auto-zoom to fit
-    if (msg.audio_sec > 0) {
-      const cw = canvas.parentElement.clientWidth;
-      zoomLevel = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, cw / msg.audio_sec));
-    }
-
-    renderTimeline();
-  }
-
-  function updateTranscriptFromTimeline(msg) {
-    // Apply speaker labels from comprehensive timeline entries
-    const comprehensive = msg.comprehensive || [];
-    for (const entry of comprehensive) {
-      const id = entry.text_id;
-      if (!id) continue;
-      const row = asrRows.get(id);
-      if (!row) continue;
-      const spk = entry.speaker;
-      if (spk != null) {
-        const spkEl = row.querySelector(".t-speaker");
-        spkEl.textContent = "S" + spk;
-        spkEl.style.background = SPEAKER_COLORS[spk % SPEAKER_COLORS.length];
-        spkEl.style.color = "#000";
-      }
-    }
-  }
-
-  function renderTimeline() {
-    if (!timelineData) {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      return;
-    }
-
-    const audioSec = timelineData.audio_sec || 10;
-    const labelW = 80; // Left label column width
-    const headerH = 35;
-    const trackH = 40; // Fixed height for DIAR and VAD tracks
-    const gap = 8;
-    const asrEntryH = 15; // Height per ASR entry (lineHeight 13 + padding 2)
-
-    // Determine number of tracks and ASR entry count
-    const tracks = Array.isArray(timelineData.tracks) ? timelineData.tracks : [];
-    const hasDiar = tracks.some(function (t) { return t.kind === "diarization"; });
-    const hasAsr = tracks.some(function (t) { return t.kind === "asr"; });
-    const hasVad = tracks.some(function (t) { return t.kind === "vad"; });
-    
-    // Calculate ASR track height based on max text lines needed
-    const asrTrack = hasAsr ? tracks.find(function (t) { return t.kind === "asr"; }) : null;
-    let asrTrackH = trackH;
-    if (asrTrack && asrTrack.entries && asrTrack.entries.length > 0) {
-      const timeW = (canvas.parentElement.clientWidth || 1200) - labelW;
-      const audioSec = timelineData.audio_sec || 10;
-      let maxLines = 1;
-      asrTrack.entries.forEach(function(e) {
-        const x1 = (e.start / audioSec) * timeW;
-        const x2 = (e.end / audioSec) * timeW;
-        const segW = Math.max(40, x2 - x1);
-        const text = e.text || "";
-        const charsPerLine = Math.max(4, Math.floor((segW - 8) / 12));
-        const lines = Math.ceil(text.length / charsPerLine);
-        if (lines > maxLines) maxLines = lines;
-      });
-      asrTrackH = Math.max(trackH, maxLines * 13 + 4);
-    }
-    
-    const numTracks = (hasDiar ? 1 : 0) + (hasAsr ? 1 : 0) + (hasVad ? 1 : 0);
-
-    // Canvas width = container width
-    const containerW = canvas.parentElement.clientWidth || 1200;
-    const totalW = containerW;
-    // Calculate total height: header + DIAR + gap + ASR + gap + VAD + padding
-    let totalH = headerH + 20;
-    if (hasDiar) totalH += trackH + gap;
-    if (hasAsr) totalH += asrTrackH + gap;
-    if (hasVad) totalH += trackH + gap;
-    const timeW = totalW - labelW; // Width for time-aligned content
-
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = totalW * dpr;
-    canvas.height = totalH * dpr;
-    canvas.style.width = totalW + "px";
-    canvas.style.height = totalH + "px";
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-    // Background
-    ctx.fillStyle = "#1a1d27";
-    ctx.fillRect(0, 0, totalW, totalH);
-
-    // Time axis at top
-    const axisY = headerH - 8;
-    const timeX0 = labelW;
-    ctx.strokeStyle = "#2e3345";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(timeX0, axisY);
-    ctx.lineTo(totalW, axisY);
-    ctx.stroke();
-
-    // Time ticks
-    ctx.fillStyle = "#8b90a0";
-    ctx.font = "11px system-ui, sans-serif";
-    ctx.textAlign = "center";
-    const tickInterval = computeTickInterval(audioSec, timeW);
-    for (let t = 0; t <= audioSec; t += tickInterval) {
-      const x = timeX0 + (t / audioSec) * timeW;
-      ctx.beginPath();
-      ctx.moveTo(x, axisY - 4);
-      ctx.lineTo(x, axisY + 4);
-      ctx.strokeStyle = "#2e3345";
-      ctx.stroke();
-      ctx.fillText(fmtTime(t), x, axisY + 18);
-    }
-
-    // Draw tracks (each track is one horizontal band, entries time-aligned)
-    let y = headerH + 10;
-
-    if (hasDiar) {
-      const diarTrack = tracks.find(function (t) { return t.kind === "diarization"; });
-      drawTimeTrack(diarTrack, "DIAR", labelW, y, timeW, trackH, audioSec);
-      y += trackH + gap;
-    }
-
-    if (hasAsr) {
-      drawTimeTrack(asrTrack, "ASR", labelW, y, timeW, asrTrackH, audioSec);
-      y += asrTrackH + gap;
-    }
-
-    if (hasVad) {
-      const vadTrack = tracks.find(function (t) { return t.kind === "vad"; });
-      drawTimeTrack(vadTrack, "VAD", labelW, y, timeW, trackH, audioSec);
-      y += trackH + gap;
-    }
-  }
-
-  function groupByOverlap(entries) {
-    // Greedy row assignment: each entry goes to first row where it doesn't overlap
-    if (entries.length === 0) return [[]];
-    const rows = [];
-    for (const e of entries) {
-      let placed = false;
-      for (let r = 0; r < rows.length; r++) {
-        const lastInRow = rows[r][rows[r].length - 1];
-        if (e.start >= lastInRow.end) {
-          rows[r].push(e);
-          placed = true;
-          break;
-        }
-      }
-      if (!placed) {
-        rows.push([e]);
-      }
-    }
-    return rows;
-  }
-
-  function drawTimeTrack(track, label, labelW, y0, timeW, trackH, audioSec) {
-    const entries = track && track.entries ? track.entries : [];
-    const x0 = labelW;
-
-    // Label on left
-    ctx.fillStyle = "#8b90a0";
-    ctx.font = "bold 11px system-ui, sans-serif";
-    ctx.textAlign = "right";
-    ctx.textBaseline = "middle";
-    ctx.fillText(label, labelW - 8, y0 + trackH / 2);
-
-    // Track background
-    ctx.fillStyle = "#232733";
-    ctx.fillRect(x0, y0, timeW, trackH);
-
-    // Grid lines at time ticks
-    const tickInterval = computeTickInterval(audioSec, timeW);
-    ctx.strokeStyle = "#1a1d27";
-    ctx.lineWidth = 1;
-    for (let t = 0; t <= audioSec; t += tickInterval) {
-      const x = x0 + (t / audioSec) * timeW;
-      ctx.beginPath();
-      ctx.moveTo(x, y0);
-      ctx.lineTo(x, y0 + trackH);
-      ctx.stroke();
-    }
-
-    // Draw entries time-aligned within the track band
-    const kind = track.kind;
-    const pad = 2;
-    const barH = trackH - pad * 2;
-    const barY = y0 + pad;
-    const r = 3;
-
-    if (kind === "diarization" || kind === "vad") {
-      // Draw bars time-aligned
-      for (const e of entries) {
-        const x1 = x0 + (e.start / audioSec) * timeW;
-        const x2 = x0 + (e.end / audioSec) * timeW;
-        const bw = Math.max(3, x2 - x1);
-
-        if (kind === "diarization") {
-          const spk = e.speaker != null ? e.speaker : 0;
-          const color = SPEAKER_COLORS[spk % SPEAKER_COLORS.length];
-          ctx.fillStyle = color + "cc";
-        } else {
-          ctx.fillStyle = "#34d399cc";
-        }
-
-        ctx.beginPath();
-        ctx.moveTo(x1 + r, barY);
-        ctx.lineTo(x1 + bw - r, barY);
-        ctx.quadraticCurveTo(x1 + bw, barY, x1 + bw, barY + r);
-        ctx.lineTo(x1 + bw, barY + barH - r);
-        ctx.quadraticCurveTo(x1 + bw, barY + barH, x1 + bw - r, barY + barH);
-        ctx.lineTo(x1 + r, barY + barH);
-        ctx.quadraticCurveTo(x1, barY + barH, x1, barY + barH - r);
-        ctx.lineTo(x1, barY + r);
-        ctx.quadraticCurveTo(x1, barY, x1 + r, barY);
-        ctx.fill();
-
-        // Label for diarization
-        if (kind === "diarization" && bw > 30) {
-          const spk = e.speaker != null ? e.speaker : 0;
-          ctx.fillStyle = "#ffffffcc";
-          ctx.font = "10px system-ui";
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
-          ctx.fillText("S" + spk, x1 + bw / 2, barY + barH / 2);
-        }
-      }
-    } else if (kind === "asr") {
-      // For ASR: continuous text flow, wrapped within track width
-      // Each entry positioned by time, but text flows across entry boundaries
-      const sorted = entries.slice().sort(function(a, b) { return a.start - b.start; });
-      const padding = 2;
-      const lineHeight = 13;
-      const charsPerLine = Math.max(4, Math.floor((timeW - 8) / 12));
-
-      // Concatenate all text and wrap within track width
-      let allText = "";
-      sorted.forEach(function(e) {
-        allText += (e.text || "") + " ";
-      });
-      
-      const lines = [];
-      for (let i = 0; i < allText.length; i += charsPerLine) {
-        lines.push(allText.substring(i, i + charsPerLine));
-      }
-      
-      // Calculate track height based on total lines
-      const actualTrackH = Math.max(trackH, lines.length * lineHeight + padding * 2);
-
-      // Draw background
-      ctx.fillStyle = "#2a3050";
-      ctx.fillRect(x0, y0, timeW, actualTrackH);
-
-      // Draw text lines
-      ctx.fillStyle = "#e4e6ed";
-      ctx.font = "11px system-ui, sans-serif";
-      ctx.textAlign = "left";
-      ctx.textBaseline = "top";
-      
-      lines.forEach(function(line, lineIdx) {
-        const ly = y0 + padding + lineIdx * lineHeight;
-        ctx.fillText(line, x0 + 4, ly);
-      });
-      
-      return y0 + actualTrackH;
-    }
-    return y0 + trackH;
-  }
-
-  function computeTickInterval(audioSec, availW) {
-    const targetTicks = availW / 80;
-    const raw = audioSec / targetTicks;
-    const mag = Math.pow(10, Math.floor(Math.log10(raw)));
-    const norm = raw / mag;
-    if (norm <= 1.5) return mag;
-    if (norm <= 3) return 2 * mag;
-    if (norm <= 7) return 5 * mag;
-    return 10 * mag;
-  }
-
   /* ── Microphone ── */
   function f32ToInt16(buf) {
     const out = new Int16Array(buf.length);
@@ -814,7 +497,6 @@
     transcriptList.innerHTML = "";
     asrRows.clear();
     liveDraft.classList.add("hidden");
-    timelineData = null;
     downloadBtn.classList.add("hidden");
     mAudio.textContent = "-";
     mSampleRate.textContent = "-";
@@ -828,20 +510,7 @@
     progressFill.style.width = "0%";
     durationLabel.textContent = "00:00";
     statusLabel.textContent = "Streaming...";
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
     sendCmd({ reset: 1 });
-  }
-
-  /* ── Download JSON ── */
-  function downloadTimeline() {
-    if (!timelineData) return;
-    const blob = new Blob([JSON.stringify(timelineData, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "orator_timeline_" + Date.now() + ".json";
-    a.click();
-    URL.revokeObjectURL(url);
   }
 
   /* ── Event Listeners ── */
@@ -877,102 +546,30 @@
     sendCmd({ end: 1 });
   });
   clearBtn.addEventListener("click", clearAll);
-  downloadBtn.addEventListener("click", downloadTimeline);
-
-  $("zoomInBtn").addEventListener("click", function () {
-    zoomLevel = Math.min(MAX_ZOOM, zoomLevel * 1.5);
-    renderTimeline();
-  });
-  $("zoomOutBtn").addEventListener("click", function () {
-    zoomLevel = Math.max(MIN_ZOOM, zoomLevel / 1.5);
-    renderTimeline();
-  });
-  $("resetZoomBtn").addEventListener("click", function () {
-    if (timelineData && timelineData.audio_sec > 0) {
-      const cw = canvas.parentElement.clientWidth;
-      zoomLevel = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, cw / timelineData.audio_sec));
-    } else {
-      zoomLevel = 1;
-    }
-    renderTimeline();
-  });
-
-  // Resize handler
-  window.addEventListener("resize", function () { renderTimeline(); });
 
   /* ── Init ── */
   setStatus(false);
   connect();
 
   /* ── Demo data (for visualization testing) ── */
-  // Load demo timeline if ?demo=1 in URL
+  // Load demo transcript if ?demo=1 in URL
   const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.get("demo") === "1" || window.location.href.includes("demo=1") || window.location.href.includes("demo%3D1")) {
     setTimeout(function () {
-      const demoTimeline = {
-        type: "timeline",
-        audio_sec: 30.0,
-        sample_rate: 16000,
-        session_start_wall_sec: Date.now() / 1000,
-        tracks: [
-          {
-            kind: "diarization",
-            real_time_factor: 9.6,
-            entries: [
-              { start: 0.0, end: 3.2, speaker: 0, confidence: 0.94 },
-              { start: 3.2, end: 6.8, speaker: 1, confidence: 0.89 },
-              { start: 6.8, end: 10.5, speaker: 0, confidence: 0.92 },
-              { start: 10.5, end: 14.2, speaker: 2, confidence: 0.87 },
-              { start: 14.2, end: 18.0, speaker: 1, confidence: 0.91 },
-              { start: 18.0, end: 22.5, speaker: 0, confidence: 0.93 },
-              { start: 22.5, end: 26.0, speaker: 2, confidence: 0.88 },
-              { start: 26.0, end: 30.0, speaker: 1, confidence: 0.90 }
-            ]
-          },
-          {
-            kind: "asr",
-            real_time_factor: 2.6,
-            entries: [
-              { text_id: "1", start: 0.0, end: 3.2, text: "你好，欢迎来到实时转录演示系统，这是一个非常完整的测试案例" },
-              { text_id: "2", start: 3.2, end: 6.8, text: "今天我们要测试多说话人分离功能，看看系统能否准确区分不同的声音" },
-              { text_id: "3", start: 6.8, end: 10.5, text: "这个系统可以同时识别多个说话人的内容，并且实时显示在屏幕上" },
-              { text_id: "4", start: 10.5, end: 14.2, text: "说话人二开始发言，测试准确性，看看系统能否正确识别我的声音" },
-              { text_id: "5", start: 14.2, end: 18.0, text: "说话人一继续对话，系统实时处理，这个功能非常强大和实用" },
-              { text_id: "6", start: 18.0, end: 22.5, text: "这是一个完整的端到端演示流程，从音频输入到文字输出都非常流畅" },
-              { text_id: "7", start: 22.5, end: 26.0, text: "说话人三加入讨论，增加复杂度，看看系统能否处理三个人的对话" },
-              { text_id: "8", start: 26.0, end: 30.0, text: "演示结束，感谢使用 Orator 系统，希望这个演示能帮助你了解我们的技术" }
-            ]
-          },
-          {
-            kind: "vad",
-            real_time_factor: 15.2,
-            entries: [
-              { start: 0.0, end: 3.2 },
-              { start: 3.2, end: 6.8 },
-              { start: 6.8, end: 10.5 },
-              { start: 10.5, end: 14.2 },
-              { start: 14.2, end: 18.0 },
-              { start: 18.0, end: 22.5 },
-              { start: 22.5, end: 26.0 },
-              { start: 26.0, end: 30.0 }
-            ]
-          }
-        ],
-        comprehensive: [
-          { text_id: "1", start: 0.0, end: 3.2, speaker: 0, text: "你好，欢迎来到实时转录演示系统，这是一个非常完整的测试案例" },
-          { text_id: "2", start: 3.2, end: 6.8, speaker: 1, text: "今天我们要测试多说话人分离功能，看看系统能否准确区分不同的声音" },
-          { text_id: "3", start: 6.8, end: 10.5, speaker: 0, text: "这个系统可以同时识别多个说话人的内容，并且实时显示在屏幕上" },
-          { text_id: "4", start: 10.5, end: 14.2, speaker: 2, text: "说话人二开始发言，测试准确性，看看系统能否正确识别我的声音" },
-          { text_id: "5", start: 14.2, end: 18.0, speaker: 1, text: "说话人一继续对话，系统实时处理，这个功能非常强大和实用" },
-          { text_id: "6", start: 18.0, end: 22.5, speaker: 0, text: "这是一个完整的端到端演示流程，从音频输入到文字输出都非常流畅" },
-          { text_id: "7", start: 22.5, end: 26.0, speaker: 2, text: "说话人三加入讨论，增加复杂度，看看系统能否处理三个人的对话" },
-          { text_id: "8", start: 26.0, end: 30.0, speaker: 1, text: "演示结束，感谢使用 Orator 系统，希望这个演示能帮助你了解我们的技术" }
-        ]
-      };
+      const demoEntries = [
+        { text_id: "1", start: 0.0, end: 3.2, speaker: 0, text: "你好，欢迎来到实时转录演示系统，这是一个非常完整的测试案例" },
+        { text_id: "2", start: 3.2, end: 6.8, speaker: 1, text: "今天我们要测试多说话人分离功能，看看系统能否准确区分不同的声音" },
+        { text_id: "3", start: 6.8, end: 10.5, speaker: 0, text: "这个系统可以同时识别多个说话人的内容，并且实时显示在屏幕上" },
+        { text_id: "4", start: 10.5, end: 14.2, speaker: 2, text: "说话人二开始发言，测试准确性，看看系统能否正确识别我的声音" },
+        { text_id: "5", start: 14.2, end: 18.0, speaker: 1, text: "说话人一继续对话，系统实时处理，这个功能非常强大和实用" },
+        { text_id: "6", start: 18.0, end: 22.5, speaker: 0, text: "这是一个完整的端到端演示流程，从音频输入到文字输出都非常流畅" },
+        { text_id: "7", start: 22.5, end: 26.0, speaker: 2, text: "说话人三加入讨论，增加复杂度，看看系统能否处理三个人的对话" },
+        { text_id: "8", start: 26.0, end: 30.0, speaker: 1, text: "演示结束，感谢使用 Orator 系统，希望这个演示能帮助你了解我们的技术" }
+      ];
 
       // Populate transcript
       transcriptList.innerHTML = "";
-      demoTimeline.comprehensive.forEach(function (entry) {
+      demoEntries.forEach(function (entry) {
         const div = document.createElement("div");
         div.className = "t-item confirmed";
         div.dataset.id = entry.text_id;
@@ -997,9 +594,7 @@
         transcriptList.appendChild(div);
       });
 
-      // Trigger timeline handler
-      handleTimeline(demoTimeline);
-      console.log("[Demo] Timeline loaded");
+      console.log("[Demo] Transcript loaded");
     }, 1000);
   }
 })();
