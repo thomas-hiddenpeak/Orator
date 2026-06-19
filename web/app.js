@@ -97,7 +97,10 @@
   /* ── WebSocket ── */
   function defaultWsUrl() {
     const host = window.location.hostname || "127.0.0.1";
-    return "ws://" + host + ":8765";
+    // Infer WS port from HTTP port: WS = HTTP - 1 (per server convention)
+    const httpPort = window.location.port || "8766";
+    const wsPort = (parseInt(httpPort, 10) - 1) || 8765;
+    return "ws://" + host + ":" + wsPort;
   }
 
   function connect() {
