@@ -109,15 +109,18 @@
       lastError = "";
       connBadge.title = "";
       setStatus(true);
+      console.log("[WS] Connected to", defaultWsUrl());
     };
 
-    ws.onclose = function () {
+    ws.onclose = function (evt) {
       setStatus(false);
+      console.log("[WS] Closed:", evt.code, evt.reason, evt.wasClean);
       if (!lastError) scheduleReconnect();
     };
 
-    ws.onerror = function () {
+    ws.onerror = function (evt) {
       showError("WebSocket connection error");
+      console.error("[WS] Error:", evt);
     };
 
     ws.onmessage = function (ev) {
