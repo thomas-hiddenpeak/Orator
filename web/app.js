@@ -406,20 +406,31 @@
     const audioSec = timelineData.audio_sec || 10;
     const labelW = 80; // Left label column width
     const headerH = 35;
-    const trackH = 40; // Fixed height per track
+    const trackH = 40; // Fixed height for DIAR and VAD tracks
     const gap = 8;
+    const asrEntryH = 30; // Height per ASR entry (2 lines: baseEntryH * 2)
 
-    // Determine number of tracks
+    // Determine number of tracks and ASR entry count
     const tracks = Array.isArray(timelineData.tracks) ? timelineData.tracks : [];
     const hasDiar = tracks.some(function (t) { return t.kind === "diarization"; });
     const hasAsr = tracks.some(function (t) { return t.kind === "asr"; });
     const hasVad = tracks.some(function (t) { return t.kind === "vad"; });
+    
+    // Calculate ASR track height based on entry count
+    const asrTrack = hasAsr ? tracks.find(function (t) { return t.kind === "asr"; }) : null;
+    const asrEntryCount = asrTrack && asrTrack.entries ? asrTrack.entries.length : 0;
+    const asrTrackH = Math.max(trackH, asrEntryCount * asrEntryH + 4);
+    
     const numTracks = (hasDiar ? 1 : 0) + (hasAsr ? 1 : 0) + (hasVad ? 1 : 0);
 
     // Canvas width = container width
     const containerW = canvas.parentElement.clientWidth || 1200;
     const totalW = containerW;
-    const totalH = headerH + numTracks * (trackH + gap) + 20;
+    // Calculate total height: header + DIAR + gap + ASR + gap + VAD + padding
+    let totalH = headerH + 20;
+    if (hasDiar) totalH += trackH + gap;
+    if (hasAsr) totalH += asrTrackH + gap;
+    if (hasVad) totalH += trackH + gap;
     const timeW = totalW - labelW; // Width for time-aligned content
 
     const dpr = window.devicePixelRatio || 1;
@@ -468,9 +479,8 @@
     }
 
     if (hasAsr) {
-      const asrTrack = tracks.find(function (t) { return t.kind === "asr"; });
-      drawTimeTrack(asrTrack, "ASR", labelW, y, timeW, trackH, audioSec);
-      y += trackH + gap;
+      drawTimeTrack(asrTrack, "ASR", labelW, y, timeW, asrTrackH, audioSec);
+      y += asrTrackH + gap;
     }
 
     if (hasVad) {
@@ -573,40 +583,49 @@
         }
       }
     } else if (kind === "asr") {
-      // For ASR: draw text segments time-aligned
-      // If segments overlap in time, stack them vertically within the track
-      const rows = groupByOverlap(entries);
-      const rowH = Math.max(14, trackH / Math.max(1, rows.length));
+      // For ASR: each entry on its own row, text wraps within the time segment
+      const lineHeight = 13;
+      const padding = 2;
+      // Each entry can have multiple lines, so entry height = base + extra for wrapping
+      const baseEntryH = lineHeight + padding * 2;
+      // Sort by start time
+      const sorted = entries.slice().sort(function(a, b) { return a.start - b.start; });
+      
+      sorted.forEach(function(e, idx) {
+        const x1 = x0 + (e.start / audioSec) * timeW;
+        const x2 = x0 + (e.end / audioSec) * timeW;
+        const segW = Math.max(40, x2 - x1);
+        const text = e.text || "";
+        const ry = y0 + idx * baseEntryH;
 
-      rows.forEach(function (row, rowIdx) {
-        const ry = y0 + rowIdx * rowH;
-        row.forEach(function (e) {
-          const x1 = x0 + (e.start / audioSec) * timeW;
-          const x2 = x0 + (e.end / audioSec) * timeW;
-          const segW = Math.max(20, x2 - x1);
-          const text = e.text || "";
+        // Background (slightly taller to accommodate wrapped text)
+        ctx.fillStyle = "#5b8def22";
+        ctx.fillRect(x1, ry, segW, baseEntryH * 2); // Allow up to 2 lines
 
-          // Background
-          ctx.fillStyle = "#5b8def22";
-          ctx.beginPath();
-          ctx.moveTo(x1 + 2, ry + 1);
-          ctx.lineTo(x1 + segW - 2, ry + 1);
-          ctx.lineTo(x1 + segW - 2, ry + rowH - 1);
-          ctx.lineTo(x1 + 2, ry + rowH - 1);
-          ctx.closePath();
-          ctx.fill();
-
-          // Text
-          ctx.fillStyle = "#e4e6ed";
-          ctx.font = "10px system-ui, sans-serif";
-          ctx.textAlign = "left";
-          ctx.textBaseline = "middle";
-          const maxChars = Math.max(1, Math.floor(segW / 6));
-          const display = text.length > maxChars ? text.substring(0, maxChars - 1) + "…" : text;
-          ctx.fillText(display, x1 + 4, ry + rowH / 2);
+        // Text with wrapping
+        ctx.fillStyle = "#e4e6ed";
+        ctx.font = "11px system-ui, sans-serif";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "top";
+        
+        // Wrap text to fit in segment width (Chinese char ~12px, English ~7px)
+        const charsPerLine = Math.max(4, Math.floor((segW - 8) / 12));
+        const lines = [];
+        for (let i = 0; i < text.length; i += charsPerLine) {
+          lines.push(text.substring(i, i + charsPerLine));
+        }
+        
+        // Draw up to 2 lines of text
+        lines.slice(0, 2).forEach(function(line, lineIdx) {
+          const ly = ry + padding + lineIdx * lineHeight;
+          ctx.fillText(line, x1 + 4, ly);
         });
       });
+      
+      // Return the height needed for all ASR entries
+      return y0 + sorted.length * (baseEntryH * 2);
     }
+    return y0 + trackH;
   }
 
   function computeTickInterval(audioSec, availW) {
