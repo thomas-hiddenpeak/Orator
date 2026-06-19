@@ -21,9 +21,10 @@ double Secs(Clock::time_point a, Clock::time_point b) {
 }  // namespace
 
 AsrWorker::AsrWorker(model::Qwen3Asr* asr, StreamTimeline* timeline,
-                      const Params& params, Emit emit, cudaStream_t stream)
+                       const Params& params, Emit emit, core::TimeBase tb,
+                       cudaStream_t stream)
     : asr_(asr), timeline_(timeline), params_(params), emit_(std::move(emit)),
-      tb_(params.sample_rate, 0), stream_(stream),
+      tb_(std::move(tb)), stream_(stream),
       ring_buffer_(kRingBufferSamples) {
 }
 
@@ -34,57 +35,79 @@ void AsrWorker::ProcessSpan(const float* samples, int n) {
   RingPush(samples, n, inc_abs_pos_);
 
   if (params_.asr_vad_gate) {
-    // Wait for VAD to process this span so vad_segments_ is up-to-date.
-    if (vad_cursor_pos_ != nullptr) {
-      const long target = inc_abs_pos_ + n;
-      while (vad_cursor_pos_->load(std::memory_order_relaxed) < target) {
-        std::this_thread::yield();
-      }
-    }
     const double current_sec = tb_.SecondsAt(inc_abs_pos_ + n);
 
+    // Query VAD segments from ProtocolTimeline.
+    // Each message on vad/speech_segment has data: {"start":S,"end":E,...}.
+    std::vector<std::pair<double, double>> vad_segs;
+    {
+      if (protocol_timeline_) {
+        auto msgs = protocol_timeline_->Replay("vad/speech_segment", 0.0);
+        for (const auto& msg : msgs) {
+          auto sp = msg.data.find("\"start\":");
+          auto ep = msg.data.find("\"end\":");
+          if (sp != std::string::npos && ep != std::string::npos) {
+            auto sv = sp + 8;
+            auto se = msg.data.find_first_of(",}", sv);
+            auto ev = ep + 6;
+            auto ee = msg.data.find_first_of(",}", ev);
+            if (se != std::string::npos && ee != std::string::npos) {
+              double s = std::stod(msg.data.substr(sv, se - sv));
+              double e = std::stod(msg.data.substr(ev, ee - ev));
+              vad_segs.push_back({s, e});
+            }
+          }
+        }
+      }
+    }
+
+    auto in_speech = [&](double sec) {
+      for (const auto& [s, e] : vad_segs) {
+        if (sec >= s && sec < e) return true;
+      }
+      return false;
+    };
+
+    // Re-evaluate when VAD segments first arrive during fallback processing.
+    if (vad_state_ == VadState::IDLE && !vad_segs.empty() && inc_in_segment_) {
+      if (in_speech(current_sec)) {
+        vad_state_ = VadState::PROCESSING;
+      } else {
+        vad_state_ = VadState::TRAILING;
+        vad_trail_start_sec_ = current_sec;
+      }
+    }
+
     if (vad_state_ == VadState::IDLE) {
-      // Check if current position entered a VAD speech region
-      if (IsInVadSpeech(current_sec)) {
-        // Speech detected — pop lead_ms from ring buffer and start processing
+      if (in_speech(current_sec)) {
         const int lead_samples = std::max(0, params_.asr_vad_lead_ms * params_.sample_rate / 1000);
         std::vector<float> lead;
         RingPop(lead_samples, &lead);
         ProcessIncremental(lead.data(), static_cast<int>(lead.size()), /*finalize=*/false);
         vad_state_ = VadState::PROCESSING;
-        // Fall through to ProcessIncremental below
-      } else {
-        // IDLE and not in speech — skip, but only if VAD segments are available.
-        // When vad_segments_ is empty (VAD hasn't pushed yet due to consumer race),
-        // we process normally to avoid losing audio.
-        if (!vad_segments_.empty()) {
-          inc_abs_pos_ += n;
-          processed_samples_.fetch_add(n);
-          return;
-        }
-        // VAD empty — fallback: process audio normally
+      } else if (!vad_segs.empty()) {
+        inc_abs_pos_ += n;
+        processed_samples_.fetch_add(n);
+        return;
       }
     }
 
     if (vad_state_ == VadState::PROCESSING) {
-      // Check if we've exited the VAD speech region
-      if (!IsInVadSpeech(current_sec)) {
+      if (!in_speech(current_sec)) {
         vad_state_ = VadState::TRAILING;
         vad_trail_start_sec_ = current_sec;
       }
     }
 
     if (vad_state_ == VadState::TRAILING) {
-      // Check if trail window expired → commit segment
       if (current_sec - vad_trail_start_sec_ >= params_.asr_vad_trail_sec) {
-        // Trail expired — finalize current segment
         ProcessIncremental(nullptr, 0, /*finalize=*/true);
         vad_state_ = VadState::IDLE;
+        inc_in_segment_ = false;
         inc_abs_pos_ += n;
         processed_samples_.fetch_add(n);
         return;
       }
-      // Still trailing — continue processing
     }
   }
 
@@ -202,7 +225,6 @@ void AsrWorker::Reset() {
   compute_sec_ = 0.0;
   asr_->Reset();
 
-  // Reset VAD state
   vad_state_ = VadState::IDLE;
   vad_trail_start_sec_ = 0.0;
   ring_write_pos_ = 0;
@@ -240,16 +262,6 @@ void AsrWorker::RingPop(int n, std::vector<float>* out) {
     read_pos = (read_pos + 1) % kRingBufferSamples;
   }
   ring_count_ -= pop;
-}
-
-bool AsrWorker::IsInVadSpeech(double sec) const {
-  std::lock_guard<std::mutex> lock(vad_mutex_);
-  for (const auto& seg : vad_segments_) {
-    if (sec >= seg.start_sec && sec < seg.end_sec) {
-      return true;
-    }
-  }
-  return false;
 }
 
 }  // namespace pipeline

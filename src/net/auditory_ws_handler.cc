@@ -1,10 +1,121 @@
 #include "net/auditory_ws_handler.h"
 
+#include <chrono>
 #include <cstdint>
+#include <string>
 #include <vector>
 
 namespace orator {
 namespace net {
+
+namespace {
+
+// Escape a raw JSON string so it can be safely embedded as a value inside
+// another JSON object. Replaces " with \", \ with \\, newlines, etc.
+std::string EscapeJsonString(const std::string& s) {
+  std::string out;
+  out.reserve(s.size() + 16);
+  for (char c : s) {
+    switch (c) {
+      case '"': out += "\\\""; break;
+      case '\\': out += "\\\\"; break;
+      case '\n': out += "\\n"; break;
+      case '\r': out += "\\r"; break;
+      case '\t': out += "\\t"; break;
+      default:
+        if (static_cast<unsigned char>(c) < 0x20) {
+          char buf[8];
+          snprintf(buf, sizeof(buf), "\\u%04x", static_cast<unsigned char>(c));
+          out += buf;
+        } else {
+          out += c;
+        }
+    }
+  }
+  return out;
+}
+
+// Check if the JSON message already contains a "topic" key (protocol envelope).
+bool HasTopicKey(const std::string& json) {
+  // Look for "topic" as a JSON key (preceded by { or , and whitespace).
+  const std::string needle = "\"topic\"";
+  size_t pos = 0;
+  while ((pos = json.find(needle, pos)) != std::string::npos) {
+    // Verify it's a key: check character before is { or , (with optional whitespace).
+    if (pos == 0) {
+      pos += needle.size();
+      continue;
+    }
+    char prev = json[pos - 1];
+    if (prev == '{' || prev == ',' || prev == ' ' || prev == '\t' || prev == '\n' || prev == '\r') {
+      // Also verify there's a : after the key name
+      size_t afterKey = pos + needle.size();
+      while (afterKey < json.size() && (json[afterKey] == ' ' || json[afterKey] == '\t'))
+        ++afterKey;
+      if (afterKey < json.size() && json[afterKey] == ':')
+        return true;
+    }
+    pos += needle.size();
+  }
+  return false;
+}
+
+// Extract the "type" value from a legacy JSON message. Returns empty string if not found.
+std::string ExtractType(const std::string& json) {
+  const std::string needle = "\"type\"";
+  size_t pos = json.find(needle);
+  if (pos == std::string::npos) return "";
+
+  size_t afterKey = pos + needle.size();
+  while (afterKey < json.size() && (json[afterKey] == ' ' || json[afterKey] == '\t'))
+    ++afterKey;
+  if (afterKey >= json.size() || json[afterKey] != ':') return "";
+  ++afterKey; // skip ':'
+  while (afterKey < json.size() && (json[afterKey] == ' ' || json[afterKey] == '\t'))
+    ++afterKey;
+  if (afterKey >= json.size() || json[afterKey] != '"') return "";
+  ++afterKey; // skip opening quote
+
+  size_t end = json.find('"', afterKey);
+  if (end == std::string::npos) return "";
+  return json.substr(afterKey, end - afterKey);
+}
+
+// Wrap a legacy message in the new topic-based envelope format.
+// If the message already has a "topic" key, return it unchanged.
+std::string WrapMessageInEnvelope(const std::string& json, int64_t msg_id) {
+  if (HasTopicKey(json)) {
+    return json;
+  }
+
+  std::string type = ExtractType(json);
+  if (type.empty()) type = "unknown";
+
+  std::string topic = type + "/event";
+
+  // Escape the original JSON for embedding in the "data" field.
+  std::string escapedData = EscapeJsonString(json);
+
+  // Build envelope.
+  std::string envelope = "{\"topic\":\"" + topic
+                         + "\",\"pipeline\":\"" + type
+                         + "\",\"pipeline_version\":\"1.0.0\""
+                         + ",\"msg_id\":" + std::to_string(msg_id)
+                         + ",\"ts\":0"
+                         + ",\"qos\":0"
+                         + ",\"schema_version\":1"
+                         + ",\"data\":" + escapedData + "}";
+  return envelope;
+}
+
+}  // namespace
+
+void SessionEmit::Send(const std::string& json) {
+  std::lock_guard<std::mutex> lk(mu);
+  if (conn) {
+    conn->SendText(WrapMessageInEnvelope(json, ++msg_id));
+  }
+}
 
 AuditoryWsHandler::AuditoryWsHandler(
     std::shared_ptr<pipeline::AuditoryStream> stream,
@@ -25,10 +136,16 @@ void AuditoryWsHandler::OnOpen(WebSocketConnection& conn) {
   // Reset the shared stream for a fresh session (models stay loaded).
   stream_->Reset();
 
+  const auto now = std::chrono::system_clock::now();
+  const double wall_start =
+      std::chrono::duration<double>(now.time_since_epoch()).count();
   std::string ready = "{\"type\":\"ready\",\"sample_rate\":" +
-                      std::to_string(16000) +  // config is embedded in stream
-                      ",\"asr\":" + (stream_->asr_enabled() ? "true" : "false") +
-                      ",\"time_base\":\"absolute_samples\",\"origin_sample\":0}";
+                       std::to_string(16000) +
+                       ",\"asr\":" + (stream_->asr_enabled() ? "true" : "false") +
+                       ",\"time_base\":\"absolute_samples\",\"origin_sample\":0,"
+                       "\"session_start_wall_sec\":" +
+                       std::to_string(wall_start) +
+                        ",\"protocol_version\":2,\"envelope_format\":true}";
   conn.SendText(ready);
 }
 
@@ -57,6 +174,16 @@ void AuditoryWsHandler::OnText(WebSocketConnection& conn, const std::string& tex
   if (text.find("\"f32\"") != std::string::npos ||
       text.find("float32") != std::string::npos) {
     float_format_ = true;
+  }
+  if (text.find("\"describe\"") != std::string::npos ||
+      text.find("\"cmd\":\"describe\"") != std::string::npos) {
+    const auto* pt = stream_->protocol_timeline();
+    if (pt) {
+      conn.SendText(pt->Describe());
+    } else {
+      conn.SendText("{\"error\":\"protocol_timeline not initialized\"}");
+    }
+    return;
   }
   if (text.find("reset") != std::string::npos) {
     stream_->Reset();

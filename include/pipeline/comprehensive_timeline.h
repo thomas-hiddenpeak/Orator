@@ -19,12 +19,20 @@
 // re-segments by ASR's own coarse segmentation. Where diarization has not covered
 // a span the speaker is honestly "unknown" (never borrowed from a neighbour). The
 // view is a faithful interactive form of the container and carries the same
-// characteristics (common time base, no content invention).
+// characteristics (common time base, no invented content).
 //
 // Because the container is stateful and revisable, a text placed against
 // incomplete diarization is re-projected when diarization later covers the span;
 // each change is returned as a Revision the controller pushes to the WS consumer.
+//
+// Lightweight event subscription (extensibility for future pipeline growth):
+// each mutation method fires a typed event after the data change completes.
+// Subscribers receive the event payload (event type + affected time range) via
+// a callback. Events are dispatched synchronously, outside the internal lock,
+// after the mutation is fully committed. A subscriber's callback receives a
+// consistent view but may see subsequent mutations by the time it runs.
 
+#include <functional>
 #include <map>
 #include <string>
 #include <utility>
@@ -35,7 +43,43 @@ namespace pipeline {
 
 class ComprehensiveTimeline {
  public:
-  // One view entry: a time span attributed to a speaker with its (possibly
+  // Lightweight event types — each mutation fires zero or more events.
+  // Subscribers use these to react to timeline changes without polling.
+  enum class Event {
+    VAD_ADDED,          // a VAD speech segment was deposited
+    SPEAKER_REPLACED,   // the entire speaker set was replaced
+    TEXT_UPSERTED,      // a text segment was deposited or replaced
+  };
+
+  // Event payload: what changed and the affected time range.
+  // Subscribers use `type` to switch behavior and `[start,end)` to scope
+  // any follow-up read (e.g. `SnapshotVadSince(start)`).
+  struct EventPayload {
+    Event type;
+    double start = 0.0;
+    double end = 0.0;
+  };
+
+  using EventHandler = std::function<void(const EventPayload&)>;
+  // Opaque subscription handle for unsubscribe.
+  using SubscriptionId = long;
+
+  // Subscribe to events. Returns a subscription id for later unsubscribe.
+  // The handler is called synchronously after each mutation completes,
+  // outside the internal lock. The handler receives a consistent view but
+  // may see subsequent mutations by the time it runs.
+  SubscriptionId Subscribe(EventHandler handler);
+
+  // Remove a subscription. Safe to call from within an event handler.
+  void Unsubscribe(SubscriptionId id);
+
+  // Dispatch collected events to subscribers. MUST be called outside
+  // comp_mutex_ to avoid deadlock if a handler reads back.
+  // Callers of mutation methods should invoke this after releasing the lock.
+  // Returns true if any events were dispatched.
+  bool DispatchEvents();
+
+  // One view entry: a time span attributed to a speaker with their (possibly
   // diarization-split) text slice. Multiple entries may share a text_id when one
   // ASR segment is split across several diarization turns.
   struct Entry {
@@ -133,6 +177,17 @@ class ComprehensiveTimeline {
   std::vector<VadSeg> vad_;           // vad track: speech segments
   // Current diarization-split projection per text id (kept in sync).
   std::map<long, std::vector<Entry>> pieces_;
+
+  void fire_event_(Event type, double start, double end);
+
+  struct HandlerEntry {
+    SubscriptionId id;
+    EventHandler handler;
+  };
+  std::vector<HandlerEntry> handlers_;
+  // Collected during mutation, dispatched after lock release.
+  std::vector<EventPayload> pending_events_;
+  long next_subscription_id_ = 1;
 };
 
 }  // namespace pipeline

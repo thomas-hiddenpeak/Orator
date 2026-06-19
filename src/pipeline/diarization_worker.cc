@@ -3,7 +3,6 @@
 #include <chrono>
 
 #include "pipeline/diar_postprocess.h"
-#include "core/time_base.h"
 
 namespace orator {
 namespace pipeline {
@@ -16,17 +15,18 @@ double Secs(Clock::time_point a, Clock::time_point b) {
 }  // namespace
 
 DiarizationWorker::DiarizationWorker(model::SortformerDiarizer* diarizer,
-                                      StreamTimeline* timeline,
-                                      Params params, cudaStream_t stream)
+                                       StreamTimeline* timeline,
+                                       Params params, core::TimeBase tb,
+                                       cudaStream_t stream)
     : diarizer_(diarizer), timeline_(timeline), params_(params),
-      stream_(stream) {}
+      tb_(std::move(tb)), stream_(stream) {}
 
 void DiarizationWorker::DeliverSpeakers(bool force) {
   if (!speaker_sink_) return;
   const long now = processed_samples_.load();
   if (!force) {
     const long min_gap =
-        static_cast<long>(params_.deliver_interval_sec * params_.sample_rate);
+        static_cast<long>(params_.deliver_interval_sec * tb_.sample_rate());
     if (now - last_deliver_sample_ < min_gap) return;
   }
   last_deliver_sample_ = now;
@@ -35,10 +35,8 @@ void DiarizationWorker::DeliverSpeakers(bool force) {
   core::DiarizationFrames frames = timeline_->SnapshotDiarFrames();
   if (frames.num_frames <= 0 || frames.num_speakers <= 0) return;
   // The diarization frame stream begins at the common-clock origin (absolute
-  // sample 0). Set the segment time origin explicitly through the common base
-  // so diar segment times are on the same clock as every other pipeline.
-  const core::TimeBase tb(params_.sample_rate, 0);
-  frames.t_start_sec = tb.SecondsAt(0);
+  // sample 0). Set the segment time origin through this pipeline's common base.
+  frames.t_start_sec = tb_.SecondsAt(0);
   auto segs = FramesToSegments(frames, params_.threshold, params_.merge_gap_sec);
   segs = CoalesceSegments(std::move(segs), params_.merge_gap_sec);
   speaker_sink_(segs);

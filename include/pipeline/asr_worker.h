@@ -18,21 +18,11 @@
 #include "model/qwen3_asr.h"
 #include "pipeline/stream_timeline.h"
 #include "core/time_base.h"
+#include "protocol/protocol_timeline.h"
 #include <cuda_runtime.h>
 
 namespace orator {
 namespace pipeline {
-
-  // One VAD speech segment [start_sec, end_sec) from the ComprehensiveTimeline.
-  struct VadSpeechSegment {
-    double start_sec = 0.0;
-    double end_sec = 0.0;
-  };
-
-  // Callback: the controller invokes this whenever the VAD track changes.
-  // The worker copies the segments (thread-safe snapshot).
-  using VadUpdateCallback =
-      std::function<void(const std::vector<VadSpeechSegment>&)>;
 
 class AsrWorker {
  public:
@@ -50,18 +40,16 @@ class AsrWorker {
       std::function<void(long id, double start, double end,
                          const std::string& text)>;
 
+  // `tb` is the common time base inherited from SharedAudioBuffer::time_base().
+  // The worker holds it as a member and derives all time codes from it.
   AsrWorker(model::Qwen3Asr* asr, StreamTimeline* timeline, const Params& params,
-              Emit emit, cudaStream_t stream = 0);
+              Emit emit, core::TimeBase tb, cudaStream_t stream = 0);
 
   void set_text_sink(TextSegmentSink sink) { text_sink_ = std::move(sink); }
 
-  void set_vad_update(VadUpdateCallback cb) { vad_update_ = std::move(cb); }
-  std::mutex* vad_mutex() { return &vad_mutex_; }
-  std::vector<VadSpeechSegment>& vad_segments() { return vad_segments_; }
-
-  // Pointer to VAD cursor's atomic position for synchronization.
-  // When non-null, ProcessSpan waits for VAD to reach at least this span's position.
-  void set_vad_cursor_pos(std::atomic<long>* pos) { vad_cursor_pos_ = pos; }
+  void set_protocol_timeline(protocol::ProtocolTimeline* pt) {
+    protocol_timeline_ = pt;
+  }
 
   void ProcessSpan(const float* samples, int n);
   void Finalize();
@@ -81,6 +69,10 @@ class AsrWorker {
   TextSegmentSink text_sink_;
   core::TimeBase tb_;
 
+  // VAD gating via ProtocolTimeline (Constitution Art. III §8).
+  // The worker reads VAD segments from the protocol layer, not via direct push.
+  protocol::ProtocolTimeline* protocol_timeline_ = nullptr;
+
   std::atomic<long> processed_samples_{0};
   double compute_sec_ = 0.0;
   cudaStream_t stream_ = 0;
@@ -98,15 +90,6 @@ class AsrWorker {
   void RingPush(const float* samples, int n, long abs_pos);
   // Pop the last `n` samples from the ring buffer into *out.
   void RingPop(int n, std::vector<float>* out);
-  // Check if `abs_pos` (in seconds) falls within any VAD speech segment.
-  bool IsInVadSpeech(double sec) const;
-
-  // --- VAD gating ---
-  VadUpdateCallback vad_update_;
-  std::vector<VadSpeechSegment> vad_segments_;
-  mutable std::mutex vad_mutex_;
-  std::atomic<long>* vad_cursor_pos_ = nullptr;
-
   static constexpr int kRingBufferSamples = 8000;
   std::vector<float> ring_buffer_;
   int ring_write_pos_ = 0;

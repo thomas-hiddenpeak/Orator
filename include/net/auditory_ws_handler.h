@@ -39,11 +39,10 @@ namespace net {
 struct SessionEmit {
   std::mutex mu;
   WebSocketConnection* conn = nullptr;  // guarded by mu
+  int64_t msg_id = 0;                   // auto-increment, guarded by mu
 
-  void Send(const std::string& json) {
-    std::lock_guard<std::mutex> lk(mu);
-    if (conn) conn->SendText(json);
-  }
+  // Transform legacy messages to the new topic-based envelope format, then send.
+  void Send(const std::string& json);
 };
 
 class AuditoryWsHandler final : public WebSocketHandler {

@@ -101,6 +101,9 @@ int main(int argc, char** argv) {
   // Spec 002 FR7: periodic GPU-scheduling telemetry interval (seconds). 0 off.
   ReadEnvDouble("ORATOR_GPU_TELEMETRY_SEC", &cfg.gpu_telemetry_interval_sec);
 
+  // Spec 004 Phase 12: configurable DISK storage path.
+  ReadEnvString("ORATOR_STORAGE_DISK_PATH", &cfg.storage_disk_path);
+
   // reused across all client connections. This avoids repeated GPU model loads
   // which would exhaust device memory on Jetson.
   auto emit_target = std::make_shared<net::SessionEmit>();

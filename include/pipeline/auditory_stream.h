@@ -19,6 +19,7 @@
 // contains no socket code; the WebSocket handler and the streaming test drive it
 // through the same interface.
 
+#include <atomic>
 #include <condition_variable>
 #include <functional>
 #include <memory>
@@ -39,6 +40,7 @@
 #include "pipeline/diarization_worker.h"
 #include "pipeline/shared_audio_buffer.h"
 #include "pipeline/stream_timeline.h"
+#include "protocol/protocol_timeline.h"
 
 namespace orator {
 namespace pipeline {
@@ -68,6 +70,8 @@ class AuditoryStream {
     // message ({"type":"gpu_telemetry"}). A dedicated low-rate timer thread
     // emits it through the serialized transport. 0 disables it.
     double gpu_telemetry_interval_sec = 1.0;
+    // Spec 004 Phase 12: configurable DISK storage path for protocol timeline.
+    std::string storage_disk_path = "/tmp/orator/storage/";
   };
 
   // Delivers a result event as a JSON string. Invoked from the ASR worker thread
@@ -106,6 +110,14 @@ class AuditoryStream {
   double audio_sec() const;
   double diar_compute_sec() const;
   double asr_compute_sec() const;
+
+  double session_start_wall_sec() const { return session_start_wall_sec_.load(); }
+  bool wall_clock_ok() const { return wall_clock_ok_.load(); }
+
+  // Spec 004 Phase 12: access to protocol timeline for describe command.
+  const protocol::ProtocolTimeline* protocol_timeline() const {
+    return protocol_timeline_.get();
+  }
 
  private:
   void StartWorkers();           // start diar + asr threads
@@ -177,8 +189,24 @@ class AuditoryStream {
   ComprehensiveTimeline comp_;
   std::mutex comp_mutex_;
 
-  // VAD cursor position for ASR synchronization.
-  std::atomic<long> vad_cursor_pos_{0};
+  // Spec 004 Phase 12: protocol timeline for pipeline registration and routing.
+  // Bridges to ComprehensiveTimeline for the comprehensive view.
+  std::unique_ptr<protocol::ProtocolTimeline> protocol_timeline_;
+  std::unique_ptr<protocol::PipelineHandle> ws_input_handle_;
+  std::unique_ptr<protocol::PipelineHandle> vad_handle_;
+  std::unique_ptr<protocol::PipelineHandle> asr_handle_;
+  std::unique_ptr<protocol::PipelineHandle> diar_handle_;
+
+  // Spec 004 Phase 12: internal subscription IDs bridging ProtocolTimeline
+  // messages back to ComprehensiveTimeline. Unsubscribed in Reset().
+  long vad_sub_id_ = 0;
+  long diar_sub_id_ = 0;
+  long asr_sub_id_ = 0;
+
+  // Wall clock anchor for session-level physical-time mapping.
+  // Set at Reset() (entry), validated at EmitTimeline(finalize=true) (exit).
+  std::atomic<double> session_start_wall_sec_{0.0};
+  std::atomic<bool> wall_clock_ok_{true};
 };
 
 }  // namespace pipeline

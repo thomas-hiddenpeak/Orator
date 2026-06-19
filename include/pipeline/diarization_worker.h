@@ -6,6 +6,7 @@
 #include <functional>
 #include <vector>
 
+#include "core/time_base.h"
 #include "core/types.h"
 #include "model/streaming_sortformer.h"
 #include "pipeline/stream_timeline.h"
@@ -42,8 +43,10 @@ class DiarizationWorker {
   // `diarizer` and `timeline` are owned by the controller and must outlive the
   // worker. The diarizer must already be initialized + weight-loaded.
   // `stream` is the CUDA stream for all GPU work (kernels, copies, sync).
+  // `tb` is the common time base inherited from SharedAudioBuffer::time_base().
+  // The worker holds it as a member and derives all time codes from it.
   DiarizationWorker(model::SortformerDiarizer* diarizer, StreamTimeline* timeline,
-                    Params params, cudaStream_t stream);
+                     Params params, core::TimeBase tb, cudaStream_t stream);
 
   // Set the comprehensive-timeline speaker-view sink (Spec 004). Optional.
   void set_speaker_sink(SpeakerSink sink) { speaker_sink_ = std::move(sink); }
@@ -70,6 +73,7 @@ class DiarizationWorker {
   model::SortformerDiarizer* diarizer_;
   StreamTimeline* timeline_;
   Params params_;
+  core::TimeBase tb_;
   cudaStream_t stream_;
   SpeakerSink speaker_sink_;
   long last_deliver_sample_ = 0;

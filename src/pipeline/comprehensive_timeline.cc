@@ -7,6 +7,41 @@
 namespace orator {
 namespace pipeline {
 
+ComprehensiveTimeline::SubscriptionId
+ComprehensiveTimeline::Subscribe(EventHandler handler) {
+  const SubscriptionId id = next_subscription_id_++;
+  handlers_.push_back({id, std::move(handler)});
+  return id;
+}
+
+void ComprehensiveTimeline::Unsubscribe(SubscriptionId id) {
+  for (auto& e : handlers_) {
+    if (e.id == id) {
+      e.handler = nullptr;  // lazy removal, safe from event handler
+      return;
+    }
+  }
+}
+
+void ComprehensiveTimeline::fire_event_(Event type, double start, double end) {
+  pending_events_.push_back({type, start, end});
+}
+
+bool ComprehensiveTimeline::DispatchEvents() {
+  if (pending_events_.empty()) return false;
+  for (const auto& evt : pending_events_) {
+    for (auto& e : handlers_) {
+      if (!e.handler) continue;
+      try {
+        e.handler(evt);
+      } catch (...) {
+      }
+    }
+  }
+  pending_events_.clear();
+  return true;
+}
+
 namespace {
 double Overlap(double a0, double a1, double b0, double b1) {
   return std::max(0.0, std::min(a1, b1) - std::max(a0, b0));
@@ -178,6 +213,7 @@ std::vector<ComprehensiveTimeline::Revision> ComprehensiveTimeline::UpsertSpeake
 
   std::vector<Revision> revs;
   ReprojectRange(start, end, &revs);
+  fire_event_(Event::SPEAKER_REPLACED, start, end);
   return revs;
 }
 
@@ -203,6 +239,7 @@ std::vector<ComprehensiveTimeline::Revision> ComprehensiveTimeline::UpsertText(
   }
   std::vector<Revision> revs;
   ReprojectText(*it, &revs);
+  fire_event_(Event::TEXT_UPSERTED, start, end);
   return revs;
 }
 
@@ -211,6 +248,12 @@ std::vector<ComprehensiveTimeline::Revision> ComprehensiveTimeline::ReplaceSpeak
   // Diarization delivers its whole current segment view (global derivation), so
   // replace the speaker set wholesale and re-project ALL text. Emit a revision
   // for every text whose attributed result changed.
+  double min_start = 0.0;
+  double max_end = 0.0;
+  if (!segs.empty()) {
+    min_start = segs.front().start;
+    max_end = segs.back().end;
+  }
   speakers_.clear();
   for (const auto& s : segs) {
     SpeakerSeg seg;
@@ -225,6 +268,7 @@ std::vector<ComprehensiveTimeline::Revision> ComprehensiveTimeline::ReplaceSpeak
   }
   std::vector<Revision> revs;
   for (const auto& t : texts_) ReprojectText(t, &revs);
+  fire_event_(Event::SPEAKER_REPLACED, min_start, max_end);
   return revs;
 }
 
@@ -234,6 +278,7 @@ void ComprehensiveTimeline::AddVad(double start, double end) {
       vad_.begin(), vad_.end(), start,
       [](const VadSeg& a, double s) { return a.start < s; });
   vad_.insert(pos, v);
+  fire_event_(Event::VAD_ADDED, start, end);
 }
 
 std::vector<ComprehensiveTimeline::Entry> ComprehensiveTimeline::Snapshot()
@@ -264,6 +309,10 @@ void ComprehensiveTimeline::Clear() {
   texts_.clear();
   vad_.clear();
   pieces_.clear();
+  for (auto& e : handlers_) e.handler = nullptr;
+  handlers_.clear();
+  pending_events_.clear();
+  next_subscription_id_ = 1;
 }
 
 }  // namespace pipeline
