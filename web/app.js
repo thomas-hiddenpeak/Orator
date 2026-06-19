@@ -954,14 +954,14 @@
             kind: "asr",
             real_time_factor: 2.6,
             entries: [
-              { text_id: "1", start: 0.0, end: 3.2, text: "你好，欢迎来到实时转录演示系统" },
-              { text_id: "2", start: 3.2, end: 6.8, text: "今天我们要测试多说话人分离功能" },
-              { text_id: "3", start: 6.8, end: 10.5, text: "这个系统可以同时识别多个说话人的内容" },
-              { text_id: "4", start: 10.5, end: 14.2, text: "说话人二开始发言，测试准确性" },
-              { text_id: "5", start: 14.2, end: 18.0, text: "说话人一继续对话，系统实时处理" },
-              { text_id: "6", start: 18.0, end: 22.5, text: "这是一个完整的端到端演示流程" },
-              { text_id: "7", start: 22.5, end: 26.0, text: "说话人三加入讨论，增加复杂度" },
-              { text_id: "8", start: 26.0, end: 30.0, text: "演示结束，感谢使用 Orator 系统" }
+              { text_id: "1", start: 0.0, end: 3.2, text: "你好，欢迎来到实时转录演示系统，这是一个非常完整的测试案例" },
+              { text_id: "2", start: 3.2, end: 6.8, text: "今天我们要测试多说话人分离功能，看看系统能否准确区分不同的声音" },
+              { text_id: "3", start: 6.8, end: 10.5, text: "这个系统可以同时识别多个说话人的内容，并且实时显示在屏幕上" },
+              { text_id: "4", start: 10.5, end: 14.2, text: "说话人二开始发言，测试准确性，看看系统能否正确识别我的声音" },
+              { text_id: "5", start: 14.2, end: 18.0, text: "说话人一继续对话，系统实时处理，这个功能非常强大和实用" },
+              { text_id: "6", start: 18.0, end: 22.5, text: "这是一个完整的端到端演示流程，从音频输入到文字输出都非常流畅" },
+              { text_id: "7", start: 22.5, end: 26.0, text: "说话人三加入讨论，增加复杂度，看看系统能否处理三个人的对话" },
+              { text_id: "8", start: 26.0, end: 30.0, text: "演示结束，感谢使用 Orator 系统，希望这个演示能帮助你了解我们的技术" }
             ]
           },
           {
@@ -980,14 +980,14 @@
           }
         ],
         comprehensive: [
-          { text_id: "1", start: 0.0, end: 3.2, speaker: 0, text: "你好，欢迎来到实时转录演示系统" },
-          { text_id: "2", start: 3.2, end: 6.8, speaker: 1, text: "今天我们要测试多说话人分离功能" },
-          { text_id: "3", start: 6.8, end: 10.5, speaker: 0, text: "这个系统可以同时识别多个说话人的内容" },
-          { text_id: "4", start: 10.5, end: 14.2, speaker: 2, text: "说话人二开始发言，测试准确性" },
-          { text_id: "5", start: 14.2, end: 18.0, speaker: 1, text: "说话人一继续对话，系统实时处理" },
-          { text_id: "6", start: 18.0, end: 22.5, speaker: 0, text: "这是一个完整的端到端演示流程" },
-          { text_id: "7", start: 22.5, end: 26.0, speaker: 2, text: "说话人三加入讨论，增加复杂度" },
-          { text_id: "8", start: 26.0, end: 30.0, speaker: 1, text: "演示结束，感谢使用 Orator 系统" }
+          { text_id: "1", start: 0.0, end: 3.2, speaker: 0, text: "你好，欢迎来到实时转录演示系统，这是一个非常完整的测试案例" },
+          { text_id: "2", start: 3.2, end: 6.8, speaker: 1, text: "今天我们要测试多说话人分离功能，看看系统能否准确区分不同的声音" },
+          { text_id: "3", start: 6.8, end: 10.5, speaker: 0, text: "这个系统可以同时识别多个说话人的内容，并且实时显示在屏幕上" },
+          { text_id: "4", start: 10.5, end: 14.2, speaker: 2, text: "说话人二开始发言，测试准确性，看看系统能否正确识别我的声音" },
+          { text_id: "5", start: 14.2, end: 18.0, speaker: 1, text: "说话人一继续对话，系统实时处理，这个功能非常强大和实用" },
+          { text_id: "6", start: 18.0, end: 22.5, speaker: 0, text: "这是一个完整的端到端演示流程，从音频输入到文字输出都非常流畅" },
+          { text_id: "7", start: 22.5, end: 26.0, speaker: 2, text: "说话人三加入讨论，增加复杂度，看看系统能否处理三个人的对话" },
+          { text_id: "8", start: 26.0, end: 30.0, speaker: 1, text: "演示结束，感谢使用 Orator 系统，希望这个演示能帮助你了解我们的技术" }
         ]
       };
 
