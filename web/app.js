@@ -408,7 +408,7 @@
     const headerH = 35;
     const trackH = 40; // Fixed height for DIAR and VAD tracks
     const gap = 8;
-    const asrEntryH = 30; // Height per ASR entry (2 lines: baseEntryH * 2)
+    const asrEntryH = 15; // Height per ASR entry (lineHeight 13 + padding 2)
 
     // Determine number of tracks and ASR entry count
     const tracks = Array.isArray(timelineData.tracks) ? timelineData.tracks : [];
@@ -583,47 +583,48 @@
         }
       }
     } else if (kind === "asr") {
-      // For ASR: each entry on its own row, text wraps within the time segment
-      const lineHeight = 13;
-      const padding = 2;
-      // Each entry can have multiple lines, so entry height = base + extra for wrapping
-      const baseEntryH = lineHeight + padding * 2;
-      // Sort by start time
+      // For ASR: all entries in one horizontal band, positioned by time
+      // Text wraps within segment, but doesn't affect other entries
       const sorted = entries.slice().sort(function(a, b) { return a.start - b.start; });
-      
-      sorted.forEach(function(e, idx) {
+      const padding = 2;
+      const midY = y0 + trackH / 2;
+
+      sorted.forEach(function(e) {
         const x1 = x0 + (e.start / audioSec) * timeW;
         const x2 = x0 + (e.end / audioSec) * timeW;
         const segW = Math.max(40, x2 - x1);
         const text = e.text || "";
-        const ry = y0 + idx * baseEntryH;
 
-        // Background (slightly taller to accommodate wrapped text)
-        ctx.fillStyle = "#5b8def22";
-        ctx.fillRect(x1, ry, segW, baseEntryH * 2); // Allow up to 2 lines
+        // Background with subtle border
+        ctx.fillStyle = "#2a3050";
+        ctx.fillRect(x1, y0 + padding, segW, trackH - padding * 2);
+        ctx.strokeStyle = "#3a4060";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x1, y0 + padding, segW, trackH - padding * 2);
 
-        // Text with wrapping
+        // Text centered in segment
         ctx.fillStyle = "#e4e6ed";
         ctx.font = "11px system-ui, sans-serif";
         ctx.textAlign = "left";
         ctx.textBaseline = "top";
         
-        // Wrap text to fit in segment width (Chinese char ~12px, English ~7px)
+        // Wrap text to fit in segment width and height
         const charsPerLine = Math.max(4, Math.floor((segW - 8) / 12));
+        const maxLines = Math.floor((trackH - padding * 2) / 13);
         const lines = [];
-        for (let i = 0; i < text.length; i += charsPerLine) {
+        for (let i = 0; i < text.length && lines.length < maxLines; i += charsPerLine) {
           lines.push(text.substring(i, i + charsPerLine));
         }
         
-        // Draw up to 2 lines of text
-        lines.slice(0, 2).forEach(function(line, lineIdx) {
-          const ly = ry + padding + lineIdx * lineHeight;
+        // Center text vertically in segment
+        const textBlockH = lines.length * 13;
+        const startY = midY - textBlockH / 2;
+        
+        lines.forEach(function(line, lineIdx) {
+          const ly = startY + lineIdx * 13;
           ctx.fillText(line, x1 + 4, ly);
         });
       });
-      
-      // Return the height needed for all ASR entries
-      return y0 + sorted.length * (baseEntryH * 2);
     }
     return y0 + trackH;
   }
