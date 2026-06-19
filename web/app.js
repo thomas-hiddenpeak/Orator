@@ -404,8 +404,7 @@
     }
 
     const audioSec = timelineData.audio_sec || 10;
-    const padding = 80; // Increased for labels
-    const trackH = 50;  // Taller tracks
+    const padding = 80; // Left padding for labels
     const headerH = 35;
     const gap = 12;
 
@@ -413,12 +412,25 @@
     const tracks = Array.isArray(timelineData.tracks) ? timelineData.tracks : [];
     const hasDiar = tracks.some(function (t) { return t.kind === "diarization"; });
     const hasAsr = tracks.some(function (t) { return t.kind === "asr"; });
-    const numTracks = (hasDiar ? 1 : 0) + (hasAsr ? 1 : 0);
-    const totalH = headerH + numTracks * (trackH + gap) + padding;
+    const hasVad = tracks.some(function (t) { return t.kind === "vad"; });
+
+    // Canvas width = container width (no horizontal scroll)
+    const containerW = canvas.parentElement.clientWidth || 1200;
+    const totalW = containerW;
+
+    // Calculate track heights based on wrapped content
+    const diarTrack = hasDiar ? tracks.find(function (t) { return t.kind === "diarization"; }) : null;
+    const asrTrack = hasAsr ? tracks.find(function (t) { return t.kind === "asr"; }) : null;
+    const vadTrack = hasVad ? tracks.find(function (t) { return t.kind === "vad"; }) : null;
+
+    const diarH = hasDiar ? calcTrackHeight(diarTrack, totalW - padding * 2, "diar") : 0;
+    const asrH = hasAsr ? calcTrackHeight(asrTrack, totalW - padding * 2, "asr") : 0;
+    const vadH = hasVad ? calcTrackHeight(vadTrack, totalW - padding * 2, "vad") : 0;
+
+    const numTracks = (hasDiar ? 1 : 0) + (hasAsr ? 1 : 0) + (hasVad ? 1 : 0);
+    const totalH = headerH + diarH + asrH + vadH + numTracks * gap + padding;
 
     const dpr = window.devicePixelRatio || 1;
-    const totalW = Math.max(1000, audioSec * zoomLevel + padding * 2);
-
     canvas.width = totalW * dpr;
     canvas.height = totalH * dpr;
     canvas.style.width = totalW + "px";
@@ -444,7 +456,7 @@
     ctx.textAlign = "center";
     const tickInterval = computeTickInterval(audioSec, totalW - padding * 2);
     for (let t = 0; t <= audioSec; t += tickInterval) {
-      const x = padding + t * zoomLevel;
+      const x = padding + (t / audioSec) * (totalW - padding * 2);
       ctx.beginPath();
       ctx.moveTo(x, axisY - 4);
       ctx.lineTo(x, axisY + 4);
@@ -453,19 +465,44 @@
       ctx.fillText(fmtTime(t), x, axisY + 18);
     }
 
-    // Draw tracks
+    // Draw tracks (vertical stack with wrapped rows)
     let y = headerH + 10;
 
     if (hasDiar) {
-      const diarTrack = tracks.find(function (t) { return t.kind === "diarization"; });
-      drawDiarTrack(diarTrack, padding, y, totalW - padding * 2, trackH, audioSec);
-      y += trackH + gap;
+      drawDiarTrack(diarTrack, padding, y, totalW - padding * 2, diarH, audioSec);
+      y += diarH + gap;
     }
 
     if (hasAsr) {
-      const asrTrack = tracks.find(function (t) { return t.kind === "asr"; });
-      drawAsrTrack(asrTrack, padding, y, totalW - padding * 2, trackH, audioSec);
-      y += trackH + gap;
+      drawAsrTrack(asrTrack, padding, y, totalW - padding * 2, asrH, audioSec);
+      y += asrH + gap;
+    }
+
+    if (hasVad) {
+      drawVadTrack(vadTrack, padding, y, totalW - padding * 2, vadH, audioSec);
+      y += vadH + gap;
+    }
+  }
+
+  function calcTrackHeight(track, availW, kind) {
+    const entries = track && track.entries ? track.entries : [];
+    if (entries.length === 0) return 40;
+
+    if (kind === "diar") {
+      const minBarW = 30;
+      const barsPerRow = Math.max(1, Math.floor(availW / minBarW));
+      const rows = Math.ceil(entries.length / barsPerRow);
+      return Math.max(40, rows * 20);
+    } else if (kind === "asr") {
+      const minSegW = 100;
+      const segsPerRow = Math.max(1, Math.floor(availW / minSegW));
+      const rows = Math.ceil(entries.length / segsPerRow);
+      return Math.max(40, rows * 24);
+    } else {
+      const minBarW = 20;
+      const barsPerRow = Math.max(1, Math.floor(availW / minBarW));
+      const rows = Math.ceil(entries.length / barsPerRow);
+      return Math.max(30, rows * 16);
     }
   }
 
@@ -482,41 +519,55 @@
     ctx.fillStyle = "#232733";
     ctx.fillRect(x0, y0, w, h);
 
-    // Speaker bars
-    for (const e of entries) {
-      const x1 = x0 + e.start * zoomLevel;
-      const x2 = x0 + e.end * zoomLevel;
-      const spk = e.speaker != null ? e.speaker : 0;
-      const colorIdx = spk % SPEAKER_COLORS.length;
-      const color = SPEAKER_COLORS[colorIdx];
-
-      ctx.fillStyle = color + "cc";
-      const barH = h * 0.6;
-      const barY = y0 + (h - barH) / 2;
-      
-      // Rounded rect
-      const r = 4;
-      const bw = Math.max(2, x2 - x1);
-      ctx.beginPath();
-      ctx.moveTo(x1 + r, barY);
-      ctx.lineTo(x1 + bw - r, barY);
-      ctx.quadraticCurveTo(x1 + bw, barY, x1 + bw, barY + r);
-      ctx.lineTo(x1 + bw, barY + barH - r);
-      ctx.quadraticCurveTo(x1 + bw, barY + barH, x1 + bw - r, barY + barH);
-      ctx.lineTo(x1 + r, barY + barH);
-      ctx.quadraticCurveTo(x1, barY + barH, x1, barY + barH - r);
-      ctx.lineTo(x1, barY + r);
-      ctx.quadraticCurveTo(x1, barY, x1 + r, barY);
-      ctx.fill();
-
-      // Confidence text
-      if (e.confidence != null && bw > 40) {
-        ctx.fillStyle = "#ffffffcc";
-        ctx.font = "10px system-ui";
-        ctx.textAlign = "center";
-        ctx.fillText((e.confidence * 100).toFixed(0) + "%", (x1 + x2) / 2, barY + barH / 2 + 4);
-      }
+    // Wrap entries into rows
+    const minBarW = 30; // Minimum width per speaker bar
+    const barsPerRow = Math.max(1, Math.floor(w / minBarW));
+    const rows = [];
+    for (let i = 0; i < entries.length; i += barsPerRow) {
+      rows.push(entries.slice(i, i + barsPerRow));
     }
+
+    const rowH = Math.max(16, Math.floor(h / Math.max(1, rows.length)));
+
+    rows.forEach(function (row, rowIdx) {
+      const rowY = y0 + rowIdx * rowH;
+      const barW = w / row.length;
+
+      row.forEach(function (e, barIdx) {
+        const bx = x0 + barIdx * barW;
+        const spk = e.speaker != null ? e.speaker : 0;
+        const colorIdx = spk % SPEAKER_COLORS.length;
+        const color = SPEAKER_COLORS[colorIdx];
+
+        // Speaker bar
+        ctx.fillStyle = color + "cc";
+        const barPad = 2;
+        const barH = rowH - barPad * 2;
+        const by = rowY + barPad;
+        const r = 3;
+        const bw = barW - barPad * 2;
+        
+        ctx.beginPath();
+        ctx.moveTo(bx + r, by);
+        ctx.lineTo(bx + bw - r, by);
+        ctx.quadraticCurveTo(bx + bw, by, bx + bw, by + r);
+        ctx.lineTo(bx + bw, by + barH - r);
+        ctx.quadraticCurveTo(bx + bw, by + barH, bx + bw - r, by + barH);
+        ctx.lineTo(bx + r, by + barH);
+        ctx.quadraticCurveTo(bx, by + barH, bx, by + barH - r);
+        ctx.lineTo(bx, by + r);
+        ctx.quadraticCurveTo(bx, by, bx + r, by);
+        ctx.fill();
+
+        // Speaker label
+        if (bw > 40) {
+          ctx.fillStyle = "#ffffffcc";
+          ctx.font = "10px system-ui";
+          ctx.textAlign = "center";
+          ctx.fillText("S" + spk, bx + bw / 2, by + barH / 2 + 3);
+        }
+      });
+    });
   }
 
   function drawAsrTrack(track, x0, y0, w, h, audioSec) {
@@ -532,41 +583,103 @@
     ctx.fillStyle = "#232733";
     ctx.fillRect(x0, y0, w, h);
 
-    // Text segments
-    for (const e of entries) {
-      const x1 = x0 + e.start * zoomLevel;
-      const x2 = x0 + e.end * zoomLevel;
-      const segW = x2 - x1;
-      if (segW < 5) continue;
-
-      // Segment background with rounded corners
-      ctx.fillStyle = "#5b8def22";
-      const r = 4;
-      const sy = y0 + 6;
-      const sh = h - 12;
-      ctx.beginPath();
-      ctx.moveTo(x1 + r, sy);
-      ctx.lineTo(x1 + segW - r, sy);
-      ctx.quadraticCurveTo(x1 + segW, sy, x1 + segW, sy + r);
-      ctx.lineTo(x1 + segW, sy + sh - r);
-      ctx.quadraticCurveTo(x1 + segW, sy + sh, x1 + segW - r, sy + sh);
-      ctx.lineTo(x1 + r, sy + sh);
-      ctx.quadraticCurveTo(x1, sy + sh, x1, sy + sh - r);
-      ctx.lineTo(x1, sy + r);
-      ctx.quadraticCurveTo(x1, sy, x1 + r, sy);
-      ctx.fill();
-
-      // Text
-      const text = e.text || "";
-      ctx.fillStyle = "#e4e6ed";
-      ctx.font = "12px system-ui, sans-serif";
-      ctx.textAlign = "left";
-
-      // Truncate if needed
-      const maxChars = Math.floor(segW / 7);
-      const display = maxChars > 0 ? (text.length > maxChars ? text.substring(0, maxChars - 1) + "…" : text) : "";
-      ctx.fillText(display, x1 + 6, y0 + h / 2 + 4);
+    // Wrap entries into rows
+    const minSegW = 100; // Minimum width per text segment
+    const segsPerRow = Math.max(1, Math.floor(w / minSegW));
+    const rows = [];
+    for (let i = 0; i < entries.length; i += segsPerRow) {
+      rows.push(entries.slice(i, i + segsPerRow));
     }
+
+    const rowH = Math.max(20, Math.floor(h / Math.max(1, rows.length)));
+
+    rows.forEach(function (row, rowIdx) {
+      const rowY = y0 + rowIdx * rowH;
+      const segW = w / row.length;
+
+      row.forEach(function (e, segIdx) {
+        const sx = x0 + segIdx * segW;
+        const text = e.text || "";
+
+        // Segment background
+        ctx.fillStyle = "#5b8def22";
+        const r = 4;
+        const sy = rowY + 4;
+        const sh = rowH - 8;
+        const sw = segW - 4;
+        ctx.beginPath();
+        ctx.moveTo(sx + r, sy);
+        ctx.lineTo(sx + sw - r, sy);
+        ctx.quadraticCurveTo(sx + sw, sy, sx + sw, sy + r);
+        ctx.lineTo(sx + sw, sy + sh - r);
+        ctx.quadraticCurveTo(sx + sw, sy + sh, sx + sw - r, sy + sh);
+        ctx.lineTo(sx + r, sy + sh);
+        ctx.quadraticCurveTo(sx, sy + sh, sx, sy + sh - r);
+        ctx.lineTo(sx, sy + r);
+        ctx.quadraticCurveTo(sx, sy, sx + r, sy);
+        ctx.fill();
+
+        // Text (truncated)
+        ctx.fillStyle = "#e4e6ed";
+        ctx.font = "11px system-ui, sans-serif";
+        ctx.textAlign = "left";
+        const maxChars = Math.floor(sw / 7);
+        const display = maxChars > 0 ? (text.length > maxChars ? text.substring(0, maxChars - 1) + "…" : text) : "";
+        ctx.fillText(display, sx + 6, rowY + rowH / 2 + 3);
+      });
+    });
+  }
+
+  function drawVadTrack(track, x0, y0, w, h, audioSec) {
+    const entries = track && track.entries ? track.entries : [];
+
+    // Label
+    ctx.fillStyle = "#8b90a0";
+    ctx.font = "bold 12px system-ui, sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText("VAD", x0 - 78, y0 + 16);
+
+    // Background
+    ctx.fillStyle = "#232733";
+    ctx.fillRect(x0, y0, w, h);
+
+    // Draw speech segments as bars (wrapped)
+    const minBarW = 20;
+    const barsPerRow = Math.max(1, Math.floor(w / minBarW));
+    const rows = [];
+    for (let i = 0; i < entries.length; i += barsPerRow) {
+      rows.push(entries.slice(i, i + barsPerRow));
+    }
+
+    const rowH = Math.max(14, Math.floor(h / Math.max(1, rows.length)));
+
+    rows.forEach(function (row, rowIdx) {
+      const rowY = y0 + rowIdx * rowH;
+      const barW = w / row.length;
+
+      row.forEach(function (e, barIdx) {
+        const bx = x0 + barIdx * barW;
+        const barPad = 2;
+        const barH = rowH - barPad * 2;
+        const by = rowY + barPad;
+        const bw = barW - barPad * 2;
+
+        // Speech segment bar
+        ctx.fillStyle = "#34d399cc";
+        const r = 2;
+        ctx.beginPath();
+        ctx.moveTo(bx + r, by);
+        ctx.lineTo(bx + bw - r, by);
+        ctx.quadraticCurveTo(bx + bw, by, bx + bw, by + r);
+        ctx.lineTo(bx + bw, by + barH - r);
+        ctx.quadraticCurveTo(bx + bw, by + barH, bx + bw - r, by + barH);
+        ctx.lineTo(bx + r, by + barH);
+        ctx.quadraticCurveTo(bx, by + barH, bx, by + barH - r);
+        ctx.lineTo(bx, by + r);
+        ctx.quadraticCurveTo(bx, by, bx + r, by);
+        ctx.fill();
+      });
+    });
   }
 
   function computeTickInterval(audioSec, availW) {
