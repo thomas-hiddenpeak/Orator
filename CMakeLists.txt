@@ -64,6 +64,15 @@ set(ORATOR_CORE_SOURCES
     src/net/websocket_server.cc
     src/net/http_static_server.cc
     src/net/auditory_ws_handler.cc
+    # protocol layer (Spec 004)
+    src/protocol/pipeline_registry.cc
+    src/protocol/topic_router.cc
+    src/protocol/storage.cc
+    src/protocol/memory_backend.cc
+    src/protocol/disk_backend.cc
+    src/protocol/time_index.cc
+    src/protocol/protocol_timeline.cc
+    src/protocol/ws_envelope.cc
 )
 
 add_library(orator_core STATIC ${ORATOR_CORE_SOURCES})

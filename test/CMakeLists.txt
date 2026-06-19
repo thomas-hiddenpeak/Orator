@@ -50,6 +50,11 @@ orator_add_test(test_reference   test_reference.cc)
 orator_add_test(test_safetensors test_safetensors.cc)
 orator_add_test(test_websocket   test_websocket.cc)
 target_link_libraries(test_websocket PRIVATE pthread)
+orator_add_test(test_topic_router test_topic_router.cc)
+orator_add_test(test_protocol_types test_protocol_types.cc)
+orator_add_test(test_pipeline_registry test_pipeline_registry.cc)
+orator_add_test(test_storage test_storage.cc)
+orator_add_test(test_protocol_timeline test_protocol_timeline.cc)
 
 # Manual evaluation tool (not a ctest): runs against a real reference file.
 add_executable(orator_eval ${CMAKE_CURRENT_SOURCE_DIR}/eval_reference.cc)
