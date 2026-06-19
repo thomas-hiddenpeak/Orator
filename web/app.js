@@ -125,6 +125,7 @@
       let msg;
       try { msg = JSON.parse(ev.data); } catch (_) { return; }
       if (!msg || !msg.type) return;
+      console.log("[WS] Received:", msg.type, msg);
 
       switch (msg.type) {
         case "ready":
