@@ -597,61 +597,40 @@
         }
       }
     } else if (kind === "asr") {
-      // For ASR: all entries in one horizontal band, positioned by time
-      // Text wraps within segment, track height expands to fit all lines
+      // For ASR: continuous text flow, wrapped within track width
+      // Each entry positioned by time, but text flows across entry boundaries
       const sorted = entries.slice().sort(function(a, b) { return a.start - b.start; });
       const padding = 2;
       const lineHeight = 13;
+      const charsPerLine = Math.max(4, Math.floor((timeW - 8) / 12));
 
-      // First pass: calculate max lines needed across all entries
-      let maxLines = 1;
+      // Concatenate all text and wrap within track width
+      let allText = "";
       sorted.forEach(function(e) {
-        const x1 = x0 + (e.start / audioSec) * timeW;
-        const x2 = x0 + (e.end / audioSec) * timeW;
-        const segW = Math.max(40, x2 - x1);
-        const text = e.text || "";
-        const charsPerLine = Math.max(4, Math.floor((segW - 8) / 12));
-        const lines = Math.ceil(text.length / charsPerLine);
-        if (lines > maxLines) maxLines = lines;
+        allText += (e.text || "") + " ";
       });
+      
+      const lines = [];
+      for (let i = 0; i < allText.length; i += charsPerLine) {
+        lines.push(allText.substring(i, i + charsPerLine));
+      }
+      
+      // Calculate track height based on total lines
+      const actualTrackH = Math.max(trackH, lines.length * lineHeight + padding * 2);
 
-      // Calculate actual track height needed
-      const neededH = maxLines * lineHeight + padding * 2;
-      const actualTrackH = Math.max(trackH, neededH);
+      // Draw background
+      ctx.fillStyle = "#2a3050";
+      ctx.fillRect(x0, y0, timeW, actualTrackH);
 
-      sorted.forEach(function(e) {
-        const x1 = x0 + (e.start / audioSec) * timeW;
-        const x2 = x0 + (e.end / audioSec) * timeW;
-        const segW = Math.max(40, x2 - x1);
-        const text = e.text || "";
-
-        // Background with subtle border
-        ctx.fillStyle = "#2a3050";
-        ctx.fillRect(x1, y0 + padding, segW, actualTrackH - padding * 2);
-        ctx.strokeStyle = "#3a4060";
-        ctx.lineWidth = 1;
-        ctx.strokeRect(x1, y0 + padding, segW, actualTrackH - padding * 2);
-
-        // Text with wrapping
-        ctx.fillStyle = "#e4e6ed";
-        ctx.font = "11px system-ui, sans-serif";
-        ctx.textAlign = "left";
-        ctx.textBaseline = "top";
-        
-        const charsPerLine = Math.max(4, Math.floor((segW - 8) / 12));
-        const lines = [];
-        for (let i = 0; i < text.length; i += charsPerLine) {
-          lines.push(text.substring(i, i + charsPerLine));
-        }
-        
-        // Center text vertically in segment
-        const textBlockH = lines.length * lineHeight;
-        const startY = y0 + padding + (actualTrackH - padding * 2 - textBlockH) / 2;
-        
-        lines.forEach(function(line, lineIdx) {
-          const ly = startY + lineIdx * lineHeight;
-          ctx.fillText(line, x1 + 4, ly);
-        });
+      // Draw text lines
+      ctx.fillStyle = "#e4e6ed";
+      ctx.font = "11px system-ui, sans-serif";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      
+      lines.forEach(function(line, lineIdx) {
+        const ly = y0 + padding + lineIdx * lineHeight;
+        ctx.fillText(line, x0 + 4, ly);
       });
       
       return y0 + actualTrackH;
