@@ -416,10 +416,24 @@
     const hasAsr = tracks.some(function (t) { return t.kind === "asr"; });
     const hasVad = tracks.some(function (t) { return t.kind === "vad"; });
     
-    // Calculate ASR track height based on entry count
+    // Calculate ASR track height based on max text lines needed
     const asrTrack = hasAsr ? tracks.find(function (t) { return t.kind === "asr"; }) : null;
-    const asrEntryCount = asrTrack && asrTrack.entries ? asrTrack.entries.length : 0;
-    const asrTrackH = Math.max(trackH, asrEntryCount * asrEntryH + 4);
+    let asrTrackH = trackH;
+    if (asrTrack && asrTrack.entries && asrTrack.entries.length > 0) {
+      const timeW = (canvas.parentElement.clientWidth || 1200) - labelW;
+      const audioSec = timelineData.audio_sec || 10;
+      let maxLines = 1;
+      asrTrack.entries.forEach(function(e) {
+        const x1 = (e.start / audioSec) * timeW;
+        const x2 = (e.end / audioSec) * timeW;
+        const segW = Math.max(40, x2 - x1);
+        const text = e.text || "";
+        const charsPerLine = Math.max(4, Math.floor((segW - 8) / 12));
+        const lines = Math.ceil(text.length / charsPerLine);
+        if (lines > maxLines) maxLines = lines;
+      });
+      asrTrackH = Math.max(trackH, maxLines * 13 + 4);
+    }
     
     const numTracks = (hasDiar ? 1 : 0) + (hasAsr ? 1 : 0) + (hasVad ? 1 : 0);
 
@@ -584,10 +598,26 @@
       }
     } else if (kind === "asr") {
       // For ASR: all entries in one horizontal band, positioned by time
-      // Text wraps within segment, but doesn't affect other entries
+      // Text wraps within segment, track height expands to fit all lines
       const sorted = entries.slice().sort(function(a, b) { return a.start - b.start; });
       const padding = 2;
-      const midY = y0 + trackH / 2;
+      const lineHeight = 13;
+
+      // First pass: calculate max lines needed across all entries
+      let maxLines = 1;
+      sorted.forEach(function(e) {
+        const x1 = x0 + (e.start / audioSec) * timeW;
+        const x2 = x0 + (e.end / audioSec) * timeW;
+        const segW = Math.max(40, x2 - x1);
+        const text = e.text || "";
+        const charsPerLine = Math.max(4, Math.floor((segW - 8) / 12));
+        const lines = Math.ceil(text.length / charsPerLine);
+        if (lines > maxLines) maxLines = lines;
+      });
+
+      // Calculate actual track height needed
+      const neededH = maxLines * lineHeight + padding * 2;
+      const actualTrackH = Math.max(trackH, neededH);
 
       sorted.forEach(function(e) {
         const x1 = x0 + (e.start / audioSec) * timeW;
@@ -597,34 +627,34 @@
 
         // Background with subtle border
         ctx.fillStyle = "#2a3050";
-        ctx.fillRect(x1, y0 + padding, segW, trackH - padding * 2);
+        ctx.fillRect(x1, y0 + padding, segW, actualTrackH - padding * 2);
         ctx.strokeStyle = "#3a4060";
         ctx.lineWidth = 1;
-        ctx.strokeRect(x1, y0 + padding, segW, trackH - padding * 2);
+        ctx.strokeRect(x1, y0 + padding, segW, actualTrackH - padding * 2);
 
-        // Text centered in segment
+        // Text with wrapping
         ctx.fillStyle = "#e4e6ed";
         ctx.font = "11px system-ui, sans-serif";
         ctx.textAlign = "left";
         ctx.textBaseline = "top";
         
-        // Wrap text to fit in segment width and height
         const charsPerLine = Math.max(4, Math.floor((segW - 8) / 12));
-        const maxLines = Math.floor((trackH - padding * 2) / 13);
         const lines = [];
-        for (let i = 0; i < text.length && lines.length < maxLines; i += charsPerLine) {
+        for (let i = 0; i < text.length; i += charsPerLine) {
           lines.push(text.substring(i, i + charsPerLine));
         }
         
         // Center text vertically in segment
-        const textBlockH = lines.length * 13;
-        const startY = midY - textBlockH / 2;
+        const textBlockH = lines.length * lineHeight;
+        const startY = y0 + padding + (actualTrackH - padding * 2 - textBlockH) / 2;
         
         lines.forEach(function(line, lineIdx) {
-          const ly = startY + lineIdx * 13;
+          const ly = startY + lineIdx * lineHeight;
           ctx.fillText(line, x1 + 4, ly);
         });
       });
+      
+      return y0 + actualTrackH;
     }
     return y0 + trackH;
   }
