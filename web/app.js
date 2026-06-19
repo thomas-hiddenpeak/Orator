@@ -489,20 +489,46 @@
     if (entries.length === 0) return 40;
 
     if (kind === "diar") {
-      const minBarW = 30;
-      const barsPerRow = Math.max(1, Math.floor(availW / minBarW));
-      const rows = Math.ceil(entries.length / barsPerRow);
-      return Math.max(40, rows * 20);
+      // Group overlapping diar segments into rows
+      const rows = groupByOverlap(entries);
+      return Math.max(40, rows.length * 22);
     } else if (kind === "asr") {
-      // Each ASR entry gets its own row
-      const rowH = 24;
-      return Math.max(40, entries.length * rowH);
+      // Group overlapping ASR segments into rows
+      const rows = groupByOverlap(entries);
+      return Math.max(40, rows.length * 28);
     } else {
-      const minBarW = 20;
-      const barsPerRow = Math.max(1, Math.floor(availW / minBarW));
-      const rows = Math.ceil(entries.length / barsPerRow);
-      return Math.max(30, rows * 16);
+      // VAD - group overlapping segments
+      const rows = groupByOverlap(entries);
+      return Math.max(30, rows.length * 18);
     }
+  }
+
+  function groupByOverlap(entries) {
+    // Greedy row assignment: each entry goes to first row where it doesn't overlap
+    if (entries.length === 0) return [[]];
+    const rows = [];
+    for (const e of entries) {
+      let placed = false;
+      for (let r = 0; r < rows.length; r++) {
+        const lastInRow = rows[r][rows[r].length - 1];
+        if (e.start >= lastInRow.end) {
+          rows[r].push(e);
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) {
+        rows.push([e]);
+      }
+    }
+    return rows;
+  }
+
+  function timeToX(start, end, x0, w, audioSec) {
+    return {
+      x1: x0 + (start / audioSec) * w,
+      x2: x0 + (end / audioSec) * w
+    };
   }
 
   function drawDiarTrack(track, x0, y0, w, h, audioSec) {
@@ -518,22 +544,15 @@
     ctx.fillStyle = "#232733";
     ctx.fillRect(x0, y0, w, h);
 
-    // Wrap entries into rows
-    const minBarW = 30; // Minimum width per speaker bar
-    const barsPerRow = Math.max(1, Math.floor(w / minBarW));
-    const rows = [];
-    for (let i = 0; i < entries.length; i += barsPerRow) {
-      rows.push(entries.slice(i, i + barsPerRow));
-    }
-
+    // Group entries into non-overlapping rows
+    const rows = groupByOverlap(entries);
     const rowH = Math.max(16, Math.floor(h / Math.max(1, rows.length)));
 
     rows.forEach(function (row, rowIdx) {
       const rowY = y0 + rowIdx * rowH;
-      const barW = w / row.length;
 
-      row.forEach(function (e, barIdx) {
-        const bx = x0 + barIdx * barW;
+      row.forEach(function (e) {
+        const { x1, x2 } = timeToX(e.start, e.end, x0, w, audioSec);
         const spk = e.speaker != null ? e.speaker : 0;
         const colorIdx = spk % SPEAKER_COLORS.length;
         const color = SPEAKER_COLORS[colorIdx];
@@ -544,8 +563,9 @@
         const barH = rowH - barPad * 2;
         const by = rowY + barPad;
         const r = 3;
-        const bw = barW - barPad * 2;
-        
+        const bw = Math.max(4, x2 - x1 - barPad * 2);
+        const bx = x1 + barPad;
+
         ctx.beginPath();
         ctx.moveTo(bx + r, by);
         ctx.lineTo(bx + bw - r, by);
@@ -559,7 +579,7 @@
         ctx.fill();
 
         // Speaker label
-        if (bw > 40) {
+        if (bw > 30) {
           ctx.fillStyle = "#ffffffcc";
           ctx.font = "10px system-ui";
           ctx.textAlign = "center";
@@ -582,38 +602,43 @@
     ctx.fillStyle = "#232733";
     ctx.fillRect(x0, y0, w, h);
 
-    // Each entry gets its own row (vertical stacking)
-    const rowH = Math.max(24, Math.floor(h / Math.max(1, entries.length)));
+    // Group entries into non-overlapping rows
+    const rows = groupByOverlap(entries);
+    const rowH = Math.max(22, Math.floor(h / Math.max(1, rows.length)));
 
-    entries.forEach(function (e, idx) {
-      const rowY = y0 + idx * rowH;
-      const text = e.text || "";
+    rows.forEach(function (row, rowIdx) {
+      const rowY = y0 + rowIdx * rowH;
 
-      // Segment background
-      ctx.fillStyle = "#5b8def22";
-      const r = 4;
-      const sy = rowY + 3;
-      const sh = rowH - 6;
-      const sw = w - 4;
-      ctx.beginPath();
-      ctx.moveTo(x0 + r, sy);
-      ctx.lineTo(x0 + sw - r, sy);
-      ctx.quadraticCurveTo(x0 + sw, sy, x0 + sw, sy + r);
-      ctx.lineTo(x0 + sw, sy + sh - r);
-      ctx.quadraticCurveTo(x0 + sw, sy + sh, x0 + sw - r, sy + sh);
-      ctx.lineTo(x0 + r, sy + sh);
-      ctx.quadraticCurveTo(x0, sy + sh, x0, sy + sh - r);
-      ctx.lineTo(x0, sy + r);
-      ctx.quadraticCurveTo(x0, sy, x0 + r, sy);
-      ctx.fill();
+      row.forEach(function (e) {
+        const { x1, x2 } = timeToX(e.start, e.end, x0, w, audioSec);
+        const text = e.text || "";
+        const segW = Math.max(20, x2 - x1);
 
-      // Text (truncated)
-      ctx.fillStyle = "#e4e6ed";
-      ctx.font = "11px system-ui, sans-serif";
-      ctx.textAlign = "left";
-      const maxChars = Math.floor(sw / 7);
-      const display = maxChars > 0 ? (text.length > maxChars ? text.substring(0, maxChars - 1) + "…" : text) : "";
-      ctx.fillText(display, x0 + 8, rowY + rowH / 2 + 3);
+        // Segment background
+        ctx.fillStyle = "#5b8def22";
+        const r = 4;
+        const sy = rowY + 3;
+        const sh = rowH - 6;
+        ctx.beginPath();
+        ctx.moveTo(x1 + r, sy);
+        ctx.lineTo(x1 + segW - r, sy);
+        ctx.quadraticCurveTo(x1 + segW, sy, x1 + segW, sy + r);
+        ctx.lineTo(x1 + segW, sy + sh - r);
+        ctx.quadraticCurveTo(x1 + segW, sy + sh, x1 + segW - r, sy + sh);
+        ctx.lineTo(x1 + r, sy + sh);
+        ctx.quadraticCurveTo(x1, sy + sh, x1, sy + sh - r);
+        ctx.lineTo(x1, sy + r);
+        ctx.quadraticCurveTo(x1, sy, x1 + r, sy);
+        ctx.fill();
+
+        // Text (truncated)
+        ctx.fillStyle = "#e4e6ed";
+        ctx.font = "11px system-ui, sans-serif";
+        ctx.textAlign = "left";
+        const maxChars = Math.max(1, Math.floor(segW / 7));
+        const display = text.length > maxChars ? text.substring(0, maxChars - 1) + "…" : text;
+        ctx.fillText(display, x1 + 6, rowY + rowH / 2 + 3);
+      });
     });
   }
 
@@ -630,26 +655,20 @@
     ctx.fillStyle = "#232733";
     ctx.fillRect(x0, y0, w, h);
 
-    // Draw speech segments as bars (wrapped)
-    const minBarW = 20;
-    const barsPerRow = Math.max(1, Math.floor(w / minBarW));
-    const rows = [];
-    for (let i = 0; i < entries.length; i += barsPerRow) {
-      rows.push(entries.slice(i, i + barsPerRow));
-    }
-
+    // Group entries into non-overlapping rows
+    const rows = groupByOverlap(entries);
     const rowH = Math.max(14, Math.floor(h / Math.max(1, rows.length)));
 
     rows.forEach(function (row, rowIdx) {
       const rowY = y0 + rowIdx * rowH;
-      const barW = w / row.length;
 
-      row.forEach(function (e, barIdx) {
-        const bx = x0 + barIdx * barW;
-        const barPad = 2;
+      row.forEach(function (e) {
+        const { x1, x2 } = timeToX(e.start, e.end, x0, w, audioSec);
+        const barPad = 1;
         const barH = rowH - barPad * 2;
         const by = rowY + barPad;
-        const bw = barW - barPad * 2;
+        const bw = Math.max(2, x2 - x1 - barPad * 2);
+        const bx = x1 + barPad;
 
         // Speech segment bar
         ctx.fillStyle = "#34d399cc";
