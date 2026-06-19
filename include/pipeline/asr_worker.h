@@ -72,6 +72,8 @@ class AsrWorker {
   // VAD gating via ProtocolTimeline (Constitution Art. III §8).
   // The worker reads VAD segments from the protocol layer, not via direct push.
   protocol::ProtocolTimeline* protocol_timeline_ = nullptr;
+  double last_vad_replay_sec_ = 0.0;  // incremental replay cursor
+  std::vector<std::pair<double, double>> vad_segments_cache_;  // cached VAD segments
 
   std::atomic<long> processed_samples_{0};
   double compute_sec_ = 0.0;

@@ -37,12 +37,12 @@ void AsrWorker::ProcessSpan(const float* samples, int n) {
   if (params_.asr_vad_gate) {
     const double current_sec = tb_.SecondsAt(inc_abs_pos_ + n);
 
-    // Query VAD segments from ProtocolTimeline.
+    // Query VAD segments from ProtocolTimeline (incremental).
     // Each message on vad/speech_segment has data: {"start":S,"end":E,...}.
-    std::vector<std::pair<double, double>> vad_segs;
+    // Only fetch segments newer than last_vad_replay_sec_ to avoid O(n) full replay.
     {
       if (protocol_timeline_) {
-        auto msgs = protocol_timeline_->Replay("vad/speech_segment", 0.0);
+        auto msgs = protocol_timeline_->Replay("vad/speech_segment", last_vad_replay_sec_);
         for (const auto& msg : msgs) {
           auto sp = msg.data.find("\"start\":");
           auto ep = msg.data.find("\"end\":");
@@ -54,12 +54,16 @@ void AsrWorker::ProcessSpan(const float* samples, int n) {
             if (se != std::string::npos && ee != std::string::npos) {
               double s = std::stod(msg.data.substr(sv, se - sv));
               double e = std::stod(msg.data.substr(ev, ee - ev));
-              vad_segs.push_back({s, e});
+              vad_segments_cache_.push_back({s, e});
+              if (e > last_vad_replay_sec_) {
+                last_vad_replay_sec_ = e;
+              }
             }
           }
         }
       }
     }
+    const auto& vad_segs = vad_segments_cache_;
 
     auto in_speech = [&](double sec) {
       for (const auto& [s, e] : vad_segs) {
@@ -227,6 +231,8 @@ void AsrWorker::Reset() {
 
   vad_state_ = VadState::IDLE;
   vad_trail_start_sec_ = 0.0;
+  last_vad_replay_sec_ = 0.0;
+  vad_segments_cache_.clear();
   ring_write_pos_ = 0;
   ring_count_ = 0;
   ring_base_abs_pos_ = 0;
