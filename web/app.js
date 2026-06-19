@@ -494,10 +494,9 @@
       const rows = Math.ceil(entries.length / barsPerRow);
       return Math.max(40, rows * 20);
     } else if (kind === "asr") {
-      const minSegW = 100;
-      const segsPerRow = Math.max(1, Math.floor(availW / minSegW));
-      const rows = Math.ceil(entries.length / segsPerRow);
-      return Math.max(40, rows * 24);
+      // Each ASR entry gets its own row
+      const rowH = 24;
+      return Math.max(40, entries.length * rowH);
     } else {
       const minBarW = 20;
       const barsPerRow = Math.max(1, Math.floor(availW / minBarW));
@@ -583,50 +582,38 @@
     ctx.fillStyle = "#232733";
     ctx.fillRect(x0, y0, w, h);
 
-    // Wrap entries into rows
-    const minSegW = 100; // Minimum width per text segment
-    const segsPerRow = Math.max(1, Math.floor(w / minSegW));
-    const rows = [];
-    for (let i = 0; i < entries.length; i += segsPerRow) {
-      rows.push(entries.slice(i, i + segsPerRow));
-    }
+    // Each entry gets its own row (vertical stacking)
+    const rowH = Math.max(24, Math.floor(h / Math.max(1, entries.length)));
 
-    const rowH = Math.max(20, Math.floor(h / Math.max(1, rows.length)));
+    entries.forEach(function (e, idx) {
+      const rowY = y0 + idx * rowH;
+      const text = e.text || "";
 
-    rows.forEach(function (row, rowIdx) {
-      const rowY = y0 + rowIdx * rowH;
-      const segW = w / row.length;
+      // Segment background
+      ctx.fillStyle = "#5b8def22";
+      const r = 4;
+      const sy = rowY + 3;
+      const sh = rowH - 6;
+      const sw = w - 4;
+      ctx.beginPath();
+      ctx.moveTo(x0 + r, sy);
+      ctx.lineTo(x0 + sw - r, sy);
+      ctx.quadraticCurveTo(x0 + sw, sy, x0 + sw, sy + r);
+      ctx.lineTo(x0 + sw, sy + sh - r);
+      ctx.quadraticCurveTo(x0 + sw, sy + sh, x0 + sw - r, sy + sh);
+      ctx.lineTo(x0 + r, sy + sh);
+      ctx.quadraticCurveTo(x0, sy + sh, x0, sy + sh - r);
+      ctx.lineTo(x0, sy + r);
+      ctx.quadraticCurveTo(x0, sy, x0 + r, sy);
+      ctx.fill();
 
-      row.forEach(function (e, segIdx) {
-        const sx = x0 + segIdx * segW;
-        const text = e.text || "";
-
-        // Segment background
-        ctx.fillStyle = "#5b8def22";
-        const r = 4;
-        const sy = rowY + 4;
-        const sh = rowH - 8;
-        const sw = segW - 4;
-        ctx.beginPath();
-        ctx.moveTo(sx + r, sy);
-        ctx.lineTo(sx + sw - r, sy);
-        ctx.quadraticCurveTo(sx + sw, sy, sx + sw, sy + r);
-        ctx.lineTo(sx + sw, sy + sh - r);
-        ctx.quadraticCurveTo(sx + sw, sy + sh, sx + sw - r, sy + sh);
-        ctx.lineTo(sx + r, sy + sh);
-        ctx.quadraticCurveTo(sx, sy + sh, sx, sy + sh - r);
-        ctx.lineTo(sx, sy + r);
-        ctx.quadraticCurveTo(sx, sy, sx + r, sy);
-        ctx.fill();
-
-        // Text (truncated)
-        ctx.fillStyle = "#e4e6ed";
-        ctx.font = "11px system-ui, sans-serif";
-        ctx.textAlign = "left";
-        const maxChars = Math.floor(sw / 7);
-        const display = maxChars > 0 ? (text.length > maxChars ? text.substring(0, maxChars - 1) + "…" : text) : "";
-        ctx.fillText(display, sx + 6, rowY + rowH / 2 + 3);
-      });
+      // Text (truncated)
+      ctx.fillStyle = "#e4e6ed";
+      ctx.font = "11px system-ui, sans-serif";
+      ctx.textAlign = "left";
+      const maxChars = Math.floor(sw / 7);
+      const display = maxChars > 0 ? (text.length > maxChars ? text.substring(0, maxChars - 1) + "…" : text) : "";
+      ctx.fillText(display, x0 + 8, rowY + rowH / 2 + 3);
     });
   }
 
@@ -947,4 +934,103 @@
   /* ── Init ── */
   setStatus(false);
   connect();
+
+  /* ── Demo data (for visualization testing) ── */
+  // Load demo timeline if ?demo=1 in URL
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get("demo") === "1" || window.location.href.includes("demo=1") || window.location.href.includes("demo%3D1")) {
+    setTimeout(function () {
+      const demoTimeline = {
+        type: "timeline",
+        audio_sec: 30.0,
+        sample_rate: 16000,
+        session_start_wall_sec: Date.now() / 1000,
+        tracks: [
+          {
+            kind: "diarization",
+            real_time_factor: 9.6,
+            entries: [
+              { start: 0.0, end: 3.2, speaker: 0, confidence: 0.94 },
+              { start: 3.2, end: 6.8, speaker: 1, confidence: 0.89 },
+              { start: 6.8, end: 10.5, speaker: 0, confidence: 0.92 },
+              { start: 10.5, end: 14.2, speaker: 2, confidence: 0.87 },
+              { start: 14.2, end: 18.0, speaker: 1, confidence: 0.91 },
+              { start: 18.0, end: 22.5, speaker: 0, confidence: 0.93 },
+              { start: 22.5, end: 26.0, speaker: 2, confidence: 0.88 },
+              { start: 26.0, end: 30.0, speaker: 1, confidence: 0.90 }
+            ]
+          },
+          {
+            kind: "asr",
+            real_time_factor: 2.6,
+            entries: [
+              { text_id: "1", start: 0.0, end: 3.2, text: "你好，欢迎来到实时转录演示系统" },
+              { text_id: "2", start: 3.2, end: 6.8, text: "今天我们要测试多说话人分离功能" },
+              { text_id: "3", start: 6.8, end: 10.5, text: "这个系统可以同时识别多个说话人的内容" },
+              { text_id: "4", start: 10.5, end: 14.2, text: "说话人二开始发言，测试准确性" },
+              { text_id: "5", start: 14.2, end: 18.0, text: "说话人一继续对话，系统实时处理" },
+              { text_id: "6", start: 18.0, end: 22.5, text: "这是一个完整的端到端演示流程" },
+              { text_id: "7", start: 22.5, end: 26.0, text: "说话人三加入讨论，增加复杂度" },
+              { text_id: "8", start: 26.0, end: 30.0, text: "演示结束，感谢使用 Orator 系统" }
+            ]
+          },
+          {
+            kind: "vad",
+            real_time_factor: 15.2,
+            entries: [
+              { start: 0.0, end: 3.2 },
+              { start: 3.2, end: 6.8 },
+              { start: 6.8, end: 10.5 },
+              { start: 10.5, end: 14.2 },
+              { start: 14.2, end: 18.0 },
+              { start: 18.0, end: 22.5 },
+              { start: 22.5, end: 26.0 },
+              { start: 26.0, end: 30.0 }
+            ]
+          }
+        ],
+        comprehensive: [
+          { text_id: "1", start: 0.0, end: 3.2, speaker: 0, text: "你好，欢迎来到实时转录演示系统" },
+          { text_id: "2", start: 3.2, end: 6.8, speaker: 1, text: "今天我们要测试多说话人分离功能" },
+          { text_id: "3", start: 6.8, end: 10.5, speaker: 0, text: "这个系统可以同时识别多个说话人的内容" },
+          { text_id: "4", start: 10.5, end: 14.2, speaker: 2, text: "说话人二开始发言，测试准确性" },
+          { text_id: "5", start: 14.2, end: 18.0, speaker: 1, text: "说话人一继续对话，系统实时处理" },
+          { text_id: "6", start: 18.0, end: 22.5, speaker: 0, text: "这是一个完整的端到端演示流程" },
+          { text_id: "7", start: 22.5, end: 26.0, speaker: 2, text: "说话人三加入讨论，增加复杂度" },
+          { text_id: "8", start: 26.0, end: 30.0, speaker: 1, text: "演示结束，感谢使用 Orator 系统" }
+        ]
+      };
+
+      // Populate transcript
+      transcriptList.innerHTML = "";
+      demoTimeline.comprehensive.forEach(function (entry) {
+        const div = document.createElement("div");
+        div.className = "t-item confirmed";
+        div.dataset.id = entry.text_id;
+
+        const timeEl = document.createElement("span");
+        timeEl.className = "t-time";
+        timeEl.textContent = fmtTime(entry.start) + "–" + fmtTime(entry.end);
+
+        const spkEl = document.createElement("span");
+        spkEl.className = "t-speaker";
+        spkEl.textContent = "S" + entry.speaker;
+        spkEl.style.background = SPEAKER_COLORS[entry.speaker % SPEAKER_COLORS.length];
+        spkEl.style.color = "#000";
+
+        const textEl = document.createElement("span");
+        textEl.className = "t-text";
+        textEl.textContent = entry.text;
+
+        div.appendChild(timeEl);
+        div.appendChild(spkEl);
+        div.appendChild(textEl);
+        transcriptList.appendChild(div);
+      });
+
+      // Trigger timeline handler
+      handleTimeline(demoTimeline);
+      console.log("[Demo] Timeline loaded");
+    }, 1000);
+  }
 })();
