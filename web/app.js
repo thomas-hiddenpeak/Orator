@@ -404,31 +404,23 @@
     }
 
     const audioSec = timelineData.audio_sec || 10;
-    const padding = 80; // Left padding for labels
+    const labelW = 80; // Left label column width
     const headerH = 35;
-    const gap = 12;
+    const trackH = 40; // Fixed height per track
+    const gap = 8;
 
     // Determine number of tracks
     const tracks = Array.isArray(timelineData.tracks) ? timelineData.tracks : [];
     const hasDiar = tracks.some(function (t) { return t.kind === "diarization"; });
     const hasAsr = tracks.some(function (t) { return t.kind === "asr"; });
     const hasVad = tracks.some(function (t) { return t.kind === "vad"; });
+    const numTracks = (hasDiar ? 1 : 0) + (hasAsr ? 1 : 0) + (hasVad ? 1 : 0);
 
-    // Canvas width = container width (no horizontal scroll)
+    // Canvas width = container width
     const containerW = canvas.parentElement.clientWidth || 1200;
     const totalW = containerW;
-
-    // Calculate track heights based on wrapped content
-    const diarTrack = hasDiar ? tracks.find(function (t) { return t.kind === "diarization"; }) : null;
-    const asrTrack = hasAsr ? tracks.find(function (t) { return t.kind === "asr"; }) : null;
-    const vadTrack = hasVad ? tracks.find(function (t) { return t.kind === "vad"; }) : null;
-
-    const diarH = hasDiar ? calcTrackHeight(diarTrack, totalW - padding * 2, "diar") : 0;
-    const asrH = hasAsr ? calcTrackHeight(asrTrack, totalW - padding * 2, "asr") : 0;
-    const vadH = hasVad ? calcTrackHeight(vadTrack, totalW - padding * 2, "vad") : 0;
-
-    const numTracks = (hasDiar ? 1 : 0) + (hasAsr ? 1 : 0) + (hasVad ? 1 : 0);
-    const totalH = headerH + diarH + asrH + vadH + numTracks * gap + padding;
+    const totalH = headerH + numTracks * (trackH + gap) + 20;
+    const timeW = totalW - labelW; // Width for time-aligned content
 
     const dpr = window.devicePixelRatio || 1;
     canvas.width = totalW * dpr;
@@ -441,22 +433,23 @@
     ctx.fillStyle = "#1a1d27";
     ctx.fillRect(0, 0, totalW, totalH);
 
-    // Time axis
+    // Time axis at top
     const axisY = headerH - 8;
+    const timeX0 = labelW;
     ctx.strokeStyle = "#2e3345";
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(padding, axisY);
-    ctx.lineTo(totalW - padding, axisY);
+    ctx.moveTo(timeX0, axisY);
+    ctx.lineTo(totalW, axisY);
     ctx.stroke();
 
     // Time ticks
     ctx.fillStyle = "#8b90a0";
     ctx.font = "11px system-ui, sans-serif";
     ctx.textAlign = "center";
-    const tickInterval = computeTickInterval(audioSec, totalW - padding * 2);
+    const tickInterval = computeTickInterval(audioSec, timeW);
     for (let t = 0; t <= audioSec; t += tickInterval) {
-      const x = padding + (t / audioSec) * (totalW - padding * 2);
+      const x = timeX0 + (t / audioSec) * timeW;
       ctx.beginPath();
       ctx.moveTo(x, axisY - 4);
       ctx.lineTo(x, axisY + 4);
@@ -465,40 +458,25 @@
       ctx.fillText(fmtTime(t), x, axisY + 18);
     }
 
-    // Draw tracks (vertical stack with wrapped rows)
+    // Draw tracks (each track is one horizontal band, entries time-aligned)
     let y = headerH + 10;
 
     if (hasDiar) {
-      drawDiarTrack(diarTrack, padding, y, totalW - padding * 2, diarH, audioSec);
-      y += diarH + gap;
+      const diarTrack = tracks.find(function (t) { return t.kind === "diarization"; });
+      drawTimeTrack(diarTrack, "DIAR", labelW, y, timeW, trackH, audioSec);
+      y += trackH + gap;
     }
 
     if (hasAsr) {
-      drawAsrTrack(asrTrack, padding, y, totalW - padding * 2, asrH, audioSec);
-      y += asrH + gap;
+      const asrTrack = tracks.find(function (t) { return t.kind === "asr"; });
+      drawTimeTrack(asrTrack, "ASR", labelW, y, timeW, trackH, audioSec);
+      y += trackH + gap;
     }
 
     if (hasVad) {
-      drawVadTrack(vadTrack, padding, y, totalW - padding * 2, vadH, audioSec);
-      y += vadH + gap;
-    }
-  }
-
-  function calcTrackHeight(track, availW, kind) {
-    const entries = track && track.entries ? track.entries : [];
-    if (entries.length === 0) return 40;
-
-    if (kind === "diar") {
-      // Group overlapping diar segments into rows
-      const rows = groupByOverlap(entries);
-      return Math.max(40, rows.length * 22);
-    } else if (kind === "asr") {
-      // ASR: each entry gets its own row for readability
-      return Math.max(40, entries.length * 28);
-    } else {
-      // VAD - group overlapping segments
-      const rows = groupByOverlap(entries);
-      return Math.max(30, rows.length * 18);
+      const vadTrack = tracks.find(function (t) { return t.kind === "vad"; });
+      drawTimeTrack(vadTrack, "VAD", labelW, y, timeW, trackH, audioSec);
+      y += trackH + gap;
     }
   }
 
@@ -523,171 +501,112 @@
     return rows;
   }
 
-  function timeToX(start, end, x0, w, audioSec) {
-    return {
-      x1: x0 + (start / audioSec) * w,
-      x2: x0 + (end / audioSec) * w
-    };
-  }
-
-  function drawDiarTrack(track, x0, y0, w, h, audioSec) {
+  function drawTimeTrack(track, label, labelW, y0, timeW, trackH, audioSec) {
     const entries = track && track.entries ? track.entries : [];
+    const x0 = labelW;
 
-    // Label
+    // Label on left
     ctx.fillStyle = "#8b90a0";
-    ctx.font = "bold 12px system-ui, sans-serif";
-    ctx.textAlign = "left";
-    ctx.fillText("DIARIZATION", x0 - 78, y0 + 16);
+    ctx.font = "bold 11px system-ui, sans-serif";
+    ctx.textAlign = "right";
+    ctx.textBaseline = "middle";
+    ctx.fillText(label, labelW - 8, y0 + trackH / 2);
 
-    // Background
+    // Track background
     ctx.fillStyle = "#232733";
-    ctx.fillRect(x0, y0, w, h);
+    ctx.fillRect(x0, y0, timeW, trackH);
 
-    // Group entries into non-overlapping rows
-    const rows = groupByOverlap(entries);
-    const rowH = Math.max(16, Math.floor(h / Math.max(1, rows.length)));
+    // Grid lines at time ticks
+    const tickInterval = computeTickInterval(audioSec, timeW);
+    ctx.strokeStyle = "#1a1d27";
+    ctx.lineWidth = 1;
+    for (let t = 0; t <= audioSec; t += tickInterval) {
+      const x = x0 + (t / audioSec) * timeW;
+      ctx.beginPath();
+      ctx.moveTo(x, y0);
+      ctx.lineTo(x, y0 + trackH);
+      ctx.stroke();
+    }
 
-    rows.forEach(function (row, rowIdx) {
-      const rowY = y0 + rowIdx * rowH;
+    // Draw entries time-aligned within the track band
+    const kind = track.kind;
+    const pad = 2;
+    const barH = trackH - pad * 2;
+    const barY = y0 + pad;
+    const r = 3;
 
-      row.forEach(function (e) {
-        const { x1, x2 } = timeToX(e.start, e.end, x0, w, audioSec);
-        const spk = e.speaker != null ? e.speaker : 0;
-        const colorIdx = spk % SPEAKER_COLORS.length;
-        const color = SPEAKER_COLORS[colorIdx];
+    if (kind === "diarization" || kind === "vad") {
+      // Draw bars time-aligned
+      for (const e of entries) {
+        const x1 = x0 + (e.start / audioSec) * timeW;
+        const x2 = x0 + (e.end / audioSec) * timeW;
+        const bw = Math.max(3, x2 - x1);
 
-        // Speaker bar
-        ctx.fillStyle = color + "cc";
-        const barPad = 2;
-        const barH = rowH - barPad * 2;
-        const by = rowY + barPad;
-        const r = 3;
-        const bw = Math.max(4, x2 - x1 - barPad * 2);
-        const bx = x1 + barPad;
+        if (kind === "diarization") {
+          const spk = e.speaker != null ? e.speaker : 0;
+          const color = SPEAKER_COLORS[spk % SPEAKER_COLORS.length];
+          ctx.fillStyle = color + "cc";
+        } else {
+          ctx.fillStyle = "#34d399cc";
+        }
 
         ctx.beginPath();
-        ctx.moveTo(bx + r, by);
-        ctx.lineTo(bx + bw - r, by);
-        ctx.quadraticCurveTo(bx + bw, by, bx + bw, by + r);
-        ctx.lineTo(bx + bw, by + barH - r);
-        ctx.quadraticCurveTo(bx + bw, by + barH, bx + bw - r, by + barH);
-        ctx.lineTo(bx + r, by + barH);
-        ctx.quadraticCurveTo(bx, by + barH, bx, by + barH - r);
-        ctx.lineTo(bx, by + r);
-        ctx.quadraticCurveTo(bx, by, bx + r, by);
+        ctx.moveTo(x1 + r, barY);
+        ctx.lineTo(x1 + bw - r, barY);
+        ctx.quadraticCurveTo(x1 + bw, barY, x1 + bw, barY + r);
+        ctx.lineTo(x1 + bw, barY + barH - r);
+        ctx.quadraticCurveTo(x1 + bw, barY + barH, x1 + bw - r, barY + barH);
+        ctx.lineTo(x1 + r, barY + barH);
+        ctx.quadraticCurveTo(x1, barY + barH, x1, barY + barH - r);
+        ctx.lineTo(x1, barY + r);
+        ctx.quadraticCurveTo(x1, barY, x1 + r, barY);
         ctx.fill();
 
-        // Speaker label
-        if (bw > 30) {
+        // Label for diarization
+        if (kind === "diarization" && bw > 30) {
+          const spk = e.speaker != null ? e.speaker : 0;
           ctx.fillStyle = "#ffffffcc";
           ctx.font = "10px system-ui";
           ctx.textAlign = "center";
-          ctx.fillText("S" + spk, bx + bw / 2, by + barH / 2 + 3);
+          ctx.textBaseline = "middle";
+          ctx.fillText("S" + spk, x1 + bw / 2, barY + barH / 2);
         }
+      }
+    } else if (kind === "asr") {
+      // For ASR: draw text segments time-aligned
+      // If segments overlap in time, stack them vertically within the track
+      const rows = groupByOverlap(entries);
+      const rowH = Math.max(14, trackH / Math.max(1, rows.length));
+
+      rows.forEach(function (row, rowIdx) {
+        const ry = y0 + rowIdx * rowH;
+        row.forEach(function (e) {
+          const x1 = x0 + (e.start / audioSec) * timeW;
+          const x2 = x0 + (e.end / audioSec) * timeW;
+          const segW = Math.max(20, x2 - x1);
+          const text = e.text || "";
+
+          // Background
+          ctx.fillStyle = "#5b8def22";
+          ctx.beginPath();
+          ctx.moveTo(x1 + 2, ry + 1);
+          ctx.lineTo(x1 + segW - 2, ry + 1);
+          ctx.lineTo(x1 + segW - 2, ry + rowH - 1);
+          ctx.lineTo(x1 + 2, ry + rowH - 1);
+          ctx.closePath();
+          ctx.fill();
+
+          // Text
+          ctx.fillStyle = "#e4e6ed";
+          ctx.font = "10px system-ui, sans-serif";
+          ctx.textAlign = "left";
+          ctx.textBaseline = "middle";
+          const maxChars = Math.max(1, Math.floor(segW / 6));
+          const display = text.length > maxChars ? text.substring(0, maxChars - 1) + "…" : text;
+          ctx.fillText(display, x1 + 4, ry + rowH / 2);
+        });
       });
-    });
-  }
-
-  function drawAsrTrack(track, x0, y0, w, h, audioSec) {
-    const entries = track && track.entries ? track.entries : [];
-
-    // Label
-    ctx.fillStyle = "#8b90a0";
-    ctx.font = "bold 12px system-ui, sans-serif";
-    ctx.textAlign = "left";
-    ctx.fillText("ASR", x0 - 78, y0 + 16);
-
-    // Background
-    ctx.fillStyle = "#232733";
-    ctx.fillRect(x0, y0, w, h);
-
-    // Each ASR entry gets its own row (vertical stacking)
-    const rowH = Math.max(24, Math.floor(h / Math.max(1, entries.length)));
-
-    entries.forEach(function (e, idx) {
-      const rowY = y0 + idx * rowH;
-      const text = e.text || "";
-
-      // Time label
-      ctx.fillStyle = "#8b90a0";
-      ctx.font = "10px system-ui, sans-serif";
-      ctx.textAlign = "left";
-      ctx.fillText(fmtTime(e.start) + "–" + fmtTime(e.end), x0 + 2, rowY + rowH / 2 + 3);
-
-      // Segment background
-      const labelW = 72;
-      const segX = x0 + labelW;
-      ctx.fillStyle = "#5b8def22";
-      const r = 4;
-      const sy = rowY + 3;
-      const sh = rowH - 6;
-      const sw = w - segX - 4;
-      ctx.beginPath();
-      ctx.moveTo(segX + r, sy);
-      ctx.lineTo(segX + sw - r, sy);
-      ctx.quadraticCurveTo(segX + sw, sy, segX + sw, sy + r);
-      ctx.lineTo(segX + sw, sy + sh - r);
-      ctx.quadraticCurveTo(segX + sw, sy + sh, segX + sw - r, sy + sh);
-      ctx.lineTo(segX + r, sy + sh);
-      ctx.quadraticCurveTo(segX, sy + sh, segX, sy + sh - r);
-      ctx.lineTo(segX, sy + r);
-      ctx.quadraticCurveTo(segX, sy, segX + r, sy);
-      ctx.fill();
-
-      // Text
-      ctx.fillStyle = "#e4e6ed";
-      ctx.font = "11px system-ui, sans-serif";
-      ctx.textAlign = "left";
-      const maxChars = Math.max(1, Math.floor(sw / 7));
-      const display = text.length > maxChars ? text.substring(0, maxChars - 1) + "…" : text;
-      ctx.fillText(display, segX + 6, rowY + rowH / 2 + 3);
-    });
-  }
-
-  function drawVadTrack(track, x0, y0, w, h, audioSec) {
-    const entries = track && track.entries ? track.entries : [];
-
-    // Label
-    ctx.fillStyle = "#8b90a0";
-    ctx.font = "bold 12px system-ui, sans-serif";
-    ctx.textAlign = "left";
-    ctx.fillText("VAD", x0 - 78, y0 + 16);
-
-    // Background
-    ctx.fillStyle = "#232733";
-    ctx.fillRect(x0, y0, w, h);
-
-    // Group entries into non-overlapping rows
-    const rows = groupByOverlap(entries);
-    const rowH = Math.max(14, Math.floor(h / Math.max(1, rows.length)));
-
-    rows.forEach(function (row, rowIdx) {
-      const rowY = y0 + rowIdx * rowH;
-
-      row.forEach(function (e) {
-        const { x1, x2 } = timeToX(e.start, e.end, x0, w, audioSec);
-        const barPad = 1;
-        const barH = rowH - barPad * 2;
-        const by = rowY + barPad;
-        const bw = Math.max(2, x2 - x1 - barPad * 2);
-        const bx = x1 + barPad;
-
-        // Speech segment bar
-        ctx.fillStyle = "#34d399cc";
-        const r = 2;
-        ctx.beginPath();
-        ctx.moveTo(bx + r, by);
-        ctx.lineTo(bx + bw - r, by);
-        ctx.quadraticCurveTo(bx + bw, by, bx + bw, by + r);
-        ctx.lineTo(bx + bw, by + barH - r);
-        ctx.quadraticCurveTo(bx + bw, by + barH, bx + bw - r, by + barH);
-        ctx.lineTo(bx + r, by + barH);
-        ctx.quadraticCurveTo(bx, by + barH, bx, by + barH - r);
-        ctx.lineTo(bx, by + r);
-        ctx.quadraticCurveTo(bx, by, bx + r, by);
-        ctx.fill();
-      });
-    });
+    }
   }
 
   function computeTickInterval(audioSec, availW) {
