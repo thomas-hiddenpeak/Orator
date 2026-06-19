@@ -35,3 +35,12 @@ asrTest2Final.txt
 
 # One-off experiment scripts (not version-controlled)
 tools/tmp_*
+
+# AI session runtime files
+.omo/
+
+# CTest temporary files
+Testing/
+
+# Debug build directory
+build_debug/

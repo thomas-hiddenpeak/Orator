@@ -14,7 +14,7 @@ work is specified under [specs/](.).
 > pass is the consistency proof. Status lines advance to `Implemented` in the
 > same change that lands the code, with the commit reference.
 
-- **Last updated**: 2026-06-18 (Spec 004 fully implemented: time base + comprehensive timeline + protocol layer; Constitution v1.3.0)
+- **Last updated**: 2026-06-19 (Spec 006 Web UI MVP implemented: HTTP server + full UI + Canvas timeline + integration test)
 - **Branch**: `master`
 - **Constitution**: v1.3.0
 
@@ -73,6 +73,7 @@ modifies, splits, infers, or back-fills any pipeline's content (Spec 004 §1a).
 | Pipeline protocol layer (Spec 004) | ✅ Implemented | Phases 7–12 complete: data types (topic.h, schema.h), pipeline registry, topic router, storage layer (MEMORY + DISK), ProtocolTimeline integration, WS v2 envelope with describe command, --storage-disk-path flag. 25/25 tests pass. |
 | Streaming validation | ✅ Through real WebSocket | `tools/ws_stream_client.py` (stdlib, reader thread) streams PCM through the socket at an accelerated rate and exports the full event log + timeline to JSON. |
 | Test suite | ✅ 25/25 ctests pass | Clean build under `-Wall -Wextra`, ZERO warnings. `test_vad` gates the GPU VAD detector vs the CPU reference. Protocol layer tests: `test_protocol_types`, `test_pipeline_registry`, `test_topic_router`, `test_storage`, `test_protocol_timeline`. |
+| Web UI (Spec 006 MVP) | ✅ Implemented (Phases 1 complete) | HTTP static server (`http_static_server.h/.cc`), full SPA (`index.html`, `style.css`, `app.js`), Canvas timeline with zoom, microphone + file upload, WebSocket client with auto-reconnect, GPU telemetry display, JSON export. Integration test: `tools/ws_ui_integration_test.py`. |
 
 ## 4. Measured performance (GPU fixed at 1.3 GHz, power mode MaxN)
 
@@ -147,6 +148,8 @@ Findings:
 
 ## 7. Immediate next step
 
-Specs 001, 002, 003, and 004 (time base + timeline + protocol layer) are complete, verified, and committed.
+Specs 001, 002, 003, 004, and 006 (Web UI MVP) are complete, verified, and committed.
 
 - **Spec 004 — Protocol Layer**: Implemented. Phases 7–12 complete: data types (topic.h, schema.h), pipeline registry, topic router, storage layer (MEMORY + DISK), ProtocolTimeline integration, WS v2 envelope with describe command, --storage-disk-path flag. 25/25 tests pass. Full 1-hour stress test passed (3615s audio, 9.48x real-time, stable temperature/power).
+- **Spec 006 — Web UI MVP**: Implemented. Phase 1 complete (T001–T008): dedicated HTTP static server on separate port, full SPA with dark theme, Canvas timeline (diarization + ASR tracks) with zoom/pan, microphone capture with resampling, file upload with real-time streaming, GPU telemetry display, JSON export. Integration test via `tools/ws_ui_integration_test.py`.
+- **Spec 006 — Phase 2** (T009–T010): Canvas timeline enhancements and zoom/pan controls are already implemented in app.js (exceeds original spec). Phase 2 tasks are effectively complete.

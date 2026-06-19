@@ -76,7 +76,7 @@ Spec 006 implementation broken into ordered, independently verifiable tasks orga
 ---
 
 ### T005 — Implement web/ws_client.js with connection and event parsing
-**Status**: DRAFT
+**Status**: ✅ COMPLETED (in app.js)
 **Goal**: Establish WebSocket connection and dispatch events to listeners.
 **Functions**:
 - `WsClient.connect(host, port)`: Create WebSocket, add event listeners (open, message, close, error).
@@ -94,7 +94,7 @@ Spec 006 implementation broken into ordered, independently verifiable tasks orga
 ---
 
 ### T006 — Implement web/ui_controller.js with basic state and DOM updates
-**Status**: DRAFT
+**Status**: ✅ COMPLETED (in app.js)
 **Goal**: Manage application state and update DOM in response to WebSocket events.
 **State**:
 - `uiState.transcript`: Array of {start, end, speaker, text}.
@@ -121,8 +121,8 @@ Spec 006 implementation broken into ordered, independently verifiable tasks orga
 
 ---
 
-### T007 — Implement basic timeline rendering (HTML list, no Canvas yet)
-**Status**: DRAFT
+### T007 — Implement basic timeline rendering (Canvas)
+**Status**: ✅ COMPLETED (in app.js, exceeds spec: Canvas implementation)
 **Goal**: Display diarization and ASR entries as an HTML list (MVP).
 **Content**:
 - Parse final `{"type":"timeline",...}`.
@@ -139,7 +139,8 @@ Spec 006 implementation broken into ordered, independently verifiable tasks orga
 ---
 
 ### T008 — Integration test: Full MVP flow (basic)
-**Status**: DRAFT
+**Status**: ✅ COMPLETED
+**Test script**: `tools/ws_ui_integration_test.py` (stdlib-only, HTTP + WS full flow)
 **Goal**: End-to-end test: start server, send audio via WebSocket, verify UI updates.
 **Steps**:
 1. Start `./build/orator_ws 8765 <models>...`.
