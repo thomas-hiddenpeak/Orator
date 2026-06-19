@@ -493,9 +493,8 @@
       const rows = groupByOverlap(entries);
       return Math.max(40, rows.length * 22);
     } else if (kind === "asr") {
-      // Group overlapping ASR segments into rows
-      const rows = groupByOverlap(entries);
-      return Math.max(40, rows.length * 28);
+      // ASR: each entry gets its own row for readability
+      return Math.max(40, entries.length * 28);
     } else {
       // VAD - group overlapping segments
       const rows = groupByOverlap(entries);
@@ -602,43 +601,46 @@
     ctx.fillStyle = "#232733";
     ctx.fillRect(x0, y0, w, h);
 
-    // Group entries into non-overlapping rows
-    const rows = groupByOverlap(entries);
-    const rowH = Math.max(22, Math.floor(h / Math.max(1, rows.length)));
+    // Each ASR entry gets its own row (vertical stacking)
+    const rowH = Math.max(24, Math.floor(h / Math.max(1, entries.length)));
 
-    rows.forEach(function (row, rowIdx) {
-      const rowY = y0 + rowIdx * rowH;
+    entries.forEach(function (e, idx) {
+      const rowY = y0 + idx * rowH;
+      const text = e.text || "";
 
-      row.forEach(function (e) {
-        const { x1, x2 } = timeToX(e.start, e.end, x0, w, audioSec);
-        const text = e.text || "";
-        const segW = Math.max(20, x2 - x1);
+      // Time label
+      ctx.fillStyle = "#8b90a0";
+      ctx.font = "10px system-ui, sans-serif";
+      ctx.textAlign = "left";
+      ctx.fillText(fmtTime(e.start) + "–" + fmtTime(e.end), x0 + 2, rowY + rowH / 2 + 3);
 
-        // Segment background
-        ctx.fillStyle = "#5b8def22";
-        const r = 4;
-        const sy = rowY + 3;
-        const sh = rowH - 6;
-        ctx.beginPath();
-        ctx.moveTo(x1 + r, sy);
-        ctx.lineTo(x1 + segW - r, sy);
-        ctx.quadraticCurveTo(x1 + segW, sy, x1 + segW, sy + r);
-        ctx.lineTo(x1 + segW, sy + sh - r);
-        ctx.quadraticCurveTo(x1 + segW, sy + sh, x1 + segW - r, sy + sh);
-        ctx.lineTo(x1 + r, sy + sh);
-        ctx.quadraticCurveTo(x1, sy + sh, x1, sy + sh - r);
-        ctx.lineTo(x1, sy + r);
-        ctx.quadraticCurveTo(x1, sy, x1 + r, sy);
-        ctx.fill();
+      // Segment background
+      const labelW = 72;
+      const segX = x0 + labelW;
+      ctx.fillStyle = "#5b8def22";
+      const r = 4;
+      const sy = rowY + 3;
+      const sh = rowH - 6;
+      const sw = w - segX - 4;
+      ctx.beginPath();
+      ctx.moveTo(segX + r, sy);
+      ctx.lineTo(segX + sw - r, sy);
+      ctx.quadraticCurveTo(segX + sw, sy, segX + sw, sy + r);
+      ctx.lineTo(segX + sw, sy + sh - r);
+      ctx.quadraticCurveTo(segX + sw, sy + sh, segX + sw - r, sy + sh);
+      ctx.lineTo(segX + r, sy + sh);
+      ctx.quadraticCurveTo(segX, sy + sh, segX, sy + sh - r);
+      ctx.lineTo(segX, sy + r);
+      ctx.quadraticCurveTo(segX, sy, segX + r, sy);
+      ctx.fill();
 
-        // Text (truncated)
-        ctx.fillStyle = "#e4e6ed";
-        ctx.font = "11px system-ui, sans-serif";
-        ctx.textAlign = "left";
-        const maxChars = Math.max(1, Math.floor(segW / 7));
-        const display = text.length > maxChars ? text.substring(0, maxChars - 1) + "…" : text;
-        ctx.fillText(display, x1 + 6, rowY + rowH / 2 + 3);
-      });
+      // Text
+      ctx.fillStyle = "#e4e6ed";
+      ctx.font = "11px system-ui, sans-serif";
+      ctx.textAlign = "left";
+      const maxChars = Math.max(1, Math.floor(sw / 7));
+      const display = text.length > maxChars ? text.substring(0, maxChars - 1) + "…" : text;
+      ctx.fillText(display, segX + 6, rowY + rowH / 2 + 3);
     });
   }
 
