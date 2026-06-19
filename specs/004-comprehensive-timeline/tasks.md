@@ -1,12 +1,9 @@
-# Tasks 004 — Common Time Base + Revisable Comprehensive Timeline
+# Tasks 004 — Common Time Base + Comprehensive Timeline + Protocol Layer
 
 - **Feature**: `004-comprehensive-timeline`
 - **Spec**: [spec.md](spec.md) · **Plan**: [plan.md](plan.md)
-- **Status**: Implemented. Phases 1–6 done. Core + revisions + timebase
-  (3159b75 step 1, 673f95d step 2); VAD pipeline completed in Phase 5 (GPU
-  detector + serialized `vad` track + dead-code cleanup), validated on the
-  real WS path including live ASR self-revision behavior.
-- **Constitution**: v1.2.1
+- **Status**: Phases 1–6 Implemented. Phases 7–12 (protocol layer) Implemented. All phases complete.
+- **Constitution**: v1.3.0
 
 > Ordered, independently verifiable steps. Each phase builds + tests before the
 > next. Schema changes are additive only.
@@ -116,7 +113,7 @@
   (unchanged — no accuracy regression). Evidence: `/tmp/fullhour_validate.py`,
   `/tmp/fullhour_timeline.json`.
 
-## Traceability
+## Traceability (Phases 1–6)
 
 | Requirement | Tasks |
 |---|---|
@@ -125,7 +122,7 @@
 | FR3 time-alignment attribution | T010, T040 |
 | FR4 revision events | T010, T021 |
 | FR5 WS revision push | T021, T041 |
-| FR6 endpoint pipeline | T031, T061, T062 |
+| FR6 VAD pipeline | T031, T061, T062 |
 | FR7 final timeline | T020, T063 |
 | FR8 endpoint numeric gate | T060, T061 |
 | FR9 dead-code removal | T064 |
@@ -136,16 +133,169 @@
 | AC2 incremental | T011 |
 | AC3 revision on change | T011, T021 |
 | AC4 WS replay | T041 |
-| AC5 endpoint pipeline | T031 |
+| AC5 VAD pipeline | T031 |
 | AC6 common-base meta | T030 |
 | AC7 build/tests/schema | T050 |
 | AC8 GPU detector, no stall | T061, T065 |
-| AC9 endpoints in final timeline | T063, T065 |
+| AC9 VAD in final timeline | T063, T065 |
 | AC10 GPU vs oracle numeric gate | T060, T061 |
 | AC11 dead code removed | T064 |
+| AC12 pipeline independence | T063, T068 |
+| AC13–AC18 protocol layer | Phases 7–12 (see below) |
 
-## Definition of Done
+## Definition of Done (Phases 1–6)
 Native stateful comprehensive timeline with time-alignment attribution and
 in-place revision; revisions pushed to WS; common-time-base metadata exposed;
 endpoint detector as an independent third pipeline; multi-speaker attribution
 correct on test.mp3; build + tests green; schema additive; docs updated; commit.
+
+---
+
+## Phase 7 — Data Type System (FR4.1–FR4.4)
+- [x] **T070** `include/protocol/topic.h`: `Topic` value type with level parsing;
+  `TopicPattern` with `+`/`#` wildcard support; `TopicPattern::Matches(Topic)`;
+  standard topic constexpr constants (`kAudioRaw`, `kVadSpeechSegment`, etc.).
+  Header-only. *(Builds clean.)* (FR4.1)
+- [x] **T071** `include/protocol/schema.h`: `FieldType` enum; `Field` struct;
+  `Schema` struct; `TopicSchema` struct; `SchemaRegistry` class (topic →
+  `TopicSchema` map, version tracking). Header-only. *(Builds clean.)* (FR4.2)
+- [x] **T072** `test_protocol_types`: unit tests for topic parsing, wildcard
+  matching (`+` single-level, `#` multi-level), schema registration, version
+  conflict detection. *(ctest green.)* (FR4.1, FR4.3, FR4.4)
+
+## Phase 8 — Pipeline Registry (FR3.1–FR3.5)
+- [x] **T080** `include/protocol/pipeline_registry.h` +
+  `src/protocol/pipeline_registry.cc`: `PipelineDescriptor`, `PipelineHandle`
+  (RAII), `PipelineRegistry::Register()`/`Unregister()`/`Describe()`/
+  `Heartbeat()`/`HealthCheck()`. `Register()` publishes `system/pipeline/online`;
+  `Unregister()` publishes `system/pipeline/offline`. Disabled pipelines skip
+  subscription wiring. Add sources to CMakeLists.txt. *(Builds clean.)* (FR3.1)
+- [x] **T081** `test_pipeline_registry`: register/deregister lifecycle; `Describe()`
+  returns all pipelines; heartbeat timeout detection; disabled pipeline skips
+  wiring; RAII destructor auto-unregisters. *(ctest green.)* (FR3.1–FR3.5)
+
+## Phase 9 — Topic Routing Engine (FR5.1–FR5.5)
+- [x] **T090** `include/protocol/topic_router.h` + `src/protocol/topic_router.cc`:
+  `TopicRouter::Subscribe()`/`Unsubscribe()`/`Route()`. Wildcard matching via
+  `TopicPattern::Matches()`. Fan-out delivery. `no_local` filtering. Returns
+  `std::vector<Delivery>` with effective QoS. Add to CMakeLists.txt.
+  *(Builds clean.)* (FR5.1–FR5.5)
+- [x] **T091** `test_topic_router`: wildcard matching (`vad/*` matches
+  `vad/speech_segment`; `system/#` matches all system events); fan-out to
+  multiple subscribers; `no_local` prevents self-receipt; unsubscribe removes
+  subscription. *(ctest green.)* (FR5.1, FR5.3, FR5.4, FR5.5)
+
+## Phase 10 — Time Index + Storage Backends (FR6.1–FR6.4, FR8.1–FR8.7)
+- [x] **T100** `include/protocol/storage.h` + `src/protocol/storage.cc`:
+  `Message` struct (msg_id, topic, pipeline, timestamp_sec, qos, schema_version,
+  data); `StorageRef` (backend enum + offset); `StorageManager` with per-topic
+  backend routing config. Add to CMakeLists.txt. *(Builds clean.)* (FR8.5)
+- [x] **T101** `include/protocol/memory_backend.h` + `src/protocol/memory_backend.cc`:
+  128 MB ring buffer; `Write()`/`Read()` with offset; FIFO eviction on overflow.
+  Add to CMakeLists.txt. *(Builds clean.)* (FR8.5)
+- [x] **T102** `include/protocol/disk_backend.h` + `src/protocol/disk_backend.cc`:
+  mmap-backed file; configurable path (`ORATOR_STORAGE_DISK_PATH` env or
+  `--storage-disk-path` CLI); per-session file naming; `Write()`/`Read()`.
+  Add to CMakeLists.txt. *(Builds clean.)* (FR8.5, FR8.6)
+- [x] **T103** `include/protocol/time_index.h` + `src/protocol/time_index.cc`:
+  `TimeIndex::Append()` (sorted by timestamp); `Replay(topic, from_sec)`;
+  `Last(topic)` for retained messages; `system/out_of_order` event on
+  out-of-order insert. Add to CMakeLists.txt. *(Builds clean.)* (FR6.1, FR6.4)
+- [x] **T104** `test_storage_backends`: memory ring buffer write/read/eviction;
+  disk backend write/read with configurable path; time index sorted insert;
+  replay from timestamp; retained message; out-of-order detection.
+  *(ctest green.)* (FR6.1, FR6.4, FR8.2, FR8.5)
+
+## Phase 11 — ProtocolTimeline (integration layer)
+- [x] **T110** `include/protocol/protocol_timeline.h` +
+  `src/protocol/protocol_timeline.cc`: `ProtocolTimeline` owns `PipelineRegistry`,
+  `TopicRouter`, `TimeIndex`, `StorageManager`. `RegisterPipeline()` returns
+  `PipelineHandle`. `Publish()` validates timestamp, writes storage, updates
+  index, routes to subscribers, updates retained. `Replay()` and `Describe()`.
+  Internal subscriber wires `ComprehensiveTimeline` methods to topic routing.
+  Add to CMakeLists.txt. *(Builds clean.)* (FR3.1, FR5.2, FR6.1, FR8.1)
+- [x] **T111** `test_protocol_timeline`: end-to-end: register pipeline → publish
+  message → subscriber receives it; retained message on new subscribe; replay
+  from timestamp; `Describe()` returns full state; out-of-order message stored
+  sorted. *(ctest green.)* (FR3.1, FR5.2, FR8.1, FR8.2)
+
+## Phase 12 — WS Protocol v2 + One-Shot Refactor (FR9.1–FR9.4)
+- [x] **T120** Wire `ProtocolTimeline` into `AuditoryStream`: replace
+  `ComprehensiveTimeline comp_` member with `ProtocolTimeline`; create
+  `PipelineHandle`s for VAD, ASR, diarization pipelines at `Start()`; pass
+  handles to workers. `ComprehensiveTimeline` becomes internal subscriber.
+  *(Builds clean.)* (FR3.1, FR5.2)
+- [x] **T121** Migrate workers to `PipelineHandle::Publish()`:
+  - `AsrWorker`: `set_comprehensive_timeline()` → `set_pipeline_handle()`;
+    publishes to `asr/transcript` and `asr/transcript_partial`
+  - `DiarizationWorker`: publishes to `diar/speaker_segment`
+  - VAD thread: publishes to `vad/speech_segment`
+  - `ws_input` pipeline registered for `audio/raw`
+  *(Builds clean.)* (FR3.1, FR4.1, FR5.2)
+- [x] **T122** WS topic-based envelope (FR9.1): `auditory_ws_handler.cc` serializes
+  messages with `topic`, `pipeline`, `pipeline_version`, `msg_id`, `ts`, `qos`,
+  `schema_version`, `data`. `ready` message includes `"protocol_version": 2`.
+  *(Builds clean.)* (FR9.1)
+- [x] **T123** Backward compatibility (FR9.2): WS handler recognizes legacy
+  `{"type":"vad",...}` format; translates to topic-based internally.
+  `{"cmd":"describe"}` returns full topic map, schemas, pipelines.
+  *(Builds clean.)* (FR9.2, FR9.3)
+- [x] **T124** Remove legacy API: delete `AddVad()`, `UpsertText()`,
+  `ReplaceSpeakers()` from public `ComprehensiveTimeline` interface (move to
+  private/internal). Remove `StreamTimeline` (superseded). Clean up
+  `auditory_stream.h`/`.cc`. Add `--storage-disk-path` to `ws_main.cc`.
+  *(Builds clean, zero warnings.)* (FR9.4)
+- [x] **T125** Regression validation: stream `test.mp3` (120 s) through WS;
+  output byte-identical to pre-refactor final timeline. All 20+ ctests pass.
+  *(ctest green, AC13, AC18.)* (AC13, AC18)
+- [x] **T126** Full-hour validation: 3615 s `test.mp3` through `orator_ws`;
+  timeline byte-identical; CER unchanged; GPU busy profile unchanged.
+  *(AC18.)* (AC18)
+- [x] **T127** Update `PROJECT_STATE.md`; commit. *(Constitution Art. VIII.)*
+
+## Traceability (Protocol Layer)
+
+| Requirement | Tasks |
+|---|---|
+| FR3.1 registration | T080, T110, T120 |
+| FR3.2 discovery | T080, T110 |
+| FR3.3 deregistration | T080, T081 |
+| FR3.4 health | T080, T081 |
+| FR3.5 disabled | T080, T081 |
+| FR4.1 topics | T070, T072 |
+| FR4.2 schema | T071, T072 |
+| FR4.3 static schema | T071 |
+| FR4.4 schema evolution | T071, T072 |
+| FR5.1 wildcards | T090, T091 |
+| FR5.2 publish | T090, T110 |
+| FR5.3 subscribe | T090, T091 |
+| FR5.4 fan-out | T090, T091 |
+| FR5.5 unsubscribe | T090, T091 |
+| FR6.1 timestamped | T103, T110 |
+| FR6.4 time ordering | T103, T104 |
+| FR7.1–FR7.4 QoS | T090, T100 |
+| FR8.1 retained | T103, T104 |
+| FR8.2 replay | T103, T104 |
+| FR8.5 storage backends | T100, T101, T102, T104 |
+| FR8.6 disk path | T102, T124 |
+| FR8.7 retention | T100 |
+| FR9.1 topic envelope | T122 |
+| FR9.2 backward compat | T123 |
+| FR9.3 describe | T123 |
+| FR9.4 control messages | T124 |
+
+| Acceptance | Tasks |
+|---|---|
+| AC13 pipeline registration | T110, T120, T121 |
+| AC14 extensibility | T110, T111 |
+| AC15 wildcards | T091, T111 |
+| AC16 time ordering | T104, T111 |
+| AC17 replay + retention | T104, T111 |
+| AC18 byte-identical output | T125, T126 |
+
+## Definition of Done (Phases 7–12)
+Protocol layer replaces hard-coded pipeline interfaces; pipelines register via
+`PipelineDescriptor`; topic-based routing with wildcard support; time-ordered
+storage with MEMORY + DISK backends; WS messages use topic-based envelope with
+backward compatibility; full 1-hour streaming run produces byte-identical output;
+build + tests green; docs updated; commit. **DONE** (2026-06-19).

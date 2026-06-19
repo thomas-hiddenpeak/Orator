@@ -6,9 +6,9 @@ conflicts with the Constitution, the Constitution takes precedence. Amending it
 is a deliberate, recorded action (see *Amendment Process*), not an undocumented
 change.
 
-- **Version**: 1.2.1
+- **Version**: 1.3.0
 - **Ratified**: 2026-06-12
-- **Last amended**: 2026-06-16
+- **Last amended**: 2026-06-18
 
 ---
 
@@ -51,27 +51,79 @@ binary with a fixed, auditable surface is a hard product requirement.
 4. A change that cannot be validated against a reference is not complete; it is
    an unvalidated experiment, and must be labeled as such.
 
-## Article III — Independent Pipelines on a Comprehensive Timeline
+## Article III — Common Time Base and Independent Pipelines
 
-1. Diarization (speaker separation) and ASR are **independent pipelines**.
-   Neither reads the other's results; neither blocks on the other.
-2. Their only shared inputs are the **input audio stream** and a **single
-   absolute time base** (stream seconds). Audio entering the system is the sole
-   point of coupling: after it is written to the shared buffer, each pipeline
-   processes it at its own rate and in any order.
-3. The terminal output of the system is **one comprehensive timeline**: a single
-   document with a shared time axis that contains one **track** per pipeline.
-   Each track holds that pipeline's time-ordered entries (for example a speaker
-   diarization track and an ASR transcript track). The timeline always carries
-   the diarization track and, when ASR is enabled, the ASR track.
-4. The timeline is **extensible by adding tracks**. A new pipeline contributes a
-   new track; existing tracks and the document schema are unchanged. Combining
-   tracks (attributing transcript text to a speaker by time alignment) is
-   performed by a separate component (`pipeline::ComprehensiveTimeline`) and does
-   not alter how each pipeline produces its track.
-5. The pipelines are decoupled from concrete models by interfaces
-   (`core::IDiarizer`, `core::IAsr`, …) plus a registry. Replacing a model is a
-   registration/configuration change, not an edit to a consumer.
+The common time base is the foundational mechanism that enables all pipelines to
+exist as independent units and coordinate through the comprehensive timeline.
+Every registered pipeline MUST acquire, maintain, and report time data through
+the common time base — without exception.
+
+### 3.1 — Common Time Base as the Foundation
+
+1. A **common time base** (`core::TimeBase`) is the shared clock for the entire
+   system. It is defined once per session, anchored at the shared audio buffer's
+   origin (absolute sample 0 = stream start), and accessible through
+   `SharedAudioBuffer::time_base()`.
+2. The common time base is a **mandatory prerequisite** for every registered
+   pipeline. A pipeline MUST obtain its time base from the shared audio buffer
+   (`buffer_.time_base()`), not by constructing an independent instance.
+   Deriving a time base from `params.sample_rate` or any other local parameter
+   is a violation.
+3. A pipeline holds the common time base as a member field (e.g.
+   `core::TimeBase tb_`) and derives all time codes from it. The time base
+   is never created on-demand per operation.
+
+### 3.2 — Three Consistency Principles
+
+Every registered pipeline MUST satisfy the following three consistency
+requirements with respect to the common time base. These are enforced in review;
+a pipeline that violates any one of them is rejected.
+
+4. **Origin consistency (起点一致性)**: Every pipeline derives its time origin
+   from the shared audio buffer's common time base. The absolute sample position
+   of t = 0 is identical across all pipelines by construction — inherited from
+   `buffer_.time_base()`, not assumed locally. A pipeline MUST NOT set its own
+   origin independently.
+5. **Process consistency (过程一致性)**: During internal processing, a pipeline
+   MUST compute all time codes through the common time base's conversion methods
+   (`SecondsAt`, `SampleAt`, `Duration`). A pipeline MUST NOT derive time codes
+   through ad hoc arithmetic (`sample / sample_rate`, local counters, manual
+   offset addition). Every time value produced internally — segment boundaries,
+   frame start times, window anchors, cursor positions — MUST pass through the
+   common time base. A sub-stream anchored at an arbitrary absolute sample MUST
+   use `TimeBase::Derive()` and `LocalSeconds()`.
+6. **Result consistency (结果一致性)**: Every datum a pipeline reports to the
+   comprehensive timeline MUST carry absolute start and end times (in seconds)
+   on the common time base. These time codes MUST be computed through the
+   pipeline's own common time base instance. A pipeline MUST NOT report time
+   codes derived by any other mechanism. End-of-stream reconciliation
+   (`TimeBase::ReconcileExtent`) MUST confirm the pipeline's processed extent
+   equals the common clock total.
+
+### 3.3 — Pipeline Independence and the Comprehensive Timeline
+
+7. Pipelines are **independent units**. One pipeline MUST NOT read another
+   pipeline's results. One pipeline MUST NOT block on another pipeline's progress.
+8. Pipelines communicate **only through the comprehensive timeline**
+   (`pipeline::ComprehensiveTimeline`). A pipeline deposits its data (with time
+   codes on the common base) into the comprehensive timeline and reads another
+   pipeline's data from the same source. Direct data exchange between pipelines
+   — callbacks, shared pointers, atomic flags, or any mechanism that bypasses
+   the comprehensive timeline — is a violation.
+9. The comprehensive timeline is a **pure container and alignment layer**. It
+   never modifies, infers, substitutes, or back-fills a pipeline's content. Each
+   pipeline is solely responsible for its own output content AND its own accurate
+   time codes on the common base.
+10. The terminal output of the system is **one comprehensive timeline document**:
+    a single structure with a shared time axis containing one track per pipeline.
+    Adding a pipeline adds a track; existing tracks and the document schema are
+    unchanged.
+
+### 3.4 — Model Decoupling
+
+11. Pipelines are decoupled from concrete models by interfaces
+    (`core::IDiarizer`, `core::IAsr`, ...) plus a registry. Replacing a model is
+    a registration or configuration change, not an edit to a consumer.
 
 ## Article IV — Streaming Validation Through the Real Transport
 
@@ -245,4 +297,4 @@ state claim:
 - When guidance is silent, Articles II (accuracy) and V (quality) take
   precedence over other considerations.
 
-**Version 1.2.1 · Ratified 2026-06-12 · Last amended 2026-06-16**
+**Version 1.3.0 · Ratified 2026-06-12 · Last amended 2026-06-18**
