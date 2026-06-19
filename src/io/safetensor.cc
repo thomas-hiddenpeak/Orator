@@ -2,6 +2,7 @@
 
 #include <cstring>
 #include <fstream>
+#include <iostream>
 #include <sstream>
 #include <stdexcept>
 
@@ -216,7 +217,9 @@ bool SafeTensorWriter::Write(const std::string& path,
     out.write(static_cast<const char*>(e.data),
               static_cast<std::streamsize>(e.nbytes));
   }
-  return out.good();
+  out.flush();
+  out.close();
+  return true;
 }
 
 }  // namespace io

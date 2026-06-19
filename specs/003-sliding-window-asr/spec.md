@@ -3,7 +3,7 @@
 - **Feature**: `003-sliding-window-asr`
 - **Status**: Revised 2026-06-17 (VAD gating + trailing window)
 - **Created**: 2026-06-12
-- **Revised**: 2026-06-15 (pivot), 2026-06-17 (parameter refinement), 2026-06-17 (VAD gating + trailing window)
+- **Revised**: 2026-06-15 (pivot), 2026-06-17 (parameter refinement), 2026-06-17 (VAD gating + trailing window), 2026-06-18 (VAD decoupling)
 - **Owner**: project owner
 - **Constitution**: v1.2.1
 
@@ -325,8 +325,10 @@ when enough silence has elapsed to commit a segment. The mechanism:
   first phoneme when VAD is late detecting onset.
 
 The VAD signal source is `ComprehensiveTimeline::SnapshotVad()`, not `GpuVad`
-directly. This preserves the dual-pipeline independence: ASR reads the timeline
-(its declared dependency) rather than reaching into the VAD pipeline. The
+directly. ASR reads the timeline and never receives VAD data via direct push
+(no callback, no shared pointer, no atomic cursor). The VAD pipeline deposits
+segments into the comprehensive timeline; ASR reads them under the timeline's
+mutex. This is enforced by Constitution Article III §8. The
 ComprehensiveTimeline already has `AddVad()` and `SnapshotVad()` methods
 populated by the independent GpuVad worker.
 
@@ -336,7 +338,9 @@ populated by the independent GpuVad worker.
   SHALL query the VAD track from `ComprehensiveTimeline::SnapshotVad()` to
   determine whether the current audio position falls within a speech region.
   Audio outside VAD-speech regions SHALL NOT be fed to the encoder/decoder,
-  regardless of elapsed segment time.
+  regardless of elapsed segment time. ASR reads VAD data only through the
+  comprehensive timeline — never via direct push from the VAD pipeline
+  (Constitution Article III §8).
 
 - **FR10 — Trailing window**: When VAD transitions from speech to silence, the
   ASR worker SHALL enter a trailing window of `asr_vad_trail_sec` seconds before
