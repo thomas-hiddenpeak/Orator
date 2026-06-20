@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <map>
 #include <mutex>
 #include <string>
 #include <utility>

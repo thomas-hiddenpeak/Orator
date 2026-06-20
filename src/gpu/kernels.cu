@@ -127,6 +127,7 @@ __global__ void MultiplyKernel(const float* a, float scalar, int n,
 
 void Kernels::NormalizeVector(const float* input, int n, float* output,
                               cudaStream_t stream) {
+  if (n <= 0) return;
   int block_size = 256;
   int grid_size = (n + block_size - 1) / block_size;
   NormalizeKernel<<<grid_size, block_size, 0, stream>>>(input, n, output);
@@ -134,9 +135,23 @@ void Kernels::NormalizeVector(const float* input, int n, float* output,
   CUDA_CHECK(cudaStreamSynchronize(stream));
 }
 
+float Kernels::CosineSimilarity(const float* a, const float* b, int n,
+                                cudaStream_t stream) {
+  if (n <= 0) return 0.0f;
+  float* d_out = nullptr;
+  CUDA_CHECK(cudaMalloc(&d_out, sizeof(float)));
+  CosineSimilarityKernel<<<1, n, 0, stream>>>(a, b, n, d_out);
+  CUDA_CHECK(cudaGetLastError());
+  float result = 0.0f;
+  CUDA_CHECK(cudaMemcpy(&result, d_out, sizeof(float), cudaMemcpyDeviceToHost));
+  CUDA_CHECK(cudaFree(d_out));
+  return result;
+}
+
 void Kernels::BatchCosineSimilarity(const float* query, const float* keys,
                                     int num_keys, int vec_dim,
                                     float* output, cudaStream_t stream) {
+  if (num_keys <= 0 || vec_dim <= 0) return;
   // One block per key, threads for vector dimension
   int block_size = std::min(vec_dim, 256);
   BatchCosineSimilarityKernel<<<num_keys, block_size, 0, stream>>>(
@@ -147,6 +162,7 @@ void Kernels::BatchCosineSimilarity(const float* query, const float* keys,
 
 void Kernels::Add(const float* a, const float* b, int n, float* output,
                   cudaStream_t stream) {
+  if (n <= 0) return;
   int block_size = 256;
   int grid_size = (n + block_size - 1) / block_size;
   AddKernel<<<grid_size, block_size, 0, stream>>>(a, b, n, output);
@@ -156,6 +172,7 @@ void Kernels::Add(const float* a, const float* b, int n, float* output,
 
 void Kernels::Multiply(const float* a, float scalar, int n, float* output,
                        cudaStream_t stream) {
+  if (n <= 0) return;
   int block_size = 256;
   int grid_size = (n + block_size - 1) / block_size;
   MultiplyKernel<<<grid_size, block_size, 0, stream>>>(a, scalar, n, output);

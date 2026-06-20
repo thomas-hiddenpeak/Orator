@@ -1,43 +1,49 @@
 #pragma once
 
-// Dependency-free WebSocket server (RFC 6455) over raw POSIX sockets.
-//
-// No third-party libraries: the HTTP upgrade handshake (SHA-1 + base64 of the
-// Sec-WebSocket-Key) and the frame codec are implemented from scratch using
-// only libc / OS sockets, consistent with the project's "pure C++, only CUDA"
-// constraint (networking is OS/libc, not a third-party dependency).
-//
-// The server accepts connections sequentially: one active connection at a time.
-// Each connection gets a fresh WebSocketHandler from the factory. The server
-// returns to accept() immediately after a handler completes, so short-lived
-// clients (browser refresh) see the server available again within milliseconds.
-// TCP keepalive is enabled per connection to detect dead peers quickly.
+// WebSocket server using libwebsockets (MIT license).
+// Replaces hand-rolled implementation with industrial-grade WS support:
+// - Multi-client concurrent connections
+// - Proper EINTR handling, timeouts, backpressure
+// - RFC 6455/7692 compliant
 
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <string>
+#include <vector>
+
+#include <libwebsockets.h>
 
 namespace orator {
 namespace net {
 
+// Forward declaration for the per-session linked-list node.
+struct per_session_data;
+
+// ---------------------------------------------------------------------------
 // Per-connection handle the handler uses to push messages back to the client.
+// ---------------------------------------------------------------------------
 class WebSocketConnection {
+  friend int ws_callback(struct lws *, enum lws_callback_reasons,
+                         void *, void *, size_t);
  public:
-  explicit WebSocketConnection(int fd) : fd_(fd) {}
+  WebSocketConnection(struct lws *wsi, struct lws_context *ctx)
+      : wsi_(wsi), context_(ctx) {}
 
   bool SendText(const std::string& text);
   bool SendBinary(const void* data, size_t n);
-  // Sends a CLOSE frame; the accept loop tears the socket down afterwards.
   void Close(uint16_t code = 1000);
 
   bool closed() const { return closed_; }
-  int fd() const { return fd_; }
 
- private:
-  bool SendFrame(uint8_t opcode, const void* data, size_t n);
-  int fd_;
-  bool closed_ = false;
+  private:
+   struct lws *wsi_;
+   struct lws_context *context_;
+   bool closed_ = false;
+   bool wakeup_pending_ = false;
+   std::vector<std::string> pending_text_;
+   std::shared_ptr<std::mutex> mu_ = std::make_shared<std::mutex>();
 };
 
 // Application callback surface. Override the events of interest.
@@ -49,7 +55,21 @@ struct WebSocketHandler {
   virtual void OnClose() {}
 };
 
+// ---------------------------------------------------------------------------
+// detail: SHA-1 + Base64 utilities (retained for test compatibility with
+// the RFC 6455 handshake reference vectors).
+// ---------------------------------------------------------------------------
+namespace detail {
+
+std::string Sha1Base64(const std::string& key, const std::string& magic);
+std::string Sha1Base64(const std::string& combined);
+std::string Base64Encode(const uint8_t* data, size_t len);
+
+}  // namespace detail
+
 class WebSocketServer {
+  friend int ws_callback(struct lws *, enum lws_callback_reasons,
+                         void *, void *, size_t);
  public:
   explicit WebSocketServer(int port);
   ~WebSocketServer();
@@ -61,31 +81,28 @@ class WebSocketServer {
   // Blocks; intended to run on a dedicated thread or as the app main loop.
   void Serve(const std::function<std::unique_ptr<WebSocketHandler>()>& factory);
 
-  // Accept and fully serve exactly one connection with the given handler.
-  // Returns true if a client connected and the session ran. Used by tests and
-  // single-shot servers.
-  bool ServeOnce(WebSocketHandler& handler);
+  // Accept exactly one connection, serve it with the given handler, then
+  // return.  Used by unit tests that need a single loopback.
+  void ServeOnce(WebSocketHandler& handler);
 
   void Stop();
   int port() const { return port_; }
 
  private:
-  // Performs the RFC6455 upgrade handshake on an accepted fd. Returns true on
-  // success (101 sent).
-  bool Handshake(int fd);
-  // Runs the read loop for one upgraded connection, dispatching to handler.
-  void RunConnection(int fd, WebSocketHandler& handler);
-
   int port_;
-  int listen_fd_ = -1;
+  struct lws_context *context_ = nullptr;
   bool running_ = false;
-};
 
-// Exposed for unit testing the handshake primitives.
-namespace detail {
-std::string Sha1Base64(const std::string& input);
-std::string Base64Encode(const uint8_t* data, size_t n);
-}  // namespace detail
+  // Per-instance serve-once state (replaces file-scope statics).
+  bool serve_once_done_ = false;
+  WebSocketHandler* serve_once_handler_ = nullptr;
+
+  // Per-instance serve-loop state.
+  std::function<std::unique_ptr<WebSocketHandler>()> serve_factory_;
+
+  // Linked-list head for all active per_session_data nodes.
+  struct per_session_data *pss_list_head_ = nullptr;
+};
 
 }  // namespace net
 }  // namespace orator

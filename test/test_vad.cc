@@ -4,7 +4,7 @@
 // GPU GpuVad must reproduce its per-window speech probability with the SAME
 // weights. This test feeds an identical deterministic signal to both and asserts
 // the per-window probabilities match within a recorded tolerance. Run from the
-// repo root so models/asr/silero_vad.safetensors resolves.
+// repo root so models/vad/silero_vad.safetensors resolves.
 
 #include <cmath>
 #include <cstdio>
@@ -33,7 +33,7 @@ int main() {
     pcm[i] = static_cast<float>(0.3 * env * s);
   }
 
-  const std::string model = "models/asr/silero_vad.safetensors";
+  const std::string model = "models/vad/silero_vad.safetensors";
 
   pipeline::AsrSileroVad::Params cp;
   cp.sample_rate = sr;

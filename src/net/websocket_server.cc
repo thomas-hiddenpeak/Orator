@@ -1,386 +1,471 @@
 #include "net/websocket_server.h"
 
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <netinet/tcp.h>
-#include <sys/socket.h>
-#include <unistd.h>
+#include "core/log.h"
 
-#include <cctype>
+#include <array>
+#include <cstdio>
 #include <cstring>
+#include <mutex>
+#include <string>
+#include <sys/syscall.h>
+#include <unistd.h>
 #include <vector>
 
 namespace orator {
 namespace net {
-namespace {
-
-constexpr const char* kMagicGuid = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
-
-// ---------------------------------------------------------------------------
-// SHA-1 (RFC 3174), self-contained.
-// ---------------------------------------------------------------------------
-struct Sha1 {
-  uint32_t h[5] = {0x67452301u, 0xEFCDAB89u, 0x98BADCFEu, 0x10325476u,
-                   0xC3D2E1F0u};
-  uint64_t bitlen = 0;
-  uint8_t buf[64];
-  size_t buflen = 0;
-
-  static uint32_t Rol(uint32_t v, int s) { return (v << s) | (v >> (32 - s)); }
-
-  void Block(const uint8_t* p) {
-    uint32_t w[80];
-    for (int i = 0; i < 16; ++i)
-      w[i] = (uint32_t(p[i * 4]) << 24) | (uint32_t(p[i * 4 + 1]) << 16) |
-             (uint32_t(p[i * 4 + 2]) << 8) | uint32_t(p[i * 4 + 3]);
-    for (int i = 16; i < 80; ++i)
-      w[i] = Rol(w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16], 1);
-    uint32_t a = h[0], b = h[1], c = h[2], d = h[3], e = h[4];
-    for (int i = 0; i < 80; ++i) {
-      uint32_t f, k;
-      if (i < 20) {
-        f = (b & c) | ((~b) & d);
-        k = 0x5A827999u;
-      } else if (i < 40) {
-        f = b ^ c ^ d;
-        k = 0x6ED9EBA1u;
-      } else if (i < 60) {
-        f = (b & c) | (b & d) | (c & d);
-        k = 0x8F1BBCDCu;
-      } else {
-        f = b ^ c ^ d;
-        k = 0xCA62C1D6u;
-      }
-      uint32_t t = Rol(a, 5) + f + e + k + w[i];
-      e = d;
-      d = c;
-      c = Rol(b, 30);
-      b = a;
-      a = t;
-    }
-    h[0] += a;
-    h[1] += b;
-    h[2] += c;
-    h[3] += d;
-    h[4] += e;
-  }
-
-  void Update(const uint8_t* data, size_t n) {
-    bitlen += uint64_t(n) * 8;
-    while (n > 0) {
-      size_t take = 64 - buflen;
-      if (take > n) take = n;
-      std::memcpy(buf + buflen, data, take);
-      buflen += take;
-      data += take;
-      n -= take;
-      if (buflen == 64) {
-        Block(buf);
-        buflen = 0;
-      }
-    }
-  }
-
-  void Final(uint8_t out[20]) {
-    uint8_t pad = 0x80;
-    uint64_t bl = bitlen;
-    Update(&pad, 1);
-    uint8_t zero = 0;
-    while (buflen != 56) Update(&zero, 1);
-    uint8_t len[8];
-    for (int i = 0; i < 8; ++i) len[i] = uint8_t(bl >> (56 - i * 8));
-    Update(len, 8);
-    for (int i = 0; i < 5; ++i) {
-      out[i * 4] = uint8_t(h[i] >> 24);
-      out[i * 4 + 1] = uint8_t(h[i] >> 16);
-      out[i * 4 + 2] = uint8_t(h[i] >> 8);
-      out[i * 4 + 3] = uint8_t(h[i]);
-    }
-  }
-};
-
-ssize_t ReadAll(int fd, uint8_t* dst, size_t n) {
-  size_t got = 0;
-  while (got < n) {
-    ssize_t r = ::recv(fd, dst + got, n - got, 0);
-    if (r <= 0) return r;  // 0 = peer closed, <0 = error
-    got += size_t(r);
-  }
-  return ssize_t(got);
-}
-
-bool WriteAll(int fd, const uint8_t* src, size_t n) {
-  size_t sent = 0;
-  while (sent < n) {
-    ssize_t w = ::send(fd, src + sent, n - sent, MSG_NOSIGNAL);
-    if (w <= 0) return false;
-    sent += size_t(w);
-  }
-  return true;
-}
-
-}  // namespace
-
 namespace detail {
 
-std::string Base64Encode(const uint8_t* data, size_t n) {
-  static const char* tbl =
-      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+namespace {
+static const char b64_table[] =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+}
+
+std::string Base64Encode(const uint8_t* data, size_t len) {
   std::string out;
-  out.reserve(((n + 2) / 3) * 4);
+  out.reserve(((len + 2) / 3) * 4);
   size_t i = 0;
-  for (; i + 3 <= n; i += 3) {
-    uint32_t v = (uint32_t(data[i]) << 16) | (uint32_t(data[i + 1]) << 8) |
-                 uint32_t(data[i + 2]);
-    out.push_back(tbl[(v >> 18) & 0x3F]);
-    out.push_back(tbl[(v >> 12) & 0x3F]);
-    out.push_back(tbl[(v >> 6) & 0x3F]);
-    out.push_back(tbl[v & 0x3F]);
+  while (i + 2 < len) {
+    out += b64_table[data[i] >> 2];
+    out += b64_table[((data[i] & 0x03) << 4) | (data[i + 1] >> 4)];
+    out += b64_table[((data[i + 1] & 0x0f) << 2) | (data[i + 2] >> 6)];
+    out += b64_table[data[i + 2] & 0x3f];
+    i += 3;
   }
-  if (n - i == 1) {
-    uint32_t v = uint32_t(data[i]) << 16;
-    out.push_back(tbl[(v >> 18) & 0x3F]);
-    out.push_back(tbl[(v >> 12) & 0x3F]);
-    out.push_back('=');
-    out.push_back('=');
-  } else if (n - i == 2) {
-    uint32_t v = (uint32_t(data[i]) << 16) | (uint32_t(data[i + 1]) << 8);
-    out.push_back(tbl[(v >> 18) & 0x3F]);
-    out.push_back(tbl[(v >> 12) & 0x3F]);
-    out.push_back(tbl[(v >> 6) & 0x3F]);
-    out.push_back('=');
+  if (i < len) {
+    out += b64_table[data[i] >> 2];
+    if (i + 1 < len) {
+      out += b64_table[((data[i] & 0x03) << 4) | (data[i + 1] >> 4)];
+      out += b64_table[(data[i + 1] & 0x0f) << 2];
+    } else {
+      out += b64_table[(data[i] & 0x03) << 4];
+      out += '=';
+    }
+    out += '=';
   }
   return out;
 }
 
-std::string Sha1Base64(const std::string& input) {
-  Sha1 s;
-  s.Update(reinterpret_cast<const uint8_t*>(input.data()), input.size());
-  uint8_t digest[20];
-  s.Final(digest);
-  return Base64Encode(digest, 20);
+namespace {
+
+struct Sha1 {
+  std::array<uint8_t, 20> digest;
+
+  void Update(const uint8_t* data, size_t len);
+  void Finalize();
+
+ private:
+  std::vector<uint8_t> buffer_;
+  uint64_t count_ = 0;
+  std::array<uint32_t, 5> h{};
+
+  void Init();
+  void Transform(const uint8_t block[64]);
+};
+
+void Sha1::Init() {
+  h[0] = 0x67452301;
+  h[1] = 0xEFCDAB89;
+  h[2] = 0x98BADCFE;
+  h[3] = 0x10325476;
+  h[4] = 0xC3D2E1F0;
+}
+
+static uint32_t rotl(uint32_t x, int n) { return (x << n) | (x >> (32 - n)); }
+
+void Sha1::Transform(const uint8_t block[64]) {
+  std::array<uint32_t, 80> w;
+  for (int i = 0; i < 16; ++i) {
+    w[i] = (uint32_t(block[4 * i]) << 24) | (uint32_t(block[4 * i + 1]) << 16) |
+           (uint32_t(block[4 * i + 2]) << 8) | uint32_t(block[4 * i + 3]);
+  }
+  for (int i = 16; i < 80; ++i) {
+    w[i] = rotl(w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16], 1);
+  }
+
+  uint32_t a = h[0], b = h[1], c = h[2], d = h[3], e = h[4];
+
+  for (int i = 0; i < 80; ++i) {
+    uint32_t f, k;
+    if (i < 20) {
+      f = (b & c) | (~b & d);
+      k = 0x5A827999;
+    } else if (i < 40) {
+      f = b ^ c ^ d;
+      k = 0x6ED9EBA1;
+    } else if (i < 60) {
+      f = (b & c) | (b & d) | (c & d);
+      k = 0x8F1BBCDC;
+    } else {
+      f = b ^ c ^ d;
+      k = 0xCA62C1D6;
+    }
+    uint32_t t = rotl(a, 5) + f + e + k + w[i];
+    e = d;
+    d = c;
+    c = rotl(b, 30);
+    b = a;
+    a = t;
+  }
+
+  h[0] += a;
+  h[1] += b;
+  h[2] += c;
+  h[3] += d;
+  h[4] += e;
+}
+
+void Sha1::Update(const uint8_t* data, size_t len) {
+  if (h[0] == 0 && h[1] == 0 && h[2] == 0 && h[3] == 0 && h[4] == 0) Init();
+
+  for (size_t i = 0; i < len; ++i) {
+    buffer_.push_back(data[i]);
+    if (buffer_.size() == 64) {
+      Transform(buffer_.data());
+      buffer_.clear();
+    }
+  }
+  count_ += len;
+}
+
+void Sha1::Finalize() {
+  if (h[0] == 0 && h[1] == 0 && h[2] == 0 && h[3] == 0 && h[4] == 0) Init();
+
+  uint64_t bits = count_ * 8;
+  buffer_.push_back(0x80);
+  while (buffer_.size() < 56) buffer_.push_back(0);
+  for (int i = 7; i >= 0; --i) buffer_.push_back(uint8_t((bits >> (i * 8)) & 0xff));
+
+  Transform(buffer_.data());
+  buffer_.clear();
+
+  for (int i = 0; i < 5; ++i) {
+    digest[4 * i]     = uint8_t((h[i] >> 24) & 0xff);
+    digest[4 * i + 1] = uint8_t((h[i] >> 16) & 0xff);
+    digest[4 * i + 2] = uint8_t((h[i] >> 8) & 0xff);
+    digest[4 * i + 3] = uint8_t(h[i] & 0xff);
+  }
+}
+
+}
+
+std::string Sha1Base64(const std::string& key, const std::string& magic) {
+  Sha1 sha;
+  sha.Update(reinterpret_cast<const uint8_t*>(key.data()), key.size());
+  sha.Update(reinterpret_cast<const uint8_t*>(magic.data()), magic.size());
+  sha.Finalize();
+  return Base64Encode(sha.digest.data(), sha.digest.size());
+}
+
+std::string Sha1Base64(const std::string& combined) {
+  Sha1 sha;
+  sha.Update(reinterpret_cast<const uint8_t*>(combined.data()), combined.size());
+  sha.Finalize();
+  return Base64Encode(sha.digest.data(), sha.digest.size());
 }
 
 }  // namespace detail
 
-// ---------------------------------------------------------------------------
-// WebSocketConnection
-// ---------------------------------------------------------------------------
-bool WebSocketConnection::SendFrame(uint8_t opcode, const void* data,
-                                    size_t n) {
-  std::vector<uint8_t> frame;
-  frame.push_back(uint8_t(0x80 | opcode));  // FIN + opcode
-  if (n < 126) {
-    frame.push_back(uint8_t(n));
-  } else if (n <= 0xFFFF) {
-    frame.push_back(126);
-    frame.push_back(uint8_t(n >> 8));
-    frame.push_back(uint8_t(n));
-  } else {
-    frame.push_back(127);
-    for (int i = 7; i >= 0; --i) frame.push_back(uint8_t(uint64_t(n) >> (i * 8)));
+struct per_session_data {
+  struct per_session_data *pss_list = nullptr;
+  struct lws *wsi_ = nullptr;
+  struct lws_context *context_ = nullptr;
+  WebSocketHandler* handler = nullptr;
+  WebSocketConnection conn;
+  std::vector<uint8_t> fragment_buf;
+  bool is_binary = false;
+  bool pending_open_send = false;
+  bool message_processed = false;
+  bool pending_writable = false;
+};
+
+// Retrieve the WebSocketServer instance stored in the lws context user data.
+inline WebSocketServer* GetServer(struct lws *wsi) {
+  return static_cast<WebSocketServer*>(
+      lws_context_user(lws_get_context(wsi)));
+}
+
+int ws_callback(struct lws *wsi, enum lws_callback_reasons reason,
+                        void *user, void *in, size_t len) {
+  struct per_session_data *pss = static_cast<struct per_session_data *>(user);
+  WebSocketServer* server = GetServer(wsi);
+
+  switch (reason) {
+    case LWS_CALLBACK_ESTABLISHED: {
+      if (pss && server) {
+        pss->context_ = lws_get_context(wsi);
+        pss->wsi_ = wsi;
+        pss->conn = WebSocketConnection(wsi, pss->context_);
+        if (server->serve_once_handler_) {
+          pss->handler = server->serve_once_handler_;
+        } else if (server->serve_factory_) {
+          pss->handler = server->serve_factory_().release();
+        }
+        lws_ll_fwd_insert(pss, pss_list, server->pss_list_head_);
+        if (pss->handler) {
+          pss->pending_open_send = true;
+          lws_callback_on_writable(wsi);
+        }
+      }
+      break;
+    }
+
+    case LWS_CALLBACK_GET_THREAD_ID:
+      if (in) *(uint64_t *)in = (uint64_t)gettid();
+      break;
+
+    case LWS_CALLBACK_LOCK_POLL:
+      break;
+
+    case LWS_CALLBACK_UNLOCK_POLL:
+      break;
+
+      case LWS_CALLBACK_EVENT_WAIT_CANCELLED: {
+        lws_start_foreach_llp(struct per_session_data **, ppss, server->pss_list_head_) {
+         std::lock_guard<std::mutex> lk(*(*ppss)->conn.mu_);
+         if (!(*ppss)->conn.pending_text_.empty() && !(*ppss)->pending_writable && !(*ppss)->conn.closed_) {
+           (*ppss)->pending_writable = true;
+           lws_callback_on_writable((*ppss)->wsi_);
+         }
+       } lws_end_foreach_llp(ppss, pss_list);
+       break;
+     }
+
+     case LWS_CALLBACK_RECEIVE: {
+       if (!pss || !pss->handler) return 0;
+
+       // Confirm validity to reset the keepalive/validity timer
+       lws_validity_confirmed(wsi);
+
+       if (lws_is_first_fragment(wsi)) {
+         pss->is_binary = lws_frame_is_binary(wsi);
+         pss->fragment_buf.clear();
+       }
+
+       pss->fragment_buf.insert(pss->fragment_buf.end(),
+                                 static_cast<const uint8_t *>(in),
+                                 static_cast<const uint8_t *>(in) + len);
+
+        if (lws_is_final_fragment(wsi)) {
+          LOG_DEBUG("RECEIVE: final fragment, is_binary=%d, len=%zu\n", pss->is_binary, pss->fragment_buf.size());
+          if (pss->is_binary) {
+            // Copy data to a local buffer before calling OnBinary to avoid memory issues
+            std::vector<uint8_t> data_copy(pss->fragment_buf.begin(), pss->fragment_buf.end());
+            pss->fragment_buf.clear();  // Clear before calling handler
+            pss->handler->OnBinary(pss->conn, data_copy.data(), data_copy.size());
+          } else {
+            std::string text(pss->fragment_buf.begin(), pss->fragment_buf.end());
+            pss->fragment_buf.clear();  // Clear before calling handler
+            pss->handler->OnText(pss->conn, text);
+          }
+          // Flush any pending text messages (VAD/ASR responses) that worker
+          // threads queued via SendText.  This is a safety net: it ensures
+          // messages are sent even if the EVENT_WAIT_CANCELLED→writable
+          // pipeline stalls (e.g. after flags were stuck *before* the fix in
+          // SERVER_WRITEABLE, or if lws_cancel_service from a worker thread
+          // races with the service thread).
+          {
+            std::lock_guard<std::mutex> lk(*pss->conn.mu_);
+            if (!pss->conn.pending_text_.empty() && !pss->conn.closed_) {
+              lws_callback_on_writable(wsi);
+            }
+          }
+          // Schedule completion in SERVER_WRITEABLE after response is flushed
+           if (server && server->serve_once_handler_) {
+            pss->message_processed = true;
+            lws_callback_on_writable(wsi);
+          }
+          break;
+        }
+       break;
+     }
+
+      case LWS_CALLBACK_SERVER_WRITEABLE: {
+        if (pss && pss->pending_open_send && pss->handler) {
+          pss->pending_open_send = false;
+          pss->handler->OnOpen(pss->conn);
+        }
+        if (pss) {
+          std::vector<std::string> to_send;
+          {
+            std::lock_guard<std::mutex> lk(*pss->conn.mu_);
+            to_send.swap(pss->conn.pending_text_);
+          }
+          size_t sent = 0;
+          for (const auto& text : to_send) {
+            std::vector<uint8_t> buf(LWS_PRE + text.size());
+            std::memcpy(buf.data() + LWS_PRE, text.data(), text.size());
+            int ret = lws_write(pss->conn.wsi_, buf.data() + LWS_PRE, text.size(), LWS_WRITE_TEXT);
+            if (ret < 0) {
+              LOG_DEBUG("SERVER_WRITEABLE: lws_write failed (ret=%d), closing\n", ret);
+              pss->conn.closed_ = true;
+              lws_close_reason(pss->conn.wsi_, LWS_CLOSE_STATUS_NOSTATUS, nullptr, 0);
+              break;
+            }
+            ++sent;
+          }
+          // Reset flow-control flags so the next SendText/lws_cancel_service
+          // cycle can schedule a fresh writable callback.  This must happen
+          // *after* the send loop: when to_send was non-empty on entry the
+          // old code kept the flags set even after draining everything, which
+          // permanently blocked subsequent worker-thread messages.
+          {
+            std::lock_guard<std::mutex> lk(*pss->conn.mu_);
+            pss->pending_writable = false;
+            pss->conn.wakeup_pending_ = false;
+          }
+          if (sent < to_send.size() && !pss->conn.closed()) {
+            lws_callback_on_writable(wsi);
+          }
+        }
+       if (pss && pss->message_processed && server && server->serve_once_handler_) {
+          server->serve_once_done_ = true;
+       }
+       break;
+     }
+
+    case LWS_CALLBACK_CLOSED:
+    case LWS_CALLBACK_WS_PEER_INITIATED_CLOSE: {
+      LOG_DEBUG("CLOSED: reason=%d, pss=%p, handler=%p, closed_=%d\n", reason, (void*)pss, pss ? (void*)pss->handler : (void*)nullptr, pss ? pss->conn.closed_ : -1);
+      if (pss) {
+        if (server) lws_ll_fwd_remove(struct per_session_data, pss_list, pss, server->pss_list_head_);
+        pss->conn.closed_ = true;
+      }
+      if (pss && pss->handler) {
+        pss->handler->OnClose();
+        if (!server || !server->serve_once_handler_) {
+          delete pss->handler;
+        }
+        pss->handler = nullptr;
+      }
+      if (server && server->serve_once_handler_) {
+        server->serve_once_done_ = true;
+      }
+      break;
+    }
+
+    default:
+      break;
   }
-  // Server->client frames are NOT masked.
-  size_t hdr = frame.size();
-  frame.resize(hdr + n);
-  if (n) std::memcpy(frame.data() + hdr, data, n);
-  return WriteAll(fd_, frame.data(), frame.size());
+  return 0;
 }
 
 bool WebSocketConnection::SendText(const std::string& text) {
-  return SendFrame(0x1, text.data(), text.size());
-}
-
-bool WebSocketConnection::SendBinary(const void* data, size_t n) {
-  return SendFrame(0x2, data, n);
-}
-
-void WebSocketConnection::Close(uint16_t code) {
-  if (closed_) return;
-  uint8_t payload[2] = {uint8_t(code >> 8), uint8_t(code)};
-  SendFrame(0x8, payload, 2);
-  closed_ = true;
-}
-
-// ---------------------------------------------------------------------------
-// WebSocketServer
-// ---------------------------------------------------------------------------
-WebSocketServer::WebSocketServer(int port) : port_(port) {}
-
-WebSocketServer::~WebSocketServer() { Stop(); }
-
-bool WebSocketServer::Start() {
-  listen_fd_ = ::socket(AF_INET, SOCK_STREAM, 0);
-  if (listen_fd_ < 0) return false;
-  int yes = 1;
-  ::setsockopt(listen_fd_, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
-  sockaddr_in addr{};
-  addr.sin_family = AF_INET;
-  addr.sin_addr.s_addr = htonl(INADDR_ANY);
-  addr.sin_port = htons(uint16_t(port_));
-  if (::bind(listen_fd_, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) < 0) {
-    ::close(listen_fd_);
-    listen_fd_ = -1;
-    return false;
+  if (closed_ || !wsi_) return false;
+  bool should_wakeup = false;
+  {
+    std::lock_guard<std::mutex> lk(*mu_);
+    pending_text_.push_back(text);
+    if (!wakeup_pending_) {
+      wakeup_pending_ = true;
+      should_wakeup = true;
+    }
   }
-  // If port 0 was requested, learn the OS-assigned port.
-  socklen_t alen = sizeof(addr);
-  if (::getsockname(listen_fd_, reinterpret_cast<sockaddr*>(&addr), &alen) == 0)
-    port_ = ntohs(addr.sin_port);
-  if (::listen(listen_fd_, 4) < 0) {
-    ::close(listen_fd_);
-    listen_fd_ = -1;
-    return false;
-  }
-  running_ = true;
+  if (should_wakeup) lws_cancel_service(context_);
   return true;
 }
 
-void WebSocketServer::Stop() {
-  running_ = false;
-  if (listen_fd_ >= 0) {
-    ::close(listen_fd_);
-    listen_fd_ = -1;
-  }
+bool WebSocketConnection::SendBinary(const void* data, size_t n) {
+  if (closed_ || !wsi_) return false;
+  // For binary data, send directly (assumes caller is on lws thread)
+  std::vector<uint8_t> buf(LWS_PRE + n);
+  std::memcpy(buf.data() + LWS_PRE, data, n);
+  int ret = lws_write(wsi_, buf.data() + LWS_PRE, n, LWS_WRITE_BINARY);
+  return ret == static_cast<ssize_t>(n);
 }
 
-bool WebSocketServer::Handshake(int fd) {
-  // Read the HTTP request headers up to the blank line.
-  std::string req;
-  uint8_t c;
-  while (req.find("\r\n\r\n") == std::string::npos) {
-    ssize_t r = ::recv(fd, &c, 1, 0);
-    if (r <= 0) return false;
-    req.push_back(char(c));
-    if (req.size() > 16384) return false;  // guard
-  }
-  // Extract Sec-WebSocket-Key (case-insensitive header name).
-  std::string lower = req;
-  for (char& ch : lower) ch = char(::tolower(ch));
-  size_t kpos = lower.find("sec-websocket-key:");
-  if (kpos == std::string::npos) return false;
-  size_t vstart = req.find_first_not_of(" \t", kpos + 18);
-  size_t vend = req.find("\r\n", vstart);
-  if (vstart == std::string::npos || vend == std::string::npos) return false;
-  std::string key = req.substr(vstart, vend - vstart);
-
-  std::string accept = detail::Sha1Base64(key + kMagicGuid);
-  std::string resp =
-      "HTTP/1.1 101 Switching Protocols\r\n"
-      "Upgrade: websocket\r\n"
-      "Connection: Upgrade\r\n"
-      "Sec-WebSocket-Accept: " +
-      accept + "\r\n\r\n";
-  return WriteAll(fd, reinterpret_cast<const uint8_t*>(resp.data()),
-                  resp.size());
+void WebSocketConnection::Close(uint16_t code) {
+  if (closed_ || !wsi_) return;
+  lws_close_reason(wsi_, static_cast<enum lws_close_status>(code), nullptr, 0);
+  closed_ = true;
 }
 
-void WebSocketServer::RunConnection(int fd, WebSocketHandler& handler) {
-  int one = 1;
-  ::setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one));
-  // Keepalive: detect dead peers in ~30 s (10 idle + 3 probes × 5 s).
-  ::setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &one, sizeof(one));
-  int idle = 10;  ::setsockopt(fd, IPPROTO_TCP, TCP_KEEPIDLE,  &idle,  sizeof(idle));
-  int intvl = 5;  ::setsockopt(fd, IPPROTO_TCP, TCP_KEEPINTVL, &intvl, sizeof(intvl));
-  int cnt = 3;    ::setsockopt(fd, IPPROTO_TCP, TCP_KEEPCNT,   &cnt,   sizeof(cnt));
-  WebSocketConnection conn(fd);
-  handler.OnOpen(conn);
+WebSocketServer::WebSocketServer(int port) : port_(port) {}
 
-  std::string frag;       // reassembly buffer for fragmented messages
-  uint8_t frag_opcode = 0;
-
-  while (running_ && !conn.closed()) {
-    uint8_t hdr[2];
-    if (ReadAll(fd, hdr, 2) <= 0) break;
-    bool fin = (hdr[0] & 0x80) != 0;
-    uint8_t opcode = hdr[0] & 0x0F;
-    bool masked = (hdr[1] & 0x80) != 0;
-    uint64_t len = hdr[1] & 0x7F;
-    if (len == 126) {
-      uint8_t ext[2];
-      if (ReadAll(fd, ext, 2) <= 0) break;
-      len = (uint64_t(ext[0]) << 8) | ext[1];
-    } else if (len == 127) {
-      uint8_t ext[8];
-      if (ReadAll(fd, ext, 8) <= 0) break;
-      len = 0;
-      for (int i = 0; i < 8; ++i) len = (len << 8) | ext[i];
-    }
-    uint8_t mask[4] = {0, 0, 0, 0};
-    if (masked && ReadAll(fd, mask, 4) <= 0) break;
-    if (len > (64ull << 20)) break;  // 64 MiB frame guard
-
-    std::string payload;
-    payload.resize(size_t(len));
-    if (len && ReadAll(fd, reinterpret_cast<uint8_t*>(&payload[0]),
-                       size_t(len)) <= 0)
-      break;
-    if (masked)
-      for (size_t i = 0; i < payload.size(); ++i)
-        payload[i] = char(uint8_t(payload[i]) ^ mask[i & 3]);
-
-    if (opcode == 0x8) {  // CLOSE
-      conn.Close();
-      break;
-    } else if (opcode == 0x9) {  // PING -> PONG (opcode 0xA), echo payload
-      std::vector<uint8_t> pong;
-      pong.push_back(0x8A);
-      pong.push_back(uint8_t(payload.size()));
-      pong.insert(pong.end(), payload.begin(), payload.end());
-      WriteAll(fd, pong.data(), pong.size());
-      continue;
-    } else if (opcode == 0xA) {  // PONG
-      continue;
-    }
-
-    // Data frames: 0x0 continuation, 0x1 text, 0x2 binary.
-    if (opcode == 0x1 || opcode == 0x2) {
-      frag_opcode = opcode;
-      frag = payload;
-    } else if (opcode == 0x0) {
-      frag += payload;
-    }
-    if (fin) {
-      if (frag_opcode == 0x1)
-        handler.OnText(conn, frag);
-      else if (frag_opcode == 0x2)
-        handler.OnBinary(conn, reinterpret_cast<const uint8_t*>(frag.data()),
-                         frag.size());
-      frag.clear();
-      frag_opcode = 0;
-    }
-  }
-  handler.OnClose();
-  ::close(fd);
+WebSocketServer::~WebSocketServer() {
+  Stop();
 }
 
-bool WebSocketServer::ServeOnce(WebSocketHandler& handler) {
-  if (listen_fd_ < 0 && !Start()) return false;
-  int fd = ::accept(listen_fd_, nullptr, nullptr);
-  if (fd < 0) return false;
-  if (!Handshake(fd)) {
-    ::close(fd);
+bool WebSocketServer::Start() {
+  static struct lws_protocols protocols[] = {
+      {"ws", ws_callback, sizeof(struct per_session_data), 0, 0, nullptr, 0},
+      {NULL, NULL, 0, 0, 0, nullptr, 0}
+  };
+
+  struct lws_context_creation_info info;
+  std::memset(&info, 0, sizeof(info));
+
+  info.port = port_;
+  info.protocols = protocols;
+  info.options = LWS_SERVER_OPTION_DISABLE_IPV6;
+  info.user = this;  // ws_callback retrieves server via lws_context_user()
+  lws_set_log_level(LLL_DEBUG, nullptr);
+
+  context_ = lws_create_context(&info);
+  if (!context_) {
+    LOG_ERROR("lws_create_context failed\n");
     return false;
   }
-  RunConnection(fd, handler);
+
+  struct lws_vhost *vhost = lws_get_vhost_by_name(context_, "default");
+  if (vhost) {
+    int actual_port = lws_get_vhost_port(vhost);
+    if (actual_port > 0) {
+      port_ = actual_port;
+    }
+  }
+
+  running_ = true;
   return true;
 }
 
 void WebSocketServer::Serve(
     const std::function<std::unique_ptr<WebSocketHandler>()>& factory) {
-  if (listen_fd_ < 0 && !Start()) return;
+  if (!context_ && !Start()) return;
+
+  serve_factory_ = factory;
+
   while (running_) {
-    int fd = ::accept(listen_fd_, nullptr, nullptr);
-    if (fd < 0) {
-      if (!running_) break;
-      continue;
-    }
-    if (!Handshake(fd)) {
-      ::close(fd);
-      continue;
-    }
-    auto handler = factory();
-    RunConnection(fd, *handler);
+    lws_service(context_, 100);
+  }
+
+  serve_factory_ = nullptr;
+}
+
+void WebSocketServer::ServeOnce(WebSocketHandler& handler) {
+  // For ServeOnce, we reuse the existing context if it exists.
+  // lws v4.3.3 supports multi-threading with proper callback handling.
+  if (!context_ && !Start()) {
+    return;
+  }
+  running_ = true;
+
+  serve_once_handler_ = &handler;
+  serve_once_done_ = false;
+
+  // Process events until serve_once_done_ is set (after message is processed).
+  // lws_service(context_, 0) blocks for LWS_POLL_WAIT_LIMIT (~23 days).
+  // Use small poll intervals to allow checking serve_once_done_.
+  const int timeout_ms = 5000;
+  const int poll_ms = 50;
+  int elapsed = 0;
+  while (elapsed < timeout_ms && !serve_once_done_ && running_) {
+    int ret = lws_service(context_, poll_ms);
+    if (ret < 0) break;
+    elapsed += poll_ms;
+  }
+  // Run additional cycles to ensure the response is fully flushed.
+  for (int i = 0; i < 10 && running_; ++i) {
+    lws_service(context_, 100);
+  }
+
+  serve_once_handler_ = nullptr;
+}
+
+void WebSocketServer::Stop() {
+  running_ = false;
+  if (context_) {
+    lws_context_destroy(context_);
+    context_ = nullptr;
   }
 }
 

@@ -61,7 +61,7 @@ class AuditoryStream {
     int asr_vad_lead_ms = 200;
     double asr_vad_trail_sec = 1.5;
     bool vad_stream = true;
-    std::string vad_model = "models/asr/silero_vad.safetensors";
+    std::string vad_model = "models/vad/silero_vad.safetensors";
     float vad_threshold = 0.5f;
     int vad_min_speech_ms = 250;
     int vad_min_silence_ms = 120;
@@ -69,7 +69,7 @@ class AuditoryStream {
     // Spec 002 FR7: interval (seconds) for the periodic GPU-scheduling telemetry
     // message ({"type":"gpu_telemetry"}). A dedicated low-rate timer thread
     // emits it through the serialized transport. 0 disables it.
-    double gpu_telemetry_interval_sec = 1.0;
+    double gpu_telemetry_interval_sec = 0.0;  // 0 = disabled; set env ORATOR_GPU_TELEMETRY_SEC to enable
     // Spec 004 Phase 12: configurable DISK storage path for protocol timeline.
     std::string storage_disk_path = "/tmp/orator/storage/";
   };

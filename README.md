@@ -76,11 +76,19 @@ cmake --build build -j
 
 可选环境变量：
 
-- `ORATOR_UI_PORT`：覆盖 UI 端口
-- `ORATOR_UI_ROOT`：覆盖静态页面目录（默认 `web`）
-- `ORATOR_ASR_MODEL_DIR`：覆盖 ASR 模型目录
-- `ORATOR_ASR_DISABLE=1`：显式禁用 ASR
-- `ORATOR_PREWARM_ON_BOOT=0`：关闭启动预热
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `ORATOR_UI_PORT` | `port+1` | 覆盖 UI 端口 |
+| `ORATOR_UI_ROOT` | `web` | 覆盖静态页面目录 |
+| `ORATOR_ASR_MODEL_DIR` | `models/asr/Qwen/Qwen3-ASR-1.7B` | 覆盖 ASR 模型目录 |
+| `ORATOR_ASR_DISABLE` | `0` | `=1` 显式禁用 ASR |
+| `ORATOR_PREWARM_ON_BOOT` | `1` | `=0` 关闭启动预热 |
+| `ORATOR_GPU_TELEMETRY_SEC` | `0` | GPU 遥测推送间隔（秒）；`0`=禁用 |
+| `ORATOR_VAD_STREAM` | `1` | `=0` 禁用 VAD 流 |
+| `ORATOR_LOG_LEVEL` | `0` | 日志级别：`0`=DEBUG, `1`=INFO, `2`=WARN, `3`=ERROR |
+| `ORATOR_ASR_PROFILE` | — | 设置即启用 ASR 每帧耗时日志 |
+| `ORATOR_STREAM_PROGRESS` | — | 设置即显示 diarizer 流式进度条 |
+| `ORATOR_TIMEBASE_CHECK` | — | `=1` 启用时间基一致性校验 |
 
 ## 主要可执行目标
 
@@ -88,12 +96,28 @@ cmake --build build -j
 - `asr_testmp3`：ASR 单段端到端测试
 - `asr_stream_test`：流式链路测试
 - `asr_stream_window_probe`：窗口策略探针工具
+- `asr_encoder_chunk_probe`：编码器分块等价性验证
+- `asr_stream_incremental_probe`：增量 KV-cache 流式探针
 
 ## 测试
 
 ```bash
 cd build
 ctest --output-on-failure
+```
+
+包含 25+ CTest 测试和可选 Python 集成测试：
+
+- C++ 单元测试覆盖：时间基、ComprehensiveTimeline、ASR 算子、GPU 核函数（Add/Multiply/Normalize/CosineSimilarity）、WebSocket、协议层等
+- CUDA kernel 测试（`test_kernels`）：13 个测试，验证 GPU 核函数与 CPU 参考实现的数值等价性
+- Python 集成测试（需 pytest）：测试真实 WebSocket 流式路径
+
+```bash
+# 单独运行 CUDA kernel 测试
+./build/test/test_kernels
+
+# Python 集成测试
+cd build && ctest -R py- --output-on-failure
 ```
 
 ## 目录概览

@@ -143,6 +143,22 @@ def ws_receive_text(sock, timeout=5):
         return None
     return payload.decode("utf-8")
 
+def unwrap_envelope(json_str):
+    """Unwrap Spec 004 topic-based protocol envelope.
+
+    Server wraps pipeline messages in:
+      {"topic":"...","data":"<escaped JSON>",...}
+    Legacy messages (ready, reset_ok) are sent raw.
+    Returns the inner payload object for both cases.
+    """
+    obj = json.loads(json_str)
+    if isinstance(obj, dict) and "topic" in obj and "data" in obj:
+        inner = obj["data"]
+        if isinstance(inner, str):
+            return json.loads(inner)
+        return inner
+    return obj
+
 # ── Test helpers ──────────────────────────────────────────
 
 def generate_silence_pcm(duration_sec, sample_rate=SAMPLE_RATE):
@@ -219,7 +235,7 @@ def test_websocket_connection(host, port):
         # Expect "ready" message
         msg = ws_receive_text(sock, timeout=5)
         if msg:
-            data = json.loads(msg)
+            data = unwrap_envelope(msg)
             r.check("Received 'ready' message", data.get("type") == "ready",
                      f"type={data.get('type')}")
             r.check("ready has sample_rate", "sample_rate" in data,
@@ -255,9 +271,9 @@ def test_audio_streaming_and_asr(host, port):
                 opcode, payload = ws_receive(sock)
                 if opcode == 0x1 and payload:  # text
                     try:
-                        msg = json.loads(payload)
+                        msg = unwrap_envelope(payload.decode("utf-8"))
                         events.append(msg.get("type", "unknown"))
-                    except json.JSONDecodeError:
+                    except (json.JSONDecodeError, UnicodeDecodeError):
                         pass
             except socket.timeout:
                 pass
@@ -275,9 +291,9 @@ def test_audio_streaming_and_asr(host, port):
                 opcode, payload = ws_receive(sock)
                 if opcode == 0x1 and payload:
                     try:
-                        msg = json.loads(payload)
+                        msg = unwrap_envelope(payload.decode("utf-8"))
                         events.append(msg.get("type", "unknown"))
-                    except json.JSONDecodeError:
+                    except (json.JSONDecodeError, UnicodeDecodeError):
                         pass
             except socket.timeout:
                 break
@@ -311,7 +327,7 @@ def test_flush_and_timeline(host, port):
             msg = ws_receive_text(sock, timeout=2)
             if msg is None:
                 break
-            data = json.loads(msg)
+            data = unwrap_envelope(msg)
             if data.get("type") == "timeline":
                 timeline_found = True
                 # Validate structure
@@ -344,7 +360,7 @@ def test_reset(host, port):
 
         msg = ws_receive_text(sock, timeout=3)
         if msg:
-            data = json.loads(msg)
+            data = unwrap_envelope(msg)
             r.check("Received reset_ok", data.get("type") == "reset_ok",
                      f"type={data.get('type')}")
         else:

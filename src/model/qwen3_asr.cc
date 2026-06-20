@@ -1,5 +1,7 @@
 #include "model/qwen3_asr.h"
 
+#include "core/log.h"
+
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -125,11 +127,10 @@ std::string Qwen3Asr::BuildAndRun(const std::vector<float>& encoder_out,
     auto ms = [](auto a, auto b) {
       return std::chrono::duration<double, std::milli>(b - a).count();
     };
-    std::fprintf(stderr,
-                 "[asr-profile]   prefill(T=%d)=%.1fms  decode(%zu tok)=%.1fms"
-                 " (%.1fms/tok)\n",
-                 T, ms(p0, p1), out_tokens.size(), ms(p1, p2),
-                 out_tokens.empty() ? 0.0 : ms(p1, p2) / out_tokens.size());
+    LOG_INFO("[asr-profile]   prefill(T=%d)=%.1fms  decode(%zu tok)=%.1fms"
+             " (%.1fms/tok)\n",
+             T, ms(p0, p1), out_tokens.size(), ms(p1, p2),
+             out_tokens.empty() ? 0.0 : ms(p1, p2) / out_tokens.size());
   }
 
   std::string text = tokenizer_.Decode(out_tokens, /*skip_special=*/true);
@@ -169,9 +170,8 @@ std::string Qwen3Asr::TranscribeText(const float* samples, int num_samples,
     auto ms = [](auto a, auto b) {
       return std::chrono::duration<double, std::milli>(b - a).count();
     };
-    std::fprintf(stderr,
-                 "[asr-profile] mel=%.1fms encoder=%.1fms decode=%.1fms (tokens=%d)\n",
-                 ms(t0, t_mel), ms(t_mel, t_enc), ms(t_enc, t_dec), n_tokens);
+    LOG_INFO("[asr-profile] mel=%.1fms encoder=%.1fms decode=%.1fms (tokens=%d)\n",
+             ms(t0, t_mel), ms(t_mel, t_enc), ms(t_enc, t_dec), n_tokens);
   }
   return text;
 }

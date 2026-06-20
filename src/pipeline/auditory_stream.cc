@@ -1,8 +1,11 @@
 #include "pipeline/auditory_stream.h"
 
+#include "core/log.h"
+
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <string>
 #include <utility>
 
 #include <cuda_runtime.h>
@@ -248,10 +251,9 @@ void AuditoryStream::Start() {
                                         /*create_stream=*/true);
       int greatest = 0, least = 0;
       scheduler_.PriorityRange(&greatest, &least);
-      std::fprintf(stderr,
-                   "[gpu-sched] priority range [greatest=%d, least=%d]; "
-                   "asr at index 1 (foreground)\n",
-                   greatest, least);
+      LOG_INFO("[gpu-sched] priority range [greatest=%d, least=%d]; "
+               "asr at index 1 (foreground)\n",
+               greatest, least);
   }
   StartWorkers();
 }
@@ -536,9 +538,8 @@ void AuditoryStream::EmitTimeline(bool finalize) {
     auto report = [total](const char* who, long processed) {
       const long gap = core::TimeBase::ReconcileExtent(processed, total);
       if (gap != 0)
-        std::fprintf(stderr,
-                     "[timebase] %s extent %ld vs common total %ld -> gap %ld\n",
-                     who, processed, total, gap);
+        LOG_INFO("[timebase] %s extent %ld vs common total %ld -> gap %ld\n",
+                 who, processed, total, gap);
     };
     if (diar_worker_) report("diarization", diar_worker_->processed_samples());
     if (asr_worker_) report("asr", asr_worker_->processed_samples());
@@ -557,13 +558,17 @@ std::string AuditoryStream::SerializeRevision(
                 "\"dirty_start\":%.3f,\"dirty_end\":%.3f,\"entries\":[",
                 r.dirty_start, r.dirty_end);
   out += buf;
-  for (size_t i = 0; i < r.entries.size(); ++i) {
+    for (size_t i = 0; i < r.entries.size(); ++i) {
     const auto& e = r.entries[i];
+    int spk_idx = -1;
+    if (e.speaker.size() > 8 && e.speaker.substr(0, 8) == "speaker_") {
+      try { spk_idx = std::stoi(e.speaker.substr(8)); }
+      catch (...) { spk_idx = -1; }
+    }
     std::snprintf(buf, sizeof(buf),
-                  "{\"start\":%.3f,\"end\":%.3f,\"text_id\":%ld,\"speaker\":\"",
-                  e.start, e.end, e.text_id);
-    out += std::string(buf) + JsonEscape(e.speaker) + "\",\"text\":\"" +
-           JsonEscape(e.text) + "\"}";
+                  "{\"start\":%.3f,\"end\":%.3f,\"text_id\":%ld,\"speaker\":%d,\"text\":\"",
+                  e.start, e.end, e.text_id, spk_idx);
+    out += std::string(buf) + JsonEscape(e.text) + "\"}";
     if (i + 1 < r.entries.size()) out += ",";
   }
   out += "]}";
@@ -721,11 +726,16 @@ std::string AuditoryStream::Serialize() {
   if (asr_) {
     for (size_t i = 0; i < comp_view.size(); ++i) {
       const auto& e = comp_view[i];
+      // Extract numeric speaker index from "speaker_N" format.
+      int spk_idx = -1;
+      if (e.speaker.size() > 8 && e.speaker.substr(0, 8) == "speaker_") {
+        try { spk_idx = std::stoi(e.speaker.substr(8)); }
+        catch (...) { spk_idx = -1; }
+      }
       std::snprintf(buf, sizeof(buf),
-                    "{\"start\":%.3f,\"end\":%.3f,\"speaker\":\"",
-                    e.start, e.end);
-      out += std::string(buf) + JsonEscape(e.speaker) + "\",\"text\":\"" +
-             JsonEscape(e.text) + "\"}";
+                    "{\"start\":%.3f,\"end\":%.3f,\"text_id\":%ld,\"speaker\":%d,\"text\":\"",
+                    e.start, e.end, e.text_id, spk_idx);
+      out += std::string(buf) + JsonEscape(e.text) + "\"}";
       if (i + 1 < comp_view.size()) out += ",";
     }
   }

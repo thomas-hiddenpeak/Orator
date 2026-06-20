@@ -17,7 +17,7 @@ class AsrSileroVad {
     double max_utterance_sec = 28.0;
     double min_utterance_sec = 0.20;
 
-    std::string silero_model_path = "models/asr/silero_vad.safetensors";
+    std::string silero_model_path = "models/vad/silero_vad.safetensors";
     float silero_threshold = 0.5f;
     int silero_min_speech_ms = 250;
     int silero_min_silence_ms = 120;

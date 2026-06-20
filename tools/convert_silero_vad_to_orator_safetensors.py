@@ -7,7 +7,7 @@ Source model can be extracted from silero-vad wheel at:
 Usage:
   python3 tools/convert_silero_vad_to_orator_safetensors.py \
     --src /tmp/silero_pkg/unpack/silero_vad/data/silero_vad_16k.safetensors \
-    --dst /home/rm01/Orator/models/asr/silero_vad.safetensors
+    --dst /home/rm01/Orator/models/vad/silero_vad.safetensors
 """
 
 import argparse

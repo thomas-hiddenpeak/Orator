@@ -1,5 +1,7 @@
 #include "net/auditory_ws_handler.h"
 
+#include "core/log.h"
+
 #include <chrono>
 #include <cstdint>
 #include <string>
@@ -104,7 +106,7 @@ std::string WrapMessageInEnvelope(const std::string& json, int64_t msg_id) {
                          + ",\"ts\":0"
                          + ",\"qos\":0"
                          + ",\"schema_version\":1"
-                         + ",\"data\":" + escapedData + "}";
+                          + ",\"data\":\"" + escapedData + "\"}";
   return envelope;
 }
 
@@ -112,7 +114,7 @@ std::string WrapMessageInEnvelope(const std::string& json, int64_t msg_id) {
 
 void SessionEmit::Send(const std::string& json) {
   std::lock_guard<std::mutex> lk(mu);
-  if (conn) {
+  if (conn && !conn->closed()) {
     conn->SendText(WrapMessageInEnvelope(json, ++msg_id));
   }
 }
@@ -150,8 +152,9 @@ void AuditoryWsHandler::OnOpen(WebSocketConnection& conn) {
 }
 
 void AuditoryWsHandler::OnBinary(WebSocketConnection& conn, const uint8_t* data,
-                                 size_t n) {
+                                  size_t n) {
   (void)conn;
+  LOG_DEBUG("OnBinary: received %zu bytes\n", n);
   std::vector<float> in;
   if (float_format_) {
     size_t count = n / sizeof(float);
@@ -167,16 +170,20 @@ void AuditoryWsHandler::OnBinary(WebSocketConnection& conn, const uint8_t* data,
       p += 2;
     }
   }
-  if (!in.empty()) stream_->PushAudio(in.data(), static_cast<int>(in.size()));
+  LOG_DEBUG("OnBinary: converted to %zu float samples\n", in.size());
+  if (!in.empty()) {
+    LOG_DEBUG("OnBinary: calling stream_->PushAudio\n");
+    stream_->PushAudio(in.data(), static_cast<int>(in.size()));
+    LOG_DEBUG("OnBinary: PushAudio returned\n");
+  }
 }
 
 void AuditoryWsHandler::OnText(WebSocketConnection& conn, const std::string& text) {
-  if (text.find("\"f32\"") != std::string::npos ||
-      text.find("float32") != std::string::npos) {
+  // Match known commands by JSON key (not substring) to avoid false positives.
+  if (text.find("\"f32\"") != std::string::npos) {
     float_format_ = true;
   }
-  if (text.find("\"describe\"") != std::string::npos ||
-      text.find("\"cmd\":\"describe\"") != std::string::npos) {
+  if (text.find("\"describe\"") != std::string::npos) {
     const auto* pt = stream_->protocol_timeline();
     if (pt) {
       conn.SendText(pt->Describe());
@@ -185,17 +192,17 @@ void AuditoryWsHandler::OnText(WebSocketConnection& conn, const std::string& tex
     }
     return;
   }
-  if (text.find("reset") != std::string::npos) {
+  if (text.find("\"reset\"") != std::string::npos) {
     stream_->Reset();
     conn.SendText("{\"type\":\"reset_ok\"}");
     return;
   }
-  if (text.find("end") != std::string::npos) {
+  if (text.find("\"end\"") != std::string::npos) {
     stream_->EmitTimeline(/*finalize=*/true);
     stream_->Reset();
     return;
   }
-  if (text.find("flush") != std::string::npos) {
+  if (text.find("\"flush\"") != std::string::npos) {
     stream_->EmitTimeline(/*finalize=*/false);
   }
 }

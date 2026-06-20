@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Install CUDA
+        uses: Jimver/cuda-toolkit@v0.2.21
+        with:
+          cuda: '12.5.1'
+          method: network
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake \
+            libopencv-dev \
+            ffmpeg \
+            python3 \
+            lsof \
+            netcat-openbsd
+
+      - name: Cache libwebsockets build
+        uses: actions/cache@v4
+        with:
+          path: |
+            build/_deps/libwebsockets-build
+            build/_deps/libwebsockets-src
+          key: lws-${{ runner.os }}-v4.3.3
+
+      - name: Configure CMake
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} -DCMAKE_CUDA_ARCHITECTURES=native
+
+      - name: Build
+        run: cmake --build build -j $(nproc)
+
+      - name: Run CTest
+        working-directory: build
+        run: ctest --output-on-failure -j $(nproc) --timeout 60
+
+      - name: Check compiler warnings
+        run: cmake --build build -j $(nproc) 2>&1 | head -100 | grep -E "warning:|error:" || echo "No warnings/errors"
+
+      - name: Verify no debug fprintf in production code
+        run: |
+          ! grep -rn 'fprintf.*stderr.*DEBUG' src/ --include='*.cc' --include='*.cu' || \
+            { echo "Found debug fprintf in production code:"; grep -rn 'fprintf.*stderr.*DEBUG' src/; exit 1; }
+
+      - name: Verify Python test syntax
+        run: |
+          python3 -m py_compile test/ws_comprehensive_test.py
+          python3 -m py_compile test/test_ws_real_audio.py
+          python3 -m py_compile test/test_ws_business.py

@@ -137,10 +137,10 @@ std::string ProtocolTimeline::Describe() const {
     if (i + 1 < pipelines.size()) out << ",";
     out << "\n";
   }
-  out << "  ]\n";
+  out << "  ],\n";
+  out << "  \"schemas\": [\n";
 
   auto schemas = schema_->GetAll();
-  out << "  \"schemas\": [\n";
   for (size_t i = 0; i < schemas.size(); ++i) {
     out << "    {\"topic\": \"" << schemas[i].topic.to_string()
         << "\", \"version\": " << schemas[i].version << "}";

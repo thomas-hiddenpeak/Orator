@@ -16,7 +16,7 @@ Usage:
     --gold asrTest2Final.txt \
     --diar models/sortformer_4spk_v2.safetensors \
     --asr models/asr/Qwen/Qwen3-ASR-1.7B \
-    --asr-vad models/asr/silero_vad.safetensors
+    --asr-vad models/vad/silero_vad.safetensors
 """
 
 import argparse

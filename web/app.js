@@ -50,6 +50,33 @@
   // Speaker colors for canvas
   const SPEAKER_COLORS = ["#5b8def","#34d399","#f59e0b","#ef4444","#a78bfa","#22d3ee"];
 
+  /* ── Protocol envelope unwrapper ── */
+  // Spec 004 protocol layer wraps legacy JSON in a topic-based envelope:
+  //   { "topic": "...", "pipeline": "...", "msg_id": N, "ts": T,
+  //     "qos": Q, "schema_version": V, "data": <original JSON string> }
+  // This function detects and unwraps such envelopes, returning the inner
+  // payload. If the message is already in legacy format (no "topic" key),
+  // it is returned as-is.
+  function unwrapEnvelope(raw) {
+    if (typeof raw !== "string") return null;
+    let obj;
+    try { obj = JSON.parse(raw); } catch (_) { return null; }
+    if (!obj || typeof obj !== "object") return null;
+
+    // Envelope detection: presence of "topic" + "data" keys
+    if (obj.topic && obj.data !== undefined) {
+      // obj.data is the escaped JSON string of the original payload.
+      // It may already be a parsed object or a raw JSON string.
+      if (typeof obj.data === "string") {
+        try { return JSON.parse(obj.data); } catch (_) { return null; }
+      }
+      return obj.data;
+    }
+
+    // Legacy format — return as-is
+    return obj;
+  }
+
   /* ── Helpers ── */
   function fmtTime(sec) {
     if (typeof sec !== "number" || isNaN(sec)) return "--:--";
@@ -110,6 +137,8 @@
       connBadge.title = "";
       setStatus(true);
       console.log("[WS] Connected to", defaultWsUrl());
+      // Request protocol description for debugging (Spec 004 Phase 12)
+      describeProtocol();
     };
 
     ws.onclose = function (evt) {
@@ -125,8 +154,7 @@
 
     ws.onmessage = function (ev) {
       if (typeof ev.data !== "string") return;
-      let msg;
-      try { msg = JSON.parse(ev.data); } catch (_) { return; }
+      let msg = unwrapEnvelope(ev.data);
       if (!msg || !msg.type) return;
       console.log("[WS] Received:", msg.type, msg);
 
@@ -184,9 +212,15 @@
     ws.send(JSON.stringify(cmd));
   }
 
+  // Request protocol description from server (Spec 004 Phase 12).
+  // Server responds with topic/schema registry info.
+  function describeProtocol() {
+    sendCmd({ cmd: "describe" });
+  }
+
   /* ── ASR handlers ── */
   function handleAsrPartial(msg) {
-    const id = msg.text_id || "__draft__";
+    const id = msg.text_id != null ? msg.text_id : "__draft__";
     const text = msg.text || "";
 
     // Show live draft
@@ -205,7 +239,7 @@
   }
 
   function handleAsrFinal(msg) {
-    const id = msg.text_id || ("__f_" + Date.now());
+    const id = msg.text_id != null ? msg.text_id : ("__f_" + Date.now());
     const text = msg.text || "";
 
     // Hide live draft
@@ -225,7 +259,7 @@
     if (!Array.isArray(msg.entries)) return;
     for (const e of msg.entries) {
       const id = e.text_id;
-      if (!id) continue;
+      if (id == null) continue;
       const row = asrRows.get(id);
       if (!row) continue;
       const spk = e.speaker != null ? e.speaker : null;
@@ -279,7 +313,7 @@
     const comprehensive = msg.comprehensive || [];
     for (const entry of comprehensive) {
       const id = entry.text_id;
-      if (!id) continue;
+      if (id == null) continue;
       const row = asrRows.get(id);
       if (!row) continue;
       const spk = entry.speaker;

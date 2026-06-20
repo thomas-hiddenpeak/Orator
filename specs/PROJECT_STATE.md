@@ -14,7 +14,7 @@ work is specified under [specs/](.).
 > pass is the consistency proof. Status lines advance to `Implemented` in the
 > same change that lands the code, with the commit reference.
 
-- **Last updated**: 2026-06-19 (Spec 006 Web UI MVP implemented: HTTP server + full UI + Canvas timeline + integration test)
+- **Last updated**: 2026-06-21 (Codebase hardening: logging, static refactor, CUDA kernel tests, CI, VAD path migration)
 - **Branch**: `master`
 - **Constitution**: v1.3.0
 
@@ -47,7 +47,8 @@ modifies, splits, infers, or back-fills any pipeline's content (Spec 004 §1a).
 ### Pipeline responsibility boundaries (ratified, do not re-litigate)
 
 - **ASR** outputs ONLY plain transcript text + its own time codes. It has **no**
-  speaker awareness and never attributes speakers.
+  speaker awareness and never attributes speakers. ASR now includes `text_id` in
+  incremental messages for stable in-place segment tracking.
 - **Diarization** outputs ONLY its own speaker identities + time codes. It never
   attributes text.
 - **Comprehensive timeline** aligns the two purely by time overlap on the common
@@ -65,15 +66,21 @@ modifies, splits, infers, or back-fills any pipeline's content (Spec 004 §1a).
 | WhisperMel / BPE tokenizer / sharded safetensors loader | ✅ Verified | Unit-tested. |
 | Decoupling (interfaces + registry) | ✅ In place | `IDiarizer`, `IAsr`; registry-constructed. Text↔speaker combination is the concrete `ComprehensiveTimeline` (pure time-alignment), not an interface. |
 | `OverlapTimelineMerger` / `ITimelineMerger` | 🗑️ Removed | The old one-shot max-overlap merger and its orphaned interface were deleted — superseded by `ComprehensiveTimeline` (Spec 004). |
-| WebSocket server (from-scratch POSIX) | ✅ Working | RFC6455 handshake + frame codec, no deps. |
+| WebSocket server (libwebsockets v4.3.3) | ✅ Refactored | Replaced hand-rolled POSIX WS with libwebsockets (multi-client, RFC 6455/7692). Eliminated file-scope static variables (`serve_server`, `serve_factory`, `pss_list_head`) → instance members via `lws_context_user`. Thread-safe `SendText` with wakeup/cancel-service. ServeOnce mode for unit tests. |
 | ASR + WS integration | Done; threaded, three independent pipelines, fully decoupled | `AuditoryStream` is a controller owning a `SharedAudioBuffer`, three worker threads (`DiarizationWorker`, `AsrWorker`, VAD detector), and a mutex-guarded `ComprehensiveTimeline`. Pipelines communicate ONLY through the comprehensive timeline (Constitution Art. III §8): no direct push, no callback, no shared atomic cursor. Diarization and ASR workers hold `core::TimeBase` inherited from `buffer_.time_base()`; all time codes derive from it (origin/process/result consistency). ASR reads VAD segments via `ComprehensiveTimeline::SnapshotVad()`. Sends incremental `diar`, `asr`/`asr_partial`, `vad`, `revision`, and a comprehensive `timeline`. ASR uses stable `text_id` for in-place segment revision. GPU work serialized by `gpu::DeviceLock()`. |
 | Incremental KV-cache ASR streaming (Spec 003) | ✅ Implemented, verified, committed (8cc31ab); params refined 2026-06-17 | Persistent KV cache + prefix caching + chunk-local windowed encoder; partial-emission every 1 s via WebSocket. Full 1hr CER 16.1% / 6.22x; beats production Silero-VAD at every scale. **Current params**: `kStreamWindowMel=100` (1 s), `max_new_tokens=32`, `unfixed_chunks=2`, `unfixed_tokens=15`, `max_segment_sec=24.0`. |
 | Revisable comprehensive timeline (Spec 004) | ✅ Implemented (core + VAD pipeline + WS conformance) | Native stateful PURE CONTAINER + diarization-driven VIEW. Three tracks (diarization, asr, vad) each carry data + `source` meta + time codes; every pipeline emits its own WS message (`diar`/`asr`/`vad`) and revisions are source-tagged. The comprehensive VIEW splits text at DIARIZATION boundaries (not ASR's coarse segmentation). VAD = batched GPU `GpuVad` publishing speech segments (`test_vad` gate 3.7e-8). Owner invariant: no overlap → "unknown", never borrowed. |
 | Reusable common time base (Spec 004) | ✅ Implemented, Constitution v1.3.0 Article III | Header-only `core::TimeBase` value type. All pipelines inherit from `buffer_.time_base()`, hold it as a member, derive all time codes through it. Three consistency principles enforced (origin/process/result). `WaitAndRead` returns `span_start_abs` to all consumers. Reconciliation check clean (zero gap) at 120s + 600s. Wall clock anchor at session entry/exit: `session_start_wall_sec` in `ready`/`timeline` WS messages, `wall_clock_ok` drift validation (< 1s tolerance). |
 | Pipeline protocol layer (Spec 004) | ✅ Implemented | Phases 7–12 complete: data types (topic.h, schema.h), pipeline registry, topic router, storage layer (MEMORY + DISK), ProtocolTimeline integration, WS v2 envelope with describe command, --storage-disk-path flag. 25/25 tests pass. |
 | Streaming validation | ✅ Through real WebSocket | `tools/ws_stream_client.py` (stdlib, reader thread) streams PCM through the socket at an accelerated rate and exports the full event log + timeline to JSON. |
-| Test suite | ✅ 25/25 ctests pass | Clean build under `-Wall -Wextra`, ZERO warnings. `test_vad` gates the GPU VAD detector vs the CPU reference. Protocol layer tests: `test_protocol_types`, `test_pipeline_registry`, `test_topic_router`, `test_storage`, `test_protocol_timeline`. |
-| Web UI (Spec 006 MVP) | ✅ Implemented (Phases 1 complete) | HTTP static server (`http_static_server.h/.cc`), full SPA (`index.html`, `style.css`, `app.js`), Canvas timeline with zoom, microphone + file upload, WebSocket client with auto-reconnect, GPU telemetry display, JSON export. Integration test: `tools/ws_ui_integration_test.py`. |
+| Logging system | ✅ Include-level `core/log.h` | Level-based macros (`LOG_DEBUG`/`INFO`/`WARN`/`ERROR`) with compile-time floor (`ORATOR_LOG_LEVEL`) and runtime env-var gate. All 14 `fprintf(stderr)` calls in src/ replaced. |
+| CUDA kernel unit tests | ✅ `test_kernels`: 13/13 passed | GPU kernel operations (Add, Multiply, NormalizeVector, CosineSimilarity, BatchCosineSimilarity) validated against CPU reference; includes edge cases (zero, single-element, large 1M vectors). |
+| CI pipeline | ✅ GitHub Actions | `.github/workflows/ci.yml`: CUDA 12.5, CMake build + ctest + warning check + Python syntax verification. Triggered on push/PR to master. |
+| Test suite | ✅ 26/26 C++ ctests pass | Clean build under `-Wall -Wextra`, ZERO warnings. `test_kernels` validates GPU kernel numerics. Python integration tests registered (`py-ws-comprehensive`, `py-ws-real-audio`) marked manual (require running server). |
+| OnText protocol matching | ✅ Fixed | Substring `text.find("end")` → JSON key `text.find("\"end\"")` to prevent false positives on partial matches. Same for reset/flush. |
+| GPU telemetry default | ✅ Changed | `gpu_telemetry_interval_sec = 0.0` (was 1.0); disabled by default, opt-in via `ORATOR_GPU_TELEMETRY_SEC`. |
+| VAD model path | ✅ Migrated | `models/asr/silero_vad.safetensors` → `models/vad/`. Updated 6 file references across test, include, and tools. |
+| Web UI (Spec 006 MVP) | ✅ Implemented (Phases 1+2) | HTTP static server (`http_static_server.h/.cc`), full SPA (`index.html`, `style.css`, `app.js`), Canvas timeline with zoom/pan, microphone + file upload, WebSocket client with auto-reconnect, GPU telemetry display, JSON export, Spec 004 protocol envelope unwrapping (`unwrapEnvelope()`), protocol describe command on connect. Integration test: `tools/ws_ui_integration_test.py` with envelope-aware message parsing. |
 
 ## 4. Measured performance (GPU fixed at 1.3 GHz, power mode MaxN)
 
@@ -150,6 +157,13 @@ Findings:
 
 Specs 001, 002, 003, 004, and 006 (Web UI MVP) are complete, verified, and committed.
 
-- **Spec 004 — Protocol Layer**: Implemented. Phases 7–12 complete: data types (topic.h, schema.h), pipeline registry, topic router, storage layer (MEMORY + DISK), ProtocolTimeline integration, WS v2 envelope with describe command, --storage-disk-path flag. 25/25 tests pass. Full 1-hour stress test passed (3615s audio, 9.48x real-time, stable temperature/power).
-- **Spec 006 — Web UI MVP**: Implemented. Phase 1 complete (T001–T008): dedicated HTTP static server on separate port, full SPA with dark theme, Canvas timeline (diarization + ASR tracks) with zoom/pan, microphone capture with resampling, file upload with real-time streaming, GPU telemetry display, JSON export. Integration test via `tools/ws_ui_integration_test.py`.
-- **Spec 006 — Phase 2** (T009–T010): Canvas timeline enhancements and zoom/pan controls are already implemented in app.js (exceeds original spec). Phase 2 tasks are effectively complete.
+- **Codebase hardening** — complete. All P0/P1 items from 2026-06-21 evaluation executed:
+  - GitHub Actions CI (CUDA 12.5, cmake + ctest + Python lint)
+  - CUDA kernel unit tests (`test_kernels`: 13/13 passed, GPU vs CPU reference)
+  - Level-based logging (`core/log.h`) replacing raw `fprintf(stderr)`
+  - WebSocket server file-static elimination (`serve_server`/`serve_factory`/`pss_list_head` → instance members)
+  - OnText JSON key exact matching (fixes `end`/`flush`/`reset` false positives)
+  - GPU telemetry default disabled (1.0 → 0.0)
+  - VAD model path migration (`models/asr/` → `models/vad/`)
+  - README env var table + Python test CTest registration + protocol envelope unwrapping in web UI
+- **Spec 004 — Protocol Layer**: Implemented. Phases 7–12 complete. Web UI (`app.js`) now includes `unwrapEnvelope()` for Spec 004 topic-based protocol envelopes. Integration test (`ws_ui_integration_test.py`) uses `unwrap_envelope()` for all WS message parsing.

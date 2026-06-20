@@ -191,11 +191,11 @@ void AsrWorker::EmitIncrementalChunk(const float* samples, int n, bool finalize)
     ++inc_text_id_;
     inc_delivered_text_.clear();
     if (emit_) {
-      char buf[128];
+      char buf[160];
       std::snprintf(buf, sizeof(buf),
                     "{\"type\":\"asr\",\"source\":\"qwen3_asr\","
-                    "\"start\":%.3f,\"end\":%.3f,\"text\":\"",
-                    tok.start_sec, tok.end_sec);
+                    "\"text_id\":%ld,\"start\":%.3f,\"end\":%.3f,\"text\":\"",
+                    inc_text_id_, tok.start_sec, tok.end_sec);
       emit_(std::string(buf) + JsonEscape(tok.text) + "\"}");
     }
     inc_live_text_.clear();
@@ -206,11 +206,12 @@ void AsrWorker::EmitIncrementalChunk(const float* samples, int n, bool finalize)
       inc_delivered_text_ = inc_live_text_;
     }
     if (emit_ && !inc_live_text_.empty()) {
-      char buf[160];
+      char buf[192];
       std::snprintf(buf, sizeof(buf),
                     "{\"type\":\"asr_partial\",\"source\":\"qwen3_asr\","
-                    "\"start\":%.3f,\"end\":%.3f,"
+                    "\"text_id\":%ld,\"start\":%.3f,\"end\":%.3f,"
                     "\"text\":\"",
+                    inc_text_id_,
                     tb_.SecondsAt(inc_seg_start_sample_),
                     tb_.SecondsAt(inc_seg_end_sample_));
       emit_(std::string(buf) + JsonEscape(inc_live_text_) + "\"}");

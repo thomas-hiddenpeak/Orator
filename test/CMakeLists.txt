@@ -48,6 +48,7 @@ orator_add_test(test_mel         test_mel.cc)
 orator_add_test(test_audio       test_audio.cc)
 orator_add_test(test_reference   test_reference.cc)
 orator_add_test(test_safetensors test_safetensors.cc)
+orator_add_test(test_kernels test_kernels.cc)
 orator_add_test(test_websocket   test_websocket.cc)
 target_link_libraries(test_websocket PRIVATE pthread)
 orator_add_test(test_topic_router test_topic_router.cc)
@@ -60,3 +61,29 @@ orator_add_test(test_protocol_timeline test_protocol_timeline.cc)
 add_executable(orator_eval ${CMAKE_CURRENT_SOURCE_DIR}/eval_reference.cc)
 set_property(TARGET orator_eval PROPERTY CUDA_ARCHITECTURES native)
 target_link_libraries(orator_eval PRIVATE orator_core)
+
+# ---------------------------------------------------------------------------
+# Python integration tests registered as CTest tests.
+# Each runs via cmake -P with working directory set to repo root so
+# relative model/ paths resolve.
+# ---------------------------------------------------------------------------
+find_program(Python3_EXECUTABLE python3)
+if(Python3_EXECUTABLE)
+  function(orator_add_py_test name script)
+    add_test(NAME ${name}
+      COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/${script}
+    )
+    set_tests_properties(${name} PROPERTIES
+      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+      ENVIRONMENT "ORATOR_GPU_TELEMETRY_SEC=0;ORATOR_VAD_STREAM=0"
+    )
+    # Python integration tests require a running orator_ws server;
+    # they are excluded from default ctest runs.
+    set_tests_properties(${name} PROPERTIES
+      LABELS "python;integration;manual"
+    )
+  endfunction()
+
+  orator_add_py_test(py-ws-comprehensive ws_comprehensive_test.py)
+  orator_add_py_test(py-ws-real-audio test_ws_real_audio.py)
+endif()

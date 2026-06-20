@@ -11,6 +11,31 @@ find_package(CUDA REQUIRED)
 find_package(Threads REQUIRED)
 enable_language(CUDA)
 
+# ---------------------------------------------------------------------------
+# libwebsockets (MIT license) - robust WebSocket server implementation
+# Replaces hand-rolled websocket_server.cc with industrial-grade WS support:
+# - Multi-client concurrent connections
+# - Proper EINTR handling, timeouts, backpressure
+# - Permessage-deflate compression (RFC 7692)
+# - TLS/WSS support (optional)
+# ---------------------------------------------------------------------------
+include(FetchContent)
+FetchContent_Declare(
+  libwebsockets
+  GIT_REPOSITORY https://github.com/warmcat/libwebsockets.git
+  GIT_TAG v4.3.3
+  GIT_SHALLOW TRUE
+)
+# Disable unnecessary features to keep build minimal
+set(LWS_WITH_SSL OFF CACHE BOOL "" FORCE)
+set(LWS_WITHOUT_TESTAPPS ON CACHE BOOL "" FORCE)
+set(LWS_WITH_LEJP ON CACHE BOOL "" FORCE)
+set(LWS_WITH_LEJP_PULL ON CACHE BOOL "" FORCE)
+set(LWS_WITH_SYS_Signal ON CACHE BOOL "" FORCE)
+set(LWS_WITH_IPV6 ON CACHE BOOL "" FORCE)
+set(LWS_UNIXSOCK OFF CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(libwebsockets)
+
 # Resolve the CUDA runtime library explicitly (Tegra/ARM64 friendly).
 link_directories(${CUDA_TOOLKIT_ROOT_DIR}/lib64)
 
@@ -60,9 +85,9 @@ set(ORATOR_CORE_SOURCES
     src/pipeline/stream_timeline.cc
     src/pipeline/diarization_worker.cc
     src/pipeline/asr_worker.cc
-    # networking (dependency-free WebSocket over POSIX sockets)
-    src/net/websocket_server.cc
+    # networking (libwebsockets-based WebSocket server)
     src/net/http_static_server.cc
+    src/net/websocket_server.cc
     src/net/auditory_ws_handler.cc
     # protocol layer (Spec 004)
     src/protocol/pipeline_registry.cc
@@ -84,7 +109,7 @@ target_include_directories(orator_core PUBLIC
 target_include_directories(orator_core PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/minimp3
 )
-target_link_libraries(orator_core PUBLIC cudart cublas Threads::Threads)
+target_link_libraries(orator_core PUBLIC cudart cublas Threads::Threads websockets)
 if(NOT MSVC)
     target_compile_options(orator_core PRIVATE
         $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra>)
