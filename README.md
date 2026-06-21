@@ -94,11 +94,20 @@ ORATOR_CONFIG=/path/to/orator.toml ./build/orator_ws 8765 ""
 | `ORATOR_UI_ROOT` | `web` | 覆盖静态页面目录 |
 | `ORATOR_ASR_MODEL_DIR` | `models/asr/Qwen/Qwen3-ASR-1.7B` | 覆盖 ASR 模型目录 |
 | `ORATOR_ASR_DISABLE` | `0` | `=1` 显式禁用 ASR |
+| `ORATOR_ASR_MAX_NEW_TOKENS` | `32` | 覆盖 ASR 最大解码 token 数 |
+| `ORATOR_ASR_SEGMENT_SEC` | `24.0` | 覆盖 ASR 硬分段阈值（秒） |
+| `ORATOR_ASR_LANGUAGE` | `Chinese` | 覆盖 ASR 语言提示 |
+| `ORATOR_ASR_BAN_STEPS` | `3` | 覆盖 ASR 去重步数 |
+| `ORATOR_ASR_DECODE_BATCH` | `4` | 覆盖 ASR 解码批量大小 |
+| `ORATOR_ASR_SYSTEM_PROMPT` | `` | 覆盖 ASR 系统提示词 |
 | `ORATOR_GPU_TELEMETRY_SEC` | `0` | GPU 遥测推送间隔（秒）；`0`=禁用 |
+| `ORATOR_GPU_SERIAL` | `0` | `=1` 强制 GPU 序列化模式（禁用并发流） |
+| `ORATOR_GPU_CONCURRENT` | `0` | `=1` 强制 GPU 全并发模式（实验性） |
 | `ORATOR_VAD_STREAM` | `1` | `=0` 禁用 VAD 流 |
 | `ORATOR_VAD_THRESHOLD` | `0.5` | VAD 敏感度 |
 | `ORATOR_VAD_MIN_SPEECH_MS` | `250` | VAD 最短语音 (ms) |
 | `ORATOR_VAD_MIN_SILENCE_MS` | `300` | VAD 最短静音 (ms) |
+| `ORATOR_VAD_MODEL` | `models/vad/silero_vad.safetensors` | 覆盖 VAD 模型路径 |
 | `ORATOR_LOG_LEVEL` | `2` | 日志级别：`0`=DEBUG, `1`=INFO, `2`=WARN, `3`=ERROR |
 | `ORATOR_ASR_PROFILE` | — | 设置即启用 ASR 每帧耗时日志 |
 | `ORATOR_STREAM_PROGRESS` | — | 设置即显示 diarizer 流式进度条 |
@@ -124,7 +133,7 @@ cd build
 ctest --output-on-failure
 ```
 
-包含 25+ CTest 测试和可选 Python 集成测试：
+包含 40 测试（38 C++ + 2 Python）和可选 Python 集成测试：
 
 - C++ 单元测试覆盖：时间基、ComprehensiveTimeline、ASR 算子、GPU 核函数（Add/Multiply/Normalize/CosineSimilarity）、WebSocket、协议层等
 - CUDA kernel 测试（`test_kernels`）：13 个测试，验证 GPU 核函数与 CPU 参考实现的数值等价性
@@ -170,7 +179,7 @@ pipeline/  (管道编排、工作者线程、时间线)
 
 `orator_ws` 是唯一主入口（`src/ws_main.cc`）：
 
-1. **配置加载** — 解析 CLI 参数和 20+ 环境变量到 `AuditoryStream::Config`
+1. **配置加载** — 解析 CLI 参数和 26 环境变量到 `AuditoryStream::Config`
 2. **单例管线创建** — `AuditoryStream` 只创建一次（GPU 模型仅加载一次），通过 `shared_ptr` 在所有 WebSocket 连接间共享。每个新连接调用 `Reset()`（清状态但不卸载模型），避免 Jetson OOM
 3. **服务器双端口** — 主端口提供 WebSocket 服务（libwebsockets），`port+1` 提供 HTTP 静态服务（零依赖原始 socket），托管 `web/` SPA
 4. **服务循环** — 新 WS 连接创建 `AuditoryWsHandler`，共享已有的 `AuditoryStream`
@@ -261,6 +270,19 @@ SPA 架构（`web/app.js`），通过 WS 实时接收事件推送：
 | `gpu_telemetry` | 实时 RTF 指标 |
 
 Canvas 时间线支持缩放、拖拽平移、缩放复位、键盘导航。
+
+### 调试环境变量（仅用于模型开发）
+
+以下环境变量用于 ASR 模型调试和性能分析，不纳入常规配置系统：
+
+| 变量 | 说明 |
+|---|---|
+| `ORATOR_ASR_PROFILE2` | 逐 token GPU 耗时分析 |
+| `ORATOR_ASR_BATCH` | 解码批量大小覆盖 |
+| `ORATOR_ASR_DECPROF` | 解码器性能分析 |
+| `ORATOR_ASR_NOGRAPH` | 禁用 CUDA Graph 捕获 |
+| `ORATOR_ASR_WINDOWED` | 分窗编码器模式 |
+| `ORATOR_ASR_CUBLAS_GEMV` | 强制使用 cuBLAS GEMV |
 
 ## 贡献
 

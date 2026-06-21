@@ -90,6 +90,8 @@ set(ORATOR_CORE_SOURCES
     src/pipeline/diar_postprocess.cc
     src/pipeline/json_util.cc
     src/pipeline/auditory_stream.cc
+    src/pipeline/auditory_stream_subscriptions.cc
+    src/pipeline/auditory_stream_serialize.cc
     src/pipeline/asr_preprocessor.cc
     src/pipeline/comprehensive_timeline.cc
     src/pipeline/gpu_vad.cu

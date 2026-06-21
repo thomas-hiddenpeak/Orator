@@ -143,3 +143,25 @@
 # GPU scheduling mode: "auto" (default), "serial" (ORATOR_GPU_SERIAL),
 # or "concurrent" (ORATOR_GPU_CONCURRENT)
 # gpu_scheduling = "auto"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Debug — ASR model development knobs (read via std::getenv, not via Config)
+# ══════════════════════════════════════════════════════════════════════════════
+[debug_model]
+# Per-token GPU timing (ORATOR_ASR_PROFILE2)
+# profile2 = false
+
+# Decode batch override (ORATOR_ASR_BATCH)
+# batch = 0
+
+# Decoder profiling (ORATOR_ASR_DECPROF)
+# decprof = false
+
+# Disable CUDA graph capture (ORATOR_ASR_NOGRAPH)
+# no_graph = false
+
+# Windowed encoder mode (ORATOR_ASR_WINDOWED)
+# windowed_encoder = false
+
+# Force cuBLAS GEMV (ORATOR_ASR_CUBLAS_GEMV)
+# cublas_gemv = false

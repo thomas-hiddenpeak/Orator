@@ -42,7 +42,7 @@ rework. Enforce these every session:
 7. Record verified lessons in `/memories/repo/` and keep docs in sync.
 
 ## Constitutional hard rules
-- Runtime dependency policy: production runtime is pure C++17/CUDA only. No new runtime third-party libraries.
+- Runtime dependency policy: production runtime is pure C++20/CUDA only. No new runtime third-party libraries.
 - Accuracy first: do not trade measurable quality for speed unless explicitly approved and validated.
 - Dual pipeline model: diarization and ASR are independent pipelines sharing only input audio and one absolute time base.
 - Streaming validation: validate through the real WebSocket streaming path, not whole-file shortcut runs.
