@@ -8,7 +8,7 @@
 
 #include "core/time_base.h"
 #include "core/types.h"
-#include "model/streaming_sortformer.h"
+#include "core/stages.h"
 
 // DiarizationWorker: the speaker-separation pipeline as an independent unit.
 //
@@ -43,7 +43,7 @@ class DiarizationWorker {
   // `tb` is the common time base inherited from SharedAudioBuffer::time_base().
   // The worker holds it as a member and derives all time codes from it.
   // Frames are accumulated internally (no external StreamTimeline needed).
-  DiarizationWorker(model::SortformerDiarizer* diarizer,
+  DiarizationWorker(core::IDiarizer* diarizer,
                      Params params, core::TimeBase tb, cudaStream_t stream);
 
   // Set the comprehensive-timeline speaker-view sink (Spec 004). Optional.
@@ -73,7 +73,7 @@ class DiarizationWorker {
   int diar_speakers_ = 0;
   double diar_frame_period_sec_ = 0.0;
 
-  model::SortformerDiarizer* diarizer_;
+  core::IDiarizer* diarizer_;
   Params params_;
   core::TimeBase tb_;
   cudaStream_t stream_;

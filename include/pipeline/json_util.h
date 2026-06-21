@@ -3,6 +3,9 @@
 // Minimal JSON string escaping for the timeline/event serializers. Shared so
 // the ASR worker (incremental events) and the controller (timeline document)
 // escape UTF-8 text identically without duplicating the logic.
+//
+// Also provides JSON key-value parsing helpers extracted from duplicated
+// inline lambdas in auditory_stream.cc subscription callbacks.
 
 #include <cstdio>
 #include <string>
@@ -34,6 +37,16 @@ inline std::string JsonEscape(const std::string& s) {
   }
   return o;
 }
+
+// Parse a numeric value for a JSON key. Returns 0.0 on failure.
+double JsonParseNum(const std::string& data, const char* key);
+
+// Parse a string value for a JSON key. Returns "" on failure.
+// Handles escaped quotes within the string value.
+std::string JsonParseStr(const std::string& data, const char* key);
+
+// Parse a long integer value for a JSON key. Returns -1 on failure.
+long JsonParseLong(const std::string& data, const char* key);
 
 }  // namespace pipeline
 }  // namespace orator

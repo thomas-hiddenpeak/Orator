@@ -92,6 +92,8 @@ class IAsr {
   // within the stream (offset by audio.t_start_sec).
   virtual Transcript Transcribe(const AudioChunk& audio) = 0;
 
+  virtual void set_max_new_tokens(int /*max_tokens*/) {}
+
   virtual std::string name() const = 0;
 };
 

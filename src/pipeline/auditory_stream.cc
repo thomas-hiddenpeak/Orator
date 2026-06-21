@@ -3,8 +3,6 @@
 #include "core/log.h"
 #include "core/registry.h"
 #include "model/builtin_registration.h"
-#include "model/qwen3_asr.h"
-#include "model/streaming_sortformer.h"
 #include "protocol/protocol_timeline.h"
 #include "protocol/session_store.h"
 
@@ -95,25 +93,10 @@ void AuditoryStream::Start() {
   vad_sub_id_ = protocol_timeline_->SubscribeInternal(
       protocol::TopicPattern{"vad/+"},
       [this](const protocol::Message& msg) {
-        const std::string& data = msg.data;
-        auto start_pos = data.find("\"start\":");
-        auto end_pos = data.find("\"end\":");
-        if (start_pos != std::string::npos && end_pos != std::string::npos) {
-          auto start_val_start = start_pos + 8; // len of "\"start\":"
-          auto start_val_end = data.find_first_of(",}", start_val_start);
-          auto end_val_start = end_pos + 6;     // len of "\"end\":"
-          auto end_val_end = data.find_first_of(",}", end_val_start);
-          if (start_val_end != std::string::npos && end_val_end != std::string::npos) {
-            try {
-              double start = std::stod(data.substr(start_val_start, start_val_end - start_val_start));
-              double end = std::stod(data.substr(end_val_start, end_val_end - end_val_start));
-              std::lock_guard<std::mutex> lk(comp_mutex_);
-              comp_.AddVad(start, end);
-            } catch (const std::exception&) {
-              // malformed VAD message — skip gracefully
-            }
-          }
-        }
+        double start = JsonParseNum(msg.data, "start");
+        double end = JsonParseNum(msg.data, "end");
+        std::lock_guard<std::mutex> lk(comp_mutex_);
+        comp_.AddVad(start, end);
       });
 
   // Diar subscription: parse {"segments":[{...},...]} → comp_.ReplaceSpeakers()
@@ -145,35 +128,11 @@ void AuditoryStream::Start() {
           if (brace_end == std::string::npos) break;
           std::string obj = seg_json.substr(brace, brace_end - brace + 1);
 
-          auto parse_num = [&obj](const char* key) -> double {
-            auto kp = obj.find("\"" + std::string(key) + "\":");
-            if (kp == std::string::npos) return 0.0;
-            kp += std::string("\"" + std::string(key) + ":").size();
-            auto ve = obj.find_first_of(",}", kp);
-            if (ve == std::string::npos) return 0.0;
-            try {
-              return std::stod(obj.substr(kp, ve - kp));
-            } catch (const std::exception&) {
-              return 0.0;
-            }
-          };
-          auto parse_str = [&obj](const char* key) -> std::string {
-            std::string search = "\"" + std::string(key) + "\":";
-            auto kp = obj.find(search);
-            if (kp == std::string::npos) return "";
-            kp += search.size();
-            if (kp >= obj.size() || obj[kp] != '"') return "";
-            kp++; // skip opening quote
-            auto ve = obj.find('"', kp);
-            if (ve == std::string::npos) return "";
-            return obj.substr(kp, ve - kp);
-          };
-
           ComprehensiveTimeline::SpeakerInput si;
-          si.start = parse_num("start");
-          si.end = parse_num("end");
-          si.speaker = parse_str("speaker");
-          si.conf = static_cast<float>(parse_num("confidence"));
+          si.start = JsonParseNum(obj, "start");
+          si.end = JsonParseNum(obj, "end");
+          si.speaker = JsonParseStr(obj, "speaker");
+          si.conf = static_cast<float>(JsonParseNum(obj, "confidence"));
           speakers.push_back(si);
 
           obj_pos = brace_end + 1;
@@ -189,59 +148,10 @@ void AuditoryStream::Start() {
       [this](const protocol::Message& msg) {
         const std::string& data = msg.data;
 
-        auto parse_num = [&data](const char* key) -> double {
-          std::string search = "\"" + std::string(key) + "\":";
-          auto kp = data.find(search);
-          if (kp == std::string::npos) return 0.0;
-          kp += search.size();
-          auto ve = data.find_first_of(",}", kp);
-          if (ve == std::string::npos) return 0.0;
-          try {
-            return std::stod(data.substr(kp, ve - kp));
-          } catch (const std::exception&) {
-            return 0.0;
-          }
-        };
-        auto parse_long = [&data](const char* key) -> long {
-          std::string search = "\"" + std::string(key) + "\":";
-          auto kp = data.find(search);
-          if (kp == std::string::npos) return -1;
-          kp += search.size();
-          auto ve = data.find_first_of(",}", kp);
-          if (ve == std::string::npos) return -1;
-          try {
-            return static_cast<long>(std::stol(data.substr(kp, ve - kp)));
-          } catch (const std::exception&) {
-            return -1;
-          }
-        };
-        auto parse_str = [&data](const char* key) -> std::string {
-          std::string search = "\"" + std::string(key) + "\":";
-          auto kp = data.find(search);
-          if (kp == std::string::npos) return "";
-          kp += search.size();
-          if (kp >= data.size() || data[kp] != '"') return "";
-          kp++; // skip opening quote
-          // Handle escaped quotes within the string value
-          std::string result;
-          while (kp < data.size()) {
-            if (data[kp] == '\\' && kp + 1 < data.size()) {
-              result += data[kp + 1];
-              kp += 2;
-            } else if (data[kp] == '"') {
-              break;
-            } else {
-              result += data[kp];
-              kp++;
-            }
-          }
-          return result;
-        };
-
-        long id = parse_long("id");
-        double start = parse_num("start");
-        double end = parse_num("end");
-        std::string text = parse_str("text");
+        long id = JsonParseLong(data, "id");
+        double start = JsonParseNum(data, "start");
+        double end = JsonParseNum(data, "end");
+        std::string text = JsonParseStr(data, "text");
 
         if (id < 0) return;
 
@@ -275,11 +185,7 @@ void AuditoryStream::Start() {
     ac.sample_rate = config_.sample_rate;
     ac.language = config_.asr_language;
     asr_->Initialize(ac);
-    // set_language is redundant with AsrConfig above; set_max_new_tokens is
-    // Qwen3-specific — downcast through the interface pointer.
-    if (auto* qwen = dynamic_cast<model::Qwen3Asr*>(asr_.get())) {
-      qwen->set_max_new_tokens(config_.asr_max_new_tokens);
-    }
+    asr_->set_max_new_tokens(config_.asr_max_new_tokens);
     asr_->LoadWeights(config_.asr_model_dir);
 
       // Spec 002: source the ASR pipeline's GPU stream from the priority
@@ -308,8 +214,7 @@ void AuditoryStream::StartWorkers() {
     dp.deliver_interval_sec = config_.diar_deliver_interval_sec;
     dp.sample_rate = config_.sample_rate;
     diar_worker_ =
-        std::make_unique<DiarizationWorker>(
-            dynamic_cast<model::SortformerDiarizer*>(diarizer_.get()), dp,
+        std::make_unique<DiarizationWorker>(diarizer_.get(), dp,
             buffer_.time_base(), diar_stream_);
     // Spec 004 Step 2: diarization publishes speaker segments to the protocol
     // timeline on the diar/speaker_segment topic. last_segments_ is stored
@@ -371,8 +276,7 @@ void AuditoryStream::StartWorkers() {
     p.asr_vad_lead_ms = config_.asr_vad_lead_ms;
     p.asr_vad_trail_sec = config_.asr_vad_trail_sec;
     p.max_audio_tokens = config_.asr_max_audio_tokens;
-    asr_worker_ = std::make_unique<AsrWorker>(
-        dynamic_cast<model::Qwen3Asr*>(asr_.get()), p,
+    asr_worker_ = std::make_unique<AsrWorker>(asr_.get(), p,
         [this](const std::string& json) { EmitLocked(json); },
         buffer_.time_base(), asr_stream_);
     asr_worker_->set_text_sink(

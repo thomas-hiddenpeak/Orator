@@ -8,6 +8,7 @@
 #include <thread>
 
 #include "gpu/gpu_lock.h"
+#include "model/qwen3_asr.h"
 #include "pipeline/json_util.h"
 
 namespace orator {
@@ -20,7 +21,7 @@ double Secs(Clock::time_point a, Clock::time_point b) {
 }
 }  // namespace
 
-AsrWorker::AsrWorker(model::Qwen3Asr* asr,
+AsrWorker::AsrWorker(core::IAsr* asr,
                        const Params& params, Emit emit, core::TimeBase tb,
                        cudaStream_t stream)
     : asr_(asr), params_(params), emit_(std::move(emit)),
@@ -191,6 +192,7 @@ void AsrWorker::ProcessIncremental(const float* samples, int n, bool finalize) {
 }
 
 void AsrWorker::EmitIncrementalChunk(const float* samples, int n, bool finalize) {
+  auto* qwen = dynamic_cast<model::Qwen3Asr*>(asr_);
   const auto t0 = Clock::now();
   {
     gpu::DeviceGuard gpu(/*own_stream=*/true);
@@ -199,16 +201,16 @@ void AsrWorker::EmitIncrementalChunk(const float* samples, int n, bool finalize)
         inc_seg_start_sample_ = inc_abs_pos_;
         inc_seg_samples_ = 0;
         inc_live_text_.clear();
-        asr_->StreamReset(inc_seg_start_sample_);
+        qwen->StreamReset(inc_seg_start_sample_);
         inc_in_segment_ = true;
       }
-      inc_live_text_ = asr_->StreamChunk(samples, n, stream_);
+      inc_live_text_ = qwen->StreamChunk(samples, n, stream_);
       inc_seg_samples_ += n;
       inc_abs_pos_ += n;
       inc_seg_end_sample_ = inc_abs_pos_;
     }
     if (inc_in_segment_ && finalize) {
-      inc_live_text_ = asr_->StreamFinalize(stream_);
+      inc_live_text_ = qwen->StreamFinalize(stream_);
       inc_in_segment_ = false;
     }
     // KV-cache safety cap: force-finalize before GPU memory crash.
@@ -222,8 +224,8 @@ void AsrWorker::EmitIncrementalChunk(const float* samples, int n, bool finalize)
     // the margin increases and the per-segment cap is ~115s of audio. VAD
     // trailing window normally closes segments before the cap is reached.
     if (inc_in_segment_ && params_.max_audio_tokens > 0 &&
-        asr_->stream_audio_tokens() >= params_.max_audio_tokens) {
-      inc_live_text_ = asr_->StreamFinalize(stream_);
+        qwen->stream_audio_tokens() >= params_.max_audio_tokens) {
+      inc_live_text_ = qwen->StreamFinalize(stream_);
       inc_in_segment_ = false;
     }
   }

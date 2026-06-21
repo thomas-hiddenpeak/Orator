@@ -2,6 +2,7 @@
 
 #include <chrono>
 
+#include "model/streaming_sortformer.h"
 #include "pipeline/diar_postprocess.h"
 
 namespace orator {
@@ -14,7 +15,7 @@ double Secs(Clock::time_point a, Clock::time_point b) {
 }
 }  // namespace
 
-DiarizationWorker::DiarizationWorker(model::SortformerDiarizer* diarizer,
+DiarizationWorker::DiarizationWorker(core::IDiarizer* diarizer,
                                        Params params, core::TimeBase tb,
                                        cudaStream_t stream)
     : diarizer_(diarizer), params_(params),
@@ -48,9 +49,10 @@ void DiarizationWorker::DeliverSpeakers(bool force) {
 
 void DiarizationWorker::ProcessSpan(const float* samples, int n) {
   if (samples == nullptr || n <= 0) return;
+  auto* sd = dynamic_cast<model::SortformerDiarizer*>(diarizer_);
   const auto t0 = Clock::now();
   core::DiarizationFrames part =
-      diarizer_->StreamAudio(samples, n, false, stream_);
+      sd->StreamAudio(samples, n, false, stream_);
   compute_sec_ += Secs(t0, Clock::now());
   // Accumulate frames internally (replaces StreamTimeline::AppendDiarFrames).
   if (part.num_frames > 0 && part.num_speakers > 0) {
@@ -65,9 +67,10 @@ void DiarizationWorker::ProcessSpan(const float* samples, int n) {
 }
 
 void DiarizationWorker::Finalize() {
+  auto* sd = dynamic_cast<model::SortformerDiarizer*>(diarizer_);
   const auto t0 = Clock::now();
   core::DiarizationFrames tail =
-      diarizer_->StreamAudio(nullptr, 0, true, stream_);
+      sd->StreamAudio(nullptr, 0, true, stream_);
   compute_sec_ += Secs(t0, Clock::now());
   if (tail.num_frames > 0 && tail.num_speakers > 0) {
     if (diar_speakers_ == 0) {

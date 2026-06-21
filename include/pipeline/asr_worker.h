@@ -15,7 +15,7 @@
 #include <string>
 #include <vector>
 
-#include "model/qwen3_asr.h"
+#include "core/stages.h"
 #include "core/time_base.h"
 #include <cuda_runtime.h>
 
@@ -43,7 +43,7 @@ class AsrWorker {
   // The worker holds it as a member and derives all time codes from it.
   // Text segments are delivered via text_sink_ (→ ProtocolTimeline → comp_);
   // raw tokens are no longer written to an external StreamTimeline.
-  AsrWorker(model::Qwen3Asr* asr, const Params& params,
+  AsrWorker(core::IAsr* asr, const Params& params,
               Emit emit, core::TimeBase tb, cudaStream_t stream = 0);
 
   void set_text_sink(TextSegmentSink sink) { text_sink_ = std::move(sink); }
@@ -63,7 +63,7 @@ class AsrWorker {
   void ProcessIncremental(const float* samples, int n, bool finalize);
   void EmitIncrementalChunk(const float* samples, int n, bool finalize);
 
-  model::Qwen3Asr* asr_;
+  core::IAsr* asr_;
   Params params_;
   Emit emit_;
   TextSegmentSink text_sink_;
