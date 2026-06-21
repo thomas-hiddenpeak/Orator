@@ -48,34 +48,57 @@ namespace pipeline {
 class AuditoryStream {
  public:
   struct Config {
+    // ── Model paths ──────────────────────────────────────────────────
     std::string diarizer_weights = "models/sortformer_4spk_v2.safetensors";
-    std::string asr_model_dir = "";  // "" => ASR pipeline disabled
-    int sample_rate = 16000;
-    int max_speakers = 4;
-    float diar_threshold = 0.5f;
-    double diar_merge_gap_sec = 0.5;
+    std::string asr_model_dir = "models/asr/Qwen/Qwen3-ASR-1.7B";
+    std::string vad_model = "models/vad/silero_vad.safetensors";
 
-    int asr_max_new_tokens = 32;
-    double asr_segment_sec = 24.0;
+    // ── Hardware ─────────────────────────────────────────────────────
+    int sample_rate = 16000;
+    int gpu_scheduling_mode = 0;  // 0=auto, 1=serial, 2=full_concurrent
+
+    // ── Server ───────────────────────────────────────────────────────
+    int port = 8765;
+    int ui_port = 0;        // 0 = auto (port+1)
+    std::string ui_root = "web";
+
+    // ── ASR pipeline ─────────────────────────────────────────────────
     bool asr_vad_gate = true;
     int asr_vad_lead_ms = 200;
     double asr_vad_trail_sec = 1.0;
     int asr_max_audio_tokens = 1500;
+    int asr_max_new_tokens = 32;
+    double asr_segment_sec = 24.0;
+    std::string asr_language = "Chinese";
+    std::string asr_system_prompt = "";
+    int asr_ban_steps = 3;
+    int asr_decode_batch = 4;
+    bool asr_profile = false;
+
+    // ── VAD pipeline ─────────────────────────────────────────────────
     bool vad_stream = true;
-    std::string vad_model = "models/vad/silero_vad.safetensors";
     float vad_threshold = 0.5f;
     int vad_min_speech_ms = 250;
     int vad_min_silence_ms = 300;
-    std::string asr_language = "Chinese";
-    // Spec 002 FR7: interval (seconds) for the periodic GPU-scheduling telemetry
-    // message ({"type":"gpu_telemetry"}). A dedicated low-rate timer thread
-    // emits it through the serialized transport. 0 disables it.
-    double gpu_telemetry_interval_sec = 0.0;  // 0 = disabled; set env ORATOR_GPU_TELEMETRY_SEC to enable
-    // Spec 004 Phase 12: configurable DISK storage path for protocol timeline.
+    int vad_speech_pad_ms = 60;
+
+    // ── Diarizer pipeline ────────────────────────────────────────────
+    int max_speakers = 4;
+    float diar_threshold = 0.5f;
+    double diar_merge_gap_sec = 0.5;
+    double diar_deliver_interval_sec = 1.0;
+
+    // ── Storage ──────────────────────────────────────────────────────
     std::string storage_disk_path = "/tmp/orator/storage/";
-    // Spec 004 Phase 13: session persistence directory.
-    // When empty, defaults to <storage_disk_path>/sessions/.
     std::string session_dir;
+
+    // ── Telemetry ────────────────────────────────────────────────────
+    double gpu_telemetry_interval_sec = 0.0;
+
+    // ── Debug ────────────────────────────────────────────────────────
+    int log_level = 2;   // 0=DEBUG, 1=INFO, 2=WARN, 3=ERROR
+    bool timebase_check = false;
+    bool stream_progress = false;
   };
 
   // Delivers a result event as a JSON string. Invoked from the ASR worker thread

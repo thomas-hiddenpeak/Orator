@@ -292,6 +292,7 @@ void AuditoryStream::StartWorkers() {
     DiarizationWorker::Params dp;
     dp.threshold = config_.diar_threshold;
     dp.merge_gap_sec = config_.diar_merge_gap_sec;
+    dp.deliver_interval_sec = config_.diar_deliver_interval_sec;
     dp.sample_rate = config_.sample_rate;
     diar_worker_ =
         std::make_unique<DiarizationWorker>(diarizer_.get(), dp,
@@ -432,6 +433,7 @@ void AuditoryStream::StartWorkers() {
     vp.silero_threshold = config_.vad_threshold;
     vp.silero_min_speech_ms = config_.vad_min_speech_ms;
     vp.silero_min_silence_ms = config_.vad_min_silence_ms;
+    vp.silero_speech_pad_ms = config_.vad_speech_pad_ms;
     vp.stream = vad_stream_;
     vad_detector_ = std::make_unique<GpuVad>(vp);
     vad_cursor_ = buffer_.AddConsumer();

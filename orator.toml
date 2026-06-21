@@ -7,14 +7,30 @@
 #   3. Environment variables (ORATOR_*)
 #   4. CLI arguments (port, diarizer weights, ASR model dir)
 #
-# All values shown below are the project defaults. Uncomment and change only
-# the parameters you want to tune.
-#
 # TIP: Keep notes as comments next to values you try, e.g.:
 #   vad_trail_sec = 1.0    # was 1.5 — v7 fix, tested 120s OK
 # ──────────────────────────────────────────────────────────────────────────────
 
+# ══════════════════════════════════════════════════════════════════════════════
+# Server — network ports and UI
+# ══════════════════════════════════════════════════════════════════════════════
+[server]
+# WebSocket port (CLI arg overrides)
+# port = 8765
+
+# UI HTTP port. 0 = auto (port + 1)
+# ui_port = 0
+
+# Static file root for the web UI
+# ui_root = "web"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ASR — speech recognition pipeline
+# ══════════════════════════════════════════════════════════════════════════════
 [asr]
+# Model directory path (CLI arg overrides)
+# model_dir = "models/asr/Qwen/Qwen3-ASR-1.7B"
+
 # Master switch for VAD-gated processing
 # vad_gate = true
 
@@ -39,9 +55,27 @@
 # Language hint ("" = auto-detect)
 # language = "Chinese"
 
+# Optional system prompt for ASR decoder
+# system_prompt = ""
+
+# Decoder beam ban steps (suppress repetitive n-grams)
+# ban_steps = 3
+
+# Decode batch size (parallel token candidates)
+# decode_batch = 4
+
+# Enable per-frame ASR timing profile (ORATOR_ASR_PROFILE)
+# profile = false
+
+# ══════════════════════════════════════════════════════════════════════════════
+# VAD — voice activity detection pipeline
+# ══════════════════════════════════════════════════════════════════════════════
 [vad]
 # Silero VAD model path
 # model = "models/vad/silero_vad.safetensors"
+
+# Enable VAD streaming pipeline
+# stream = true
 
 # Speech probability threshold (0.0-1.0)
 # threshold = 0.5
@@ -54,13 +88,58 @@
 # We tested: 300 (v7 default), 200 (more VAD splits)
 # min_silence_ms = 300
 
+# Speech segment padding (ms) on each side
+# speech_pad_ms = 60
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Diarization — speaker separation pipeline
+# ══════════════════════════════════════════════════════════════════════════════
 [diarizer]
+# Model weights path (CLI arg overrides). Empty = disable diarization
+# model = "models/sortformer_4spk_v2.safetensors"
+
+# Maximum number of speakers
+# max_speakers = 4
+
 # Per-speaker activity threshold (0.0-1.0)
 # threshold = 0.5
 
 # Merge same-speaker segments closer than this (seconds)
 # merge_gap_sec = 0.5
 
+# Minimum audio interval between live speaker-view deliveries
+# deliver_interval_sec = 1.0
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Storage — protocol timeline persistence
+# ══════════════════════════════════════════════════════════════════════════════
+[storage]
+# DISK backend path for protocol timeline
+# disk_path = "/tmp/orator/storage/"
+
+# Session persistence directory. Empty = defaults to <disk_path>/sessions/
+# session_dir = ""
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Telemetry — GPU scheduling metrics
+# ══════════════════════════════════════════════════════════════════════════════
 [telemetry]
-# GPU scheduling telemetry push interval (seconds). 0 = disabled.
+# GPU telemetry push interval (seconds). 0 = disabled.
 # gpu_interval_sec = 0.0
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Debug — diagnostics and profiling
+# ══════════════════════════════════════════════════════════════════════════════
+[debug]
+# Log level: 0=DEBUG, 1=INFO, 2=WARN, 3=ERROR
+# log_level = 2
+
+# Enable timebase consistency checks (ORATOR_TIMEBASE_CHECK)
+# timebase_check = false
+
+# Show diarizer streaming progress bar (ORATOR_STREAM_PROGRESS)
+# stream_progress = false
+
+# GPU scheduling mode: "auto" (default), "serial" (ORATOR_GPU_SERIAL),
+# or "concurrent" (ORATOR_GPU_CONCURRENT)
+# gpu_scheduling = "auto"

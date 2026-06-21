@@ -65,19 +65,16 @@ bool ReadEnvFlag(const char* name, bool dflt) {
 }  // namespace
 
 int main(int argc, char** argv) {
-  int port = argc > 1 ? std::atoi(argv[1]) : 8765;
-  int ui_port = 0;
+  // ── Step 1: compile-time defaults (Config struct initializers) ────
   pipeline::AuditoryStream::Config cfg;
+
+  // ── Step 2: CLI args override defaults ────────────────────────────
+  if (argc > 1) cfg.port = std::atoi(argv[1]);
   const bool asr_arg_provided = argc > 3;
   if (argc > 2) cfg.diarizer_weights = argv[2];
   if (asr_arg_provided) cfg.asr_model_dir = argv[3];
 
-  // Default startup policy: bring all pipelines to standby for production-like
-  // readiness. Keep explicit CLI override behavior: passing an empty third
-  // argument still disables ASR intentionally.
-  if (!asr_arg_provided) cfg.asr_model_dir = "models/asr/Qwen/Qwen3-ASR-1.7B";
-
-  // Config file (optional) — compile-time defaults → orator.toml → env vars
+  // ── Step 3: TOML config file overrides defaults ──────────────────
   {
     const char* config_path = std::getenv("ORATOR_CONFIG");
     if (config_path == nullptr || config_path[0] == '\0') {
@@ -86,39 +83,64 @@ int main(int argc, char** argv) {
     io::ApplyTomlConfig(config_path, cfg);
   }
 
-  // Runtime tuning knobs
+  // ── Step 4: sync toml params into env for deep getenv() code ─────
+  // (Existing model code reads these via getenv; setting the env var is
+  //  the least-invasive bridge. The loading order is preserved: env set
+  //  here can still be overridden by the user's env below.)
+  auto set_env_int = [](const char* name, int val) {
+    setenv(name, std::to_string(val).c_str(), 0);
+  };
+  auto set_env_flag = [](const char* name, bool val) {
+    setenv(name, val ? "1" : "0", 0);
+  };
+  set_env_int("ORATOR_LOG_LEVEL", cfg.log_level);
+  set_env_flag("ORATOR_TIMEBASE_CHECK", cfg.timebase_check);
+  set_env_flag("ORATOR_ASR_PROFILE", cfg.asr_profile);
+  set_env_int("ORATOR_ASR_BAN_STEPS", cfg.asr_ban_steps);
+  set_env_int("ORATOR_ASR_DECODE_BATCH", cfg.asr_decode_batch);
+  set_env_flag("ORATOR_STREAM_PROGRESS", cfg.stream_progress);
+  if (!cfg.asr_system_prompt.empty()) {
+    setenv("ORATOR_ASR_SYSTEM_PROMPT", cfg.asr_system_prompt.c_str(), 0);
+  }
+  set_env_int("ORATOR_GPU_SERIAL", cfg.gpu_scheduling_mode == 1);
+  set_env_int("ORATOR_GPU_CONCURRENT", cfg.gpu_scheduling_mode == 2);
+
+  // ── Step 5: environment variables override toml + defaults ────────
   ReadEnvInt("ORATOR_ASR_MAX_NEW_TOKENS", &cfg.asr_max_new_tokens);
   ReadEnvDouble("ORATOR_ASR_SEGMENT_SEC", &cfg.asr_segment_sec);
   ReadEnvString("ORATOR_ASR_LANGUAGE", &cfg.asr_language);
   ReadEnvString("ORATOR_ASR_MODEL_DIR", &cfg.asr_model_dir);
-  const bool asr_disable = std::getenv("ORATOR_ASR_DISABLE") != nullptr;
-  if (asr_disable) cfg.asr_model_dir.clear();
-  ReadEnvInt("ORATOR_UI_PORT", &ui_port);
-  if (ui_port <= 0) ui_port = port + 1;
-  std::string ui_root = "web";
-  ReadEnvString("ORATOR_UI_ROOT", &ui_root);
-  auto env_flag = [](const char* name, bool dflt) {
-    const char* v = std::getenv(name);
-    if (v == nullptr || v[0] == '\0') return dflt;
-    return v[0] == '1' || v[0] == 't' || v[0] == 'T' || v[0] == 'y' || v[0] == 'Y';
-  };
-  cfg.vad_stream = env_flag("ORATOR_VAD_STREAM", cfg.vad_stream);
+  if (std::getenv("ORATOR_ASR_DISABLE")) cfg.asr_model_dir.clear();
+  ReadEnvInt("ORATOR_PORT", &cfg.port);
+  ReadEnvInt("ORATOR_UI_PORT", &cfg.ui_port);
+  ReadEnvString("ORATOR_UI_ROOT", &cfg.ui_root);
+  cfg.vad_stream = ReadEnvFlag("ORATOR_VAD_STREAM", cfg.vad_stream);
   ReadEnvString("ORATOR_VAD_MODEL", &cfg.vad_model);
   ReadEnvFloat("ORATOR_VAD_THRESHOLD", &cfg.vad_threshold);
   ReadEnvInt("ORATOR_VAD_MIN_SPEECH_MS", &cfg.vad_min_speech_ms);
   ReadEnvInt("ORATOR_VAD_MIN_SILENCE_MS", &cfg.vad_min_silence_ms);
-
-  // Spec 002 FR7: periodic GPU-scheduling telemetry interval (seconds). 0 off.
   ReadEnvDouble("ORATOR_GPU_TELEMETRY_SEC", &cfg.gpu_telemetry_interval_sec);
-
-  // Spec 004 Phase 12: configurable DISK storage path.
   ReadEnvString("ORATOR_STORAGE_DISK_PATH", &cfg.storage_disk_path);
-
-  // Spec 004 Phase 13: configurable session persistence directory.
   ReadEnvString("ORATOR_SESSION_DIR", &cfg.session_dir);
+  ReadEnvInt("ORATOR_LOG_LEVEL", &cfg.log_level);
+  cfg.timebase_check = ReadEnvFlag("ORATOR_TIMEBASE_CHECK", cfg.timebase_check);
+  cfg.asr_profile = ReadEnvFlag("ORATOR_ASR_PROFILE", cfg.asr_profile);
+  ReadEnvInt("ORATOR_ASR_BAN_STEPS", &cfg.asr_ban_steps);
+  ReadEnvInt("ORATOR_ASR_DECODE_BATCH", &cfg.asr_decode_batch);
+  cfg.stream_progress = ReadEnvFlag("ORATOR_STREAM_PROGRESS", cfg.stream_progress);
+  ReadEnvString("ORATOR_ASR_SYSTEM_PROMPT", &cfg.asr_system_prompt);
+  // gpu_scheduling_mode: env ORATOR_GPU_SERIAL=1 → mode 1, ORATOR_GPU_CONCURRENT=1 → mode 2
+  int gpu_mode = 0;
+  if (ReadEnvInt("ORATOR_GPU_SERIAL", &gpu_mode) && gpu_mode == 1) {
+    cfg.gpu_scheduling_mode = 1;
+  } else if (ReadEnvInt("ORATOR_GPU_CONCURRENT", &gpu_mode) && gpu_mode == 1) {
+    cfg.gpu_scheduling_mode = 2;
+  }
 
-  // reused across all client connections. This avoids repeated GPU model loads
-  // which would exhaust device memory on Jetson.
+  // ── Step 6: finalize port / ui_port ───────────────────────────────
+  if (cfg.ui_port <= 0) cfg.ui_port = cfg.port + 1;
+
+  // ── Step 7: start pipeline + servers ──────────────────────────────
   auto emit_target = std::make_shared<net::SessionEmit>();
   auto stream = std::make_shared<pipeline::AuditoryStream>(
       cfg, [emit_target](const std::string& json) { emit_target->Send(json); });
@@ -131,14 +153,14 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  net::WebSocketServer server(port);
+  net::WebSocketServer server(cfg.port);
   if (!server.Start()) {
-    std::cerr << "failed to bind port " << port << std::endl;
+    std::cerr << "failed to bind port " << cfg.port << std::endl;
     return 1;
   }
-  net::HttpStaticServer ui(ui_port, ui_root);
+  net::HttpStaticServer ui(cfg.ui_port, cfg.ui_root);
   if (!ui.Start()) {
-    std::cerr << "failed to bind UI port " << ui_port
+    std::cerr << "failed to bind UI port " << cfg.ui_port
               << " (set ORATOR_UI_PORT to override)" << std::endl;
     return 1;
   }
