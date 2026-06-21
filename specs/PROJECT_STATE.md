@@ -14,7 +14,7 @@ work is specified under [specs/](.).
 > pass is the consistency proof. Status lines advance to `Implemented` in the
 > same change that lands the code, with the commit reference.
 
-- **Last updated**: 2026-06-21 (All specs audited; Spec 001 T051 confirmed clean; Spec 006 T015+T016 completed)
+- **Last updated**: 2026-06-22 (TOML config system, VAD-gated ASR fix)
 - **Branch**: `master`
 - **Constitution**: v1.3.0
 
@@ -193,3 +193,5 @@ Specs 001, 002, 003, 004, and 006 (Web UI MVP) are complete, verified, and commi
   - README env var table + Python test CTest registration + protocol envelope unwrapping in web UI
 - **Spec 004 — Protocol Layer**: Implemented. Phases 7–12 complete. Web UI (`app.js`) now includes `unwrapEnvelope()` for Spec 004 topic-based protocol envelopes. Integration test (`ws_ui_integration_test.py`) uses `unwrap_envelope()` for all WS message parsing.
 - **Full-length streaming verification**: 2026-06-21. 3615 s (1 hr) audio pushed through real WebSocket → 382.0 s wall = **9.46× real-time**. All three tracks (ASR/diarization/VAD) cover 100 % of the audio, no crash, no clock drift, no data loss. Achieved 9.25× on a consecutive warm-GPU re-run and 5.82× on a cold-start run, confirming model-load overhead is one-time.
+- **TOML config system** (2026-06-22). All ~35 runtime parameters consolidated into `orator.toml` with 8 sections: `[server]`, `[asr]`, `[vad]`, `[diarizer]`, `[storage]`, `[telemetry]`, `[debug]`. Loading order: compile-time defaults → CLI args → `orator.toml` → env var overrides. Header-only toml++ (FetchContent, zero runtime dep). Config struct expanded to 35 fields across all pipelines. Previous env-only params (`ORATOR_TIMEBASE_CHECK`, `ORATOR_ASR_PROFILE`, `ORATOR_STREAM_PROGRESS`, `ORATOR_LOG_LEVEL`, `ORATOR_GPU_SERIAL`/`CONCURRENT`) now in Config + synced to environment for deep getenv() code. See `include/io/config_reader.h`, `src/io/config_reader.cc`, `orator.toml`.
+- **VAD-gated ASR fix** (2026-06-22). VAD async-lag protection via segment-start confirmation check. ASR segments reduced from 43→18 (120s test). RTF improved 4.7→3.7. Parameters tuned: `asr_vad_trail_sec=1.0`, `vad_min_silence_ms=300`. See `src/pipeline/asr_worker.cc:61-141`.

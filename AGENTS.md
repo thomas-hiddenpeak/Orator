@@ -184,5 +184,6 @@ cmake --build build -j 2>&1 | grep -E "warning:|error:" || true  # Warning check
 - **Build output** in `build/` and `build_debug/` — both in `.gitignore`
 - **AI session runtime data** in `.omo/` — also gitignored
 - **GPU telemetry** disabled by default; opt-in via `ORATOR_GPU_TELEMETRY_SEC`
-- **Log level** controlled by `ORATOR_LOG_LEVEL` env var (0=DEBUG .. 3=ERROR)
+- **Log level** controlled by `ORATOR_LOG_LEVEL` env var or `[debug].log_level` in `orator.toml` (0=DEBUG .. 3=ERROR)
+- **Runtime config** via `orator.toml` (TOML format). All ~35 runtime parameters in 8 sections. Loading order: defaults → CLI → `orator.toml` → env. See `include/io/config_reader.h`.
 - **Specs 001-004 completed and verified.** Spec 006 (Web UI MVP) implemented. Active work follows Spec 004 protocol layer.

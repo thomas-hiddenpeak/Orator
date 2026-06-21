@@ -74,21 +74,39 @@ cmake --build build -j
 - Web UI：`<port+1>`（默认 `8766`）
 - 进程启动时默认预热全管线（diar + asr + vad）进入待命；若未显式传 `asr_model_dir`，默认使用 `models/asr/Qwen/Qwen3-ASR-1.7B`
 
-可选环境变量：
+运行时配置通过 `orator.toml`（TOML 格式）管理，环境变量可覆盖配置文件中的值：
+
+```bash
+# 使用默认配置
+./build/orator_ws 8765 ""
+
+# 使用自定义配置文件
+ORATOR_CONFIG=/path/to/orator.toml ./build/orator_ws 8765 ""
+```
+
+可选环境变量（覆盖 `orator.toml` 中的对应字段）：
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
+| `ORATOR_CONFIG` | `orator.toml` | 配置文件路径 |
+| `ORATOR_PORT` | `8765` | WebSocket 端口 |
 | `ORATOR_UI_PORT` | `port+1` | 覆盖 UI 端口 |
 | `ORATOR_UI_ROOT` | `web` | 覆盖静态页面目录 |
 | `ORATOR_ASR_MODEL_DIR` | `models/asr/Qwen/Qwen3-ASR-1.7B` | 覆盖 ASR 模型目录 |
 | `ORATOR_ASR_DISABLE` | `0` | `=1` 显式禁用 ASR |
-| `ORATOR_PREWARM_ON_BOOT` | `1` | `=0` 关闭启动预热 |
 | `ORATOR_GPU_TELEMETRY_SEC` | `0` | GPU 遥测推送间隔（秒）；`0`=禁用 |
 | `ORATOR_VAD_STREAM` | `1` | `=0` 禁用 VAD 流 |
-| `ORATOR_LOG_LEVEL` | `0` | 日志级别：`0`=DEBUG, `1`=INFO, `2`=WARN, `3`=ERROR |
+| `ORATOR_VAD_THRESHOLD` | `0.5` | VAD 敏感度 |
+| `ORATOR_VAD_MIN_SPEECH_MS` | `250` | VAD 最短语音 (ms) |
+| `ORATOR_VAD_MIN_SILENCE_MS` | `300` | VAD 最短静音 (ms) |
+| `ORATOR_LOG_LEVEL` | `2` | 日志级别：`0`=DEBUG, `1`=INFO, `2`=WARN, `3`=ERROR |
 | `ORATOR_ASR_PROFILE` | — | 设置即启用 ASR 每帧耗时日志 |
 | `ORATOR_STREAM_PROGRESS` | — | 设置即显示 diarizer 流式进度条 |
 | `ORATOR_TIMEBASE_CHECK` | — | `=1` 启用时间基一致性校验 |
+| `ORATOR_STORAGE_DISK_PATH` | `/tmp/orator/storage/` | 协议时间线持久化路径 |
+| `ORATOR_SESSION_DIR` | — | 会话持久化目录 |
+
+完整参数列表见 `orator.toml` 文件。加载顺序：编译期默认值 → CLI 参数 → `orator.toml` → 环境变量。
 
 ## 主要可执行目标
 
