@@ -70,17 +70,17 @@ target_link_libraries(orator_eval PRIVATE orator_core)
 find_program(Python3_EXECUTABLE python3)
 if(Python3_EXECUTABLE)
   function(orator_add_py_test name script)
+    # Uses run_py_test.py wrapper which starts/shuts down orator_ws
+    # automatically around the test.
     add_test(NAME ${name}
-      COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/${script}
+      COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/run_py_test.py
+        ${script}
     )
     set_tests_properties(${name} PROPERTIES
       WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-      ENVIRONMENT "ORATOR_GPU_TELEMETRY_SEC=0;ORATOR_VAD_STREAM=0"
-    )
-    # Python integration tests require a running orator_ws server;
-    # they are excluded from default ctest runs.
-    set_tests_properties(${name} PROPERTIES
-      LABELS "python;integration;manual"
+      TIMEOUT 180
+      LABELS "python;integration"
     )
   endfunction()
 

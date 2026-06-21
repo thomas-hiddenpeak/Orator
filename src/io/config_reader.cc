@@ -1,5 +1,6 @@
 #include "io/config_reader.h"
 
+#include <fstream>
 #include <iostream>
 #include <toml++/toml.h>
 
@@ -8,6 +9,12 @@ namespace io {
 
 bool ApplyTomlConfig(const std::string& path,
                      pipeline::AuditoryStream::Config& cfg) {
+  // File is optional — silence is normal.
+  {
+    std::ifstream f(path);
+    if (!f.good()) return false;
+  }
+
   toml::parse_result config;
   try {
     config = toml::parse_file(path);
