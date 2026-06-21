@@ -35,6 +35,7 @@
 #include <functional>
 #include <map>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -99,34 +100,18 @@ class ComprehensiveTimeline {
     std::vector<Entry> entries;  // the new state of the changed entries
   };
 
-  // Deposit a speaker segment (who/when). Returns the revisions caused by any
-  // change in attribution of overlapping text segments.
-  std::vector<Revision> UpsertSpeaker(double start, double end,
-                                      const std::string& speaker, float conf);
-
-  // Replace the ENTIRE speaker set in one call and re-project all text. This is
-  // the delivery model for diarization, whose segments are a GLOBAL derivation
-  // from frames (boundaries shift as frames arrive), so there is no stable
-  // per-segment event to upsert -- the pipeline delivers its whole current
-  // segment view and the timeline re-projects. Returns revisions for every text
-  // segment whose attribution changed.
-  struct SpeakerInput {
-    double start;
-    double end;
-    std::string speaker;
-    float conf;
+  // One raw text segment as stored internally, exposed for serialization.
+  // This is the ASR track data (who/when) before diarization attribution.
+  struct RawTextSeg {
+    long id = -1;
+    double start = 0.0;
+    double end = 0.0;
+    std::string text;
   };
-  std::vector<Revision> ReplaceSpeakers(const std::vector<SpeakerInput>& segs);
 
-  // Deposit or replace a text segment (what/when), keyed by a stable id. Returns
-  // a revision for this segment if its diarization-split projection changed.
-  std::vector<Revision> UpsertText(long id, double start, double end,
-                                   const std::string& text);
-
-  // Deposit a VAD speech segment (the VAD pipeline's data: a voice-activity
-  // region on the common time base). The vad track is a pure data track; it does
-  // not modify the diar/asr tracks or drive the view's boundaries.
-  void AddVad(double start, double end);
+  // Snapshot all raw text segments for the ASR track in Serialize().
+  // Returns the text segments ordered by start time.
+  std::vector<RawTextSeg> SnapshotRawTexts() const;
 
   // One VAD speech segment.
   struct VadSeg {
@@ -142,6 +127,33 @@ class ComprehensiveTimeline {
   std::vector<VadSeg> SnapshotVad() const { return vad_; }
 
   void Clear();
+
+  // ---------------------------------------------------------------------------
+  // INTERNAL mutation API — called by AuditoryStream protocol bridge callbacks
+  // and unit tests. Production pipeline data MUST arrive through
+  // ProtocolTimeline subscriptions; these methods are the sink for that path.
+  // ---------------------------------------------------------------------------
+
+  // Deposit a speaker segment (who/when). Returns the revisions caused by any
+  // change in attribution of overlapping text segments.
+  std::vector<Revision> UpsertSpeaker(double start, double end,
+                                      const std::string& speaker, float conf);
+
+  // Replace the ENTIRE speaker set in one call and re-project all text.
+  struct SpeakerInput {
+    double start;
+    double end;
+    std::string speaker;
+    float conf;
+  };
+  std::vector<Revision> ReplaceSpeakers(const std::vector<SpeakerInput>& segs);
+
+  // Deposit or replace a text segment (what/when), keyed by a stable id.
+  std::vector<Revision> UpsertText(long id, double start, double end,
+                                   const std::string& text);
+
+  // Deposit a VAD speech segment.
+  void AddVad(double start, double end);
 
  private:
   struct SpeakerSeg {

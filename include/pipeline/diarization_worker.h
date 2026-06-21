@@ -9,16 +9,13 @@
 #include "core/time_base.h"
 #include "core/types.h"
 #include "model/streaming_sortformer.h"
-#include "pipeline/stream_timeline.h"
 
 // DiarizationWorker: the speaker-separation pipeline as an independent unit.
 //
 // It owns a streaming diarizer and consumes audio spans handed to it (by the
 // controller's worker thread, pulled from the SharedAudioBuffer). It keeps the
-// diarizer's persistent streaming state, deposits newly produced frames into
-// the shared StreamTimeline, and tracks how much audio it has committed (so the
-// controller can implement flush barriers) plus its own compute time (for
-// honest per-pipeline real-time factors). It never reads ASR state.
+// diarizer's persistent streaming state and accumulates frame probabilities
+// internally for segment derivation. It never reads ASR state.
 
 namespace orator {
 namespace pipeline {
@@ -40,12 +37,13 @@ class DiarizationWorker {
   // is processed (throttled) and once on Finalize.
   using SpeakerSink = std::function<void(const std::vector<core::DiarSegment>&)>;
 
-  // `diarizer` and `timeline` are owned by the controller and must outlive the
-  // worker. The diarizer must already be initialized + weight-loaded.
+  // `diarizer` is owned by the controller and must outlive the worker.
+  // The diarizer must already be initialized + weight-loaded.
   // `stream` is the CUDA stream for all GPU work (kernels, copies, sync).
   // `tb` is the common time base inherited from SharedAudioBuffer::time_base().
   // The worker holds it as a member and derives all time codes from it.
-  DiarizationWorker(model::SortformerDiarizer* diarizer, StreamTimeline* timeline,
+  // Frames are accumulated internally (no external StreamTimeline needed).
+  DiarizationWorker(model::SortformerDiarizer* diarizer,
                      Params params, core::TimeBase tb, cudaStream_t stream);
 
   // Set the comprehensive-timeline speaker-view sink (Spec 004). Optional.
@@ -70,8 +68,12 @@ class DiarizationWorker {
   // through speaker_sink_. `force` bypasses the delivery-interval throttle.
   void DeliverSpeakers(bool force);
 
+  // Accumulated frame probabilities (internal, replaces StreamTimeline storage).
+  std::vector<float> diar_probs_;
+  int diar_speakers_ = 0;
+  double diar_frame_period_sec_ = 0.0;
+
   model::SortformerDiarizer* diarizer_;
-  StreamTimeline* timeline_;
   Params params_;
   core::TimeBase tb_;
   cudaStream_t stream_;

@@ -304,6 +304,16 @@ std::vector<ComprehensiveTimeline::Entry> ComprehensiveTimeline::Snapshot()
   return out;
 }
 
+std::vector<ComprehensiveTimeline::RawTextSeg> ComprehensiveTimeline::SnapshotRawTexts()
+    const {
+  std::vector<RawTextSeg> out;
+  out.reserve(texts_.size());
+  for (const auto& t : texts_) {
+    out.push_back({t.id, t.start, t.end, t.text});
+  }
+  return out;
+}
+
 void ComprehensiveTimeline::Clear() {
   speakers_.clear();
   texts_.clear();

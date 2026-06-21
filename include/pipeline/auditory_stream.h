@@ -39,7 +39,6 @@
 #include "pipeline/comprehensive_timeline.h"
 #include "pipeline/diarization_worker.h"
 #include "pipeline/shared_audio_buffer.h"
-#include "pipeline/stream_timeline.h"
 #include "protocol/protocol_timeline.h"
 
 namespace orator {
@@ -140,7 +139,6 @@ class AuditoryStream {
   std::unique_ptr<model::Qwen3Asr> asr_;  // null when ASR disabled
 
   SharedAudioBuffer buffer_;
-  StreamTimeline timeline_;
   std::unique_ptr<DiarizationWorker> diar_worker_;
   std::unique_ptr<AsrWorker> asr_worker_;
   int diar_cursor_ = -1;

@@ -43,7 +43,7 @@ void AuditoryStream::Start() {
   vad_desc.name = "vad";
   vad_desc.version = "1.0.0";
   vad_desc.produces = {protocol::kVadSpeechSegment};
-  vad_desc.consumes = {protocol::TopicPattern{"audio/*"}};
+  vad_desc.consumes = {protocol::TopicPattern{"audio/+"}};
   vad_handle_ = protocol_timeline_->RegisterPipeline(std::move(vad_desc));
 
   // Register asr pipeline (produces asr/transcript, asr/transcript_partial).
@@ -51,7 +51,7 @@ void AuditoryStream::Start() {
   asr_desc.name = "asr";
   asr_desc.version = "1.0.0";
   asr_desc.produces = {protocol::kAsrTranscript, protocol::kAsrTranscriptPartial};
-  asr_desc.consumes = {protocol::TopicPattern{"vad/*"}};
+  asr_desc.consumes = {protocol::TopicPattern{"vad/+"}};
   asr_handle_ = protocol_timeline_->RegisterPipeline(std::move(asr_desc));
 
   // Register diar pipeline (produces diar/speaker_segment).
@@ -59,7 +59,7 @@ void AuditoryStream::Start() {
   diar_desc.name = "diar";
   diar_desc.version = "1.0.0";
   diar_desc.produces = {protocol::kDiarSpeakerSegment};
-  diar_desc.consumes = {protocol::TopicPattern{"audio/*"}};
+  diar_desc.consumes = {protocol::TopicPattern{"audio/+"}};
   diar_handle_ = protocol_timeline_->RegisterPipeline(std::move(diar_desc));
 
   // -----------------------------------------------------------------------
@@ -70,7 +70,7 @@ void AuditoryStream::Start() {
 
   // VAD subscription: parse {"start":..., "end":...} → comp_.AddVad()
   vad_sub_id_ = protocol_timeline_->SubscribeInternal(
-      protocol::TopicPattern{"vad/*"},
+      protocol::TopicPattern{"vad/+"},
       [this](const protocol::Message& msg) {
         const std::string& data = msg.data;
         auto start_pos = data.find("\"start\":");
@@ -81,17 +81,21 @@ void AuditoryStream::Start() {
           auto end_val_start = end_pos + 6;     // len of "\"end\":"
           auto end_val_end = data.find_first_of(",}", end_val_start);
           if (start_val_end != std::string::npos && end_val_end != std::string::npos) {
-            double start = std::stod(data.substr(start_val_start, start_val_end - start_val_start));
-            double end = std::stod(data.substr(end_val_start, end_val_end - end_val_start));
-            std::lock_guard<std::mutex> lk(comp_mutex_);
-            comp_.AddVad(start, end);
+            try {
+              double start = std::stod(data.substr(start_val_start, start_val_end - start_val_start));
+              double end = std::stod(data.substr(end_val_start, end_val_end - end_val_start));
+              std::lock_guard<std::mutex> lk(comp_mutex_);
+              comp_.AddVad(start, end);
+            } catch (const std::exception&) {
+              // malformed VAD message — skip gracefully
+            }
           }
         }
       });
 
   // Diar subscription: parse {"segments":[{...},...]} → comp_.ReplaceSpeakers()
   diar_sub_id_ = protocol_timeline_->SubscribeInternal(
-      protocol::TopicPattern{"diar/*"},
+      protocol::TopicPattern{"diar/+"},
       [this](const protocol::Message& msg) {
         const std::string& data = msg.data;
         auto seg_start = data.find("\"segments\":[");
@@ -124,7 +128,11 @@ void AuditoryStream::Start() {
             kp += std::string("\"" + std::string(key) + ":").size();
             auto ve = obj.find_first_of(",}", kp);
             if (ve == std::string::npos) return 0.0;
-            return std::stod(obj.substr(kp, ve - kp));
+            try {
+              return std::stod(obj.substr(kp, ve - kp));
+            } catch (const std::exception&) {
+              return 0.0;
+            }
           };
           auto parse_str = [&obj](const char* key) -> std::string {
             std::string search = "\"" + std::string(key) + "\":";
@@ -154,7 +162,7 @@ void AuditoryStream::Start() {
 
   // ASR subscription: parse {"id":..., "start":..., "end":..., "text":"..."} → comp_.UpsertText()
   asr_sub_id_ = protocol_timeline_->SubscribeInternal(
-      protocol::TopicPattern{"asr/*"},
+      protocol::TopicPattern{"asr/+"},
       [this](const protocol::Message& msg) {
         const std::string& data = msg.data;
 
@@ -165,7 +173,11 @@ void AuditoryStream::Start() {
           kp += search.size();
           auto ve = data.find_first_of(",}", kp);
           if (ve == std::string::npos) return 0.0;
-          return std::stod(data.substr(kp, ve - kp));
+          try {
+            return std::stod(data.substr(kp, ve - kp));
+          } catch (const std::exception&) {
+            return 0.0;
+          }
         };
         auto parse_long = [&data](const char* key) -> long {
           std::string search = "\"" + std::string(key) + "\":";
@@ -174,7 +186,11 @@ void AuditoryStream::Start() {
           kp += search.size();
           auto ve = data.find_first_of(",}", kp);
           if (ve == std::string::npos) return -1;
-          return static_cast<long>(std::stol(data.substr(kp, ve - kp)));
+          try {
+            return static_cast<long>(std::stol(data.substr(kp, ve - kp)));
+          } catch (const std::exception&) {
+            return -1;
+          }
         };
         auto parse_str = [&data](const char* key) -> std::string {
           std::string search = "\"" + std::string(key) + "\":";
@@ -265,7 +281,7 @@ void AuditoryStream::StartWorkers() {
     dp.merge_gap_sec = config_.diar_merge_gap_sec;
     dp.sample_rate = config_.sample_rate;
     diar_worker_ =
-        std::make_unique<DiarizationWorker>(diarizer_.get(), &timeline_, dp,
+        std::make_unique<DiarizationWorker>(diarizer_.get(), dp,
                                              buffer_.time_base(), diar_stream_);
     // Spec 004 Step 2: diarization publishes speaker segments to the protocol
     // timeline on the diar/speaker_segment topic. last_segments_ is stored
@@ -327,7 +343,7 @@ void AuditoryStream::StartWorkers() {
     p.asr_vad_lead_ms = config_.asr_vad_lead_ms;
     p.asr_vad_trail_sec = config_.asr_vad_trail_sec;
     asr_worker_ = std::make_unique<AsrWorker>(
-        asr_.get(), &timeline_, p,
+        asr_.get(), p,
         [this](const std::string& json) { EmitLocked(json); },
         buffer_.time_base(), asr_stream_);
     asr_worker_->set_protocol_timeline(protocol_timeline_.get());
@@ -628,23 +644,34 @@ std::string AuditoryStream::Serialize() {
   //     utterance granularity (the ASR engine does not emit per-word times).
   // A consumer reads whichever part it needs. Adding a future pipeline adds a
   // track and, optionally, a contribution to the comprehensive view.
-  core::Transcript transcript = timeline_.SnapshotTranscript();
-
+  // StreamTimeline removed — ASR track data now comes from comp_.SnapshotRawTexts().
   // Spec 004 Step 2: the diarization worker is the sole producer of the speaker
   // view (it delivers live via ReplaceSpeakers + keeps last_segments_ fresh);
   // the ASR worker delivers text live via UpsertText. So Serialize is a pure
-  // reader: snapshot last_segments_ (diar track) and the comprehensive view
-  // under comp_mutex_. No derivation, no upserts here.
+  // reader: snapshot everything under comp_mutex_. No derivation, no upserts here.
   std::vector<core::DiarSegment> diar_view;
   std::vector<ComprehensiveTimeline::Entry> comp_view;
   std::vector<ComprehensiveTimeline::VadSeg> vad_view;
+  std::vector<ComprehensiveTimeline::RawTextSeg> raw_texts;
   {
     std::lock_guard<std::mutex> lk(comp_mutex_);
     diar_view = last_segments_;
     comp_view = comp_.Snapshot();
     vad_view = comp_.SnapshotVad();
+    raw_texts = comp_.SnapshotRawTexts();
   }
-  last_transcript_ = transcript;
+  // Populate last_transcript_ from raw_texts for the transcript() accessor.
+  {
+    core::Transcript transcript;
+    for (const auto& r : raw_texts) {
+      core::AsrToken tok;
+      tok.start_sec = r.start;
+      tok.end_sec = r.end;
+      tok.text = r.text;
+      transcript.tokens.push_back(std::move(tok));
+    }
+    last_transcript_ = std::move(transcript);
+  }
 
   const double audio = audio_sec();
   const double diar_c = diar_compute_sec();
@@ -745,19 +772,10 @@ std::string AuditoryStream::Serialize() {
 
 void AuditoryStream::Reset() {
   StopWorkers();         // stop any running threads first
-  // Unsubscribe and unregister protocol timeline pipelines before clearing state.
-  if (protocol_timeline_) {
-    if (vad_sub_id_) protocol_timeline_->UnsubscribeInternal(vad_sub_id_);
-    if (diar_sub_id_) protocol_timeline_->UnsubscribeInternal(diar_sub_id_);
-    if (asr_sub_id_) protocol_timeline_->UnsubscribeInternal(asr_sub_id_);
-    vad_sub_id_ = diar_sub_id_ = asr_sub_id_ = 0;
-    if (ws_input_handle_) protocol_timeline_->UnregisterPipeline(*ws_input_handle_);
-    if (vad_handle_) protocol_timeline_->UnregisterPipeline(*vad_handle_);
-    if (asr_handle_) protocol_timeline_->UnregisterPipeline(*asr_handle_);
-    if (diar_handle_) protocol_timeline_->UnregisterPipeline(*diar_handle_);
-  }
+  // NOTE: protocol timeline subscriptions and pipeline registrations are
+  // session-invariant — they are set up once in Start() and MUST persist
+  // across client resets. Do NOT unsubscribe or unregister here.
   buffer_.Reset();
-  timeline_.Clear();
   last_segments_.clear();
   last_transcript_.tokens.clear();
   {

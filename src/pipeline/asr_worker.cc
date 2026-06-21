@@ -20,10 +20,10 @@ double Secs(Clock::time_point a, Clock::time_point b) {
 }
 }  // namespace
 
-AsrWorker::AsrWorker(model::Qwen3Asr* asr, StreamTimeline* timeline,
+AsrWorker::AsrWorker(model::Qwen3Asr* asr,
                        const Params& params, Emit emit, core::TimeBase tb,
                        cudaStream_t stream)
-    : asr_(asr), timeline_(timeline), params_(params), emit_(std::move(emit)),
+    : asr_(asr), params_(params), emit_(std::move(emit)),
       tb_(std::move(tb)), stream_(stream),
       ring_buffer_(kRingBufferSamples) {
 }
@@ -52,8 +52,13 @@ void AsrWorker::ProcessSpan(const float* samples, int n) {
             auto ev = ep + 6;
             auto ee = msg.data.find_first_of(",}", ev);
             if (se != std::string::npos && ee != std::string::npos) {
-              double s = std::stod(msg.data.substr(sv, se - sv));
-              double e = std::stod(msg.data.substr(ev, ee - ev));
+              double s = 0.0, e = 0.0;
+              try {
+                s = std::stod(msg.data.substr(sv, se - sv));
+                e = std::stod(msg.data.substr(ev, ee - ev));
+              } catch (const std::exception&) {
+                continue;  // malformed VAD segment — skip
+              }
               vad_segments_cache_.push_back({s, e});
               if (e > last_vad_replay_sec_) {
                 last_vad_replay_sec_ = e;
@@ -186,7 +191,8 @@ void AsrWorker::EmitIncrementalChunk(const float* samples, int n, bool finalize)
     tok.start_sec = tb_.SecondsAt(inc_seg_start_sample_);
     tok.end_sec = tb_.SecondsAt(inc_seg_end_sample_);
     tok.text = inc_live_text_;
-    timeline_->AppendToken(tok);
+    // Text segment goes through ProtocolTimeline → comp_ via text_sink_.
+    // StreamTimeline was removed; raw text is read from comp_.SnapshotRawTexts().
     if (text_sink_) text_sink_(inc_text_id_, tok.start_sec, tok.end_sec, tok.text);
     ++inc_text_id_;
     inc_delivered_text_.clear();
