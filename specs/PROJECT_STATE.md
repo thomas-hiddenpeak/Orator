@@ -14,7 +14,7 @@ work is specified under [specs/](.).
 > pass is the consistency proof. Status lines advance to `Implemented` in the
 > same change that lands the code, with the commit reference.
 
-- **Last updated**: 2026-06-21 (Codebase hardening: logging, static refactor, CUDA kernel tests, CI, VAD path migration)
+- **Last updated**: 2026-06-21 (Full-length 1hr speed verification: 9.46× real-time, no crash, 100% coverage across all three tracks)
 - **Branch**: `master`
 - **Constitution**: v1.3.0
 
@@ -101,6 +101,31 @@ Measured through the **real WebSocket** at max push rate, 120 s of `test.mp3`
 Clip-based ("whole buffer") numbers are **not** treated as streaming results,
 per Constitution Art. IV.
 
+### Full-length (1 hr) verification, 2026-06-21
+
+Full 3615 s of `test.mp3` pushed through the real WebSocket at max push rate
+(380× wire speed), GPU warm, same hardware config:
+
+| Metric | Value |
+|---|---|
+| Audio duration | 3615 s (1.00 hr) |
+| Wall time | **382.0 s** (6.4 min) |
+| End-to-end speed | **9.46× real-time** |
+| ASR compute | 381.7 s → RTF 9.47 |
+| Diarization compute | 65.5 s → RTF 55.2 |
+| VAD compute | 11.9 s → RTF 303.7 |
+| `wall_clock_ok` | True (no clock drift) |
+| ASR entries | 151, last at 3615.1 s (100 % coverage) |
+| Diarization segments | 1063, last at 3614.6 s (100 % coverage) |
+| VAD segments | 1454 |
+| Total messages received | 171 (240 KB) |
+
+**Key finding**: the pipeline processes a full hour of audio without any
+degradation, crash, or clock drift. The 9.46× throughput is consistent with
+ASR GPU compute dominating the wall (381.7 s of 382.0 s total). No mid-stream
+buffer growth, no connection drop, no silent data loss. This validates the
+three-pipeline architecture (Constitution Art. III) at production duration.
+
 ### Spec 002 baseline (Phase 1, measured before any engine change)
 
 Three configurations, 120 s of `test.mp3`, through the real WebSocket at max
@@ -167,3 +192,4 @@ Specs 001, 002, 003, 004, and 006 (Web UI MVP) are complete, verified, and commi
   - VAD model path migration (`models/asr/` → `models/vad/`)
   - README env var table + Python test CTest registration + protocol envelope unwrapping in web UI
 - **Spec 004 — Protocol Layer**: Implemented. Phases 7–12 complete. Web UI (`app.js`) now includes `unwrapEnvelope()` for Spec 004 topic-based protocol envelopes. Integration test (`ws_ui_integration_test.py`) uses `unwrap_envelope()` for all WS message parsing.
+- **Full-length streaming verification**: 2026-06-21. 3615 s (1 hr) audio pushed through real WebSocket → 382.0 s wall = **9.46× real-time**. All three tracks (ASR/diarization/VAD) cover 100 % of the audio, no crash, no clock drift, no data loss. Achieved 9.25× on a consecutive warm-GPU re-run and 5.82× on a cold-start run, confirming model-load overhead is one-time.
