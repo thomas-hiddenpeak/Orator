@@ -1,0 +1,66 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# Orator runtime configuration
+#
+# Loading order (later overrides earlier):
+#   1. Compile-time defaults (C++ struct initializers)
+#   2. This file
+#   3. Environment variables (ORATOR_*)
+#   4. CLI arguments (port, diarizer weights, ASR model dir)
+#
+# All values shown below are the project defaults. Uncomment and change only
+# the parameters you want to tune.
+#
+# TIP: Keep notes as comments next to values you try, e.g.:
+#   vad_trail_sec = 1.0    # was 1.5 — v7 fix, tested 120s OK
+# ──────────────────────────────────────────────────────────────────────────────
+
+[asr]
+# Master switch for VAD-gated processing
+# vad_gate = true
+
+# Lead buffer (ms) extracted before VAD speech onset — avoids cutting first syllable
+# vad_lead_ms = 200
+
+# Trailing window (seconds) after VAD silence before committing a segment
+# Smaller = less trailing silence but may cut early if VAD lags
+# We tested: 1.5 (v5/v6), 1.0 (v7) — 16~18 ASR segs / 38 VAD segs
+# vad_trail_sec = 1.0
+
+# KV-cache safety cap — max audio tokens before force-finalize a segment
+# Crash at ~1768 tokens; 1500 leaves a comfortable margin (~115s audio)
+# max_audio_tokens = 1500
+
+# Max decode tokens per segment
+# max_new_tokens = 32
+
+# Hard segment cap (seconds) — only active when vad_gate=false
+# segment_sec = 24.0
+
+# Language hint ("" = auto-detect)
+# language = "Chinese"
+
+[vad]
+# Silero VAD model path
+# model = "models/vad/silero_vad.safetensors"
+
+# Speech probability threshold (0.0-1.0)
+# threshold = 0.5
+
+# Minimum speech duration (ms) — shorter noise bursts are rejected
+# min_speech_ms = 250
+
+# Minimum silence (ms) before VAD declares a segment end
+# Larger = fewer VAD segments but more trailing silence (async lag)
+# We tested: 300 (v7 default), 200 (more VAD splits)
+# min_silence_ms = 300
+
+[diarizer]
+# Per-speaker activity threshold (0.0-1.0)
+# threshold = 0.5
+
+# Merge same-speaker segments closer than this (seconds)
+# merge_gap_sec = 0.5
+
+[telemetry]
+# GPU scheduling telemetry push interval (seconds). 0 = disabled.
+# gpu_interval_sec = 0.0

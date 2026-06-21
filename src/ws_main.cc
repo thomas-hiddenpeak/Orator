@@ -14,6 +14,7 @@
 #include <string>
 #include <thread>
 
+#include "io/config_reader.h"
 #include "net/auditory_ws_handler.h"
 #include "net/http_static_server.h"
 #include "net/websocket_server.h"
@@ -75,6 +76,15 @@ int main(int argc, char** argv) {
   // readiness. Keep explicit CLI override behavior: passing an empty third
   // argument still disables ASR intentionally.
   if (!asr_arg_provided) cfg.asr_model_dir = "models/asr/Qwen/Qwen3-ASR-1.7B";
+
+  // Config file (optional) — compile-time defaults → orator.toml → env vars
+  {
+    const char* config_path = std::getenv("ORATOR_CONFIG");
+    if (config_path == nullptr || config_path[0] == '\0') {
+      config_path = "orator.toml";
+    }
+    io::ApplyTomlConfig(config_path, cfg);
+  }
 
   // Runtime tuning knobs
   ReadEnvInt("ORATOR_ASR_MAX_NEW_TOKENS", &cfg.asr_max_new_tokens);
