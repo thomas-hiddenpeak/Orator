@@ -104,6 +104,9 @@ int main(int argc, char** argv) {
   // Spec 004 Phase 12: configurable DISK storage path.
   ReadEnvString("ORATOR_STORAGE_DISK_PATH", &cfg.storage_disk_path);
 
+  // Spec 004 Phase 13: configurable session persistence directory.
+  ReadEnvString("ORATOR_SESSION_DIR", &cfg.session_dir);
+
   // reused across all client connections. This avoids repeated GPU model loads
   // which would exhaust device memory on Jetson.
   auto emit_target = std::make_shared<net::SessionEmit>();

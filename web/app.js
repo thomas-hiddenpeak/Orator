@@ -28,6 +28,10 @@
   const mVadRtf    = $("mVadRtf");
   const mGpuStatus = $("mGpuStatus");
 
+  // Session history panel
+  const sessionList = $("sessionList");
+  const refreshSessionsBtn = $("refreshSessionsBtn");
+
   /* ── State ── */
   let ws = null;
   let micCtx = null, micStream = null, micSrc = null, micProc = null;
@@ -158,6 +162,8 @@
       console.log("[WS] Connected to", defaultWsUrl());
       // Request protocol description for debugging (Spec 004 Phase 12)
       describeProtocol();
+      // Request session history (Spec 004 Phase 13)
+      setTimeout(refreshSessions, 500);
     };
 
     ws.onclose = function (evt) {
@@ -208,6 +214,9 @@
           break;
         case "vad_state":
           handleVadState(msg);
+          break;
+        case "sessions":
+          handleSessions(msg);
           break;
         default:
           console.warn("[Orator] Unknown WS message type:", msg.type, msg);
@@ -401,6 +410,74 @@
       connBadge.textContent = orig;
       connBadge.className = origClass;
     }, 800);
+    // Refresh session list after reset (new session may have been saved).
+    setTimeout(refreshSessions, 1000);
+  }
+
+  /* ── Session history handlers ── */
+  function handleSessions(msg) {
+    var sessions = Array.isArray(msg.sessions) ? msg.sessions : (Array.isArray(msg.list) ? msg.list : []);
+    renderSessionList(sessions);
+  }
+
+  function renderSessionList(sessions) {
+    sessionList.innerHTML = "";
+    if (!sessions || sessions.length === 0) {
+      var empty = document.createElement("div");
+      empty.className = "session-empty";
+      empty.textContent = "No saved sessions";
+      sessionList.appendChild(empty);
+      return;
+    }
+    for (var i = 0; i < sessions.length; i++) {
+      var s = sessions[i];
+      var item = document.createElement("div");
+      item.className = "session-item";
+      item.setAttribute("role", "listitem");
+
+      var idEl = document.createElement("span");
+      idEl.className = "session-item-id";
+      idEl.textContent = s.id || "?";
+      idEl.title = s.id || "";
+
+      var timeEl = document.createElement("span");
+      timeEl.className = "session-item-time";
+      timeEl.textContent = s.time ? fmtTime(s.time) : "";
+
+      var durEl = document.createElement("span");
+      durEl.className = "session-item-dur";
+      durEl.textContent = s.audio_sec ? fmtSec(s.audio_sec) : "";
+
+      var loadBtn = document.createElement("button");
+      loadBtn.className = "session-load-btn";
+      loadBtn.textContent = "Load";
+      loadBtn.setAttribute("aria-label", "Load session " + (s.id || ""));
+      loadBtn.addEventListener("click", function (sid) {
+        return function (e) {
+          e.stopPropagation();
+          loadSession(sid);
+        };
+      }(s.id || ""));
+
+      item.appendChild(idEl);
+      item.appendChild(timeEl);
+      item.appendChild(durEl);
+      item.appendChild(loadBtn);
+      sessionList.appendChild(item);
+
+      // Click on item row also loads
+      item.addEventListener("click", function (sid) {
+        return function () { loadSession(sid); };
+      }(s.id || ""));
+    }
+  }
+
+  function refreshSessions() {
+    sendCmd({ cmd: "sessions" });
+  }
+
+  function loadSession(sessionId) {
+    sendCmd({ cmd: "load_session", session_id: sessionId });
   }
 
   function createTranscriptRow(id, start, end, speaker, text, cls) {
@@ -1006,6 +1083,9 @@
   });
   clearBtn.addEventListener("click", clearAll);
   downloadBtn.addEventListener("click", downloadTimeline);
+  if (refreshSessionsBtn) {
+    refreshSessionsBtn.addEventListener("click", refreshSessions);
+  }
 
   /* ── Init ── */
   setStatus(false);

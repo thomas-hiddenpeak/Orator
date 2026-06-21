@@ -1,8 +1,10 @@
 #include "net/auditory_ws_handler.h"
 
 #include "core/log.h"
+#include "protocol/session_store.h"
 
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -204,6 +206,59 @@ void AuditoryWsHandler::OnText(WebSocketConnection& conn, const std::string& tex
   }
   if (text.find("\"flush\"") != std::string::npos) {
     stream_->EmitTimeline(/*finalize=*/false);
+  }
+  if (text.find("\"sessions\"") != std::string::npos) {
+    auto* store = stream_->session_store();
+    if (!store || !store->enabled()) {
+      conn.SendText("{\"type\":\"sessions\",\"sessions\":[]}");
+      return;
+    }
+    auto list = store->List();
+    std::string resp = "{\"type\":\"sessions\",\"sessions\":[";
+    for (size_t i = 0; i < list.size(); ++i) {
+      if (i > 0) resp += ",";
+      resp += "{\"id\":\"" + list[i].session_id + "\",\"time\":" +
+              std::to_string(list[i].wall_clock_sec) + ",\"audio_sec\":" +
+              std::to_string(list[i].audio_sec) + ",\"file_size\":" +
+              std::to_string(list[i].file_size) + "}";
+    }
+    resp += "]}";
+    conn.SendText(resp);
+    return;
+  }
+  if (text.find("\"load_session\"") != std::string::npos) {
+    auto* store = stream_->session_store();
+    if (!store || !store->enabled()) {
+      conn.SendText("{\"error\":\"session store not available\"}");
+      return;
+    }
+    // Extract session_id value from JSON (simple substring parse).
+    std::string sid_key = "\"session_id\"";
+    size_t pos = text.find(sid_key);
+    if (pos == std::string::npos) {
+      conn.SendText("{\"error\":\"missing session_id\"}");
+      return;
+    }
+    size_t val_start = text.find('"', pos + sid_key.size() + 1);
+    if (val_start == std::string::npos) {
+      conn.SendText("{\"error\":\"invalid session_id format\"}");
+      return;
+    }
+    ++val_start;
+    size_t val_end = text.find('"', val_start);
+    if (val_end == std::string::npos) {
+      conn.SendText("{\"error\":\"invalid session_id format\"}");
+      return;
+    }
+    std::string session_id = text.substr(val_start, val_end - val_start);
+    std::string timeline = store->Load(session_id);
+    if (timeline.empty()) {
+      conn.SendText("{\"error\":\"session not found\",\"session_id\":\"" +
+                    session_id + "\"}");
+      return;
+    }
+    conn.SendText(timeline);
+    return;
   }
 }
 

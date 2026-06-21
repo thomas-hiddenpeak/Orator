@@ -127,7 +127,7 @@ in time. Consequences:
 - **NG1** Per-word timestamps / forced alignment (model does not emit them).
 - **NG2** Changing the diarization or ASR engines' numerics.
 - **NG3** GPU scheduling (Spec 002).
-- **NG4** Persisting the timeline across sessions.
+- **~~NG4~~** *(Promoted to in-scope — see §5.5 Session Persistence)*
 - **NG5** Wall-clock time inside the pipeline. Wall clock appears only at the
   WS protocol boundary for downstream consumers.
 - **NG6** Engine numerics or buffer cursor rework.
@@ -343,6 +343,28 @@ Every registered pipeline MUST satisfy:
 - **FR9.4 — Control messages**: control commands (`reset`, `flush`, `end`)
   remain as text frames. They are not part of the topic protocol.
 
+### 5.10 — Session Persistence (ex-NG4)
+
+- **FR10.1 — Auto-save on reset**: when `AuditoryStream::Reset()` is called
+  (client resets or session ends), the current timeline is serialized and saved
+  to a session store on disk before any state is cleared.
+- **FR10.2 — Session metadata**: each saved session records a unique session ID,
+  wall-clock timestamp, audio duration, ASR segment count, diarization segment
+  count, and the full timeline JSON.
+- **FR10.3 — Session listing**: a client can request a list of historical
+  sessions via `{"cmd":"sessions"}` and receive metadata for each (no timeline
+  payload — lightweight).
+- **FR10.4 — Session load**: a client can request a specific session's timeline
+  via `{"cmd":"load_session","session_id":"<id>"}` and receive the full timeline
+  as a `timeline`-type message.
+- **FR10.5 — Configurable storage path**: the session store directory defaults
+  to `$ORATOR_STORAGE_DISK_PATH/sessions/` and can be overridden via
+  `ORATOR_SESSION_DIR` env var. When `ORATOR_STORAGE_DISK_PATH` is empty,
+  session persistence is disabled.
+- **FR10.6 — No data loss on unclean shutdown**: sessions are saved
+  synchronously on Reset(). For unclean shutdown (SIGKILL, crash), the last
+  session's data is lost — acceptable for Phase 1.
+
 ## 6. Acceptance Criteria
 
 - **AC1** Streaming `test.mp3` produces a final timeline whose comprehensive view,
@@ -386,6 +408,10 @@ Every registered pipeline MUST satisfy:
   reclaims messages correctly. (FR8.2, FR8.4)
 - **AC18** Full 1-hour streaming run produces output byte-identical to the
   current `ComprehensiveTimeline` final timeline. (FR9.2)
+- **AC19** After a `reset`, the session store contains a non-empty session file
+  with the timeline from the just-completed session. A subsequent `sessions`
+  command lists that session, and `load_session` returns its timeline JSON.
+  (FR10.1–10.4)
 
 ## 7. Constitution Check
 

@@ -120,6 +120,17 @@
           <canvas id="timelineCanvas" tabindex="0" role="img" aria-label="Timeline canvas"></canvas>
         </div>
       </section>
+
+      <!-- Session History Panel -->
+      <section class="panel session-panel" aria-label="Session history">
+        <div class="panel-header">
+          <h2 class="panel-title">Session History</h2>
+          <button id="refreshSessionsBtn" class="btn btn-sm btn-outline" title="Refresh session list" aria-label="Refresh session list">⟳</button>
+        </div>
+        <div id="sessionList" class="session-list" role="list" aria-label="Saved sessions">
+          <div class="session-empty">No saved sessions</div>
+        </div>
+      </section>
     </div>
 
     <script src="/app.js"></script>

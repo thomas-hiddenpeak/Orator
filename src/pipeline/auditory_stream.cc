@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <string>
+#include <unistd.h>
 #include <utility>
 
 #include <cuda_runtime.h>
@@ -25,6 +26,18 @@ AuditoryStream::~AuditoryStream() {
 }
 
 void AuditoryStream::Start() {
+  // Spec 004 Phase 13: initialize session store from config_.session_dir.
+  // When empty, derive from storage_disk_path (backward compat).
+  {
+    std::string session_dir = config_.session_dir;
+    if (session_dir.empty() && !config_.storage_disk_path.empty()) {
+      session_dir = config_.storage_disk_path;
+      if (session_dir.back() != '/') session_dir.push_back('/');
+      session_dir += "sessions";
+    }
+    session_store_ = std::make_unique<protocol::SessionStore>(session_dir);
+  }
+
   // Spec 004 Phase 12: initialize protocol timeline and register pipelines.
   protocol_timeline_ = std::make_unique<protocol::ProtocolTimeline>(
       128 * 1024 * 1024,  // 128 MB memory backend
@@ -772,6 +785,21 @@ std::string AuditoryStream::Serialize() {
 
 void AuditoryStream::Reset() {
   StopWorkers();         // stop any running threads first
+
+  // Spec 004 Phase 13: save the timeline before clearing state.
+  if (session_store_ && session_store_->enabled()) {
+    // Capture the timeline of the session that just ended.
+    std::string timeline_json = Serialize();
+    // Generate a unique session ID from wall clock time.
+    const auto now = std::chrono::system_clock::now();
+    double wall_sec = std::chrono::duration<double>(now.time_since_epoch()).count();
+    char session_id_buf[64];
+    std::snprintf(session_id_buf, sizeof(session_id_buf), "%08x%08x",
+                  static_cast<unsigned>(static_cast<long long>(wall_sec)),
+                  static_cast<unsigned>(::getpid()));
+    session_store_->Save(session_id_buf, timeline_json);
+  }
+
   // NOTE: protocol timeline subscriptions and pipeline registrations are
   // session-invariant — they are set up once in Start() and MUST persist
   // across client resets. Do NOT unsubscribe or unregister here.

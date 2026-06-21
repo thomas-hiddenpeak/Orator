@@ -40,6 +40,7 @@
 #include "pipeline/diarization_worker.h"
 #include "pipeline/shared_audio_buffer.h"
 #include "protocol/protocol_timeline.h"
+#include "protocol/session_store.h"
 
 namespace orator {
 namespace pipeline {
@@ -71,6 +72,9 @@ class AuditoryStream {
     double gpu_telemetry_interval_sec = 0.0;  // 0 = disabled; set env ORATOR_GPU_TELEMETRY_SEC to enable
     // Spec 004 Phase 12: configurable DISK storage path for protocol timeline.
     std::string storage_disk_path = "/tmp/orator/storage/";
+    // Spec 004 Phase 13: session persistence directory.
+    // When empty, defaults to <storage_disk_path>/sessions/.
+    std::string session_dir;
   };
 
   // Delivers a result event as a JSON string. Invoked from the ASR worker thread
@@ -116,6 +120,11 @@ class AuditoryStream {
   // Spec 004 Phase 12: access to protocol timeline for describe command.
   const protocol::ProtocolTimeline* protocol_timeline() const {
     return protocol_timeline_.get();
+  }
+
+  // Spec 004 Phase 13: access to session store for session list/load.
+  protocol::SessionStore* session_store() const {
+    return session_store_.get();
   }
 
  private:
@@ -200,6 +209,10 @@ class AuditoryStream {
   long vad_sub_id_ = 0;
   long diar_sub_id_ = 0;
   long asr_sub_id_ = 0;
+
+  // Spec 004 Phase 13: session persistence store. Saves timeline JSON on
+  // Reset(). Null when persistence is disabled (empty storage_disk_path).
+  std::unique_ptr<protocol::SessionStore> session_store_;
 
   // Wall clock anchor for session-level physical-time mapping.
   // Set at Reset() (entry), validated at EmitTimeline(finalize=true) (exit).

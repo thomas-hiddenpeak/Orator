@@ -97,6 +97,7 @@ set(ORATOR_CORE_SOURCES
     src/protocol/time_index.cc
     src/protocol/protocol_timeline.cc
     src/protocol/ws_envelope.cc
+    src/protocol/session_store.cc
 )
 
 add_library(orator_core STATIC ${ORATOR_CORE_SOURCES})
