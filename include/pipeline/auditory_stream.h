@@ -59,12 +59,12 @@ class AuditoryStream {
     double asr_segment_sec = 24.0;
     bool asr_vad_gate = true;
     int asr_vad_lead_ms = 200;
-    double asr_vad_trail_sec = 1.5;
+    double asr_vad_trail_sec = 1.0;
     bool vad_stream = true;
     std::string vad_model = "models/vad/silero_vad.safetensors";
     float vad_threshold = 0.5f;
     int vad_min_speech_ms = 250;
-    int vad_min_silence_ms = 120;
+    int vad_min_silence_ms = 300;
     std::string asr_language = "Chinese";
     // Spec 002 FR7: interval (seconds) for the periodic GPU-scheduling telemetry
     // message ({"type":"gpu_telemetry"}). A dedicated low-rate timer thread
@@ -209,6 +209,7 @@ class AuditoryStream {
   long vad_sub_id_ = 0;
   long diar_sub_id_ = 0;
   long asr_sub_id_ = 0;
+  long asr_vad_sub_id_ = 0;
 
   // Spec 004 Phase 13: session persistence store. Saves timeline JSON on
   // Reset(). Null when persistence is disabled (empty storage_disk_path).

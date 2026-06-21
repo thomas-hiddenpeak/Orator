@@ -17,7 +17,6 @@
 
 #include "model/qwen3_asr.h"
 #include "core/time_base.h"
-#include "protocol/protocol_timeline.h"
 #include <cuda_runtime.h>
 
 namespace orator {
@@ -27,7 +26,8 @@ class AsrWorker {
  public:
   struct Params {
     int sample_rate = 16000;
-    double segment_sec = 24.0;  // commit + reset cadence (cap)
+    double segment_sec = 24.0;  // commit + reset cadence (cap, unused with VAD gate)
+    int max_audio_tokens = 1500;       // KV-cache safety cap (prevents crash above ~1768 tokens)
     bool asr_vad_gate = true;           // enable VAD-gated processing
     int asr_vad_lead_ms = 200;          // lead buffer (ms) before VAD speech onset
     double asr_vad_trail_sec = 1.5;     // trailing window (sec) after VAD silence before commit
@@ -48,9 +48,9 @@ class AsrWorker {
 
   void set_text_sink(TextSegmentSink sink) { text_sink_ = std::move(sink); }
 
-  void set_protocol_timeline(protocol::ProtocolTimeline* pt) {
-    protocol_timeline_ = pt;
-  }
+  // Push a VAD speech segment from a ProtocolTimeline subscription callback.
+  // Thread-safe; called from the VAD publish thread.
+  void AddVadSegment(double start, double end);
 
   void ProcessSpan(const float* samples, int n);
   void Finalize();
@@ -69,13 +69,15 @@ class AsrWorker {
   TextSegmentSink text_sink_;
   core::TimeBase tb_;
 
-  // VAD gating via ProtocolTimeline (Constitution Art. III §8).
-  // The worker reads VAD segments from the protocol layer, not via direct push.
-  protocol::ProtocolTimeline* protocol_timeline_ = nullptr;
-  double last_vad_replay_sec_ = 0.0;  // incremental replay cursor
-  std::vector<std::pair<double, double>> vad_segments_cache_;  // cached VAD segments
+  // VAD segments pushed from ProtocolTimeline subscription (event-driven).
+  // Guarded by vad_mutex_ because AddVadSegment() is called from the VAD
+  // publish thread and ProcessSpan() reads from the ASR worker thread.
+  std::vector<std::pair<double, double>> vad_segments_cache_;
+  std::mutex vad_mutex_;
 
   std::atomic<long> processed_samples_{0};
+  std::atomic<int> debug_segments_started_{0};
+  std::atomic<int> debug_segments_finalized_{0};
   double compute_sec_ = 0.0;
   cudaStream_t stream_ = 0;
 

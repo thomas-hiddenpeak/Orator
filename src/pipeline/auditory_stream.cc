@@ -359,7 +359,6 @@ void AuditoryStream::StartWorkers() {
         asr_.get(), p,
         [this](const std::string& json) { EmitLocked(json); },
         buffer_.time_base(), asr_stream_);
-    asr_worker_->set_protocol_timeline(protocol_timeline_.get());
     asr_worker_->set_text_sink(
         [this](long id, double start, double end, const std::string& text) {
           protocol::Message msg;
@@ -377,6 +376,27 @@ void AuditoryStream::StartWorkers() {
                                       protocol::kAsrTranscript,
                                       msg,
                                       protocol::QoS::AT_LEAST_ONCE);
+        });
+    // Subscribe ASR to VAD speech segment events (push, not poll).
+    // Callback fires synchronously inside VAD's Publish() call.
+    asr_vad_sub_id_ = protocol_timeline_->SubscribeInternal(
+        protocol::TopicPattern{"vad/speech_segment"},
+        [this](const protocol::Message& msg) {
+          const std::string& data = msg.data;
+          auto sp = data.find("\"start\":");
+          auto ep = data.find("\"end\":");
+          if (sp == std::string::npos || ep == std::string::npos) return;
+          auto sv = sp + 8;
+          auto se = data.find_first_of(",}", sv);
+          auto ev = ep + 6;
+          auto ee = data.find_first_of(",}", ev);
+          if (se == std::string::npos || ee == std::string::npos) return;
+          try {
+            double s = std::stod(data.substr(sv, se - sv));
+            double e = std::stod(data.substr(ev, ee - ev));
+            asr_worker_->AddVadSegment(s, e);
+          } catch (const std::exception&) {
+          }
         });
     asr_cursor_ = buffer_.AddConsumer();
     asr_thread_ = std::thread([this] {
