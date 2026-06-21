@@ -759,6 +759,18 @@
         timelineCanvas.style.cursor = "";
       }
     });
+
+    // keyboard navigation: arrow keys pan, +/- zoom
+    timelineCanvas.addEventListener("keydown", function (e) {
+      var step = panOffset * 0.1 + 20;  // adaptive step
+      switch (e.key) {
+        case "ArrowLeft":  panOffset = Math.max(0, panOffset - step); _scheduleRender(); e.preventDefault(); break;
+        case "ArrowRight": panOffset += step; _scheduleRender(); e.preventDefault(); break;
+        case "+": case "=": zoomTimeline(1.4); e.preventDefault(); break;
+        case "-": case "_": zoomTimeline(0.7); e.preventDefault(); break;
+        case "Home": fitTimeline(); e.preventDefault(); break;
+      }
+    });
   }
 
   /* ── Microphone ── */

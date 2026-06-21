@@ -7,42 +7,42 @@
     <link rel="stylesheet" href="/style.css" />
   </head>
   <body>
-    <header class="topbar">
+    <header class="topbar" role="banner">
       <div class="brand">
         <h1>Orator</h1>
         <span class="subtitle">Real-Time Transcription</span>
       </div>
       <div class="topbar-right">
-        <span id="connBadge" class="badge offline">● Disconnected</span>
+        <span id="connBadge" class="badge offline" role="status" aria-live="polite">● Disconnected</span>
       </div>
     </header>
 
     <div class="container">
       <!-- Input Control Panel -->
-      <section class="panel input-panel">
+      <section class="panel input-panel" aria-label="Audio controls">
         <div class="input-row">
-          <button id="micBtn" class="btn btn-primary" disabled>
-            <span class="btn-icon">&#x1F3A4;</span> Start Mic
+          <button id="micBtn" class="btn btn-primary" disabled aria-label="Start microphone capture">
+            <span class="btn-icon" aria-hidden="true">&#x1F3A4;</span> Start Mic
           </button>
-          <label class="btn btn-secondary" id="uploadBtn" disabled>
-            <span class="btn-icon">&#x1F4C2;</span> Upload File
+          <label class="btn btn-secondary" id="uploadBtn" disabled aria-label="Upload audio file">
+            <span class="btn-icon" aria-hidden="true">&#x1F4C2;</span> Upload File
             <input type="file" id="fileInput" accept="audio/*" hidden />
           </label>
-          <button id="flushBtn" class="btn btn-outline" disabled>
-            <span class="btn-icon">&#x1F504;</span> Flush
+          <button id="flushBtn" class="btn btn-outline" disabled aria-label="Flush and get timeline">
+            <span class="btn-icon" aria-hidden="true">&#x1F504;</span> Flush
           </button>
-          <button id="endBtn" class="btn btn-warning" disabled>
-            <span class="btn-icon">&#x23F9;</span> End
+          <button id="endBtn" class="btn btn-warning" disabled aria-label="End session">
+            <span class="btn-icon" aria-hidden="true">&#x23F9;</span> End
           </button>
-          <button id="clearBtn" class="btn btn-outline" disabled>
-            <span class="btn-icon">&#x1F5D1;</span> Clear
+          <button id="clearBtn" class="btn btn-outline" disabled aria-label="Clear all data">
+            <span class="btn-icon" aria-hidden="true">&#x1F5D1;</span> Clear
           </button>
         </div>
         <div class="vad-led-wrap">
-          <span id="vadLed" class="vad-led">●</span>
+          <span id="vadLed" class="vad-led" role="status" aria-live="polite">●</span>
           <span class="vad-led-label">VAD</span>
         </div>
-        <div class="progress-row" id="progressRow" hidden>
+        <div class="progress-row" id="progressRow" hidden role="progressbar" aria-label="Upload progress">
           <span class="progress-label" id="durationLabel">00:00</span>
           <div class="progress-bar">
             <div class="progress-fill" id="progressFill"></div>
@@ -54,70 +54,70 @@
       <!-- Main Content -->
       <div class="main-grid">
         <!-- Transcript Panel (Left) -->
-        <section class="panel transcript-panel">
+        <section class="panel transcript-panel" aria-label="Transcript">
           <h2 class="panel-title">Transcript</h2>
-          <div id="transcriptList" class="transcript-list"></div>
-          <div id="liveDraft" class="live-draft hidden">
-            <span class="draft-pulse">&#x270F;</span>
+          <div id="transcriptList" class="transcript-list" role="log" aria-live="polite" aria-label="Live transcript entries"></div>
+          <div id="liveDraft" class="live-draft hidden" role="status" aria-live="assertive">
+            <span class="draft-pulse" aria-hidden="true">&#x270F;</span>
             <span id="draftText"></span>
           </div>
         </section>
 
         <!-- Metrics Panel (Right) -->
-        <section class="panel metrics-panel">
+        <section class="panel metrics-panel" aria-label="Performance metrics">
           <h2 class="panel-title">Metrics</h2>
           <div class="metrics-grid">
             <div class="metric-card">
               <span class="metric-label">Audio</span>
-              <span class="metric-value" id="mAudio">-</span>
+              <span class="metric-value" id="mAudio" aria-live="polite">-</span>
             </div>
             <div class="metric-card">
               <span class="metric-label">Sample Rate</span>
-              <span class="metric-value" id="mSampleRate">-</span>
+              <span class="metric-value" id="mSampleRate" aria-live="polite">-</span>
             </div>
             <div class="metric-card">
               <span class="metric-label">ASR RTF</span>
-              <span class="metric-value" id="mAsrRtf">-</span>
+              <span class="metric-value" id="mAsrRtf" aria-live="polite">-</span>
             </div>
             <div class="metric-card">
               <span class="metric-label">Diar RTF</span>
-              <span class="metric-value" id="mDiarRtf">-</span>
+              <span class="metric-value" id="mDiarRtf" aria-live="polite">-</span>
             </div>
             <div class="metric-card">
               <span class="metric-label">ASR Segments</span>
-              <span class="metric-value" id="mAsrSeg">0</span>
+              <span class="metric-value" id="mAsrSeg" aria-live="polite">0</span>
             </div>
             <div class="metric-card">
               <span class="metric-label">Diar Segments</span>
-              <span class="metric-value" id="mDiarSeg">0</span>
+              <span class="metric-value" id="mDiarSeg" aria-live="polite">0</span>
             </div>
             <div class="metric-card">
               <span class="metric-label">VAD RTF</span>
-              <span class="metric-value" id="mVadRtf">-</span>
+              <span class="metric-value" id="mVadRtf" aria-live="polite">-</span>
             </div>
             <div class="metric-card">
               <span class="metric-label">GPU Status</span>
-              <span class="metric-value" id="mGpuStatus">-</span>
+              <span class="metric-value" id="mGpuStatus" aria-live="polite">-</span>
             </div>
           </div>
-          <button id="downloadBtn" class="btn btn-outline btn-full hidden">
-            <span class="btn-icon">&#x1F4E5;</span> Download JSON
+          <button id="downloadBtn" class="btn btn-outline btn-full hidden" aria-label="Download timeline as JSON">
+            <span class="btn-icon" aria-hidden="true">&#x1F4E5;</span> Download JSON
           </button>
         </section>
       </div>
 
       <!-- Timeline Panel -->
-      <section class="panel timeline-panel">
+      <section class="panel timeline-panel" aria-label="Timeline visualization">
         <div class="timeline-header">
           <h2 class="panel-title">Timeline</h2>
           <div class="timeline-controls">
-            <button id="zoomInBtn" class="btn btn-sm btn-outline" title="Zoom in">+</button>
-            <button id="zoomOutBtn" class="btn btn-sm btn-outline" title="Zoom out">−</button>
-            <button id="zoomResetBtn" class="btn btn-sm btn-outline" title="Reset zoom">⟲</button>
+            <button id="zoomInBtn" class="btn btn-sm btn-outline" title="Zoom in" aria-label="Zoom in">+</button>
+            <button id="zoomOutBtn" class="btn btn-sm btn-outline" title="Zoom out" aria-label="Zoom out">−</button>
+            <button id="zoomResetBtn" class="btn btn-sm btn-outline" title="Reset zoom" aria-label="Reset zoom">⟲</button>
           </div>
         </div>
-        <div class="timeline-canvas-wrap">
-          <canvas id="timelineCanvas"></canvas>
+        <div class="timeline-canvas-wrap" role="img" aria-label="Interactive audio timeline with three tracks: diarization, ASR, and VAD">
+          <canvas id="timelineCanvas" tabindex="0" role="img" aria-label="Timeline canvas"></canvas>
         </div>
       </section>
     </div>

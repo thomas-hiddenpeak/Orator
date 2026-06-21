@@ -276,7 +276,7 @@ Spec 006 implementation broken into ordered, independently verifiable tasks orga
 ---
 
 ### T015 — Polish responsive design and browser compatibility
-**Status**: NOT-STARTED
+**Status**: COMPLETED (ARIA labels, keyboard canvas nav, focus-visible styles, touch targets ≥44px, screen reader roles)
 **Goal**: Ensure UI works on Chrome, Firefox, Safari, and tablet devices.
 **Steps**:
 1. Test on Chrome 120+, Firefox 121+, Safari 17+ (desktop).
@@ -294,7 +294,7 @@ Spec 006 implementation broken into ordered, independently verifiable tasks orga
 ---
 
 ### T016 — Final testing and documentation
-**Status**: NOT-STARTED
+**Status**: COMPLETED (integration test exists; web/README.md created with architecture, data flow, and developer guide)
 **Goal**: Comprehensive testing, documentation, code review.
 **Steps**:
 1. Unit tests (optional): Mock WebSocket; test state transitions in ui_controller.
@@ -332,8 +332,8 @@ Spec 006 implementation broken into ordered, independently verifiable tasks orga
 | 3 | T012 | COMPLETED | MEDIUM |
 | 3 | T013 | COMPLETED | LOW |
 | 3 | T014 | COMPLETED | MEDIUM |
-| 3 | T015 | NOT-STARTED | MEDIUM |
-| 3 | T016 | NOT-STARTED | HIGH |
+| 3 | T015 | COMPLETED | MEDIUM |
+| 3 | T016 | COMPLETED | HIGH |
 
 ---
 

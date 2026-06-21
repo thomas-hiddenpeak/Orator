@@ -49,9 +49,10 @@
 
 ## Phase 5 — Test integration & cleanup
 - [x] **T050** `test_shared_buffer` registered; full suite 19/19 passes clean.
-- [ ] **T051** Retire the superseded inline path / old diarization-only handler
-  if confirmed unused. *(Pending: old `DiarizationWsHandler` still present but
-  no longer wired; remove after owner confirms.)*
+- [x] **T051** Retire the superseded inline path / old diarization-only handler
+  if confirmed unused. *(Confirmed: `DiarizationWsHandler` has been fully removed
+  from the codebase. Diarization now publishes through ProtocolTimeline → comp_. 
+  SegmentSpeech retained as ASR endpoint detector.)*
 - [x] **T052** `/memories/repo/` and `PROJECT_STATE.md` updated with verified
   streaming-path facts and honest metrics.
 

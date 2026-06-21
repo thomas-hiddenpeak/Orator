@@ -14,7 +14,7 @@ work is specified under [specs/](.).
 > pass is the consistency proof. Status lines advance to `Implemented` in the
 > same change that lands the code, with the commit reference.
 
-- **Last updated**: 2026-06-21 (Spec 003 tasks.md audit complete; Spec 004 status corrected; Spec 006 Phase 3 status documented)
+- **Last updated**: 2026-06-21 (All specs audited; Spec 001 T051 confirmed clean; Spec 006 T015+T016 completed)
 - **Branch**: `master`
 - **Constitution**: v1.3.0
 
@@ -80,7 +80,7 @@ modifies, splits, infers, or back-fills any pipeline's content (Spec 004 §1a).
 | OnText protocol matching | ✅ Fixed | Substring `text.find("end")` → JSON key `text.find("\"end\"")` to prevent false positives on partial matches. Same for reset/flush. |
 | GPU telemetry default | ✅ Changed | `gpu_telemetry_interval_sec = 0.0` (was 1.0); disabled by default, opt-in via `ORATOR_GPU_TELEMETRY_SEC`. |
 | VAD model path | ✅ Migrated | `models/asr/silero_vad.safetensors` → `models/vad/`. Updated 6 file references across test, include, and tools. |
-| Web UI (Spec 006 MVP) | ✅ Implemented (Phases 1+2) | HTTP static server (`http_static_server.h/.cc`), full SPA (`index.html`, `style.css`, `app.js`), Canvas timeline with zoom/pan (mouse wheel zoom toward cursor, click-drag pan, +/−/reset buttons, 3 tracks: diarization/ASR/VAD, adaptive time axis), microphone + file upload, WebSocket client with auto-reconnect, GPU telemetry display, JSON export, Spec 004 protocol envelope unwrapping (`unwrapEnvelope()`), protocol describe command on connect. Integration test: `tools/ws_ui_integration_test.py` with envelope-aware message parsing. |
+| Web UI (Spec 006 MVP) | ✅ Implemented (all 16 tasks) | HTTP static server (`http_static_server.h/.cc`), full SPA (`index.html`, `style.css`, `app.js`), Canvas timeline with zoom/pan and keyboard nav, ARIA labels + focus indicators + 44px touch targets, rAF render scheduler + viewport clipping, microphone + file upload, WebSocket client with auto-reconnect, GPU telemetry display, JSON export, Spec 004 protocol envelope unwrapping, integration test (`tools/ws_ui_integration_test.py`), developer docs (`web/README.md`). |
 
 ## 4. Measured performance (GPU fixed at 1.3 GHz, power mode MaxN)
 
@@ -174,9 +174,9 @@ Findings:
 - [specs/002-gpu-scheduling/tasks.md](002-gpu-scheduling/tasks.md) — **COMPLETED**
 - [specs/003-sliding-window-asr/spec.md](003-sliding-window-asr/spec.md) — implemented (8cc31ab)
 - [specs/004-comprehensive-timeline/spec.md](004-comprehensive-timeline/spec.md) — **UNIFIED SPEC** (time base + comprehensive timeline + protocol layer). Implemented (all phases 1–12). Supersedes 005 and 007.
-- [specs/006-web-ui/spec.md](006-web-ui/spec.md) — draft (WebSocket client UI, real-time visualization, Phase 1 MVP scope)
-- [specs/006-web-ui/plan.md](006-web-ui/plan.md) — draft
-- [specs/006-web-ui/tasks.md](006-web-ui/tasks.md) — draft
+- [specs/006-web-ui/spec.md](006-web-ui/spec.md) — in progress (14/16 tasks, T015-T016 remaining)
+- [specs/006-web-ui/plan.md](006-web-ui/plan.md) — in progress
+- [specs/006-web-ui/tasks.md](006-web-ui/tasks.md) — in progress
 
 ## 7. Immediate next step
 

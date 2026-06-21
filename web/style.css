@@ -119,16 +119,22 @@ body {
   color: var(--text);
   transition: all 0.15s;
   white-space: nowrap;
+  min-height: 44px;
+  min-width: 44px;
 }
 .btn:hover:not(:disabled) { border-color: var(--accent); background: rgba(91,141,239,0.1); }
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
 .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 .btn-primary:hover:not(:disabled) { background: #4a7de0; }
 .btn-warning { background: rgba(245,158,11,0.15); border-color: var(--orange); color: var(--orange); }
 .btn-warning:hover:not(:disabled) { background: rgba(245,158,11,0.25); }
 .btn-secondary { background: var(--accent-dim); border-color: var(--accent-dim); color: #fff; }
 .btn-outline { color: var(--text-dim); }
-.btn-sm { padding: 4px 10px; font-size: 12px; }
+.btn-sm { padding: 4px 10px; font-size: 12px; min-height: 32px; min-width: 32px; }
 .btn-full { width: 100%; justify-content: center; margin-top: 12px; }
 
 .btn-icon { font-size: 14px; }
@@ -281,6 +287,16 @@ body {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+
+/* Focus styles for keyboard navigation */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+#timelineCanvas:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
 
 .hidden { display: none !important; }
 

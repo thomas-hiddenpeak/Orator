@@ -1,5 +1,9 @@
 # Spec 006 — Web UI Client for Real-Time Dual-Pipeline Transcription
 
+- **Status**: In progress (14/16 tasks; Phases 1-2 complete, Phase 3 T015-T016 remaining)
+- **Created**: 2026-06-18
+- **Owner**: project owner
+
 ## 1. Summary
 
 A browser-based web UI that provides **live visualization and interaction** with the Orator WebSocket service. The client connects to a running `orator_ws` server, uploads or streams audio (microphone/file), and renders the dual-pipeline output (diarization + ASR) on a unified timeline in real time. The UI is launched as an HTTP server integrated into the main Orator binary (`orator_ws`), eliminating the need for separate client setup.
