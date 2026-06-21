@@ -30,10 +30,12 @@
 
 #include <cuda_runtime.h>
 
+#include "core/stages.h"
+
 namespace orator {
 namespace pipeline {
 
-class GpuVad {
+class GpuVad : public core::IVad {
  public:
   struct Params {
     int sample_rate = 16000;
@@ -51,6 +53,13 @@ class GpuVad {
   GpuVad(const GpuVad&) = delete;
   GpuVad& operator=(const GpuVad&) = delete;
 
+  // --- core::IVad -----------------------------------------------------------
+  void Initialize(const core::VadConfig& config) override;
+  void LoadWeights(const std::string& path) override;
+  void Reset() override;
+  std::string name() const override { return "silero_vad"; }
+  // --------------------------------------------------------------------------
+
   // Append audio to the staging buffer (host side; cheap).
   void Push(const float* samples, int n);
 
@@ -63,9 +72,6 @@ class GpuVad {
 
   // Accumulated GPU compute time (for the VAD track's real-time-factor meta).
   double compute_sec() const { return compute_sec_; }
-
-  // Clear streaming state (audio staging, LSTM state, endpoint counters).
-  void Reset();
 
   long base_sample() const { return next_window_abs_; }
 
@@ -86,6 +92,8 @@ class GpuVad {
   // input (64-sample history + n_windows*512 audio) is in host `ext`. Writes
   // n_windows probabilities to *probs. Advances the LSTM device state.
   void RunBatch(const float* ext, int n_windows, std::vector<float>* probs);
+  // Free all device memory and reset pointers to nullptr.
+  void FreeDeviceMemory();
 
   Params params_;
   cudaStream_t stream_;

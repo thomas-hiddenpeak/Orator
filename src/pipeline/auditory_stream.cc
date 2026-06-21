@@ -1,6 +1,12 @@
 #include "pipeline/auditory_stream.h"
 
 #include "core/log.h"
+#include "core/registry.h"
+#include "model/builtin_registration.h"
+#include "model/qwen3_asr.h"
+#include "model/streaming_sortformer.h"
+#include "protocol/protocol_timeline.h"
+#include "protocol/session_store.h"
 
 #include <chrono>
 #include <cstdio>
@@ -26,6 +32,10 @@ AuditoryStream::~AuditoryStream() {
 }
 
 void AuditoryStream::Start() {
+  // Ensure all built-in model implementations are registered before creating
+  // any model instances through the registry.
+  model::EnsureBuiltinsRegistered();
+
   // Spec 004 Phase 13: initialize session store from config_.session_dir.
   // When empty, derive from storage_disk_path (backward compat).
   {
@@ -243,7 +253,7 @@ void AuditoryStream::Start() {
   // pipeline (symmetric with ASR). This supports measuring each pipeline in
   // isolation. In normal operation both weights are provided.
   if (!config_.diarizer_weights.empty()) {
-    diarizer_ = std::make_unique<model::SortformerDiarizer>();
+    diarizer_ = core::Registry<core::IDiarizer>::Instance().Create("sortformer");
     core::DiarizationConfig dc;
     dc.sample_rate = config_.sample_rate;
     dc.max_speakers = config_.max_speakers;
@@ -260,13 +270,16 @@ void AuditoryStream::Start() {
   }
 
   if (!config_.asr_model_dir.empty()) {
-    asr_ = std::make_unique<model::Qwen3Asr>();
+    asr_ = core::Registry<core::IAsr>::Instance().Create("qwen3_asr");
     core::AsrConfig ac;
     ac.sample_rate = config_.sample_rate;
     ac.language = config_.asr_language;
     asr_->Initialize(ac);
-    asr_->set_language(config_.asr_language);
-    asr_->set_max_new_tokens(config_.asr_max_new_tokens);
+    // set_language is redundant with AsrConfig above; set_max_new_tokens is
+    // Qwen3-specific — downcast through the interface pointer.
+    if (auto* qwen = dynamic_cast<model::Qwen3Asr*>(asr_.get())) {
+      qwen->set_max_new_tokens(config_.asr_max_new_tokens);
+    }
     asr_->LoadWeights(config_.asr_model_dir);
 
       // Spec 002: source the ASR pipeline's GPU stream from the priority
@@ -295,8 +308,9 @@ void AuditoryStream::StartWorkers() {
     dp.deliver_interval_sec = config_.diar_deliver_interval_sec;
     dp.sample_rate = config_.sample_rate;
     diar_worker_ =
-        std::make_unique<DiarizationWorker>(diarizer_.get(), dp,
-                                             buffer_.time_base(), diar_stream_);
+        std::make_unique<DiarizationWorker>(
+            dynamic_cast<model::SortformerDiarizer*>(diarizer_.get()), dp,
+            buffer_.time_base(), diar_stream_);
     // Spec 004 Step 2: diarization publishes speaker segments to the protocol
     // timeline on the diar/speaker_segment topic. last_segments_ is stored
     // under comp_mutex_ for Serialize(). ComprehensiveTimeline will be updated
@@ -358,7 +372,7 @@ void AuditoryStream::StartWorkers() {
     p.asr_vad_trail_sec = config_.asr_vad_trail_sec;
     p.max_audio_tokens = config_.asr_max_audio_tokens;
     asr_worker_ = std::make_unique<AsrWorker>(
-        asr_.get(), p,
+        dynamic_cast<model::Qwen3Asr*>(asr_.get()), p,
         [this](const std::string& json) { EmitLocked(json); },
         buffer_.time_base(), asr_stream_);
     asr_worker_->set_text_sink(

@@ -1,6 +1,7 @@
 #include "net/auditory_ws_handler.h"
 
 #include "core/log.h"
+#include "protocol/protocol_timeline.h"
 #include "protocol/session_store.h"
 
 #include <chrono>

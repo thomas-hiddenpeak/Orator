@@ -76,7 +76,7 @@ modifies, splits, infers, or back-fills any pipeline's content (Spec 004 §1a).
 | Logging system | ✅ Include-level `core/log.h` | Level-based macros (`LOG_DEBUG`/`INFO`/`WARN`/`ERROR`) with compile-time floor (`ORATOR_LOG_LEVEL`) and runtime env-var gate. All 14 `fprintf(stderr)` calls in src/ replaced. |
 | CUDA kernel unit tests | ✅ `test_kernels`: 13/13 passed | GPU kernel operations (Add, Multiply, NormalizeVector, CosineSimilarity, BatchCosineSimilarity) validated against CPU reference; includes edge cases (zero, single-element, large 1M vectors). |
 | CI pipeline | ✅ GitHub Actions | `.github/workflows/ci.yml`: CUDA 12.5, CMake build + ctest + warning check + Python syntax verification. Triggered on push/PR to master. |
-| Test suite | ✅ 26/26 C++ ctests pass | Clean build under `-Wall -Wextra`, ZERO warnings. `test_kernels` validates GPU kernel numerics. Python integration tests registered (`py-ws-comprehensive`, `py-ws-real-audio`) marked manual (require running server). |
+| Test suite | ✅ 28/28 tests pass (26 C++ + 2 Python) | Clean build under `-Wall -Wextra`, ZERO warnings. `test_kernels` validates GPU kernel numerics. Python integration tests (`py-ws-comprehensive`, `py-ws-real-audio`) run automatically via `test/run_py_test.py`. |
 | OnText protocol matching | ✅ Fixed | Substring `text.find("end")` → JSON key `text.find("\"end\"")` to prevent false positives on partial matches. Same for reset/flush. |
 | GPU telemetry default | ✅ Changed | `gpu_telemetry_interval_sec = 0.0` (was 1.0); disabled by default, opt-in via `ORATOR_GPU_TELEMETRY_SEC`. |
 | VAD model path | ✅ Migrated | `models/asr/silero_vad.safetensors` → `models/vad/`. Updated 6 file references across test, include, and tools. |
@@ -174,9 +174,9 @@ Findings:
 - [specs/002-gpu-scheduling/tasks.md](002-gpu-scheduling/tasks.md) — **COMPLETED**
 - [specs/003-sliding-window-asr/spec.md](003-sliding-window-asr/spec.md) — implemented (8cc31ab)
 - [specs/004-comprehensive-timeline/spec.md](004-comprehensive-timeline/spec.md) — **UNIFIED SPEC** (time base + comprehensive timeline + protocol layer). Implemented (all phases 1–12). Supersedes 005 and 007.
-- [specs/006-web-ui/spec.md](006-web-ui/spec.md) — in progress (14/16 tasks, T015-T016 remaining)
-- [specs/006-web-ui/plan.md](006-web-ui/plan.md) — in progress
-- [specs/006-web-ui/tasks.md](006-web-ui/tasks.md) — in progress
+- [specs/006-web-ui/spec.md](006-web-ui/spec.md) — implemented (16/16 tasks complete)
+- [specs/006-web-ui/plan.md](006-web-ui/plan.md) — implemented
+- [specs/006-web-ui/tasks.md](006-web-ui/tasks.md) — implemented
 
 ## 7. Immediate next step
 
@@ -194,5 +194,5 @@ Specs 001, 002, 003, 004, and 006 (Web UI MVP) are complete, verified, and commi
 - **Spec 004 — Protocol Layer**: Implemented. Phases 7–12 complete. Web UI (`app.js`) now includes `unwrapEnvelope()` for Spec 004 topic-based protocol envelopes. Integration test (`ws_ui_integration_test.py`) uses `unwrap_envelope()` for all WS message parsing.
 - **Full-length streaming verification**: 2026-06-21. 3615 s (1 hr) audio pushed through real WebSocket → 382.0 s wall = **9.46× real-time**. All three tracks (ASR/diarization/VAD) cover 100 % of the audio, no crash, no clock drift, no data loss. Achieved 9.25× on a consecutive warm-GPU re-run and 5.82× on a cold-start run, confirming model-load overhead is one-time.
 - **Python integration tests** (2026-06-22). Auto server lifecycle via `test/run_py_test.py`. Tests are no longer manual — run automatically with `ctest`. 28/28 tests pass (26 C++ + 2 Python).
-- **TOML config system** (2026-06-22). All ~35 runtime parameters consolidated into `orator.toml` with 8 sections: `[server]`, `[asr]`, `[vad]`, `[diarizer]`, `[storage]`, `[telemetry]`, `[debug]`. Loading order: compile-time defaults → CLI args → `orator.toml` → env var overrides. Header-only toml++ (FetchContent, zero runtime dep). Config struct expanded to 35 fields across all pipelines. Previous env-only params (`ORATOR_TIMEBASE_CHECK`, `ORATOR_ASR_PROFILE`, `ORATOR_STREAM_PROGRESS`, `ORATOR_LOG_LEVEL`, `ORATOR_GPU_SERIAL`/`CONCURRENT`) now in Config + synced to environment for deep getenv() code. See `include/io/config_reader.h`, `src/io/config_reader.cc`, `orator.toml`.
+- **TOML config system** (2026-06-22). All ~34 runtime parameters consolidated into `orator.toml` with 7 sections: `[server]`, `[asr]`, `[vad]`, `[diarizer]`, `[storage]`, `[telemetry]`, `[debug]`. Loading order: compile-time defaults → CLI args → `orator.toml` → env var overrides. Header-only toml++ (FetchContent, zero runtime dep). Config struct expanded to 34 fields across all pipelines. Previous env-only params (`ORATOR_TIMEBASE_CHECK`, `ORATOR_ASR_PROFILE`, `ORATOR_STREAM_PROGRESS`, `ORATOR_LOG_LEVEL`, `ORATOR_GPU_SERIAL`/`CONCURRENT`) now in Config + synced to environment for deep getenv() code. See `include/io/config_reader.h`, `src/io/config_reader.cc`, `orator.toml`.
 - **VAD-gated ASR fix** (2026-06-22). VAD async-lag protection via segment-start confirmation check. ASR segments reduced from 43→18 (120s test). RTF improved 4.7→3.7. Parameters tuned: `asr_vad_trail_sec=1.0`, `vad_min_silence_ms=300`. See `src/pipeline/asr_worker.cc:61-141`.

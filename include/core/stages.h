@@ -102,5 +102,30 @@ class ISink {
   virtual void Consume(const Timeline& timeline) = 0;
 };
 
+// Configuration handed to a VAD engine at initialization. Fields are
+// model-agnostic; model-specific knobs live inside each implementation.
+struct VadConfig {
+  int sample_rate = 16000;
+  float threshold = 0.5f;
+  int min_speech_ms = 250;
+  int min_silence_ms = 300;
+};
+
+// Voice Activity Detection: segments audio into speech/non-speech regions.
+// Generalizes any VAD model (Silero, energy-based, etc.); the pipeline
+// depends only on this contract, never on a concrete detector.
+class IVad {
+ public:
+  virtual ~IVad() = default;
+
+  virtual void Initialize(const VadConfig& config) = 0;
+  // Load weights from a model path. Stubs may ignore the path.
+  virtual void LoadWeights(const std::string& path) = 0;
+  // Clear streaming state (LSTM state, endpoint counters) between sessions.
+  virtual void Reset() = 0;
+
+  virtual std::string name() const = 0;
+};
+
 }  // namespace core
 }  // namespace orator

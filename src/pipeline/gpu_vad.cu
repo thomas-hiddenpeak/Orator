@@ -200,26 +200,44 @@ GpuVad::GpuVad(const Params& params)
 }
 
 GpuVad::~GpuVad() {
-  cudaFree(d_stft_basis_);
+  FreeDeviceMemory();
+}
+
+void GpuVad::FreeDeviceMemory() {
+  cudaFree(d_stft_basis_); d_stft_basis_ = nullptr;
   for (int i = 0; i < 4; ++i) {
-    cudaFree(d_enc_w_[i]);
-    cudaFree(d_enc_b_[i]);
+    cudaFree(d_enc_w_[i]); d_enc_w_[i] = nullptr;
+    cudaFree(d_enc_b_[i]); d_enc_b_[i] = nullptr;
   }
-  cudaFree(d_lstm_wih_);
-  cudaFree(d_lstm_whh_);
-  cudaFree(d_lstm_bih_);
-  cudaFree(d_lstm_bhh_);
-  cudaFree(d_dec_w_);
-  cudaFree(d_ext_);
-  cudaFree(d_padded_);
-  cudaFree(d_mag_);
-  cudaFree(d_enc0_);
-  cudaFree(d_enc1_);
-  cudaFree(d_enc2_);
-  cudaFree(d_enc3_);
-  cudaFree(d_prob_);
-  cudaFree(d_h_);
-  cudaFree(d_c_);
+  cudaFree(d_lstm_wih_); d_lstm_wih_ = nullptr;
+  cudaFree(d_lstm_whh_); d_lstm_whh_ = nullptr;
+  cudaFree(d_lstm_bih_); d_lstm_bih_ = nullptr;
+  cudaFree(d_lstm_bhh_); d_lstm_bhh_ = nullptr;
+  cudaFree(d_dec_w_); d_dec_w_ = nullptr;
+  cudaFree(d_ext_); d_ext_ = nullptr;
+  cudaFree(d_padded_); d_padded_ = nullptr;
+  cudaFree(d_mag_); d_mag_ = nullptr;
+  cudaFree(d_enc0_); d_enc0_ = nullptr;
+  cudaFree(d_enc1_); d_enc1_ = nullptr;
+  cudaFree(d_enc2_); d_enc2_ = nullptr;
+  cudaFree(d_enc3_); d_enc3_ = nullptr;
+  cudaFree(d_prob_); d_prob_ = nullptr;
+  cudaFree(d_h_); d_h_ = nullptr;
+  cudaFree(d_c_); d_c_ = nullptr;
+}
+
+void GpuVad::Initialize(const core::VadConfig& config) {
+  params_.sample_rate = config.sample_rate;
+  params_.silero_threshold = config.threshold;
+  params_.silero_min_speech_ms = config.min_speech_ms;
+  params_.silero_min_silence_ms = config.min_silence_ms;
+}
+
+void GpuVad::LoadWeights(const std::string& path) {
+  params_.silero_model_path = path;
+  FreeDeviceMemory();
+  InitModel();
+  UploadWeights();
 }
 
 void GpuVad::InitModel() {

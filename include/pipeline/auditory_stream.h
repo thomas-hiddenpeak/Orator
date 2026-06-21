@@ -30,17 +30,23 @@
 
 #include <cuda_runtime.h>
 
+#include "core/stages.h"
 #include "core/types.h"
 #include "gpu/scheduler.h"
-#include "model/qwen3_asr.h"
-#include "model/streaming_sortformer.h"
 #include "pipeline/asr_worker.h"
 #include "pipeline/gpu_vad.h"
 #include "pipeline/comprehensive_timeline.h"
 #include "pipeline/diarization_worker.h"
 #include "pipeline/shared_audio_buffer.h"
-#include "protocol/protocol_timeline.h"
-#include "protocol/session_store.h"
+// Forward declarations for protocol types (layering: pipeline depends on protocol
+// interfaces only, not includes).
+namespace orator {
+namespace protocol {
+class ProtocolTimeline;
+class SessionStore;
+class PipelineHandle;
+}  // namespace protocol
+}  // namespace orator
 
 namespace orator {
 namespace pipeline {
@@ -168,8 +174,8 @@ class AuditoryStream {
   Config config_;
   Emit emit_;
 
-  std::unique_ptr<model::SortformerDiarizer> diarizer_;
-  std::unique_ptr<model::Qwen3Asr> asr_;  // null when ASR disabled
+  std::unique_ptr<core::IDiarizer> diarizer_;
+  std::unique_ptr<core::IAsr> asr_;  // null when ASR disabled
 
   SharedAudioBuffer buffer_;
   std::unique_ptr<DiarizationWorker> diar_worker_;
