@@ -60,6 +60,7 @@ class AuditoryStream {
     bool asr_vad_gate = true;
     int asr_vad_lead_ms = 200;
     double asr_vad_trail_sec = 1.0;
+    int asr_max_audio_tokens = 1500;
     bool vad_stream = true;
     std::string vad_model = "models/vad/silero_vad.safetensors";
     float vad_threshold = 0.5f;

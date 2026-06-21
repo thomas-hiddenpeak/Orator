@@ -355,6 +355,7 @@ void AuditoryStream::StartWorkers() {
     p.asr_vad_gate = config_.asr_vad_gate;
     p.asr_vad_lead_ms = config_.asr_vad_lead_ms;
     p.asr_vad_trail_sec = config_.asr_vad_trail_sec;
+    p.max_audio_tokens = config_.asr_max_audio_tokens;
     asr_worker_ = std::make_unique<AsrWorker>(
         asr_.get(), p,
         [this](const std::string& json) { EmitLocked(json); },

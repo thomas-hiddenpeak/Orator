@@ -12,6 +12,16 @@ find_package(Threads REQUIRED)
 enable_language(CUDA)
 
 # ---------------------------------------------------------------------------
+# tomlplusplus (MIT license) - header-only TOML config parser
+include(FetchContent)
+FetchContent_Declare(
+  tomlplusplus
+  GIT_REPOSITORY https://github.com/marzer/tomlplusplus.git
+  GIT_TAG v3.4.0
+  GIT_SHALLOW TRUE
+)
+FetchContent_MakeAvailable(tomlplusplus)
+
 # libwebsockets (MIT license) - robust WebSocket server implementation
 # Replaces hand-rolled websocket_server.cc with industrial-grade WS support:
 # - Multi-client concurrent connections
@@ -58,6 +68,7 @@ set(ORATOR_CORE_SOURCES
     src/io/json_sink.cc
     src/io/audio_file.cc
     src/io/reference_transcript.cc
+    src/io/config_reader.cc
     # feature extraction (real Sortformer front-end)
     src/feature/mel_spectrogram.cu
     src/feature/whisper_mel.cu
@@ -109,7 +120,7 @@ target_include_directories(orator_core PUBLIC
 target_include_directories(orator_core PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/minimp3
 )
-target_link_libraries(orator_core PUBLIC cudart cublas Threads::Threads websockets)
+target_link_libraries(orator_core PUBLIC cudart cublas Threads::Threads websockets tomlplusplus::tomlplusplus)
 if(NOT MSVC)
     target_compile_options(orator_core PRIVATE
         $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra>)
