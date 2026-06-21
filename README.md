@@ -127,6 +127,122 @@ cd build && ctest -R py- --output-on-failure
 - `tools/`：工具与验证程序
 - `test/`：测试
 - `models/`：模型与参考数据（含 LFS 大文件）
+- `web/`：Web UI（SPA）
+- `specs/`：SDD 工件（spec、plan、tasks）
+
+## 系统架构
+
+### 分层结构
+
+依赖方向由外向内指向 `core/`：
+
+```
+protocol/  (主题路由、存储、WS 信封)
+    ↑
+  net/      (WebSocket 服务器、HTTP 静态服务器)
+    ↑
+pipeline/  (管道编排、工作者线程、时间线)
+    ↑
+ model/    (Qwen3-ASR, Sortformer, Silero VAD 推理)
+    ↑
+ gpu/ io/ feature/ → core/ (基础类型、模型接口、CUDA 调度器)
+```
+
+### 启动流程
+
+`orator_ws` 是唯一主入口（`src/ws_main.cc`）：
+
+1. **配置加载** — 解析 CLI 参数和 20+ 环境变量到 `AuditoryStream::Config`
+2. **单例管线创建** — `AuditoryStream` 只创建一次（GPU 模型仅加载一次），通过 `shared_ptr` 在所有 WebSocket 连接间共享。每个新连接调用 `Reset()`（清状态但不卸载模型），避免 Jetson OOM
+3. **服务器双端口** — 主端口提供 WebSocket 服务（libwebsockets），`port+1` 提供 HTTP 静态服务（零依赖原始 socket），托管 `web/` SPA
+4. **服务循环** — 新 WS 连接创建 `AuditoryWsHandler`，共享已有的 `AuditoryStream`
+
+### 三管道体系
+
+三个完全独立的管道在各自线程上运行，共享 **唯一**的东西是音频数据：
+
+```
+WS → PushAudio() → SharedAudioBuffer (单生产者)
+                          │
+              ┌───────────┼───────────┐
+              ▼           ▼           ▼
+        Diarization      ASR         VAD
+         (管线 0)       (管线 1)    (管线 2)
+```
+
+| 管道 | 模型 | 产出 | 优先级 |
+|------|------|------|--------|
+| 说话人分离 | Sortformer (17层 Conformer + 解码器) | `diar/speaker_segment` | 0 (最高) |
+| 语音识别 | Qwen3-ASR (KV-cache 流式解码) | `asr/transcript` | 1 |
+| 语音检测 | Silero VAD (GPU 批处理) | `vad/speech_segment` | 2 (最低) |
+
+**关键不变量**：
+- 管道间**绝不直接通信** — 无共享指针、无原子标志、无回调引用
+- 全部通过 `ProtocolTimeline`（主题消息总线）汇集到 `ComprehensiveTimeline`
+- ASR 通过 `ProtocolTimeline::Replay()` 读取 VAD 输出（VAD 门控机制），而非直接调用
+- 所有时间码从公共 `TimeBase` 派生
+
+### 数据流
+
+```
+[1] PCM 二进制入站 → OnBinary → PushAudio() → SharedAudioBuffer
+                       │
+[2] 三个工作者线程各自读取 → 推理 → ProtocolTimeline::Publish()
+                   │                     │
+                   │              ComprehensiveTimeline
+                   │              (说话人归属: SplitTextByDiar)
+                   │                     │
+[3] On Flush/End → EmitTimeline → Serialize() → WS 输出
+                       │
+[4] On Reset → SessionStore::Save() (持久化到磁盘)
+```
+
+`ComprehensiveTimeline` 的说话人归属逻辑（`SplitTextByDiar`）：
+由于 ASR 不输出字级时间戳，文本按时间比例分配给重叠的说话人段。在说话人边界切割文本区间，每个子区间归属到最大重叠的说话人。
+
+### 协议层 (Spec 004)
+
+主题消息总线，MQTT 风格 pub/sub：
+
+```
+ProtocolTimeline
+├── PipelineRegistry    (管线生命周期)
+├── TopicRouter         (主题路由, 支持 +/# 通配符)
+├── StorageManager      (MEMORY 128MB / DISK 文件双后端)
+├── TimeIndex           (排序时间索引, 支持 Replay)
+└── SchemaRegistry      (版本化模式)
+```
+
+- 管线注册返回 RAII `PipelineHandle`，析构自动注销
+- 发布流程：序列化 → 存储 → 索引 → 路由 → 锁外分发回调
+- WS 消息自动包裹 JSON 信封（topic, pipeline, msg_id, ts, qos, schema_version, data）
+- 旧版 `{"type":"vad",...}` 自动兼容
+
+### GPU 调度
+
+通过 `GpuScheduler` 为每个管道分配专用 CUDA 流，三层优先级：
+
+| 优先级 | 管道 | CUDA 优先级 |
+|--------|------|-------------|
+| 0 | Diarization | 最高 (foreground) |
+| 1 | ASR | 中 (foreground) |
+| 2 | VAD | 最低 (background) |
+
+在 Jetson (Tegra) 上，CUDA 优先级范围可能只有单值，此时降级为普通流并发。
+
+### Web UI
+
+SPA 架构（`web/app.js`），通过 WS 实时接收事件推送：
+
+| 消息类型 | 处理 |
+|----------|------|
+| `asr_partial` | 实时文本草稿 |
+| `asr` | 确认文本，渲染进 Transcript |
+| `timeline` | 三轨 canvas 时间线（说话人/ASR/VAD） |
+| `sessions` | 会话历史面板 |
+| `gpu_telemetry` | 实时 RTF 指标 |
+
+Canvas 时间线支持缩放、拖拽平移、缩放复位、键盘导航。
 
 ## 贡献
 
