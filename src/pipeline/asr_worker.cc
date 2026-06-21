@@ -134,33 +134,20 @@ void AsrWorker::Finalize() {
 // segment is committed (one timeline token) and the session reset at the
 // segment cap or on finalize.
 void AsrWorker::ProcessIncremental(const float* samples, int n, bool finalize) {
-  const int sr = params_.sample_rate;
-  const long seg_cap = std::max<long>(1, static_cast<long>(params_.segment_sec * sr));
-
   int off = 0;
   while (off < n) {
     if (inc_in_segment_) {
-      if (inc_seg_samples_ >= seg_cap) {
-        EmitIncrementalChunk(nullptr, 0, /*finalize=*/true);
-        continue;
-      }
-      const int take =
-          static_cast<int>(std::min<long>(seg_cap - inc_seg_samples_, n - off));
-      EmitIncrementalChunk(samples + off, take, /*finalize=*/false);
-      off += take;
+      EmitIncrementalChunk(samples + off, n - off, /*finalize=*/false);
+      off = n;
     } else {
-      const int take = static_cast<int>(std::min<long>(seg_cap, n - off));
-      EmitIncrementalChunk(samples + off, take, /*finalize=*/false);
-      off += take;
+      EmitIncrementalChunk(samples + off, n - off, /*finalize=*/false);
+      off = n;
     }
   }
   if (finalize) EmitIncrementalChunk(nullptr, 0, /*finalize=*/true);
 }
 
 void AsrWorker::EmitIncrementalChunk(const float* samples, int n, bool finalize) {
-  const int sr = params_.sample_rate;
-  const long seg_cap = std::max<long>(1, static_cast<long>(params_.segment_sec * sr));
-
   const auto t0 = Clock::now();
   {
     gpu::DeviceGuard gpu(/*own_stream=*/true);
@@ -177,8 +164,7 @@ void AsrWorker::EmitIncrementalChunk(const float* samples, int n, bool finalize)
       inc_abs_pos_ += n;
       inc_seg_end_sample_ = inc_abs_pos_;
     }
-    const bool hit_cap = inc_seg_samples_ >= seg_cap;
-    if (inc_in_segment_ && (finalize || hit_cap)) {
+    if (inc_in_segment_ && finalize) {
       inc_live_text_ = asr_->StreamFinalize(stream_);
       inc_in_segment_ = false;
     }
