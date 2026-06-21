@@ -9,6 +9,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <stdexcept>
+#include <sstream>
 
 namespace orator {
 namespace model {
@@ -241,8 +242,9 @@ std::string Qwen3Asr::StreamChunk(const float* pcm, int n, cudaStream_t stream) 
   // Only do work once at least one full 8 s window of new audio is available.
   const int hop = 160;  // WhisperFeatureExtractor hop
   const int avail_frames = static_cast<int>(seg_pcm_.size() / hop);
-  if (avail_frames - seg_encoded_frames_ < kStreamWindowMel)
+  if (avail_frames - seg_encoded_frames_ < kStreamWindowMel) {
     return CurrentLiveText();
+  }
 
   // Mel over the full (bounded) segment; interior frames are stream-stable.
   int n_frames = 0;
@@ -264,7 +266,9 @@ std::string Qwen3Asr::StreamChunk(const float* pcm, int n, cudaStream_t stream) 
     int toks = 0;
     std::vector<float> enc =
         encoder_->Forward(sub.data(), kStreamWindowMel, &toks, stream);
-    if (toks <= 0) break;
+    if (toks <= 0) {
+      break;
+    }
     // Append the new window's audio-token KV after the cached checkpoint. The
     // audio-pad embedding is overwritten by the encoder output, so the encoder
     // output IS the embedding at those positions.
