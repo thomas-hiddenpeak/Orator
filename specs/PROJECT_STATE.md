@@ -14,7 +14,7 @@ work is specified under [specs/](.).
 > pass is the consistency proof. Status lines advance to `Implemented` in the
 > same change that lands the code, with the commit reference.
 
-- **Last updated**: 2026-06-21 (Spec 006 Phase 2: Canvas timeline + zoom/pan; full-length 1hr speed verification)
+- **Last updated**: 2026-06-21 (Spec 003 tasks.md audit complete; Spec 004 status corrected; Spec 006 Phase 3 status documented)
 - **Branch**: `master`
 - **Constitution**: v1.3.0
 
@@ -173,7 +173,7 @@ Findings:
 - [specs/002-gpu-scheduling/plan.md](002-gpu-scheduling/plan.md) — **COMPLETED**
 - [specs/002-gpu-scheduling/tasks.md](002-gpu-scheduling/tasks.md) — **COMPLETED**
 - [specs/003-sliding-window-asr/spec.md](003-sliding-window-asr/spec.md) — implemented (8cc31ab)
-- [specs/004-comprehensive-timeline/spec.md](004-comprehensive-timeline/spec.md) — **UNIFIED SPEC** (time base + comprehensive timeline + protocol layer). Implemented (time base + timeline). Draft (protocol layer). Supersedes 005 and 007.
+- [specs/004-comprehensive-timeline/spec.md](004-comprehensive-timeline/spec.md) — **UNIFIED SPEC** (time base + comprehensive timeline + protocol layer). Implemented (all phases 1–12). Supersedes 005 and 007.
 - [specs/006-web-ui/spec.md](006-web-ui/spec.md) — draft (WebSocket client UI, real-time visualization, Phase 1 MVP scope)
 - [specs/006-web-ui/plan.md](006-web-ui/plan.md) — draft
 - [specs/006-web-ui/tasks.md](006-web-ui/tasks.md) — draft

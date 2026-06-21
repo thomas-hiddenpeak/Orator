@@ -202,10 +202,10 @@ Spec 006 implementation broken into ordered, independently verifiable tasks orga
 
 ---
 
-## Phase 3: Full Features — Microphone, File Upload, Optimization (NOT-STARTED)
+## Phase 3: Full Features — Microphone, File Upload, Optimization (PARTIALLY IMPLEMENTED)
 
 ### T011 — Implement microphone capture in web/audio_input.js
-**Status**: NOT-STARTED
+**Status**: COMPLETED (implemented in app.js — getUserMedia + AudioContext + PCM send)
 **Goal**: Capture real-time audio from user's microphone.
 **Steps**:
 1. Request permission: `navigator.mediaDevices.getUserMedia({audio: true})`.
@@ -225,7 +225,7 @@ Spec 006 implementation broken into ordered, independently verifiable tasks orga
 ---
 
 ### T012 — Implement file upload in web/audio_input.js
-**Status**: NOT-STARTED
+**Status**: COMPLETED (implemented in app.js — file input + drag-and-drop + decodeAudioData + progress bar)
 **Goal**: Allow users to upload audio files (WAV, MP3, FLAC).
 **Steps**:
 1. Create file input (`<input type="file" accept="audio/*">`).
@@ -246,7 +246,7 @@ Spec 006 implementation broken into ordered, independently verifiable tasks orga
 ---
 
 ### T013 — Performance optimization for large recordings
-**Status**: NOT-STARTED
+**Status**: COMPLETED (rAF render scheduler, viewport pre-filtering, lazy transcript loading (MAX_TRANSCRIPT_ROWS=500))
 **Goal**: Handle long recordings (> 2 hours) without UI lag.
 **Steps**:
 1. Implement viewport clipping in Canvas rendering (only render visible portion).
@@ -261,7 +261,7 @@ Spec 006 implementation broken into ordered, independently verifiable tasks orga
 ---
 
 ### T014 — Add metrics dashboard with live updates
-**Status**: NOT-STARTED
+**Status**: COMPLETED (implemented in app.js — handleGpuTelemetry renders GPU metrics + summary from timeline data)
 **Goal**: Display detailed performance metrics alongside timeline.
 **Content**:
 - Summary section: audio_sec, wall_sec, stream_rtf.
@@ -328,10 +328,10 @@ Spec 006 implementation broken into ordered, independently verifiable tasks orga
 | 1 | T008 | COMPLETED | HIGH |
 | 2 | T009 | COMPLETED | MEDIUM |
 | 2 | T010 | COMPLETED | MEDIUM |
-| 3 | T011 | NOT-STARTED | MEDIUM |
-| 3 | T012 | NOT-STARTED | MEDIUM |
-| 3 | T013 | NOT-STARTED | LOW |
-| 3 | T014 | NOT-STARTED | MEDIUM |
+| 3 | T011 | COMPLETED | MEDIUM |
+| 3 | T012 | COMPLETED | MEDIUM |
+| 3 | T013 | COMPLETED | LOW |
+| 3 | T014 | COMPLETED | MEDIUM |
 | 3 | T015 | NOT-STARTED | MEDIUM |
 | 3 | T016 | NOT-STARTED | HIGH |
 

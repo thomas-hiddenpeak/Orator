@@ -1,7 +1,7 @@
 # Spec 003 — Incremental KV-Cache Real-Time ASR
 
 - **Feature**: `003-sliding-window-asr`
-- **Status**: Revised 2026-06-17 (VAD gating + trailing window)
+- **Status**: Implemented (incremental KV-cache); tasks.md audit 2026-06-21
 - **Created**: 2026-06-12
 - **Revised**: 2026-06-15 (pivot), 2026-06-17 (parameter refinement), 2026-06-17 (VAD gating + trailing window), 2026-06-18 (VAD decoupling)
 - **Owner**: project owner

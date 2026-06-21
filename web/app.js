@@ -40,6 +40,7 @@
 
   // Transcript rows keyed by text_id
   const asrRows = new Map();
+  const MAX_TRANSCRIPT_ROWS = 500;
 
   // Timeline data for download
   let timelineData = null;
@@ -427,6 +428,22 @@
     div.appendChild(spkEl);
     div.appendChild(textEl);
     transcriptList.appendChild(div);
+
+    // Prune oldest rows when over limit to keep DOM lean
+    if (asrRows.size > MAX_TRANSCRIPT_ROWS) {
+      var oldestId = null;
+      var oldestTime = Infinity;
+      asrRows.forEach(function (r, id) {
+        var ts = parseFloat(r.dataset.start) || 0;
+        if (ts < oldestTime) { oldestTime = ts; oldestId = id; }
+      });
+      if (oldestId != null) {
+        var oldRow = asrRows.get(oldestId);
+        if (oldRow && oldRow.parentNode) oldRow.parentNode.removeChild(oldRow);
+        asrRows.delete(oldestId);
+      }
+    }
+
     return div;
   }
 
@@ -471,7 +488,18 @@
     if (audioDuration <= 0) audioDuration = 30;
     timeScale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, availW / audioDuration));
     panOffset = 0;
-    renderTimeline();
+    _scheduleRender();
+  }
+
+  /* ── rAF render scheduler ── */
+  var _renderPending = false;
+  function _scheduleRender() {
+    if (_renderPending) return;
+    _renderPending = true;
+    requestAnimationFrame(function () {
+      _renderPending = false;
+      renderTimeline();
+    });
   }
 
   function zoomTimeline(factor) {
@@ -481,7 +509,7 @@
     // keep center point fixed
     var center = timelineCanvas.width / 2;
     panOffset = panOffset * (timeScale / oldScale) + (center - center * (timeScale / oldScale));
-    renderTimeline();
+    _scheduleRender();
   }
 
   function renderTimeline() {
@@ -529,6 +557,22 @@
       else if (kind === "asr") asrEntries = entries;
       else if (kind === "vad") vadEntries = entries;
     }
+
+    // Viewport pre-filter: only iterate entries overlapping the visible time range
+    var visibleStart = panOffset < 0 ? 0 : panOffset / timeScale;
+    var visibleEnd = audioDuration > 0 ? Math.min(audioDuration, (panOffset + w) / timeScale) : (panOffset + w) / timeScale;
+    function filterVisible(arr) {
+      var out = [];
+      for (var i = 0; i < arr.length; i++) {
+        var e = arr[i];
+        if (e.end <= visibleStart || e.start >= visibleEnd) continue;
+        out.push(e);
+      }
+      return out;
+    }
+    if (diarEntries.length > 200) diarEntries = filterVisible(diarEntries);
+    if (asrEntries.length > 200)  asrEntries  = filterVisible(asrEntries);
+    if (vadEntries.length > 200)  vadEntries  = filterVisible(vadEntries);
 
     var trackY0 = PADDING_TOP;
 
@@ -684,7 +728,7 @@
       // zoom toward mouse position
       var mx = e.offsetX;
       panOffset = panOffset * (timeScale / oldScale) + mx * (1 - timeScale / oldScale);
-      renderTimeline();
+      _scheduleRender();
     }, { passive: false });
 
     // drag pan
@@ -699,7 +743,7 @@
     window.addEventListener("mousemove", function (e) {
       if (!isDragging) return;
       panOffset = dragStartPan - (e.clientX - dragStartX);
-      renderTimeline();
+      _scheduleRender();
     });
 
     window.addEventListener("mouseup", function () {
@@ -900,7 +944,7 @@
     audioDuration = 0;
     timeScale = 100;
     panOffset = 0;
-    renderTimeline();
+    _scheduleRender();
     sendCmd({ reset: 1 });
   }
 
@@ -955,7 +999,7 @@
   setStatus(false);
   connect();
   wireTimelineEvents();
-  renderTimeline();
+  _scheduleRender();
 
   /* ── Demo data (for visualization testing) ── */
   // Load demo transcript if ?demo=1 in URL
