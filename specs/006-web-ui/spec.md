@@ -340,7 +340,7 @@ web/
 
 ## 11. Constraints & Dependencies
 
-- **Runtime**: Pure C++17/CUDA runtime; embedded web server must use only standard C++ or Orator's existing dependencies.
+- **Runtime**: Pure C++20/CUDA runtime; embedded web server must use only standard C++ or Orator's existing dependencies.
 - **Frontend deps**: Vanilla JavaScript, Web APIs only (no npm/build step).
 - **Network**: Assumes HTTP and WebSocket on the same host and port (or easily configurable).
 - **Accuracy**: UI is a visualization layer; no changes to pipeline accuracy expectations (Spec 001–005 unchanged).

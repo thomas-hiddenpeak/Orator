@@ -1,7 +1,7 @@
 # Orator — Agent Knowledge Base
 
 **Generated:** 2026-06-21
-**Stack:** C++17 / CUDA / CMake
+**Stack:** C++20 / CUDA / CMake
 **Runtime:** Pure C++/CUDA, zero third-party runtime dependencies
 **Build:** `cmake -S . -B build && cmake --build build -j`
 **Test:** `cd build && ctest --output-on-failure`
@@ -149,7 +149,7 @@ This project follows **Spec-Driven Development (SDD)** adapted from spec-kit. Th
 7. Record verified lessons; sync state docs in the same change
 
 ### Constitutional hard rules
-- **Zero runtime deps** (C++17/CUDA only, Art. I)
+- **Zero runtime deps** (C++20/CUDA only, Art. I)
 - **Accuracy first** (Art. II) — no quality trade-off without explicit approval
 - **Common time base + independent pipelines** (Art. III)
 - **Streaming validation through real WebSocket** (Art. IV)

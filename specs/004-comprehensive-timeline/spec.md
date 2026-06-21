@@ -119,7 +119,7 @@ in time. Consequences:
   Schema changes are versioned.
 - **G12 — MQTT-style routing**: hierarchical topics with wildcards, fan-out
   subscriptions, and "no-local" flag.
-- **G13 — Zero runtime dependencies**: pure C++17. No MQTT library, no JSON
+- **G13 — Zero runtime dependencies**: pure C++20. No MQTT library, no JSON
   framework, no message-passing library.
 
 ## 4. Non-Goals
@@ -415,7 +415,7 @@ Every registered pipeline MUST satisfy:
 
 ## 7. Constitution Check
 
-- **Art. I (no deps)**: pure C++17. Topic routing, schema registry, ring
+- **Art. I (no deps)**: pure C++20. Topic routing, schema registry, ring
   buffers, time index, and QoS use standard containers only. No JSON library;
   existing `JsonEscape` is reused. No MQTT client.
 - **Art. II (accuracy)**: no change to ASR, diarization, or VAD numerics.

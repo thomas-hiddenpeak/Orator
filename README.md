@@ -25,7 +25,7 @@ Orator 是一个面向实时业务的本地化语音处理系统，提供：
 - Linux（已在 Jetson/ARM64 场景使用）
 - CMake >= 3.20
 - CUDA 工具链（需可用 `cudart`、`cublas`）
-- C++17 / CUDA17
+- C++20 / CUDA20
 
 ## 大文件管理（Git LFS）
 

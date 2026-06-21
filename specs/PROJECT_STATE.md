@@ -16,7 +16,7 @@ work is specified under [specs/](.).
 
 - **Last updated**: 2026-06-22 (TOML config system, VAD-gated ASR fix)
 - **Branch**: `master`
-- **Constitution**: v1.3.0
+- **Constitution**: v1.4.0
 
 ---
 
@@ -165,7 +165,7 @@ Findings:
 
 ## 6. SDD artifacts
 
-- [.specify/memory/constitution.md](../.specify/memory/constitution.md) — v1.3.0 (Article III expanded: common time base foundation, three consistency principles, pipeline decoupling via comprehensive timeline, wall clock anchor)
+- [.specify/memory/constitution.md](../.specify/memory/constitution.md) — v1.4.0 (Article I §1: C++17 → C++20)
 - [specs/001-streaming-pipeline/spec.md](001-streaming-pipeline/spec.md) — implemented
 - [specs/001-streaming-pipeline/plan.md](001-streaming-pipeline/plan.md) — implemented
 - [specs/001-streaming-pipeline/tasks.md](001-streaming-pipeline/tasks.md) — implemented

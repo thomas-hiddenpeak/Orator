@@ -6,15 +6,15 @@ conflicts with the Constitution, the Constitution takes precedence. Amending it
 is a deliberate, recorded action (see *Amendment Process*), not an undocumented
 change.
 
-- **Version**: 1.3.0
+- **Version**: 1.4.0
 - **Ratified**: 2026-06-12
-- **Last amended**: 2026-06-18
+- **Last amended**: 2026-06-22
 
 ---
 
 ## Article I — Zero Runtime Dependencies (Pure C++/CUDA)
 
-1. The shipped runtime is **C++17 and CUDA only**. No third-party runtime
+1. The shipped runtime is **C++20 and CUDA only**. No third-party runtime
    libraries may be linked into the product (`orator`, `orator_ws`, the
    `orator_core` library, or any artifact that runs in production).
 2. Permitted, and explicitly NOT considered third-party dependencies:
@@ -297,4 +297,4 @@ state claim:
 - When guidance is silent, Articles II (accuracy) and V (quality) take
   precedence over other considerations.
 
-**Version 1.3.0 · Ratified 2026-06-12 · Last amended 2026-06-18**
+**Version 1.4.0 · Ratified 2026-06-12 · Last amended 2026-06-22**
