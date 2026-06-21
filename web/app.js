@@ -50,6 +50,24 @@
   // Speaker colors for canvas
   const SPEAKER_COLORS = ["#5b8def","#34d399","#f59e0b","#ef4444","#a78bfa","#22d3ee"];
 
+  /* ── Timeline canvas state ── */
+  const timelineCanvas  = document.getElementById("timelineCanvas");
+  const timelineCtx     = timelineCanvas ? timelineCanvas.getContext("2d") : null;
+  let tracksData        = null;
+  let audioDuration     = 0;
+  let timeScale         = 100;   // px per second (initial, will auto-fit)
+  let panOffset         = 0;
+  let isDragging        = false;
+  let dragStartX        = 0;
+  let dragStartPan      = 0;
+
+  // Layout constants
+  var TRACK_HEIGHT      = 40;
+  var TIME_AXIS_HEIGHT  = 28;
+  var LABEL_WIDTH       = 80;
+  var PADDING_TOP       = 4;
+  var PADDING_BOTTOM    = 4;
+
   /* ── Protocol envelope unwrapper ── */
   // Spec 004 protocol layer wraps legacy JSON in a topic-based envelope:
   //   { "topic": "...", "pipeline": "...", "msg_id": N, "ts": T,
@@ -329,6 +347,11 @@
 
     // Show download button
     downloadBtn.classList.remove("hidden");
+
+    // Wire into canvas timeline
+    tracksData = msg.tracks;
+    audioDuration = msg.audio_sec || 0;
+    fitTimeline();
   }
 
   /* ── GPU Telemetry handler ── */
@@ -421,6 +444,277 @@
 
   function scrollToBottom() {
     transcriptList.scrollTop = transcriptList.scrollHeight;
+  }
+
+  /* ── Timeline Canvas Rendering ── */
+  function fmtMMSS(sec) {
+    if (typeof sec !== "number" || isNaN(sec)) return "--:--";
+    var m = Math.floor(sec / 60);
+    var s = Math.floor(sec % 60);
+    return String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0");
+  }
+
+  function getTickInterval(scale) {
+    var pxPerSec = scale;
+    if (pxPerSec < 10) return 60;
+    if (pxPerSec < 30) return 30;
+    if (pxPerSec < 60) return 10;
+    if (pxPerSec < 120) return 5;
+    if (pxPerSec < 250) return 2;
+    return 1;
+  }
+
+  function fitTimeline() {
+    if (!timelineCanvas || !tracksData) return;
+    var wrap = timelineCanvas.parentElement;
+    var availW = wrap ? wrap.clientWidth - 2 : 800;
+    if (audioDuration <= 0) audioDuration = 30;
+    timeScale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, availW / audioDuration));
+    panOffset = 0;
+    renderTimeline();
+  }
+
+  function zoomTimeline(factor) {
+    if (!timelineCanvas) return;
+    var oldScale = timeScale;
+    timeScale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, timeScale * factor));
+    // keep center point fixed
+    var center = timelineCanvas.width / 2;
+    panOffset = panOffset * (timeScale / oldScale) + (center - center * (timeScale / oldScale));
+    renderTimeline();
+  }
+
+  function renderTimeline() {
+    if (!timelineCanvas || !timelineCtx) return;
+
+    var wrap = timelineCanvas.parentElement;
+    var availW = wrap ? wrap.clientWidth - 2 : 800;
+    var canvasH = PADDING_TOP + 3 * TRACK_HEIGHT + TIME_AXIS_HEIGHT + PADDING_BOTTOM;
+    var dpr = window.devicePixelRatio || 1;
+
+    timelineCanvas.style.width = availW + "px";
+    timelineCanvas.style.height = canvasH + "px";
+    timelineCanvas.width = availW * dpr;
+    timelineCanvas.height = canvasH * dpr;
+    timelineCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    var w = availW;
+    var h = canvasH;
+
+    // clear
+    timelineCtx.clearRect(0, 0, w, h);
+
+    // background
+    timelineCtx.fillStyle = "#232733";
+    timelineCtx.fillRect(0, 0, w, h);
+
+    if (!tracksData || !Array.isArray(tracksData)) {
+      timelineCtx.fillStyle = "#8b90a0";
+      timelineCtx.font = "13px Inter, system-ui, sans-serif";
+      timelineCtx.textAlign = "center";
+      timelineCtx.textBaseline = "middle";
+      timelineCtx.fillText("No timeline data", w / 2, h / 2);
+      return;
+    }
+
+    var diarEntries = [];
+    var asrEntries  = [];
+    var vadEntries  = [];
+
+    for (var t = 0; t < tracksData.length; t++) {
+      var tr = tracksData[t];
+      var kind = tr.kind || "";
+      var entries = Array.isArray(tr.entries) ? tr.entries : [];
+      if (kind === "diarization") diarEntries = entries;
+      else if (kind === "asr") asrEntries = entries;
+      else if (kind === "vad") vadEntries = entries;
+    }
+
+    var trackY0 = PADDING_TOP;
+
+    // ── Track 1: Diarization ──
+    (function () {
+      var y = trackY0;
+      timelineCtx.fillStyle = "#8b90a0";
+      timelineCtx.font = "bold 11px Inter, system-ui, sans-serif";
+      timelineCtx.textAlign = "left";
+      timelineCtx.textBaseline = "middle";
+      timelineCtx.fillText("Diarization", 6, y + TRACK_HEIGHT / 2);
+
+      for (var i = 0; i < diarEntries.length; i++) {
+        var e = diarEntries[i];
+        var x = e.start * timeScale - panOffset;
+        var bw = (e.end - e.start) * timeScale;
+        if (bw < 1 || x + bw < 0 || x > w) continue;
+        var color = SPEAKER_COLORS[(e.speaker || 0) % SPEAKER_COLORS.length];
+        timelineCtx.fillStyle = color + "cc";
+        timelineCtx.fillRect(x, y + 4, bw, TRACK_HEIGHT - 8);
+        timelineCtx.strokeStyle = color;
+        timelineCtx.lineWidth = 0.5;
+        timelineCtx.strokeRect(x, y + 4, bw, TRACK_HEIGHT - 8);
+        if (bw > 40) {
+          timelineCtx.fillStyle = "#000";
+          timelineCtx.font = "bold 10px Inter, system-ui, sans-serif";
+          timelineCtx.textAlign = "left";
+          timelineCtx.textBaseline = "middle";
+          timelineCtx.fillText("S" + (e.speaker || 0), x + 4, y + TRACK_HEIGHT / 2);
+        }
+      }
+    })();
+
+    // ── Track 2: ASR ──
+    (function () {
+      var y = trackY0 + TRACK_HEIGHT;
+      timelineCtx.fillStyle = "#8b90a0";
+      timelineCtx.font = "bold 11px Inter, system-ui, sans-serif";
+      timelineCtx.textAlign = "left";
+      timelineCtx.textBaseline = "middle";
+      timelineCtx.fillText("ASR", 6, y + TRACK_HEIGHT / 2);
+
+      for (var i = 0; i < asrEntries.length; i++) {
+        var e = asrEntries[i];
+        var x = e.start * timeScale - panOffset;
+        var bw = (e.end - e.start) * timeScale;
+        if (bw < 1 || x + bw < 0 || x > w) continue;
+        timelineCtx.fillStyle = "rgba(91,141,239,0.12)";
+        timelineCtx.fillRect(x, y + 4, bw, TRACK_HEIGHT - 8);
+        timelineCtx.strokeStyle = "rgba(91,141,239,0.4)";
+        timelineCtx.lineWidth = 0.5;
+        timelineCtx.strokeRect(x, y + 4, bw, TRACK_HEIGHT - 8);
+        if (bw > 30 && e.text) {
+          timelineCtx.fillStyle = "#c9cdd8";
+          timelineCtx.font = "10px Inter, system-ui, sans-serif";
+          timelineCtx.textAlign = "left";
+          timelineCtx.textBaseline = "middle";
+          var txt = e.text;
+          var maxChars = Math.floor(bw / 6);
+          if (txt.length > maxChars) txt = txt.substring(0, maxChars) + "\u2026";
+          timelineCtx.fillText(txt, x + 3, y + TRACK_HEIGHT / 2);
+        }
+      }
+    })();
+
+    // ── Track 3: VAD ──
+    (function () {
+      var y = trackY0 + 2 * TRACK_HEIGHT;
+      timelineCtx.fillStyle = "#8b90a0";
+      timelineCtx.font = "bold 11px Inter, system-ui, sans-serif";
+      timelineCtx.textAlign = "left";
+      timelineCtx.textBaseline = "middle";
+      timelineCtx.fillText("VAD", 6, y + TRACK_HEIGHT / 2);
+
+      for (var i = 0; i < vadEntries.length; i++) {
+        var e = vadEntries[i];
+        var x = e.start * timeScale - panOffset;
+        var bw = (e.end - e.start) * timeScale;
+        if (bw < 1 || x + bw < 0 || x > w) continue;
+        if (e.speech) {
+          timelineCtx.fillStyle = "rgba(52,211,153,0.5)";
+        } else {
+          timelineCtx.fillStyle = "rgba(139,144,160,0.25)";
+        }
+        timelineCtx.fillRect(x, y + 10, bw, TRACK_HEIGHT - 20);
+      }
+    })();
+
+    // ── Time axis ──
+    (function () {
+      var y = trackY0 + 3 * TRACK_HEIGHT;
+      var tickInterval = getTickInterval(timeScale);
+      var maxTime = audioDuration > 0 ? audioDuration : 30;
+
+      // axis line
+      timelineCtx.strokeStyle = "#2e3345";
+      timelineCtx.lineWidth = 1;
+      timelineCtx.beginPath();
+      timelineCtx.moveTo(0, y);
+      timelineCtx.lineTo(w, y);
+      timelineCtx.stroke();
+
+      // ticks + labels
+      timelineCtx.fillStyle = "#8b90a0";
+      timelineCtx.font = "10px Inter, system-ui, sans-serif";
+      timelineCtx.textAlign = "center";
+      timelineCtx.textBaseline = "top";
+
+      var firstTick = Math.ceil((-panOffset / timeScale) / tickInterval) * tickInterval;
+      for (var t = firstTick; t <= maxTime + (w / timeScale); t += tickInterval) {
+        var tx = t * timeScale - panOffset;
+        if (tx < 0 || tx > w) continue;
+        timelineCtx.strokeStyle = "#2e3345";
+        timelineCtx.lineWidth = 0.5;
+        timelineCtx.beginPath();
+        timelineCtx.moveTo(tx, y);
+        timelineCtx.lineTo(tx, y + 5);
+        timelineCtx.stroke();
+        timelineCtx.fillText(fmtMMSS(t), tx, y + 8);
+      }
+    })();
+
+    // ── Track separator lines ──
+    timelineCtx.strokeStyle = "#2e3345";
+    timelineCtx.lineWidth = 0.5;
+    for (var i = 0; i < 3; i++) {
+      var ly = trackY0 + (i + 1) * TRACK_HEIGHT;
+      timelineCtx.beginPath();
+      timelineCtx.moveTo(0, ly);
+      timelineCtx.lineTo(w, ly);
+      timelineCtx.stroke();
+    }
+  }
+
+  /* ── Timeline Zoom / Pan Event Wiring ── */
+  function wireTimelineEvents() {
+    if (!timelineCanvas) return;
+
+    var zoomInBtn  = document.getElementById("zoomInBtn");
+    var zoomOutBtn = document.getElementById("zoomOutBtn");
+    var zoomResetBtn = document.getElementById("zoomResetBtn");
+
+    if (zoomInBtn)  zoomInBtn.addEventListener("click", function () { zoomTimeline(1.4); });
+    if (zoomOutBtn) zoomOutBtn.addEventListener("click", function () { zoomTimeline(0.7); });
+    if (zoomResetBtn) zoomResetBtn.addEventListener("click", function () { fitTimeline(); });
+
+    // mouse wheel zoom
+    timelineCanvas.addEventListener("wheel", function (e) {
+      e.preventDefault();
+      var factor = e.deltaY < 0 ? 1.15 : 0.87;
+      var oldScale = timeScale;
+      timeScale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, timeScale * factor));
+      // zoom toward mouse position
+      var mx = e.offsetX;
+      panOffset = panOffset * (timeScale / oldScale) + mx * (1 - timeScale / oldScale);
+      renderTimeline();
+    }, { passive: false });
+
+    // drag pan
+    timelineCanvas.addEventListener("mousedown", function (e) {
+      if (e.button !== 0) return;
+      isDragging = true;
+      dragStartX = e.clientX;
+      dragStartPan = panOffset;
+      timelineCanvas.style.cursor = "grabbing";
+    });
+
+    window.addEventListener("mousemove", function (e) {
+      if (!isDragging) return;
+      panOffset = dragStartPan - (e.clientX - dragStartX);
+      renderTimeline();
+    });
+
+    window.addEventListener("mouseup", function () {
+      if (isDragging) {
+        isDragging = false;
+        timelineCanvas.style.cursor = "";
+      }
+    });
+
+    timelineCanvas.addEventListener("mouseleave", function () {
+      if (isDragging) {
+        isDragging = false;
+        timelineCanvas.style.cursor = "";
+      }
+    });
   }
 
   /* ── Microphone ── */
@@ -602,6 +896,11 @@
     progressFill.style.width = "0%";
     durationLabel.textContent = "00:00";
     statusLabel.textContent = "Streaming...";
+    tracksData = null;
+    audioDuration = 0;
+    timeScale = 100;
+    panOffset = 0;
+    renderTimeline();
     sendCmd({ reset: 1 });
   }
 
@@ -655,6 +954,8 @@
   /* ── Init ── */
   setStatus(false);
   connect();
+  wireTimelineEvents();
+  renderTimeline();
 
   /* ── Demo data (for visualization testing) ── */
   // Load demo transcript if ?demo=1 in URL
@@ -700,6 +1001,15 @@
       });
 
       console.log("[Demo] Transcript loaded");
+
+      // Populate timeline canvas with demo data
+      tracksData = [
+        { kind: "diarization", entries: demoEntries.map(function (e) { return { start: e.start, end: e.end, speaker: e.speaker, confidence: 0.95 }; }) },
+        { kind: "asr", entries: demoEntries.map(function (e) { return { start: e.start, end: e.end, text: e.text }; }) },
+        { kind: "vad", entries: demoEntries.map(function (e) { return { start: e.start, end: e.end, speech: true }; }) }
+      ];
+      audioDuration = 30;
+      fitTimeline();
     }, 1000);
   }
 })();

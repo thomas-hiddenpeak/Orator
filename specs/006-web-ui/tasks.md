@@ -159,10 +159,10 @@ Spec 006 implementation broken into ordered, independently verifiable tasks orga
 
 ---
 
-## Phase 2: Enhanced Visualization — Canvas Timeline, Zoom/Pan (NOT-STARTED)
+## Phase 2: Enhanced Visualization — Canvas Timeline, Zoom/Pan
 
 ### T009 — Implement Canvas-based timeline rendering
-**Status**: NOT-STARTED
+**Status**: ✅ COMPLETED (2026-06-21)
 **Goal**: Replace HTML list with graphical Canvas timeline.
 **Content**:
 - `timeline_renderer.js` rewritten to use Canvas 2D API.
@@ -183,7 +183,7 @@ Spec 006 implementation broken into ordered, independently verifiable tasks orga
 ---
 
 ### T010 — Add zoom and pan controls to timeline
-**Status**: NOT-STARTED
+**Status**: ✅ COMPLETED (2026-06-21)
 **Goal**: Allow users to zoom in/out and scroll horizontally.
 **Controls**:
 - Zoom buttons (+, −) or slider.
@@ -318,16 +318,16 @@ Spec 006 implementation broken into ordered, independently verifiable tasks orga
 
 | Phase | Task | Status | Priority |
 |-------|------|--------|----------|
-| 1 | T001 | DRAFT | HIGH |
-| 1 | T002 | DRAFT | HIGH |
-| 1 | T003 | DRAFT | HIGH |
-| 1 | T004 | DRAFT | HIGH |
-| 1 | T005 | DRAFT | HIGH |
-| 1 | T006 | DRAFT | HIGH |
-| 1 | T007 | DRAFT | HIGH |
-| 1 | T008 | DRAFT | HIGH |
-| 2 | T009 | NOT-STARTED | MEDIUM |
-| 2 | T010 | NOT-STARTED | MEDIUM |
+| 1 | T001 | COMPLETED | HIGH |
+| 1 | T002 | COMPLETED | HIGH |
+| 1 | T003 | COMPLETED | HIGH |
+| 1 | T004 | COMPLETED | HIGH |
+| 1 | T005 | COMPLETED | HIGH |
+| 1 | T006 | COMPLETED | HIGH |
+| 1 | T007 | COMPLETED | HIGH |
+| 1 | T008 | COMPLETED | HIGH |
+| 2 | T009 | COMPLETED | MEDIUM |
+| 2 | T010 | COMPLETED | MEDIUM |
 | 3 | T011 | NOT-STARTED | MEDIUM |
 | 3 | T012 | NOT-STARTED | MEDIUM |
 | 3 | T013 | NOT-STARTED | LOW |

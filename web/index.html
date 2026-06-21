@@ -105,6 +105,21 @@
           </button>
         </section>
       </div>
+
+      <!-- Timeline Panel -->
+      <section class="panel timeline-panel">
+        <div class="timeline-header">
+          <h2 class="panel-title">Timeline</h2>
+          <div class="timeline-controls">
+            <button id="zoomInBtn" class="btn btn-sm btn-outline" title="Zoom in">+</button>
+            <button id="zoomOutBtn" class="btn btn-sm btn-outline" title="Zoom out">−</button>
+            <button id="zoomResetBtn" class="btn btn-sm btn-outline" title="Reset zoom">⟲</button>
+          </div>
+        </div>
+        <div class="timeline-canvas-wrap">
+          <canvas id="timelineCanvas"></canvas>
+        </div>
+      </section>
     </div>
 
     <script src="/app.js"></script>

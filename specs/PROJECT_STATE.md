@@ -14,7 +14,7 @@ work is specified under [specs/](.).
 > pass is the consistency proof. Status lines advance to `Implemented` in the
 > same change that lands the code, with the commit reference.
 
-- **Last updated**: 2026-06-21 (Full-length 1hr speed verification: 9.46× real-time, no crash, 100% coverage across all three tracks)
+- **Last updated**: 2026-06-21 (Spec 006 Phase 2: Canvas timeline + zoom/pan; full-length 1hr speed verification)
 - **Branch**: `master`
 - **Constitution**: v1.3.0
 
@@ -80,7 +80,7 @@ modifies, splits, infers, or back-fills any pipeline's content (Spec 004 §1a).
 | OnText protocol matching | ✅ Fixed | Substring `text.find("end")` → JSON key `text.find("\"end\"")` to prevent false positives on partial matches. Same for reset/flush. |
 | GPU telemetry default | ✅ Changed | `gpu_telemetry_interval_sec = 0.0` (was 1.0); disabled by default, opt-in via `ORATOR_GPU_TELEMETRY_SEC`. |
 | VAD model path | ✅ Migrated | `models/asr/silero_vad.safetensors` → `models/vad/`. Updated 6 file references across test, include, and tools. |
-| Web UI (Spec 006 MVP) | ✅ Implemented (Phases 1+2) | HTTP static server (`http_static_server.h/.cc`), full SPA (`index.html`, `style.css`, `app.js`), Canvas timeline with zoom/pan, microphone + file upload, WebSocket client with auto-reconnect, GPU telemetry display, JSON export, Spec 004 protocol envelope unwrapping (`unwrapEnvelope()`), protocol describe command on connect. Integration test: `tools/ws_ui_integration_test.py` with envelope-aware message parsing. |
+| Web UI (Spec 006 MVP) | ✅ Implemented (Phases 1+2) | HTTP static server (`http_static_server.h/.cc`), full SPA (`index.html`, `style.css`, `app.js`), Canvas timeline with zoom/pan (mouse wheel zoom toward cursor, click-drag pan, +/−/reset buttons, 3 tracks: diarization/ASR/VAD, adaptive time axis), microphone + file upload, WebSocket client with auto-reconnect, GPU telemetry display, JSON export, Spec 004 protocol envelope unwrapping (`unwrapEnvelope()`), protocol describe command on connect. Integration test: `tools/ws_ui_integration_test.py` with envelope-aware message parsing. |
 
 ## 4. Measured performance (GPU fixed at 1.3 GHz, power mode MaxN)
 
