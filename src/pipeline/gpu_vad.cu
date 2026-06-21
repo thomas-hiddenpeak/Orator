@@ -204,26 +204,26 @@ GpuVad::~GpuVad() {
 }
 
 void GpuVad::FreeDeviceMemory() {
-  cudaFree(d_stft_basis_); d_stft_basis_ = nullptr;
+  CUDA_CHECK(cudaFree(d_stft_basis_)); d_stft_basis_ = nullptr;
   for (int i = 0; i < 4; ++i) {
-    cudaFree(d_enc_w_[i]); d_enc_w_[i] = nullptr;
-    cudaFree(d_enc_b_[i]); d_enc_b_[i] = nullptr;
+    CUDA_CHECK(cudaFree(d_enc_w_[i])); d_enc_w_[i] = nullptr;
+    CUDA_CHECK(cudaFree(d_enc_b_[i])); d_enc_b_[i] = nullptr;
   }
-  cudaFree(d_lstm_wih_); d_lstm_wih_ = nullptr;
-  cudaFree(d_lstm_whh_); d_lstm_whh_ = nullptr;
-  cudaFree(d_lstm_bih_); d_lstm_bih_ = nullptr;
-  cudaFree(d_lstm_bhh_); d_lstm_bhh_ = nullptr;
-  cudaFree(d_dec_w_); d_dec_w_ = nullptr;
-  cudaFree(d_ext_); d_ext_ = nullptr;
-  cudaFree(d_padded_); d_padded_ = nullptr;
-  cudaFree(d_mag_); d_mag_ = nullptr;
-  cudaFree(d_enc0_); d_enc0_ = nullptr;
-  cudaFree(d_enc1_); d_enc1_ = nullptr;
-  cudaFree(d_enc2_); d_enc2_ = nullptr;
-  cudaFree(d_enc3_); d_enc3_ = nullptr;
-  cudaFree(d_prob_); d_prob_ = nullptr;
-  cudaFree(d_h_); d_h_ = nullptr;
-  cudaFree(d_c_); d_c_ = nullptr;
+  CUDA_CHECK(cudaFree(d_lstm_wih_)); d_lstm_wih_ = nullptr;
+  CUDA_CHECK(cudaFree(d_lstm_whh_)); d_lstm_whh_ = nullptr;
+  CUDA_CHECK(cudaFree(d_lstm_bih_)); d_lstm_bih_ = nullptr;
+  CUDA_CHECK(cudaFree(d_lstm_bhh_)); d_lstm_bhh_ = nullptr;
+  CUDA_CHECK(cudaFree(d_dec_w_)); d_dec_w_ = nullptr;
+  CUDA_CHECK(cudaFree(d_ext_)); d_ext_ = nullptr;
+  CUDA_CHECK(cudaFree(d_padded_)); d_padded_ = nullptr;
+  CUDA_CHECK(cudaFree(d_mag_)); d_mag_ = nullptr;
+  CUDA_CHECK(cudaFree(d_enc0_)); d_enc0_ = nullptr;
+  CUDA_CHECK(cudaFree(d_enc1_)); d_enc1_ = nullptr;
+  CUDA_CHECK(cudaFree(d_enc2_)); d_enc2_ = nullptr;
+  CUDA_CHECK(cudaFree(d_enc3_)); d_enc3_ = nullptr;
+  CUDA_CHECK(cudaFree(d_prob_)); d_prob_ = nullptr;
+  CUDA_CHECK(cudaFree(d_h_)); d_h_ = nullptr;
+  CUDA_CHECK(cudaFree(d_c_)); d_c_ = nullptr;
 }
 
 void GpuVad::Initialize(const core::VadConfig& config) {

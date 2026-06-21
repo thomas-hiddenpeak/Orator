@@ -27,7 +27,7 @@ GpuScheduler::GpuScheduler() {
 GpuScheduler::~GpuScheduler() {
   for (auto& e : entries_) {
     if (e.stream_active && e.stream != nullptr) {
-      cudaStreamDestroy(e.stream);
+      CheckCuda(cudaStreamDestroy(e.stream), "cudaStreamDestroy");
     }
   }
 }

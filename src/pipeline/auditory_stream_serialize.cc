@@ -9,6 +9,7 @@
 #include "core/log.h"
 #include "core/types.h"
 #include "pipeline/comprehensive_timeline.h"
+#include "pipeline/gpu_vad.h"
 #include "pipeline/json_util.h"
 
 #include <cstdio>
@@ -70,7 +71,7 @@ std::string AuditoryStream::SerializeGpuTelemetry() const {
     else if (e.name == "asr")
       compute = asr_worker_ ? asr_worker_->compute_sec() : 0.0;
     else if (e.name == "vad")
-      compute = vad_detector_ ? vad_detector_->compute_sec() : 0.0;
+      compute = vad_detector_ ? static_cast<GpuVad*>(vad_detector_.get())->compute_sec() : 0.0;
     const double rtf = compute > 0.0 ? audio / compute : 0.0;
     std::snprintf(buf, sizeof(buf),
                   "{\"name\":\"%s\",\"priority_index\":%d,\"class\":\"%s\","
@@ -183,7 +184,7 @@ std::string AuditoryStream::Serialize() {
 
   // Track: voice activity (VAD). Present only when the VAD pipeline is enabled.
   if (config_.vad_stream) {
-    const double vad_c = vad_detector_ ? vad_detector_->compute_sec() : 0.0;
+    const double vad_c = vad_detector_ ? static_cast<GpuVad*>(vad_detector_.get())->compute_sec() : 0.0;
     std::snprintf(buf, sizeof(buf),
                   ",{\"kind\":\"vad\",\"source\":\"silero_gpu\","
                   "\"compute_sec\":%.3f,\"real_time_factor\":%.3f,\"entries\":[",

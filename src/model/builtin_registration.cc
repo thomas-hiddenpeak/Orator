@@ -6,6 +6,7 @@
 #include "core/stages.h"
 #include "model/qwen3_asr.h"
 #include "model/streaming_sortformer.h"
+#include "pipeline/gpu_vad.h"
 
 namespace orator {
 namespace model {
@@ -23,6 +24,11 @@ void EnsureBuiltinsRegistered() {
   // Native Qwen3-ASR (models/asr/Qwen/Qwen3-ASR-1.7B). Same core::IAsr contract,
   // so consumers (pipeline / WS) need no changes; select via config.asr.
   asr.Register("qwen3_asr", [] { return std::make_unique<Qwen3Asr>(); });
+
+  auto& vad = core::Registry<core::IVad>::Instance();
+  vad.Register("silero_vad", [] {
+    return std::make_unique<pipeline::GpuVad>(pipeline::GpuVad::Params{});
+  });
 }
 
 }  // namespace model

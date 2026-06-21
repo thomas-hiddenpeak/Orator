@@ -4,16 +4,12 @@
 
 #include "model/streaming_sortformer.h"
 #include "pipeline/diar_postprocess.h"
+#include "pipeline/worker_common.h"
 
 namespace orator {
 namespace pipeline {
 
-namespace {
-using Clock = std::chrono::steady_clock;
-double Secs(Clock::time_point a, Clock::time_point b) {
-  return std::chrono::duration<double>(b - a).count();
-}
-}  // namespace
+using namespace worker;
 
 DiarizationWorker::DiarizationWorker(core::IDiarizer* diarizer,
                                        Params params, core::TimeBase tb,

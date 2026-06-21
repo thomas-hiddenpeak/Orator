@@ -33,7 +33,7 @@ cublasHandle_t Handle() {
 
 uint16_t* Scratch(long n) {
   if (n > g_scratch_cap) {
-    if (g_scratch) cudaFree(g_scratch);
+    if (g_scratch) CUDA_CHECK(cudaFree(g_scratch));
     CheckCudaError(cudaMalloc(&g_scratch, sizeof(uint16_t) * n), __FILE__, __LINE__);
     g_scratch_cap = n;
   }
@@ -172,7 +172,7 @@ void LinearPre(const uint16_t* in_bf16, const uint16_t* W_bf16,
 }
 
 void Shutdown() {
-  if (g_scratch) { cudaFree(g_scratch); g_scratch = nullptr; g_scratch_cap = 0; }
+  if (g_scratch) { CUDA_CHECK(cudaFree(g_scratch)); g_scratch = nullptr; g_scratch_cap = 0; }
   if (g_handle) { cublasDestroy(g_handle); g_handle = nullptr; }
 }
 

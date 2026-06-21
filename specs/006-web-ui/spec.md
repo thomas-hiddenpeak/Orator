@@ -1,6 +1,6 @@
 # Spec 006 — Web UI Client for Real-Time Dual-Pipeline Transcription
 
-- **Status**: In progress (14/16 tasks; Phases 1-2 complete, Phase 3 T015-T016 remaining)
+- **Status**: Implemented (16/16 tasks complete)
 - **Created**: 2026-06-18
 - **Owner**: project owner
 

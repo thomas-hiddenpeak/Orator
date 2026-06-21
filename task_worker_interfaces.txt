@@ -1,0 +1,50 @@
+TASK: Convert DiarizationWorker and AsrWorker to accept core::I* interfaces instead of concrete model types.
+
+CONTEXT: Orator project at /home/rm01/Orator — C++20/CUDA. T0.0 already changed `AuditoryStream` to use `core::Registry<I*>::Create()` and hold `unique_ptr<core::IDiarizer>`/`unique_ptr<core::IAsr>`. Now the workers themselves need to accept interfaces.
+
+The current code in T0.0 uses `dynamic_cast` as a temporary bridge:
+```cpp
+diar_worker_ = std::make_unique<DiarizationWorker>(
+    dynamic_cast<model::SortformerDiarizer*>(diarizer_.get()), dp, buffer_.time_base(), diar_stream_);
+```
+
+DELIVERABLE:
+1. `include/pipeline/diarization_worker.h`:
+   - Change constructor parameter from `model::SortformerDiarizer*` to `core::IDiarizer*` (line 46)
+   - Change member `model::SortformerDiarizer* diarizer_` to `core::IDiarizer* diarizer_` (line 76)
+   - Remove `#include "model/streaming_sortformer.h"` (line 11) — no longer needed
+   - The `IDiarizer` interface provides: `ProcessChunk(const AudioChunk& chunk)`, `max_speakers()`, `frame_period_sec()`
+   - The `DiarizationWorker` uses `diarizer_->ProcessChunk()` — check if the call matches and adapt if needed (AudioChunk vs span, return type DiarizationFrames vs void)
+   - Keep `#include "core/stages.h"` if not already present (it has IDiarizer)
+
+2. `include/pipeline/asr_worker.h`:
+   - Change constructor parameter from `model::Qwen3Asr*` to `core::IAsr*` (line 46)
+   - Change member `model::Qwen3Asr* asr_` to `core::IAsr* asr_` (line 66)
+   - Remove `#include "model/qwen3_asr.h"` (line 18) — no longer needed
+   - Keep `#include "core/time_base.h"` (uses core::TimeBase)
+   - The `IAsr` interface provides: `Transcribe(const AudioChunk& audio)` — check if AsrWorker uses this or a different method
+
+3. `src/pipeline/auditory_stream.cc`:
+   - Remove the `dynamic_cast` calls in `StartWorkers()` — now just pass `diarizer_.get()` and `asr_.get()` directly
+   - Remove the `#include "model/qwen3_asr.h"` and `#include "model/streaming_sortformer.h"` from this file (they were only needed for dynamic_cast)
+
+4. `src/pipeline/diarization_worker.cc`:
+   - Check if any method calls on `diarizer_` need adjustment for the interface type
+
+5. `src/pipeline/asr_worker.cc`:
+   - Check if any method calls on `asr_` need adjustment for the interface type
+
+SCOPE:
+- These files: `include/pipeline/diarization_worker.h`, `include/pipeline/asr_worker.h`, `src/pipeline/diarization_worker.cc`, `src/pipeline/asr_worker.cc`, `src/pipeline/auditory_stream.cc`
+- Do NOT change the worker logic (ProcessSpan, Finalize, etc.)
+- Do NOT change the IDiarizer or IAsr interfaces in core/stages.h
+- Do NOT change test files
+
+ACCEPTANCE:
+- `lsp_diagnostics` clean on all changed files
+- `cmake --build build -j` succeeds with zero new warnings
+- `test_diar_stream` passes
+- `test_asr_decoder` passes
+- `test_asr_encoder` passes
+- Full `ctest` passes
+- `grep "dynamic_cast" src/pipeline/auditory_stream.cc` returns nothing

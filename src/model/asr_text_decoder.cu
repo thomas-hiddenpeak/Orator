@@ -390,7 +390,7 @@ void AsrTextDecoder::DecodeForwardOnStream(float* d_x, const int* d_pos,
     if (cnt % 16 == 0)
       std::fprintf(stderr, "[dec2] per-token GPU compute avg = %.3f ms (n=%d)\n",
                    sum / cnt, cnt);
-    cudaEventDestroy(e0); cudaEventDestroy(e1);
+    CUDA_CHECK(cudaEventDestroy(e0)); CUDA_CHECK(cudaEventDestroy(e1));
   }
 }
 
@@ -502,7 +502,7 @@ void AsrTextDecoder::Forward(float* d_x, int Tq, int pos0, cudaStream_t stream) 
     if (once++ < 1)
       std::fprintf(stderr, "[dec2] 28-layer loop=%.2fms lm_head+norm=%.2fms\n",
                    layers_ms, lm_ms);
-    cudaEventDestroy(e0); cudaEventDestroy(e1); cudaEventDestroy(e2);
+    CUDA_CHECK(cudaEventDestroy(e0)); CUDA_CHECK(cudaEventDestroy(e1)); CUDA_CHECK(cudaEventDestroy(e2));
   }
 }
 
@@ -544,7 +544,7 @@ void AsrTextDecoder::DecodeStep(const float* embed, int pos, cudaStream_t stream
   if (!step_x_) {
     step_x_ = std::make_shared<UnifiedBuffer>(sizeof(float) * Hh);
     step_pos_ = std::make_shared<PinnedBuffer>(sizeof(int));
-    cudaStreamCreate(&capture_stream_);
+    CUDA_CHECK(cudaStreamCreate(&capture_stream_));
   }
   float* x = static_cast<float*>(step_x_->data());
   int* p = static_cast<int*>(step_pos_->data());
@@ -579,7 +579,7 @@ void AsrTextDecoder::DecodeStepDevice(const int* d_token, int pos,
   if (!step_x_) {
     step_x_ = std::make_shared<UnifiedBuffer>(sizeof(float) * Hh);
     step_pos_ = std::make_shared<PinnedBuffer>(sizeof(int));
-    cudaStreamCreate(&capture_stream_);
+    CUDA_CHECK(cudaStreamCreate(&capture_stream_));
   }
   float* x = static_cast<float*>(step_x_->data());
   int* p = static_cast<int*>(step_pos_->data());
@@ -629,7 +629,7 @@ std::vector<int> AsrTextDecoder::DecodeGreedy(int start_pos, int max_new,
   if (!step_x_) {
     step_x_ = std::make_shared<UnifiedBuffer>(sizeof(float) * Hh);
     step_pos_ = std::make_shared<PinnedBuffer>(sizeof(int));
-    cudaStreamCreate(&capture_stream_);
+    CUDA_CHECK(cudaStreamCreate(&capture_stream_));
   }
   if (!d_tok_) {
     d_tok_ = std::make_shared<PinnedBuffer>(sizeof(int));
@@ -638,7 +638,7 @@ std::vector<int> AsrTextDecoder::DecodeGreedy(int start_pos, int max_new,
   if (!d_out_ || d_out_->size() < sizeof(int) * static_cast<size_t>(max_new)) {
     d_out_ = std::make_shared<PinnedBuffer>(sizeof(int) * static_cast<size_t>(max_new));
     if (graph_exec_) {
-      cudaGraphExecDestroy(static_cast<cudaGraphExec_t>(graph_exec_));
+      CUDA_CHECK(cudaGraphExecDestroy(static_cast<cudaGraphExec_t>(graph_exec_)));
       graph_exec_ = nullptr;
     }
     graph_ready_ = false;  // d_out_ moved -> stale graph
@@ -703,8 +703,8 @@ std::vector<int> AsrTextDecoder::DecodeGreedy(int start_pos, int max_new,
 
   // If a previously captured banned graph baked different EOS ids, it is stale.
   if (graph_ready_ && (graph_ban0_ != eos0 || graph_ban1_ != eos1)) {
-    if (graph_exec_) cudaGraphExecDestroy(static_cast<cudaGraphExec_t>(graph_exec_));
-    if (graph_exec_banned_) cudaGraphExecDestroy(static_cast<cudaGraphExec_t>(graph_exec_banned_));
+    if (graph_exec_) CUDA_CHECK(cudaGraphExecDestroy(static_cast<cudaGraphExec_t>(graph_exec_)));
+    if (graph_exec_banned_) CUDA_CHECK(cudaGraphExecDestroy(static_cast<cudaGraphExec_t>(graph_exec_banned_)));
     graph_exec_ = graph_exec_banned_ = nullptr;
     graph_ready_ = false;
   }
@@ -730,7 +730,7 @@ std::vector<int> AsrTextDecoder::DecodeGreedy(int start_pos, int max_new,
       if (cudaStreamEndCapture(capture_stream_, &captured) != cudaSuccess) return nullptr;
       cudaGraphExec_t exec = nullptr;
       cudaError_t inst = cudaGraphInstantiate(&exec, captured, nullptr, nullptr, 0);
-      cudaGraphDestroy(captured);
+      CUDA_CHECK(cudaGraphDestroy(captured));
       return (inst == cudaSuccess) ? exec : nullptr;
     };
     graph_ban0_ = eos0; graph_ban1_ = eos1;

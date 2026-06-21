@@ -194,19 +194,20 @@ void AuditoryStream::StartWorkers() {
       const core::TimeBase tb = buffer_.time_base();
       std::vector<float> chunk;
       std::vector<std::pair<long, long>> segs;
-      auto drain = [this, &tb, &segs](bool finalize) {
-        HandleVadDrain(vad_detector_.get(), protocol_timeline_.get(),
+      auto* gpu_vad = static_cast<GpuVad*>(vad_detector_.get());
+      auto drain = [this, gpu_vad, &tb, &segs](bool finalize) {
+        HandleVadDrain(gpu_vad, protocol_timeline_.get(),
                        vad_handle_.get(), tb, &segs, finalize);
       };
       long span_start_abs = 0;
       while (buffer_.WaitAndRead(vad_cursor_, &chunk, &span_start_abs)) {
-        vad_detector_->Push(chunk.data(), static_cast<int>(chunk.size()));
+        gpu_vad->Push(chunk.data(), static_cast<int>(chunk.size()));
         drain(/*finalize=*/false);
         {
           char buf[64];
           std::snprintf(buf, sizeof(buf),
                         "{\"type\":\"vad_state\",\"speech\":%s}",
-                        vad_detector_->is_in_speech() ? "true" : "false");
+                        gpu_vad->is_in_speech() ? "true" : "false");
           EmitLocked(buf);
         }
         progress_cv_.notify_all();

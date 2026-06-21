@@ -10,16 +10,12 @@
 #include "gpu/gpu_lock.h"
 #include "model/qwen3_asr.h"
 #include "pipeline/json_util.h"
+#include "pipeline/worker_common.h"
 
 namespace orator {
 namespace pipeline {
 
-namespace {
-using Clock = std::chrono::steady_clock;
-double Secs(Clock::time_point a, Clock::time_point b) {
-  return std::chrono::duration<double>(b - a).count();
-}
-}  // namespace
+using namespace worker;
 
 AsrWorker::AsrWorker(core::IAsr* asr,
                        const Params& params, Emit emit, core::TimeBase tb,
