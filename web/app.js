@@ -288,10 +288,18 @@
     for (const e of msg.entries) {
       const id = e.text_id;
       if (id == null) continue;
-      const row = asrRows.get(id);
-      if (!row) continue;
-      const spk = e.speaker != null ? e.speaker : null;
-      updateTranscriptRow(row, e.start, e.end, spk, e.text || "", "revised");
+      let row = asrRows.get(id);
+      if (!row) {
+        // Revision may arrive before the corresponding asr/asr_partial event.
+        // Create a row so the revision is not lost.
+        row = createTranscriptRow(id, e.start, e.end,
+              e.speaker != null ? e.speaker : null,
+              e.text || "", "revised");
+        asrRows.set(id, row);
+      } else {
+        const spk = e.speaker != null ? e.speaker : null;
+        updateTranscriptRow(row, e.start, e.end, spk, e.text || "", "revised");
+      }
     }
   }
 
