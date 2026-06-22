@@ -346,7 +346,8 @@ void GpuVad::RunBatch(const float* ext, int n_windows, std::vector<float>* probs
       std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
 }
 
-void GpuVad::DrainSegments(bool finalize, std::vector<std::pair<long, long>>* segs) {
+void GpuVad::DrainSegments(bool finalize,
+                           std::vector<core::VadSegmentResult>* segs) {
   if (segs == nullptr) return;
   const int avail = static_cast<int>(buf_.size()) - win_start_;
   const int n_windows = avail / kWindow;
@@ -377,7 +378,8 @@ void GpuVad::DrainSegments(bool finalize, std::vector<std::pair<long, long>>* se
           in_speech_ = false;
           // Speech actually stopped where this silence run began.
           const long seg_end = win_end_abs - silence_samples_;
-          if (seg_end > seg_start_abs_) segs->push_back({seg_start_abs_, seg_end});
+          if (seg_end > seg_start_abs_)
+            segs->push_back({seg_start_abs_, seg_end});
           speech_samples_ = 0;
         }
       } else {

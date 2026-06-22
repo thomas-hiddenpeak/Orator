@@ -194,26 +194,30 @@ void AuditoryStream::StartWorkers() {
     vp.silero_min_silence_ms = config_.vad_min_silence_ms;
     vp.silero_speech_pad_ms = config_.vad_speech_pad_ms;
     vp.stream = vad_stream_;
-    vad_detector_ = std::make_unique<GpuVad>(vp);
+    auto vad_params_ptr = std::make_shared<GpuVad::Params>(vp);
+    core::Registry<core::IVad>::Instance().Register(
+        "silero_vad",
+        [vad_params_ptr] { return std::make_unique<GpuVad>(*vad_params_ptr); });
+    vad_detector_ =
+        core::Registry<core::IVad>::Instance().Create("silero_vad");
     vad_cursor_ = buffer_.AddConsumer();
     vad_thread_ = std::thread([this] {
       const core::TimeBase tb = buffer_.time_base();
       std::vector<float> chunk;
-      std::vector<std::pair<long, long>> segs;
-      auto* gpu_vad = static_cast<GpuVad*>(vad_detector_.get());
-      auto drain = [this, gpu_vad, &tb, &segs](bool finalize) {
-        HandleVadDrain(gpu_vad, protocol_timeline_.get(),
+      std::vector<core::VadSegmentResult> segs;
+      auto drain = [this, &tb, &segs](bool finalize) {
+        HandleVadDrain(vad_detector_.get(), protocol_timeline_.get(),
                        vad_handle_.get(), tb, &segs, finalize);
       };
       long span_start_abs = 0;
       while (buffer_.WaitAndRead(vad_cursor_, &chunk, &span_start_abs)) {
-        gpu_vad->Push(chunk.data(), static_cast<int>(chunk.size()));
+        vad_detector_->Push(chunk.data(), static_cast<int>(chunk.size()));
         drain(/*finalize=*/false);
         {
           char buf[64];
           std::snprintf(buf, sizeof(buf),
                         "{\"type\":\"vad_state\",\"speech\":%s}",
-                        gpu_vad->is_in_speech() ? "true" : "false");
+                        vad_detector_->is_in_speech() ? "true" : "false");
           EmitLocked(buf);
         }
         progress_cv_.notify_all();

@@ -61,23 +61,24 @@ class GpuVad : public core::IVad {
   // --------------------------------------------------------------------------
 
   // Append audio to the staging buffer (host side; cheap).
-  void Push(const float* samples, int n);
+  void Push(const float* samples, int n) override;
 
   // Process every ready full window on the GPU in one batch and append each
   // completed SPEECH SEGMENT as an absolute-sample [start,end) pair to *segs
   // (the VAD pipeline's data: voice-activity regions on the common time base).
   // `finalize` flushes a still-open speech segment at end of stream. Runs on its
   // own dedicated CUDA stream (Spec 002); no GPU lock is acquired.
-  void DrainSegments(bool finalize, std::vector<std::pair<long, long>>* segs);
+  void DrainSegments(bool finalize,
+                     std::vector<core::VadSegmentResult>* segs) override;
 
   // Accumulated GPU compute time (for the VAD track's real-time-factor meta).
-  double compute_sec() const { return compute_sec_; }
+  double compute_sec() const override { return compute_sec_; }
 
   long base_sample() const { return next_window_abs_; }
 
   // Real-time VAD state: true when the endpoint state machine is currently
   // inside a speech segment (after min_speech confirmation).
-  bool is_in_speech() const { return in_speech_; }
+  bool is_in_speech() const override { return in_speech_; }
 
   // Numeric-gate probe: from a fresh state, return the per-window speech
   // probability for every full window in [pcm, pcm+n). Used by test_vad to

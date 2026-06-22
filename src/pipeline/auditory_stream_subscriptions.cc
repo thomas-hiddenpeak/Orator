@@ -9,7 +9,6 @@
 #include "core/time_base.h"
 #include "core/types.h"
 #include "pipeline/comprehensive_timeline.h"
-#include "pipeline/gpu_vad.h"
 #include "pipeline/json_util.h"
 #include "protocol/pipeline_registry.h"
 #include "protocol/protocol_timeline.h"
@@ -171,19 +170,19 @@ void HandleTextSink(protocol::ProtocolTimeline* protocol_timeline,
 }
 
 // ---------------------------------------------------------------------------
-// VAD drain: extract segments from GpuVad and publish to protocol timeline.
+// VAD drain: extract segments from IVad and publish to protocol timeline.
 // ---------------------------------------------------------------------------
-void HandleVadDrain(GpuVad* vad_detector,
+void HandleVadDrain(core::IVad* vad_detector,
                     protocol::ProtocolTimeline* protocol_timeline,
                     protocol::PipelineHandle* vad_handle,
                     const core::TimeBase& tb,
-                    std::vector<std::pair<long, long>>* segs,
+                    std::vector<core::VadSegmentResult>* segs,
                     bool finalize) {
   segs->clear();
   vad_detector->DrainSegments(finalize, segs);
   for (const auto& sp : *segs) {
-    const double s = tb.SecondsAt(sp.first);
-    const double e = tb.SecondsAt(sp.second);
+    const double s = tb.SecondsAt(sp.start_sample);
+    const double e = tb.SecondsAt(sp.end_sample);
     protocol::Message msg;
     msg.topic = protocol::kVadSpeechSegment.to_string();
     msg.pipeline = "vad";

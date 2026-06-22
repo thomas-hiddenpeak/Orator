@@ -113,6 +113,12 @@ struct VadConfig {
   int min_silence_ms = 300;
 };
 
+// A single VAD speech segment identified by absolute sample indices.
+struct VadSegmentResult {
+  long start_sample = 0;
+  long end_sample = 0;
+};
+
 // Voice Activity Detection: segments audio into speech/non-speech regions.
 // Generalizes any VAD model (Silero, energy-based, etc.); the pipeline
 // depends only on this contract, never on a concrete detector.
@@ -127,6 +133,20 @@ class IVad {
   virtual void Reset() = 0;
 
   virtual std::string name() const = 0;
+
+  // Push audio samples for VAD processing.
+  virtual void Push(const float* samples, int n) = 0;
+
+  // Drain completed VAD segments. When finalize is true, flush any open
+  // speech segment at end of stream.
+  virtual void DrainSegments(bool finalize,
+                             std::vector<VadSegmentResult>* segments) = 0;
+
+  // Whether the latest processed samples are classified as speech.
+  virtual bool is_in_speech() const = 0;
+
+  // Cumulative GPU compute time for this VAD instance.
+  virtual double compute_sec() const = 0;
 };
 
 }  // namespace core

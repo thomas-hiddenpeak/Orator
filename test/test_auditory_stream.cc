@@ -16,6 +16,7 @@ using orator::core::IVad;
 using orator::core::DiarizationConfig;
 using orator::core::AsrConfig;
 using orator::core::VadConfig;
+using orator::core::VadSegmentResult;
 using orator::core::DiarizationFrames;
 using orator::core::AudioChunk;
 using orator::core::Transcript;
@@ -100,6 +101,11 @@ class TestVad : public IVad {
   void Initialize(const VadConfig& /*config*/) override { ++init_count; }
   void LoadWeights(const std::string& /*path*/) override { ++load_count; }
   void Reset() override { ++reset_count; }
+  void Push(const float* /*samples*/, int /*n*/) override {}
+  void DrainSegments(bool /*finalize*/,
+                     std::vector<VadSegmentResult>* /*segments*/) override {}
+  bool is_in_speech() const override { return false; }
+  double compute_sec() const override { return 0.0; }
   std::string name() const override { return "test_vad"; }
 };
 

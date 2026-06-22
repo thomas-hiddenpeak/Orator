@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 
+#include "core/stages.h"
 #include "core/time_base.h"
 #include "core/types.h"
 
@@ -22,7 +23,6 @@ class ProtocolTimeline;
 namespace pipeline {
 
 class ComprehensiveTimeline;
-class GpuVad;
 
 // VAD subscription: parse {"start":..., "end":...} → comp_.AddVad()
 void HandleVadSubscription(ComprehensiveTimeline& comp,
@@ -53,12 +53,12 @@ void HandleTextSink(protocol::ProtocolTimeline* protocol_timeline,
                     long id, double start, double end,
                     const std::string& text);
 
-// VAD drain: extract segments from GpuVad and publish to protocol timeline.
-void HandleVadDrain(GpuVad* vad_detector,
+// VAD drain: extract segments from IVad and publish to protocol timeline.
+void HandleVadDrain(core::IVad* vad_detector,
                     protocol::ProtocolTimeline* protocol_timeline,
                     protocol::PipelineHandle* vad_handle,
                     const core::TimeBase& tb,
-                    std::vector<std::pair<long, long>>* segs,
+                    std::vector<core::VadSegmentResult>* segs,
                     bool finalize);
 
 }  // namespace pipeline
