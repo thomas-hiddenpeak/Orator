@@ -40,12 +40,15 @@ class OratorTestHarness:
 
     def __init__(self, port: int = DEFAULT_PORT, diarizer: str = "",
                  asr: str = "", vad: str = "models/vad/silero_vad.safetensors",
-                 ui_port: Optional[int] = None):
+                 ui_port: Optional[int] = None,
+                 config_overrides: Optional[dict] = None):
         self.port = port
         self.ui_port = ui_port or port + 1
         self.diarizer = diarizer
         self.asr = asr
         self.vad = vad
+        self.config_overrides = config_overrides or {}
+        self._config_file: Optional[str] = None
         self.proc: Optional[subprocess.Popen] = None
         self.server_pid: Optional[int] = None
         self._cleanup_done = False
