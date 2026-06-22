@@ -5,226 +5,190 @@ Simulates a real client session:
   1. Connect + WebSocket upgrade
   2. Receive "ready" message
   3. Send binary audio frames (simulated PCM)
-  4. Send text control commands ("flush", "end")
-  5. Verify server responses (timeline, etc.)
+  4. Send text control commands ("flush", "describe", "reset", "end")
+  5. Verify server responses (timeline, reset_ok, protocol description)
+
+Uses OratorTestHarness for Spec 004 unwrapping and assertions.
 """
 
-import socket
-import struct
 import json
 import time
 import sys
-import os
 
-# ---------------------------------------------------------------------------
-# WebSocket frame helpers (RFC 6455)
-# ---------------------------------------------------------------------------
-
-def ws_frame(opcode, payload, mask=True):
-    """Build a WebSocket frame."""
-    frame = bytearray()
-    frame.append(0x80 | opcode)  # FIN + opcode
-    if mask:
-        mask_bytes = os.urandom(4)
-        payload_len = len(payload)
-        if payload_len < 126:
-            frame.append(0x80 | payload_len)
-        elif payload_len < 65536:
-            frame.append(126)
-            frame.extend(struct.pack('>H', payload_len))
-        else:
-            frame.append(127)
-            frame.extend(struct.pack('>Q', payload_len))
-        frame.extend(mask_bytes)
-        frame.extend(bytes(b ^ mask_bytes[i & 3] for i, b in enumerate(payload)))
-    else:
-        payload_len = len(payload)
-        if payload_len < 126:
-            frame.append(payload_len)
-        elif payload_len < 65536:
-            frame.append(126)
-            frame.extend(struct.pack('>H', payload_len))
-        else:
-            frame.append(127)
-            frame.extend(struct.pack('>Q', payload_len))
-        frame.extend(payload)
-    return bytes(frame)
+from ws_test_harness import OratorTestHarness
 
 
-def ws_parse_frame(data):
-    """Parse a WebSocket frame, return (opcode, payload)."""
-    if len(data) < 2:
-        return None, None
-    opcode = data[0] & 0x0F
-    masked = (data[1] & 0x80) != 0
-    length = data[1] & 0x7F
-    offset = 2
-    if length == 126:
-        length = struct.unpack('>H', data[2:4])[0]
-        offset = 4
-    elif length == 127:
-        length = struct.unpack('>Q', data[2:10])[0]
-        offset = 10
-    if masked:
-        mask = data[offset:offset+4]
-        offset += 4
-    payload = data[offset:offset+length]
-    if masked:
-        payload = bytes(b ^ mask[i & 3] for i, b in enumerate(payload))
-    return opcode, payload
+def recv_until(ws, timeout=5):
+    """Read all messages from websocket until timeout.
 
+    Returns list of parsed message dicts.
+    """
+    ws.settimeout(0.5)
+    msgs = []
+    t0 = time.time()
+    while time.time() - t0 < timeout:
+        try:
+            m = ws.recv()
+            d = OratorTestHarness.unwrap(m)
+            msgs.append(d)
+        except Exception:
+            break
+    return msgs
 
-# ---------------------------------------------------------------------------
-# Test harness
-# ---------------------------------------------------------------------------
 
 def run_test(port=8765):
-    print(f"=== WebSocket Business Test on port {port} ===\n")
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.settimeout(5)
-    try:
-        s.connect(('127.0.0.1', port))
-        print("[1] TCP connected")
-    except Exception as e:
-        print(f"[FAIL] TCP connect failed: {e}")
-        return False
+    """Run business test against orator_ws.
 
-    # --- HTTP upgrade ---
-    key = "dGhlIHNhbXBsZSBub25jZQ=="
-    req = (
-        "GET / HTTP/1.1\r\n"
-        "Host: localhost\r\n"
-        "Upgrade: websocket\r\n"
-        "Connection: Upgrade\r\n"
-        f"Sec-WebSocket-Key: {key}\r\n"
-        "Sec-WebSocket-Version: 13\r\n"
-        "\r\n"
-    )
-    s.sendall(req.encode())
-    resp = b""
-    while b"\r\n\r\n" not in resp:
-        try:
-            c = s.recv(1)
-            if not c:
-                break
-            resp += c
-        except socket.timeout:
-            break
-    if b"101" not in resp:
-        print(f"[FAIL] Upgrade failed: {resp.decode('latin-1')[:200]}")
+    Validates:
+    - TCP connection and WebSocket upgrade
+    - Ready message with required fields
+    - Timeline response after flush
+    - Describe command response
+    - Reset command confirmation
+    - Clean close
+
+    Returns:
+        True if all assertions pass, False otherwise.
+    """
+    print(f"=== WebSocket Business Test on port {port} ===\n")
+    failures = []
+
+    # Connect via websocket library
+    import websocket
+    ws = websocket.WebSocket()
+    ws.settimeout(10)
+    try:
+        ws.connect(f'ws://127.0.0.1:{port}')
+        print("[1] Connected to server")
+    except Exception as e:
+        print(f"[FAIL] Connect failed: {e}")
         return False
-    print("[2] WebSocket upgrade OK (101 Switching Protocols)")
 
     # --- Read ready message ---
-    s.settimeout(3)
     try:
-        frame_data = s.recv(4096)
-        opcode, payload = ws_parse_frame(frame_data)
-        if opcode == 1:  # text
-            ready = json.loads(payload.decode())
-            print(f"[3] Ready message received: sample_rate={ready.get('sample_rate')}, "
-                  f"asr={ready.get('asr')}, protocol_version={ready.get('protocol_version')}")
-        else:
-            print(f"[WARN] Expected text frame, got opcode={opcode}")
+        raw = ws.recv()
+        ready = OratorTestHarness.unwrap(raw)
+        rtype = ready.get('type', '')
+        print(f"[2] Ready message received: type={rtype}, "
+              f"sample_rate={ready.get('sample_rate')}, "
+              f"asr={ready.get('asr')}, "
+              f"protocol_version={ready.get('protocol_version')}")
+        if rtype != 'ready':
+            print(f"  [FAIL] Expected type='ready', got '{rtype}'")
+            failures.append("ready_type")
+        for field in ['sample_rate', 'time_base', 'protocol_version']:
+            if field not in ready:
+                print(f"  [FAIL] Ready missing field '{field}'")
+                failures.append(f"ready_missing_{field}")
     except Exception as e:
-        print(f"[WARN] Could not read ready message: {e}")
+        print(f"[FAIL] Could not read ready message: {e}")
+        failures.append("ready_message")
+        ws.close()
+        return False
 
     # --- Send binary audio frames (simulated 16-bit PCM) ---
-    # Simulate ~1 second of audio at 16kHz = 32000 bytes (16000 samples * 2 bytes)
     audio_data = bytearray(32000)
     for i in range(0, len(audio_data), 2):
         audio_data[i] = (i // 2) % 256
         audio_data[i+1] = ((i // 2) // 256) % 256
-    s.sendall(ws_frame(0x2, bytes(audio_data)))  # binary frame
-    print(f"[4] Sent {len(audio_data)} bytes of simulated PCM audio")
+    ws.send(bytes(audio_data), opcode=0x02)
+    print(f"[3] Sent {len(audio_data)} bytes of simulated PCM audio")
 
-    # --- Send text control: "flush" ---
-    s.sendall(ws_frame(0x1, b'{"flush"}'))
-    print("[5] Sent flush command")
+    # --- Send flush command ---
+    ws.send(json.dumps({'flush': True}))
+    print("[4] Sent flush command")
 
-    # --- Wait for timeline response ---
-    time.sleep(0.5)
-    s.settimeout(2)
-    try:
-        frame_data = s.recv(4096)
-        opcode, payload = ws_parse_frame(frame_data)
-        if opcode == 1:
-            data = json.loads(payload.decode())
-            print(f"[6] Timeline response received: type={data.get('type', 'unknown')}, "
-                  f"segments={len(data.get('segments', []))}")
-        else:
-            print(f"[WARN] Expected text frame, got opcode={opcode}")
-    except socket.timeout:
-        print("[6] No timeline response (expected if ASR is disabled)")
-    except Exception as e:
-        print(f"[WARN] Could not read timeline: {e}")
+    # --- Collect responses after flush ---
+    time.sleep(1)
+    flush_msgs = recv_until(ws, timeout=3)
+    timeline_found = False
+    for d in flush_msgs:
+        if d.get('type') == 'timeline':
+            timeline_found = True
+            print(f"[5] Timeline received: audio_sec={d.get('audio_sec')}, "
+                  f"tracks={len(d.get('tracks', []))}")
+            try:
+                OratorTestHarness.assert_timeline_valid(d)
+                print("  Timeline validation passed")
+            except AssertionError as e:
+                print(f"  [FAIL] Timeline validation: {e}")
+                failures.append("timeline_validation")
+            break
+    if not timeline_found:
+        print("[5] No timeline received (may be expected with simulated audio)")
 
-    # --- Send text control: "end" ---
-    s.sendall(ws_frame(0x1, b'{"end"}'))
-    print("[7] Sent end command")
-
-    # --- Wait for final timeline ---
-    time.sleep(0.5)
-    s.settimeout(2)
-    try:
-        frame_data = s.recv(4096)
-        opcode, payload = ws_parse_frame(frame_data)
-        if opcode == 1:
-            data = json.loads(payload.decode())
-            print(f"[8] Final timeline received: type={data.get('type', 'unknown')}")
-        else:
-            print(f"[WARN] Expected text frame, got opcode={opcode}")
-    except socket.timeout:
-        print("[8] No final timeline (expected if ASR is disabled)")
-    except Exception as e:
-        print(f"[WARN] Could not read final timeline: {e}")
-
-    # --- Send "describe" command ---
-    s.sendall(ws_frame(0x1, b'{"describe"}'))
-    print("[9] Sent describe command")
+    # --- Send describe command ---
+    ws.send(json.dumps({'describe': True}))
+    print("[6] Sent describe command")
 
     # --- Wait for protocol description ---
     time.sleep(0.5)
-    s.settimeout(2)
-    try:
-        frame_data = s.recv(4096)
-        opcode, payload = ws_parse_frame(frame_data)
-        if opcode == 1:
-            data = json.loads(payload.decode())
-            print(f"[10] Protocol description received: {list(data.keys())}")
-        else:
-            print(f"[WARN] Expected text frame, got opcode={opcode}")
-    except socket.timeout:
-        print("[10] No protocol description (expected if pipeline not started)")
-    except Exception as e:
-        print(f"[WARN] Could not read description: {e}")
+    desc_msgs = recv_until(ws, timeout=3)
+    desc_found = False
+    for d in desc_msgs:
+        # Describe response has no 'type' field; it has 'pipelines' and 'schemas'
+        if 'pipelines' in d or 'schemas' in d:
+            desc_found = True
+            print(f"[7] Protocol description received: "
+                  f"pipelines={len(d.get('pipelines', []))}, "
+                  f"schemas={len(d.get('schemas', []))}")
+            break
+    if not desc_found:
+        print("[7] No protocol description received")
+        failures.append("describe_response")
 
-    # --- Send "reset" command ---
-    s.sendall(ws_frame(0x1, b'{"reset"}'))
-    print("[11] Sent reset command")
+    # --- Send end command (before reset, so audio buffer still has data) ---
+    ws.send(json.dumps({'end': True}))
+    print("[8] Sent end command")
+
+    # --- Wait for final timeline ---
+    time.sleep(1)
+    end_msgs = recv_until(ws, timeout=3)
+    end_timeline_found = False
+    for d in end_msgs:
+        if d.get('type') == 'timeline':
+            end_timeline_found = True
+            print(f"[9] Final timeline received: "
+                  f"audio_sec={d.get('audio_sec')}")
+            try:
+                OratorTestHarness.assert_timeline_valid(d)
+                print("  Final timeline validation passed")
+            except AssertionError as e:
+                print(f"  [FAIL] Final timeline validation: {e}")
+                failures.append("final_timeline_validation")
+            break
+    if not end_timeline_found:
+        print("[9] No final timeline after end")
+
+    # --- Send reset command ---
+    ws.send(json.dumps({'reset': True}))
+    print("[10] Sent reset command")
 
     # --- Wait for reset confirmation ---
     time.sleep(0.5)
-    s.settimeout(2)
-    try:
-        frame_data = s.recv(4096)
-        opcode, payload = ws_parse_frame(frame_data)
-        if opcode == 1:
-            data = json.loads(payload.decode())
-            print(f"[12] Reset confirmation: {data}")
-        else:
-            print(f"[WARN] Expected text frame, got opcode={opcode}")
-    except socket.timeout:
-        print("[12] No reset confirmation")
-    except Exception as e:
-        print(f"[WARN] Could not read reset confirmation: {e}")
+    reset_msgs = recv_until(ws, timeout=3)
+    reset_found = False
+    for d in reset_msgs:
+        if d.get('type') == 'reset_ok':
+            reset_found = True
+            print(f"[11] Reset confirmation received")
+            break
+    if not reset_found:
+        print("[11] No reset_ok received (got types: "
+              f"{[m.get('type','?') for m in reset_msgs]})")
+        failures.append("reset_response")
 
     # --- Close connection ---
-    s.sendall(ws_frame(0x8, b''))  # close frame
-    print("[13] Sent close frame")
-    s.close()
-    print("\n=== Test completed successfully ===")
-    return True
+    ws.close()
+    print("[12] Connection closed")
+
+    # --- Summary ---
+    if failures:
+        print(f"\n=== Test FAILED: {len(failures)} failure(s): {failures} ===")
+        return False
+    else:
+        print("\n=== Test completed successfully ===")
+        return True
 
 
 if __name__ == "__main__":

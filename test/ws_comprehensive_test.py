@@ -2,9 +2,19 @@
 """
 Comprehensive WebSocket I/O validation test for orator_ws.
 Validates EVERY frame entering and leaving the WebSocket.
+
+Uses OratorTestHarness for server lifecycle management and assertions.
 """
 
-import socket, struct, json, time, sys, os, subprocess
+import socket
+import struct
+import json
+import time
+import sys
+import os
+import subprocess
+
+from ws_test_harness import OratorTestHarness
 
 # ---------------------------------------------------------------------------
 # WebSocket frame helpers (RFC 6455)
@@ -24,7 +34,9 @@ class WsFrame:
         return self.type_names.get(self.opcode, f'unknown({self.opcode})')
 
     def __repr__(self):
-        return f"WsFrame(opcode={self.opcode}[{self.type_name}], payload={len(self.payload)}B, fin={self.fin}, masked={self.masked})"
+        return (f"WsFrame(opcode={self.opcode}[{self.type_name}], "
+                f"payload={len(self.payload)}B, fin={self.fin}, "
+                f"masked={self.masked})")
 
 
 def ws_encode(opcode, payload, mask=True):
@@ -98,10 +110,10 @@ class ValidationResult:
     def __init__(self):
         self.tests = []
     def ok(self, msg):
-        print(f"  ✓ {msg}")
+        print(f"  \u2713 {msg}")
         self.tests.append(('PASS', msg))
     def fail(self, msg):
-        print(f"  ✗ FAIL: {msg}")
+        print(f"  \u2717 FAIL: {msg}")
         self.tests.append(('FAIL', msg))
     def info(self, msg):
         print(f"    {msg}")
@@ -125,36 +137,51 @@ def validate_json(data, required_fields, allow_extra=True):
     return True, obj
 
 
-def unwrap_envelope(obj):
-    """
-    If the message is a topic envelope, extract the inner data.
-    Server wraps pipeline messages as:
-      {"topic":"X","pipeline":"Y","data":"<json_escaped>"}
-    """
-    if isinstance(obj, dict) and 'topic' in obj and 'data' in obj:
-        try:
-            inner = json.loads(obj['data'])
-            return inner
-        except (json.JSONDecodeError, KeyError):
-            pass
-    return obj
-
-
 # ---------------------------------------------------------------------------
 # Main test
 # ---------------------------------------------------------------------------
 
-def run_ws_test(port=8765, audio_file="test.mp3", audio_duration=10):
+def run_ws_test(port=8765, audio_file="test.mp3", audio_duration=10,
+                diarizer=None, asr=None):
     """
     Full WS I/O validation test.
     Sends audio, captures ALL server output, validates every message.
+
+    Args:
+        port: Server port
+        audio_file: Path to audio file (MP3 or WAV)
+        audio_duration: Seconds of audio to use
+        diarizer: Diarizer model path (if provided, starts server via harness)
+        asr: ASR model path (if provided, starts server via harness)
     """
     vr = ValidationResult()
     print(f"\n{'='*60}")
     print(f"WebSocket Comprehensive I/O Test")
     print(f"  Port: {port}")
     print(f"  Audio: {audio_file} ({audio_duration}s)")
+    if diarizer:
+        print(f"  Diarizer: {diarizer}")
+    if asr:
+        print(f"  ASR: {asr}")
     print(f"{'='*60}\n")
+
+    # ------------------------------------------------------------------
+    # Server management via harness (if model paths provided)
+    # ------------------------------------------------------------------
+    harness = None
+    if diarizer or asr:
+        print("[S] Starting server via OratorTestHarness...")
+        harness = OratorTestHarness(
+            port=port,
+            diarizer=diarizer or "",
+            asr=asr or "",
+        )
+        try:
+            harness.start()
+            vr.ok(f"Server started on port {port}")
+        except (RuntimeError, TimeoutError) as e:
+            vr.fail(f"Server start failed: {e}")
+            return False
 
     # ------------------------------------------------------------------
     # Audio preparation
@@ -168,6 +195,8 @@ def run_ws_test(port=8765, audio_file="test.mp3", audio_duration=10):
     ], capture_output=True, text=True)
     if result.returncode != 0:
         print(f"  [FAIL] ffmpeg conversion failed: {result.stderr}")
+        if harness:
+            harness.cleanup()
         return False
     with open(pcm_file, 'rb') as f:
         pcm_data = f.read()
@@ -186,6 +215,8 @@ def run_ws_test(port=8765, audio_file="test.mp3", audio_duration=10):
         vr.ok("TCP connection established")
     except Exception as e:
         vr.fail(f"TCP connect failed: {e}")
+        if harness:
+            harness.cleanup()
         return False
 
     # ------------------------------------------------------------------
@@ -235,8 +266,6 @@ def run_ws_test(port=8765, audio_file="test.mp3", audio_duration=10):
     s.settimeout(2)
     all_output = []  # List of (WsFrame, context_string)
     buf = b""
-    # Read initial server frames with a cap to avoid infinite loop
-    # from continuous messages (e.g. gpu_telemetry sent by server)
     found_ready = False
     for _ in range(20):
         try:
@@ -252,10 +281,11 @@ def run_ws_test(port=8765, audio_file="test.mp3", audio_duration=10):
             if frame.opcode == 1:
                 try:
                     obj = json.loads(frame.payload.decode())
-                    inner = unwrap_envelope(obj)
+                    inner = OratorTestHarness.unwrap(json.dumps(obj))
                     if inner.get('type') == 'ready':
                         found_ready = True
-                except: pass
+                except Exception:
+                    pass
         if found_ready:
             break
 
@@ -263,6 +293,8 @@ def run_ws_test(port=8765, audio_file="test.mp3", audio_duration=10):
     if not all_output:
         vr.fail("No initial messages from server")
         s.close()
+        if harness:
+            harness.cleanup()
         return False
 
     found_ready = False
@@ -270,13 +302,15 @@ def run_ws_test(port=8765, audio_file="test.mp3", audio_duration=10):
         if frame.opcode == 1:  # text
             try:
                 obj = json.loads(frame.payload.decode())
-                inner = unwrap_envelope(obj)
+                inner = OratorTestHarness.unwrap(json.dumps(obj))
                 msg_type = inner.get('type', obj.get('type', 'unknown'))
                 if msg_type == 'ready':
                     found_ready = True
                     vr.info(f"  Ready: sample_rate={inner.get('sample_rate')}, "
-                           f"asr={inner.get('asr')}, protocol_version={inner.get('protocol_version')}")
-                    for field in ['sample_rate', 'time_base', 'protocol_version', 'session_start_wall_sec']:
+                           f"asr={inner.get('asr')}, "
+                           f"protocol_version={inner.get('protocol_version')}")
+                    for field in ['sample_rate', 'time_base',
+                                  'protocol_version', 'session_start_wall_sec']:
                         if field in inner:
                             vr.ok(f"  Ready.{field} = {inner[field]}")
                         else:
@@ -300,16 +334,19 @@ def run_ws_test(port=8765, audio_file="test.mp3", audio_duration=10):
     sent_chunks = 0
     audio_bytes_sent = 0
     buf = b""
-    s.settimeout(0.5)  # short timeout for non-blocking-like behavior
+    s.settimeout(0.5)
 
     for i in range(0, len(pcm_data), CHUNK_SIZE):
         chunk = pcm_data[i:i+CHUNK_SIZE]
         try:
             # Validate frame encoding
             frame = ws_encode(0x2, bytes(chunk))
-            assert frame[0] == 0x82, f"Frame byte 0 should be 0x82, got 0x{frame[0]:02x}"
-            assert frame[1] & 0x80, f"MASK bit not set in byte 1: 0x{frame[1]:02x}"
-            assert (frame[1] & 0x7F) in (126, 127) or (frame[1] & 0x7F) == len(chunk), \
+            assert frame[0] == 0x82, \
+                f"Frame byte 0 should be 0x82, got 0x{frame[0]:02x}"
+            assert frame[1] & 0x80, \
+                f"MASK bit not set in byte 1: 0x{frame[1]:02x}"
+            assert ((frame[1] & 0x7F) in (126, 127)
+                    or (frame[1] & 0x7F) == len(chunk)), \
                 f"Length mismatch in byte 1"
 
             s.sendall(frame)
@@ -333,20 +370,23 @@ def run_ws_test(port=8765, audio_file="test.mp3", audio_duration=10):
 
             if sent_chunks % 5 == 0:
                 print(f"  Sent {sent_chunks}/{total_chunks} chunks, "
-                      f"received {len([f for f,c in all_output if c.startswith('after_chunk')])} msgs")
+                      f"received "
+                      f"{len([f for f,c in all_output if c.startswith('after_chunk')])} msgs")
 
             time.sleep(0.01)
 
         except BrokenPipeError:
-            vr.fail(f"Connection closed after sending chunk {sent_chunks}/{total_chunks}")
-            # Try to read final message
+            vr.fail(f"Connection closed after sending chunk "
+                    f"{sent_chunks}/{total_chunks}")
             try:
                 s.settimeout(1)
                 final = s.recv(4096)
                 if final:
                     f, _ = ws_decode(final)
-                    if f: all_output.append((f, 'broken_pipe_after'))
-            except: pass
+                    if f:
+                        all_output.append((f, 'broken_pipe_after'))
+            except Exception:
+                pass
             break
         except AssertionError as e:
             vr.fail(f"Frame encoding error on chunk {sent_chunks+1}: {e}")
@@ -370,7 +410,9 @@ def run_ws_test(port=8765, audio_file="test.mp3", audio_duration=10):
                 obj = json.loads(frame.payload.decode())
                 text_msgs.append((obj, ctx, frame))
             except json.JSONDecodeError:
-                text_msgs.append(({'__invalid_json': frame.payload.decode(errors='replace')}, ctx, frame))
+                text_msgs.append(
+                    ({'__invalid_json': frame.payload.decode(errors='replace')},
+                     ctx, frame))
         elif frame.opcode == 8:
             vr.info(f"  Close frame: payload={frame.payload.hex()}")
         elif frame.opcode == 2:
@@ -379,13 +421,13 @@ def run_ws_test(port=8765, audio_file="test.mp3", audio_duration=10):
             vr.info(f"  Ping/Pong: {frame.type_name}")
 
     # ------------------------------------------------------------------
-    # Validate server output messages
+    # Validate server output messages (with Spec 004 unwrapping)
     # ------------------------------------------------------------------
     print(f"\n[5] Server message validation ({len(text_msgs)} text messages):")
 
     for obj, ctx, frame in text_msgs:
-        # Unwrap topic envelope if present
-        inner = unwrap_envelope(obj)
+        # Unwrap Spec 004 topic envelope if present
+        inner = OratorTestHarness.unwrap(json.dumps(obj))
         msg_type = inner.get('type', obj.get('type', 'unknown'))
 
         if msg_type == 'vad_state':
@@ -401,7 +443,8 @@ def run_ws_test(port=8765, audio_file="test.mp3", audio_duration=10):
                     vr.fail(f"asr missing '{f}' ({ctx})")
                     fields_ok = False
             if fields_ok:
-                vr.ok(f"asr: \"{inner['text'][:50]}\" [{inner['start']:.2f}-{inner['end']:.2f}s] ({ctx})")
+                vr.ok(f"asr: \"{inner['text'][:50]}\" "
+                      f"[{inner['start']:.2f}-{inner['end']:.2f}s] ({ctx})")
 
         elif msg_type == 'ready':
             pass  # already validated
@@ -424,13 +467,20 @@ def run_ws_test(port=8765, audio_file="test.mp3", audio_duration=10):
                            f"compute={compute_sec:.3f}s, rtf={rtf:.3f}")
                     if entries > 0:
                         vr.ok(f"  Track '{kind}' has data ({entries} entries)")
+                # Use harness assertions on the timeline
+                try:
+                    OratorTestHarness.assert_timeline_valid(inner)
+                    vr.ok("Harness timeline validation passed")
+                except AssertionError as e:
+                    vr.fail(f"Harness timeline validation: {e}")
 
         elif msg_type == 'revision':
             vr.info(f"revision: source={inner.get('source')}, "
                    f"entries={len(inner.get('entries', []))}")
 
         elif inner.get('__invalid_json'):
-            vr.fail(f"Invalid JSON in text frame: {inner['__invalid_json'][:100]}")
+            vr.fail(f"Invalid JSON in text frame: "
+                   f"{inner['__invalid_json'][:100]}")
 
         elif msg_type == 'reset_ok':
             vr.ok("reset_ok received")
@@ -476,7 +526,7 @@ def run_ws_test(port=8765, audio_file="test.mp3", audio_duration=10):
         if f.opcode == 1:
             try:
                 obj = json.loads(f.payload.decode())
-                inner = unwrap_envelope(obj)
+                inner = OratorTestHarness.unwrap(json.dumps(obj))
                 if inner.get('type') == 'timeline':
                     timeline_found = True
                     vr.ok("Timeline received after flush")
@@ -488,21 +538,32 @@ def run_ws_test(port=8765, audio_file="test.mp3", audio_duration=10):
                         e = len(t.get('entries', []))
                         vr.info(f"  Track '{k}': {e} entries")
                     if len(tracks) >= 2:
-                        diar_tracks = [t for t in tracks if t.get('kind') == 'diarization']
-                        asr_tracks = [t for t in tracks if t.get('kind') == 'asr']
+                        diar_tracks = [t for t in tracks
+                                       if t.get('kind') == 'diarization']
+                        asr_tracks = [t for t in tracks
+                                      if t.get('kind') == 'asr']
                         if diar_tracks:
-                            vr.info(f"  Diarization entries: {len(diar_tracks[0].get('entries',[]))}")
+                            vr.info(f"  Diarization entries: "
+                                   f"{len(diar_tracks[0].get('entries',[]))}")
                         if asr_tracks:
                             asr_entries = asr_tracks[0].get('entries', [])
                             vr.info(f"  ASR entries: {len(asr_entries)}")
                             if asr_entries:
                                 vr.ok("ASR produced transcription results")
                                 for entry in asr_entries[:3]:
-                                    vr.info(f"    [{entry.get('start',0):.2f}-{entry.get('end',0):.2f}] "
+                                    vr.info(f"    [{entry.get('start',0):.2f}-"
+                                           f"{entry.get('end',0):.2f}] "
                                            f"{entry.get('text','')[:60]}")
                             else:
-                                vr.info("  ASR track present but empty (audio may need processing)")
-            except: pass
+                                vr.info("ASR track present but empty")
+                    # Use harness assertions
+                    try:
+                        OratorTestHarness.assert_timeline_valid(inner)
+                        vr.ok("Harness timeline validation passed (flush)")
+                    except AssertionError as e:
+                        vr.fail(f"Harness timeline validation (flush): {e}")
+            except Exception:
+                pass
         elif f.opcode == 8:
             vr.info("Close frame received after flush")
 
@@ -541,7 +602,7 @@ def run_ws_test(port=8765, audio_file="test.mp3", audio_duration=10):
         if f.opcode == 1:
             try:
                 obj = json.loads(f.payload.decode())
-                inner = unwrap_envelope(obj)
+                inner = OratorTestHarness.unwrap(json.dumps(obj))
                 if inner.get('type') == 'timeline':
                     final_timeline = True
                     vr.ok("Final timeline received after end")
@@ -552,9 +613,17 @@ def run_ws_test(port=8765, audio_file="test.mp3", audio_duration=10):
                     vr.info(f"  Total ASR entries: {len(asr_entries)}")
                     if asr_entries:
                         for e in asr_entries:
-                            vr.info(f"    [{e.get('start',0):.2f}-{e.get('end',0):.2f}] "
+                            vr.info(f"    [{e.get('start',0):.2f}-"
+                                   f"{e.get('end',0):.2f}] "
                                    f"{e.get('text','')[:80]}")
-            except: pass
+                    # Use harness assertions
+                    try:
+                        OratorTestHarness.assert_timeline_valid(inner)
+                        vr.ok("Harness timeline validation passed (end)")
+                    except AssertionError as e:
+                        vr.fail(f"Harness timeline validation (end): {e}")
+            except Exception:
+                pass
         elif f.opcode == 8:
             vr.info("Close frame received after end")
 
@@ -568,7 +637,8 @@ def run_ws_test(port=8765, audio_file="test.mp3", audio_duration=10):
     try:
         s.sendall(ws_encode(0x8, b''))
         vr.ok("Close frame sent")
-    except: pass
+    except Exception:
+        pass
     s.close()
     vr.ok("Connection closed cleanly")
 
@@ -588,6 +658,11 @@ def run_ws_test(port=8765, audio_file="test.mp3", audio_duration=10):
     print(f"  Audio sent:  {audio_bytes_sent} bytes in {sent_chunks} chunks")
     print()
     result = vr.summary()
+
+    # Cleanup harness if we started it
+    if harness:
+        harness.cleanup()
+
     return result
 
 
@@ -595,8 +670,12 @@ if __name__ == "__main__":
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8765
     audio_file = sys.argv[2] if len(sys.argv) > 2 else "test.mp3"
     duration = int(sys.argv[3]) if len(sys.argv) > 3 else 10
-    print(f"Args: port={port}, audio={audio_file}, duration={duration}s")
-    success = run_ws_test(port, audio_file, duration)
+    # Optional: diarizer and asr model paths for auto-server-start
+    diarizer = sys.argv[4] if len(sys.argv) > 4 else None
+    asr = sys.argv[5] if len(sys.argv) > 5 else None
+    print(f"Args: port={port}, audio={audio_file}, duration={duration}s, "
+          f"diarizer={diarizer}, asr={asr}")
+    success = run_ws_test(port, audio_file, duration, diarizer, asr)
     print(f"\n{'='*60}")
     print(f"OVERALL: {'PASS' if success else 'FAIL'}")
     sys.exit(0 if success else 1)

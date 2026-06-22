@@ -6,6 +6,11 @@ Usage:
 
 The server is started on port 18765 (non-standard) before the test and
 killed unconditionally after, regardless of pass/fail.
+
+Model paths can be configured via environment variables:
+    ORATOR_TEST_DIARIZER  - Path to diarizer weights (default: models/sortformer_4spk_v2.safetensors)
+    ORATOR_TEST_ASR       - Path to ASR model directory (default: models/asr/Qwen/Qwen3-ASR-1.7B)
+    ORATOR_TEST_VAD       - Path to VAD model (default: models/vad/silero_vad.safetensors)
 """
 
 import atexit
@@ -20,6 +25,19 @@ PORT = 18765
 UI_PORT = 18766
 SERVER_READY_TIMEOUT = 30  # seconds
 
+# Default model paths (relative to repo root)
+DEFAULT_DIARIZER = "models/sortformer_4spk_v2.safetensors"
+DEFAULT_ASR = "models/asr/Qwen/Qwen3-ASR-1.7B"
+DEFAULT_VAD = "models/vad/silero_vad.safetensors"
+
+
+def get_model_paths():
+    """Get model paths from environment variables or defaults."""
+    diarizer = os.environ.get("ORATOR_TEST_DIARIZER", DEFAULT_DIARIZER)
+    asr = os.environ.get("ORATOR_TEST_ASR", DEFAULT_ASR)
+    vad = os.environ.get("ORATOR_TEST_VAD", DEFAULT_VAD)
+    return diarizer, asr, vad
+
 
 def start_server() -> subprocess.Popen:
     env = os.environ.copy()
@@ -27,8 +45,31 @@ def start_server() -> subprocess.Popen:
     env["ORATOR_GPU_TELEMETRY_SEC"] = "0"
     env["ORATOR_VAD_STREAM"] = "0"
 
+    diarizer, asr, vad = get_model_paths()
+
+    # Resolve relative paths from repo root
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    repo_root = os.path.dirname(script_dir)
+
+    def resolve_path(p):
+        if p and not os.path.isabs(p):
+            return os.path.join(repo_root, p)
+        return p
+
+    diarizer_path = resolve_path(diarizer)
+    asr_path = resolve_path(asr)
+    vad_path = resolve_path(vad)
+
+    # Set VAD model path via env var
+    env["ORATOR_VAD_MODEL"] = vad_path
+
+    print(f"[py-test] model paths:")
+    print(f"  diarizer: {diarizer_path} ({'exists' if os.path.isfile(diarizer_path) else 'not found'})")
+    print(f"  asr:      {asr_path} ({'exists' if os.path.isdir(asr_path) else 'not found'})")
+    print(f"  vad:      {vad_path} ({'exists' if os.path.isfile(vad_path) else 'not found'})")
+
     proc = subprocess.Popen(
-        [SERVER_BIN, str(PORT), "", ""],
+        [SERVER_BIN, str(PORT), diarizer_path, asr_path],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         env=env,
@@ -82,7 +123,8 @@ def main() -> None:
 
     if not wait_for_server():
         proc.kill()
-        print(f"[py-test] server failed to start within {SERVER_READY_TIMEOUT}s", file=sys.stderr)
+        print(f"[py-test] server failed to start within {SERVER_READY_TIMEOUT}s",
+              file=sys.stderr)
         sys.exit(1)
 
     print(f"[py-test] server ready. running {test_script} ...")
@@ -100,7 +142,8 @@ def main() -> None:
         print(result.stderr, file=sys.stderr, end="")
 
     if result.returncode != 0:
-        print(f"[py-test] FAILED (exit code {result.returncode})", file=sys.stderr)
+        print(f"[py-test] FAILED (exit code {result.returncode})",
+              file=sys.stderr)
         sys.exit(result.returncode)
     else:
         print("[py-test] PASSED")

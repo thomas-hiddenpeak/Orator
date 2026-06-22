@@ -126,19 +126,22 @@ class Reader(threading.Thread):
             if op != 0x1:                # only text frames carry JSON
                 continue
             try:
-                msg = json.loads(pl.decode("utf-8"))
-            except (ValueError, UnicodeDecodeError):
+                raw = json.loads(pl.decode("utf-8"))
+                # Spec 004 envelope unwrapping
+                if 'data' in raw and isinstance(raw['data'], str):
+                    raw = json.loads(raw['data'])
+            except (ValueError, UnicodeDecodeError, json.JSONDecodeError):
                 continue
-            kind = msg.get("type")
+            kind = raw.get("type")
             if kind == "asr":
-                self.events.append(msg)
-                t = msg.get("text", "")
-                print(f"  [stream] asr [{msg.get('start'):.2f}-{msg.get('end'):.2f}] {t}")
+                self.events.append(raw)
+                t = raw.get("text", "")
+                print(f"  [stream] asr [{raw.get('start'):.2f}-{raw.get('end'):.2f}] {t}")
             elif kind == "timeline":
-                self.timeline = msg
+                self.timeline = raw
                 self.timeline_event.set()
             elif kind == "ready":
-                self.ready = msg
+                self.ready = raw
 
 
 def main():
@@ -183,17 +186,28 @@ def main():
                 time.sleep(slack)
     push_wall = time.monotonic() - t0
 
-    # End the stream and wait for the final timeline document.
+    # Flush: send flush command and wait for the timeline document.
+    sock.sendall(mask_frame(0x1, b'{"flush":true}'))
+    print("  [flush] waiting for timeline...")
+    got_flush = reader.timeline_event.wait(timeout=args.timeline_timeout)
+    if got_flush and reader.timeline is not None:
+        print(f"  [flush] timeline received ({reader.timeline.get('audio_sec', '?')}s)")
+    else:
+        print("  [flush] no timeline (continuing to end)")
+
+    # End: send end command and wait for the final timeline document.
+    reader.timeline_event.clear()
     sock.sendall(mask_frame(0x1, b'{"end":true}'))
-    got = reader.timeline_event.wait(timeout=args.timeline_timeout)
+    print("  [end] waiting for final timeline...")
+    got_end = reader.timeline_event.wait(timeout=args.timeline_timeout)
     total_wall = time.monotonic() - t0
     sock.sendall(mask_frame(0x8, b"\x03\xe8"))  # CLOSE
     sock.close()
     # Join the reader thread so it stops reading before the interpreter exits.
     reader.join(timeout=2.0)
 
-    if not got or reader.timeline is None:
-        print(f"ERROR: no timeline received within {args.timeline_timeout:.1f}s",
+    if not got_end or reader.timeline is None:
+        print(f"ERROR: no final timeline received within {args.timeline_timeout:.1f}s",
               file=sys.stderr)
         return 1
 
