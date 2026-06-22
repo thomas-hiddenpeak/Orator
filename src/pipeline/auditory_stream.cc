@@ -75,12 +75,14 @@ void AuditoryStream::Start() {
   diar_sub_id_ = protocol_timeline_->SubscribeInternal(
       protocol::TopicPattern{"diar/+"},
       [this](const protocol::Message& msg) {
-        HandleDiarSubscription(comp_, comp_mutex_, msg);
+        HandleDiarSubscription(comp_, comp_mutex_, msg,
+            [this](const std::string& rev_json) { EmitLocked(rev_json); });
       });
   asr_sub_id_ = protocol_timeline_->SubscribeInternal(
       protocol::TopicPattern{"asr/+"},
       [this](const protocol::Message& msg) {
-        HandleAsrSubscription(comp_, comp_mutex_, msg);
+        HandleAsrSubscription(comp_, comp_mutex_, msg,
+            [this](const std::string& rev_json) { EmitLocked(rev_json); });
       });
 
   if (!config_.diarizer_weights.empty()) {

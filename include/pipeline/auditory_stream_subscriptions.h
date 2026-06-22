@@ -5,6 +5,7 @@
 // on lifecycle. Each function receives only the AuditoryStream members it needs
 // as explicit parameters.
 
+#include <functional>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -14,6 +15,10 @@
 #include "core/types.h"
 
 namespace orator {
+
+// Emit callback for revision JSON strings.
+using RevisionEmitter = std::function<void(const std::string&)>;
+
 namespace protocol {
 class Message;
 class PipelineHandle;
@@ -30,15 +35,19 @@ void HandleVadSubscription(ComprehensiveTimeline& comp,
                            const protocol::Message& msg);
 
 // Diar subscription: parse {"segments":[{...},...]} → comp_.ReplaceSpeakers()
+// emit_rev is called outside comp_mutex for each revision produced.
 void HandleDiarSubscription(ComprehensiveTimeline& comp,
                             std::mutex& comp_mutex,
-                            const protocol::Message& msg);
+                            const protocol::Message& msg,
+                            RevisionEmitter emit_rev);
 
 // ASR subscription: parse {"id":..., "start":..., "end":..., "text":"..."}
-// → comp_.UpsertText()
+// → comp_.UpsertText(). emit_rev is called outside comp_mutex for each
+// revision produced.
 void HandleAsrSubscription(ComprehensiveTimeline& comp,
                            std::mutex& comp_mutex,
-                           const protocol::Message& msg);
+                           const protocol::Message& msg,
+                           RevisionEmitter emit_rev);
 
 // Speaker sink callback: diarization worker → protocol publish
 void HandleSpeakerSink(std::mutex& comp_mutex,

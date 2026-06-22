@@ -25,6 +25,41 @@ namespace orator {
 namespace pipeline {
 
 // ---------------------------------------------------------------------------
+// Local helper: serialize a Revision to JSON and emit via callback.
+// Duplicates AuditoryStream::SerializeRevision() logic so it can be called
+// from free functions without access to AuditoryStream internals.
+// ---------------------------------------------------------------------------
+namespace {
+void DoEmitRevision(const ComprehensiveTimeline::Revision& r,
+                    const char* source, RevisionEmitter emit_rev) {
+  char buf[160];
+  std::string out = "{\"type\":\"revision\",\"source\":\"";
+  out += source;
+  out += "\",";
+  std::snprintf(buf, sizeof(buf),
+                "\"dirty_start\":%.3f,\"dirty_end\":%.3f,\"entries\":[",
+                r.dirty_start, r.dirty_end);
+  out += buf;
+  for (size_t i = 0; i < r.entries.size(); ++i) {
+    const auto& e = r.entries[i];
+    int spk_idx = -1;
+    if (e.speaker.size() > 8 && e.speaker.substr(0, 8) == "speaker_") {
+      try { spk_idx = std::stoi(e.speaker.substr(8)); }
+      catch (...) { spk_idx = -1; }
+    }
+    std::snprintf(buf, sizeof(buf),
+                  "{\"start\":%.3f,\"end\":%.3f,\"text_id\":%ld,\"speaker\":%d,"
+                  "\"text\":\"",
+                  e.start, e.end, e.text_id, spk_idx);
+    out += std::string(buf) + JsonEscape(e.text) + "\"}";
+    if (i + 1 < r.entries.size()) out += ",";
+  }
+  out += "]}";
+  emit_rev(out);
+}
+}  // namespace
+
+// ---------------------------------------------------------------------------
 // VAD subscription: parse {"start":..., "end":...} → comp_.AddVad()
 // ---------------------------------------------------------------------------
 void HandleVadSubscription(ComprehensiveTimeline& comp,
@@ -41,7 +76,8 @@ void HandleVadSubscription(ComprehensiveTimeline& comp,
 // ---------------------------------------------------------------------------
 void HandleDiarSubscription(ComprehensiveTimeline& comp,
                             std::mutex& comp_mutex,
-                            const protocol::Message& msg) {
+                            const protocol::Message& msg,
+                            RevisionEmitter emit_rev) {
   const std::string& data = msg.data;
   auto seg_start = data.find("\"segments\":[");
   if (seg_start == std::string::npos) return;
@@ -77,8 +113,14 @@ void HandleDiarSubscription(ComprehensiveTimeline& comp,
     obj_pos = brace_end + 1;
   }
 
-  std::lock_guard<std::mutex> lk(comp_mutex);
-  comp.ReplaceSpeakers(speakers);
+  std::vector<ComprehensiveTimeline::Revision> revs;
+  {
+    std::lock_guard<std::mutex> lk(comp_mutex);
+    revs = comp.ReplaceSpeakers(speakers);
+  }
+  for (const auto& r : revs) {
+    DoEmitRevision(r, "diar", emit_rev);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -87,7 +129,8 @@ void HandleDiarSubscription(ComprehensiveTimeline& comp,
 // ---------------------------------------------------------------------------
 void HandleAsrSubscription(ComprehensiveTimeline& comp,
                            std::mutex& comp_mutex,
-                           const protocol::Message& msg) {
+                           const protocol::Message& msg,
+                           RevisionEmitter emit_rev) {
   const std::string& data = msg.data;
 
   long id = JsonParseLong(data, "id");
@@ -97,8 +140,14 @@ void HandleAsrSubscription(ComprehensiveTimeline& comp,
 
   if (id < 0) return;
 
-  std::lock_guard<std::mutex> lk(comp_mutex);
-  comp.UpsertText(id, start, end, text);
+  std::vector<ComprehensiveTimeline::Revision> revs;
+  {
+    std::lock_guard<std::mutex> lk(comp_mutex);
+    revs = comp.UpsertText(id, start, end, text);
+  }
+  for (const auto& r : revs) {
+    DoEmitRevision(r, "asr", emit_rev);
+  }
 }
 
 // ---------------------------------------------------------------------------
