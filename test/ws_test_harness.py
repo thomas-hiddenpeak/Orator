@@ -50,11 +50,24 @@ class OratorTestHarness:
         self.server_pid: Optional[int] = None
         self._cleanup_done = False
 
+    def _ensure_port_free(self):
+        """Kill any process on our port to avoid stale server connections."""
+        try:
+            import subprocess as sp
+            sp.run(['fuser', '-k', f'{self.port}/tcp'],
+                   capture_output=True, timeout=3)
+            time.sleep(1)
+        except:
+            pass
+    
     def start(self, wait_sec: float = 30.0) -> 'OratorTestHarness':
         """Start server, wait for TCP readiness, return self for 'with' usage."""
+        self._ensure_port_free()
         env = os.environ.copy()
         env['ORATOR_UI_PORT'] = str(self.ui_port)
         env['ORATOR_GPU_TELEMETRY_SEC'] = '0'
+        if self.vad:
+            env['ORATOR_VAD_MODEL'] = self.vad
 
         cmd = [SERVER_BIN, str(self.port)]
         if self.diarizer:
@@ -180,22 +193,21 @@ class OratorTestHarness:
         return None
 
     @staticmethod
-    def assert_timeline_valid(tl: dict):
+    def assert_timeline_valid(tl: dict, check_wall_clock: bool = True):
         """Assert timeline has required structure.
 
-        Validates that the timeline has tracks and positive audio_sec.
-        wall_clock_ok is checked only when present (may be False on
-        end-of-stream timelines).
+        Args:
+            tl: Timeline dict (raw or unwrapped).
+            check_wall_clock: If True, assert wall_clock_ok is True.
+                              Pass False for end timelines.
         """
         assert tl is not None, 'No timeline received'
         t = tl.get('timeline', tl)
         assert 'tracks' in t, f'Timeline missing tracks: {list(t.keys())}'
         assert t.get('audio_sec', 0) > 0, 'audio_sec is 0'
-        # wall_clock_ok may be False on end timelines; only assert if present
-        if 'wall_clock_ok' in t:
-            wco = t['wall_clock_ok']
-            assert isinstance(wco, bool), \
-                f'wall_clock_ok should be bool, got {type(wco).__name__}'
+        assert 'wall_clock_ok' in t, 'Timeline missing wall_clock_ok'
+        if check_wall_clock:
+            assert t.get('wall_clock_ok', False) is True, 'wall_clock_ok is False'
 
     @staticmethod
     def get_track(tl: dict, kind: str) -> dict:

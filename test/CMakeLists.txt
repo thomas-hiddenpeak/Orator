@@ -98,19 +98,15 @@ if(Python3_EXECUTABLE)
     )
   endfunction()
 
-  orator_add_py_test(py-ws-comprehensive ws_comprehensive_test.py)
-  orator_add_py_test(py-ws-real-audio test_ws_real_audio.py)
-  orator_add_py_test(py-ws-business test_ws_business.py)
-
-  # Pass model paths to Python tests via environment variables.
-  # Defaults in run_py_test.py will be used if these are unset.
-  set_tests_properties(py-ws-comprehensive PROPERTIES
-    ENVIRONMENT "ORATOR_TEST_DIARIZER=models/sortformer_4spk_v2.safetensors;ORATOR_TEST_ASR=models/asr/Qwen/Qwen3-ASR-1.7B;ORATOR_TEST_VAD=models/vad/silero_vad.safetensors"
+  # Single integration test: manages its own server when ORATOR_TEST_MODELS=1.
+  add_test(NAME py-integration
+    COMMAND ${Python3_EXECUTABLE}
+      ${CMAKE_CURRENT_SOURCE_DIR}/test_integration.py
   )
-  set_tests_properties(py-ws-real-audio PROPERTIES
-    ENVIRONMENT "ORATOR_TEST_DIARIZER=models/sortformer_4spk_v2.safetensors;ORATOR_TEST_ASR=models/asr/Qwen/Qwen3-ASR-1.7B;ORATOR_TEST_VAD=models/vad/silero_vad.safetensors"
-  )
-  set_tests_properties(py-ws-business PROPERTIES
-    ENVIRONMENT "ORATOR_TEST_DIARIZER=models/sortformer_4spk_v2.safetensors;ORATOR_TEST_ASR=models/asr/Qwen/Qwen3-ASR-1.7B;ORATOR_TEST_VAD=models/vad/silero_vad.safetensors"
+  set_tests_properties(py-integration PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    TIMEOUT 300
+    LABELS "python;integration"
+    ENVIRONMENT "ORATOR_TEST_MODELS=1"
   )
 endif()
