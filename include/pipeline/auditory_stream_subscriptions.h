@@ -21,7 +21,6 @@ class ProtocolTimeline;
 
 namespace pipeline {
 
-class AsrWorker;
 class ComprehensiveTimeline;
 class GpuVad;
 
@@ -53,10 +52,6 @@ void HandleTextSink(protocol::ProtocolTimeline* protocol_timeline,
                     protocol::PipelineHandle* asr_handle,
                     long id, double start, double end,
                     const std::string& text);
-
-// ASR VAD subscription callback: forward VAD speech segments to AsrWorker
-void HandleAsrVadSubscription(AsrWorker* asr_worker,
-                              const protocol::Message& msg);
 
 // VAD drain: extract segments from GpuVad and publish to protocol timeline.
 void HandleVadDrain(GpuVad* vad_detector,

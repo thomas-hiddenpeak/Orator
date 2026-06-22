@@ -151,18 +151,24 @@ void AuditoryStream::StartWorkers() {
     p.asr_vad_lead_ms = config_.asr_vad_lead_ms;
     p.asr_vad_trail_sec = config_.asr_vad_trail_sec;
     p.max_audio_tokens = config_.asr_max_audio_tokens;
+    AsrWorker::VadSegmentReader vad_reader =
+        [this]() -> std::vector<std::pair<double, double>> {
+      std::lock_guard<std::mutex> lk(comp_mutex_);
+      auto vad_segs = comp_.SnapshotVad();
+      std::vector<std::pair<double, double>> result;
+      result.reserve(vad_segs.size());
+      for (const auto& s : vad_segs) {
+        result.emplace_back(s.start, s.end);
+      }
+      return result;
+    };
     asr_worker_ = std::make_unique<AsrWorker>(asr_.get(), p,
         [this](const std::string& json) { EmitLocked(json); },
-        buffer_.time_base(), asr_stream_);
+        buffer_.time_base(), asr_stream_, vad_reader);
     asr_worker_->set_text_sink(
         [this](long id, double start, double end, const std::string& text) {
           HandleTextSink(protocol_timeline_.get(), asr_handle_.get(),
                          id, start, end, text);
-        });
-    asr_vad_sub_id_ = protocol_timeline_->SubscribeInternal(
-        protocol::TopicPattern{"vad/speech_segment"},
-        [this](const protocol::Message& msg) {
-          HandleAsrVadSubscription(asr_worker_.get(), msg);
         });
     asr_cursor_ = buffer_.AddConsumer();
     asr_thread_ = std::thread([this] {

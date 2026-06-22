@@ -8,7 +8,6 @@
 
 #include "core/time_base.h"
 #include "core/types.h"
-#include "pipeline/asr_worker.h"
 #include "pipeline/comprehensive_timeline.h"
 #include "pipeline/gpu_vad.h"
 #include "pipeline/json_util.h"
@@ -169,29 +168,6 @@ void HandleTextSink(protocol::ProtocolTimeline* protocol_timeline,
              + ",\"text\":\"" + JsonEscape(text) + "\"}";
   protocol_timeline->Publish(*asr_handle, protocol::kAsrTranscript,
                              msg, protocol::QoS::AT_LEAST_ONCE);
-}
-
-// ---------------------------------------------------------------------------
-// ASR VAD subscription callback: forward VAD speech segments to AsrWorker
-// Parses {"start":...,"end":...,"source":"..."} and calls AddVadSegment.
-// ---------------------------------------------------------------------------
-void HandleAsrVadSubscription(AsrWorker* asr_worker,
-                              const protocol::Message& msg) {
-  const std::string& data = msg.data;
-  auto sp = data.find("\"start\":");
-  auto ep = data.find("\"end\":");
-  if (sp == std::string::npos || ep == std::string::npos) return;
-  auto sv = sp + 8;
-  auto se = data.find_first_of(",}", sv);
-  auto ev = ep + 6;
-  auto ee = data.find_first_of(",}", ev);
-  if (se == std::string::npos || ee == std::string::npos) return;
-  try {
-    double s = std::stod(data.substr(sv, se - sv));
-    double e = std::stod(data.substr(ev, ee - ev));
-    asr_worker->AddVadSegment(s, e);
-  } catch (const std::exception&) {
-  }
 }
 
 // ---------------------------------------------------------------------------

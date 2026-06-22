@@ -239,7 +239,6 @@ class AuditoryStream {
   long vad_sub_id_ = 0;
   long diar_sub_id_ = 0;
   long asr_sub_id_ = 0;
-  long asr_vad_sub_id_ = 0;
 
   // Spec 004 Phase 13: session persistence store. Saves timeline JSON on
   // Reset(). Null when persistence is disabled (empty storage_disk_path).

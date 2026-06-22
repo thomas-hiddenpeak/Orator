@@ -4,7 +4,6 @@
 #include <chrono>
 #include <cmath>
 #include <cstdio>
-#include <mutex>
 #include <thread>
 
 #include "gpu/gpu_lock.h"
@@ -19,9 +18,13 @@ using namespace worker;
 
 AsrWorker::AsrWorker(core::IAsr* asr,
                        const Params& params, Emit emit, core::TimeBase tb,
-                       cudaStream_t stream)
+                       cudaStream_t stream,
+                       VadSegmentReader vad_reader)
     : asr_(asr), params_(params), emit_(std::move(emit)),
-      tb_(std::move(tb)), stream_(stream),
+      tb_(std::move(tb)),
+      vad_reader_(vad_reader ? std::move(vad_reader)
+                  : []() { return std::vector<std::pair<double, double>>{}; }),
+      stream_(stream),
       ring_buffer_(kRingBufferSamples) {
 }
 
@@ -34,12 +37,9 @@ void AsrWorker::ProcessSpan(const float* samples, int n) {
   if (params_.asr_vad_gate) {
     const double current_sec = tb_.SecondsAt(inc_abs_pos_ + n);
 
-    // Read VAD segments atomically (pushed by subscription from VAD thread).
-    std::vector<std::pair<double, double>> vad_segs;
-    {
-      std::lock_guard<std::mutex> lk(vad_mutex_);
-      vad_segs = vad_segments_cache_;
-    }
+    // Read VAD segments from ComprehensiveTimeline via the reader.
+    // The reader handles its own synchronization (Constitution Art. III §8).
+    auto vad_segs = vad_reader_();
 
     auto in_speech = [&](double sec) {
       for (const auto& [s, e] : vad_segs) {
@@ -156,11 +156,6 @@ void AsrWorker::ProcessSpan(const float* samples, int n) {
 
 
 
-void AsrWorker::AddVadSegment(double start, double end) {
-  std::lock_guard<std::mutex> lk(vad_mutex_);
-  vad_segments_cache_.push_back({start, end});
-}
-
 void AsrWorker::Finalize() {
   vad_state_ = VadState::IDLE;
   ProcessIncremental(nullptr, 0, /*finalize=*/true);
@@ -188,6 +183,10 @@ void AsrWorker::ProcessIncremental(const float* samples, int n, bool finalize) {
 }
 
 void AsrWorker::EmitIncrementalChunk(const float* samples, int n, bool finalize) {
+  // TODO: Temporary bridge — IAsr interface only exposes Transcribe().
+  // Streaming methods (StreamReset, StreamChunk, StreamFinalize,
+  // stream_audio_tokens) are Qwen3Asr-specific. Add them to IAsr
+  // to eliminate this cast.
   auto* qwen = dynamic_cast<model::Qwen3Asr*>(asr_);
   const auto t0 = Clock::now();
   {
@@ -280,10 +279,6 @@ void AsrWorker::Reset() {
 
   vad_state_ = VadState::IDLE;
   vad_trail_start_sec_ = 0.0;
-  {
-    std::lock_guard<std::mutex> lk(vad_mutex_);
-    vad_segments_cache_.clear();
-  }
   ring_write_pos_ = 0;
   ring_count_ = 0;
   ring_base_abs_pos_ = 0;

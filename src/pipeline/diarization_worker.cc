@@ -45,6 +45,9 @@ void DiarizationWorker::DeliverSpeakers(bool force) {
 
 void DiarizationWorker::ProcessSpan(const float* samples, int n) {
   if (samples == nullptr || n <= 0) return;
+  // TODO: Temporary bridge — IDiarizer interface only exposes ProcessChunk().
+  // StreamAudio() is SortformerDiarizer-specific. Update the interface
+  // to eliminate this cast.
   auto* sd = dynamic_cast<model::SortformerDiarizer*>(diarizer_);
   const auto t0 = Clock::now();
   core::DiarizationFrames part =
@@ -63,6 +66,9 @@ void DiarizationWorker::ProcessSpan(const float* samples, int n) {
 }
 
 void DiarizationWorker::Finalize() {
+  // TODO: Temporary bridge — IDiarizer interface only exposes ProcessChunk().
+  // StreamAudio() is SortformerDiarizer-specific. Update the interface
+  // to eliminate this cast.
   auto* sd = dynamic_cast<model::SortformerDiarizer*>(diarizer_);
   const auto t0 = Clock::now();
   core::DiarizationFrames tail =

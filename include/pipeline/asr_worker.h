@@ -11,7 +11,6 @@
 
 #include <atomic>
 #include <functional>
-#include <mutex>
 #include <string>
 #include <vector>
 
@@ -43,14 +42,16 @@ class AsrWorker {
   // The worker holds it as a member and derives all time codes from it.
   // Text segments are delivered via text_sink_ (→ ProtocolTimeline → comp_);
   // raw tokens are no longer written to an external StreamTimeline.
+  // `vad_reader` is a callable that returns VAD speech segments from the
+  // ComprehensiveTimeline (Constitution Art. III §8 — pipelines communicate
+  // only through the timeline, never via direct callbacks).
+  using VadSegmentReader = std::function<std::vector<std::pair<double, double>>()>;
+
   AsrWorker(core::IAsr* asr, const Params& params,
-              Emit emit, core::TimeBase tb, cudaStream_t stream = 0);
+              Emit emit, core::TimeBase tb, cudaStream_t stream = 0,
+              VadSegmentReader vad_reader = nullptr);
 
   void set_text_sink(TextSegmentSink sink) { text_sink_ = std::move(sink); }
-
-  // Push a VAD speech segment from a ProtocolTimeline subscription callback.
-  // Thread-safe; called from the VAD publish thread.
-  void AddVadSegment(double start, double end);
 
   void ProcessSpan(const float* samples, int n);
   void Finalize();
@@ -69,11 +70,10 @@ class AsrWorker {
   TextSegmentSink text_sink_;
   core::TimeBase tb_;
 
-  // VAD segments pushed from ProtocolTimeline subscription (event-driven).
-  // Guarded by vad_mutex_ because AddVadSegment() is called from the VAD
-  // publish thread and ProcessSpan() reads from the ASR worker thread.
-  std::vector<std::pair<double, double>> vad_segments_cache_;
-  std::mutex vad_mutex_;
+  // VAD segments reader — fetches speech segments from ComprehensiveTimeline.
+  // Called from ProcessSpan() on the ASR worker thread; the reader handles its
+  // own synchronization (Constitution Art. III §8).
+  VadSegmentReader vad_reader_;
 
   std::atomic<long> processed_samples_{0};
   std::atomic<int> debug_segments_started_{0};
