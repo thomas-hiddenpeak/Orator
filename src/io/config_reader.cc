@@ -117,6 +117,24 @@ bool ApplyTomlConfig(const std::string& path,
     if (auto v = sec->get("deliver_interval_sec")) {
       if (auto d = v->value<double>()) cfg.diar_deliver_interval_sec = *d;
     }
+    if (auto v = sec->get("spkcache_len")) {
+      if (auto n = v->value<int>()) cfg.diar_spkcache_len = *n;
+    }
+    if (auto v = sec->get("chunk_len")) {
+      if (auto n = v->value<int>()) cfg.diar_chunk_len = *n;
+    }
+    if (auto v = sec->get("spkcache_update_period")) {
+      if (auto n = v->value<int>()) cfg.diar_spkcache_update_period = *n;
+    }
+    if (auto v = sec->get("chunk_left_context")) {
+      if (auto n = v->value<int>()) cfg.diar_chunk_left_context = *n;
+    }
+    if (auto v = sec->get("chunk_right_context")) {
+      if (auto n = v->value<int>()) cfg.diar_chunk_right_context = *n;
+    }
+    if (auto v = sec->get("spkcache_sil_frames")) {
+      if (auto n = v->value<int>()) cfg.diar_spkcache_sil_frames = *n;
+    }
   }
 
   // ── [storage] ─────────────────────────────────────────────────────

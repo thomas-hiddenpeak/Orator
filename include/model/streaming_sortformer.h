@@ -28,6 +28,17 @@
 namespace orator {
 namespace model {
 
+// Tunable streaming parameters that can be adjusted at runtime.
+// Zero/negative values mean "keep current default".
+struct SortformerTuning {
+  int spkcache_len = 0;
+  int chunk_len = 0;
+  int spkcache_update_period = 0;
+  int chunk_left_context = -1;
+  int chunk_right_context = -1;
+  int spkcache_sil_frames = -1;
+};
+
 // Model-specific architecture/streaming parameters (from model_config.yaml).
 struct SortformerConfig {
   int sample_rate = 16000;
@@ -105,6 +116,7 @@ class SortformerDiarizer final : public core::IDiarizer {
   void Initialize(const core::DiarizationConfig& config) override;
   void LoadWeights(const std::string& path) override;
   void Reset() override;
+  void ApplyStreamingTuning(const SortformerTuning& tuning);
   core::DiarizationFrames ProcessChunk(const core::AudioChunk& chunk) override;
 
   // Incremental real-time streaming. Feeds `num_samples` new mono 16k samples

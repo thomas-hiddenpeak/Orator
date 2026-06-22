@@ -275,6 +275,15 @@ SortformerDiarizer::SortformerDiarizer() = default;
 SortformerDiarizer::SortformerDiarizer(const SortformerConfig& cfg)
     : config_(cfg) {}
 
+void SortformerDiarizer::ApplyStreamingTuning(const SortformerTuning& tuning) {
+  if (tuning.spkcache_len > 0) config_.spkcache_len = tuning.spkcache_len;
+  if (tuning.chunk_len > 0) { config_.chunk_len = tuning.chunk_len; }
+  if (tuning.spkcache_update_period > 0) config_.spkcache_update_period = tuning.spkcache_update_period;
+  if (tuning.chunk_left_context >= 0) config_.chunk_left_context = tuning.chunk_left_context;
+  if (tuning.chunk_right_context >= 0) config_.chunk_right_context = tuning.chunk_right_context;
+  if (tuning.spkcache_sil_frames >= 0) config_.spkcache_sil_frames_per_spk = tuning.spkcache_sil_frames;
+}
+
 void SortformerDiarizer::Initialize(const core::DiarizationConfig& config) {
   config_.sample_rate = config.sample_rate;
   if (config.max_speakers > 0) {

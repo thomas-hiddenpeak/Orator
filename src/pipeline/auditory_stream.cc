@@ -4,6 +4,7 @@
 #include "core/log.h"
 #include "core/registry.h"
 #include "model/builtin_registration.h"
+#include "model/streaming_sortformer.h"
 #include "protocol/protocol_timeline.h"
 #include "protocol/session_store.h"
 
@@ -93,6 +94,15 @@ void AuditoryStream::Start() {
     dc.activity_threshold = config_.diar_threshold;
     diarizer_->Initialize(dc);
     diarizer_->LoadWeights(config_.diarizer_weights);
+    // Apply streaming tuning parameters from config.
+    model::SortformerTuning tuning;
+    tuning.spkcache_len = config_.diar_spkcache_len;
+    tuning.chunk_len = config_.diar_chunk_len;
+    tuning.spkcache_update_period = config_.diar_spkcache_update_period;
+    tuning.chunk_left_context = config_.diar_chunk_left_context;
+    tuning.chunk_right_context = config_.diar_chunk_right_context;
+    tuning.spkcache_sil_frames = config_.diar_spkcache_sil_frames;
+    static_cast<model::SortformerDiarizer*>(diarizer_.get())->ApplyStreamingTuning(tuning);
     diar_stream_ = scheduler_.Register("diarization", /*priority_index=*/0,
                                        /*background=*/false,
                                        /*create_stream=*/true);

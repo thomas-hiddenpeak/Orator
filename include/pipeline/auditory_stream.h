@@ -90,9 +90,16 @@ class AuditoryStream {
 
     // ── Diarizer pipeline ────────────────────────────────────────────
     int max_speakers = 4;
-    float diar_threshold = 0.5f;
-    double diar_merge_gap_sec = 0.5;
+    float diar_threshold = 0.4f;
+    double diar_merge_gap_sec = 0.8;
     double diar_deliver_interval_sec = 1.0;
+    // Sortformer streaming tuning (affects speaker segmentation quality)
+    int diar_spkcache_len = 188;           // speaker cache length (frames)
+    int diar_chunk_len = 188;              // processing chunk size (frames)
+    int diar_spkcache_update_period = 188; // cache update interval (frames)
+    int diar_chunk_left_context = 1;       // left context chunks
+    int diar_chunk_right_context = 1;      // right context chunks
+    int diar_spkcache_sil_frames = 5;      // silent frames before cache reset
 
     // ── Storage ──────────────────────────────────────────────────────
     std::string storage_disk_path = "/tmp/orator/storage/";
