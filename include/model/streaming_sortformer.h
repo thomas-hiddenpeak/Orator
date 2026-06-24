@@ -37,6 +37,9 @@ struct SortformerTuning {
   int chunk_left_context = -1;
   int chunk_right_context = -1;
   int spkcache_sil_frames = -1;
+  int spkcache_refresh_rate = -1;
+  int use_silence_profile = -1;
+  int fifo_len = -1;
 };
 
 // Model-specific architecture/streaming parameters (from model_config.yaml).
@@ -57,12 +60,14 @@ struct SortformerConfig {
   int transformer_heads = 8;
 
   int spkcache_len = 188;
-  int fifo_len = 40;
+  int fifo_len = 0;
   int chunk_len = 340;
   int spkcache_update_period = 300;
   int chunk_left_context = 1;
   int chunk_right_context = 40;
   int spkcache_sil_frames_per_spk = 3;
+  int spkcache_refresh_rate = 0;
+  bool use_silence_profile = false;
 
   bool Validate() const;
   // diar frame period = hop * subsampling (e.g. 0.01 * 8 = 0.08s).
@@ -82,6 +87,15 @@ struct HostStreamState {
   bool spkcache_preds_valid = false;  // mirrors "spkcache_preds is not None"
   std::vector<float> mean_sil_emb;    // [fc_d_model]
   long n_sil_frames = 0;
+  // FIFO for async streaming (NeMo streaming_update_async). When fifo_len > 0,
+  // new chunk-center frames are appended to fifo_embs/fifo_preds, and
+  // pop_out_len frames are drained to spkcache each step. When fifo_len == 0,
+  // frames go directly to spkcache (sync path). Both capacities are sized by
+  // config_.fifo_len; fifo_count tracks the current occupancy.
+  std::vector<float> fifo_embs;       // [fifo_max_len * fc_d_model]
+  std::vector<float> fifo_preds;      // [fifo_max_len * n_spk]
+  int fifo_max_len = 0;
+  int fifo_count = 0;
   void Clear() {
     spkcache.clear();
     spkcache_preds.clear();
@@ -89,6 +103,18 @@ struct HostStreamState {
     spkcache_preds_valid = false;
     std::fill(mean_sil_emb.begin(), mean_sil_emb.end(), 0.0f);
     n_sil_frames = 0;
+    fifo_embs.clear();
+    fifo_preds.clear();
+    fifo_max_len = 0;
+    fifo_count = 0;
+  }
+  // Lazy-init FIFO buffers when needed (called on first chunk when
+  // fifo_len > 0). emb_dim = fc_d_model, n_spk = max_speakers.
+  void InitFifo(int emb_dim, int n_spk, int cap) {
+    fifo_max_len = cap;
+    fifo_embs.assign(static_cast<size_t>(cap) * emb_dim, 0.0f);
+    fifo_preds.assign(static_cast<size_t>(cap) * n_spk, 0.0f);
+    fifo_count = 0;
   }
 };
 

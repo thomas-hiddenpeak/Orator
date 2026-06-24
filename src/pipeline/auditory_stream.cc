@@ -102,6 +102,9 @@ void AuditoryStream::Start() {
     tuning.chunk_left_context = config_.diar_chunk_left_context;
     tuning.chunk_right_context = config_.diar_chunk_right_context;
     tuning.spkcache_sil_frames = config_.diar_spkcache_sil_frames;
+    tuning.spkcache_refresh_rate = config_.diar_spkcache_refresh_rate;
+    tuning.use_silence_profile = config_.diar_use_silence_profile ? 1 : 0;
+    tuning.fifo_len = config_.diar_fifo_len;
     static_cast<model::SortformerDiarizer*>(diarizer_.get())->ApplyStreamingTuning(tuning);
     diar_stream_ = scheduler_.Register("diarization", /*priority_index=*/0,
                                        /*background=*/false,

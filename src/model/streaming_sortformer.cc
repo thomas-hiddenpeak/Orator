@@ -139,6 +139,7 @@ void CompressSpkcache(const std::vector<float>& emb_seq,
                       const std::vector<float>& preds, int n, int n_spk,
                       int emb_dim, int spkcache_len,
                       const std::vector<float>& mean_sil_emb,
+                      bool use_silence_profile,
                       std::vector<float>& out_emb,
                       std::vector<float>& out_preds) {
   const int spkcache_len_per_spk = spkcache_len / n_spk - kSilFramesPerSpk;
@@ -148,6 +149,33 @@ void CompressSpkcache(const std::vector<float>& emb_seq,
 
   std::vector<float> scores;
   GetLogPredScores(preds, n, n_spk, scores);
+  // Down-weight frames similar to silence (v2.1 model only): compute cosine
+  // similarity between each frame embedding and mean_sil_emb. Frames close to
+  // silence (cos_sim > 0.3) get their scores reduced, keeping the spkcache
+  // focused on active speech frames.
+  if (use_silence_profile &&
+      !mean_sil_emb.empty() && static_cast<int>(mean_sil_emb.size()) == emb_dim) {
+    float sil_norm2 = 0.0f;
+    for (int d = 0; d < emb_dim; ++d)
+      sil_norm2 += mean_sil_emb[d] * mean_sil_emb[d];
+    if (sil_norm2 > 1e-12f) {
+      float sil_norm = std::sqrt(sil_norm2);
+      for (int f = 0; f < n; ++f) {
+        float dot = 0.0f, frm_norm2 = 0.0f;
+        for (int d = 0; d < emb_dim; ++d) {
+          float v = emb_seq[static_cast<size_t>(f) * emb_dim + d];
+          dot += v * mean_sil_emb[d];
+          frm_norm2 += v * v;
+        }
+        if (frm_norm2 > 1e-12f) {
+          float cos_sim = dot / (sil_norm * std::sqrt(frm_norm2));
+          float penalty = (cos_sim > 0.3f) ? (cos_sim - 0.3f) * 10.0f : 0.0f;
+          for (int s = 0; s < n_spk; ++s)
+            scores[static_cast<size_t>(f) * n_spk + s] -= penalty;
+        }
+      }
+    }
+  }
   DisableLowScores(preds, n, n_spk, min_pos, scores);
   // boost newly added frames (index >= spkcache_len)
   if (kScoresBoostLatest > 0.0f) {
@@ -237,6 +265,7 @@ bool SortformerConfig::Validate() const {
   if (chunk_len <= 0 || spkcache_len <= 0) return false;
   if (spkcache_update_period <= 0) return false;
   if (chunk_left_context < 0 || chunk_right_context < 0) return false;
+  if (fifo_len < 0 || spkcache_refresh_rate < 0) return false;
   return true;
 }
 
@@ -282,6 +311,9 @@ void SortformerDiarizer::ApplyStreamingTuning(const SortformerTuning& tuning) {
   if (tuning.chunk_left_context >= 0) config_.chunk_left_context = tuning.chunk_left_context;
   if (tuning.chunk_right_context >= 0) config_.chunk_right_context = tuning.chunk_right_context;
   if (tuning.spkcache_sil_frames >= 0) config_.spkcache_sil_frames_per_spk = tuning.spkcache_sil_frames;
+  if (tuning.spkcache_refresh_rate >= 0) config_.spkcache_refresh_rate = tuning.spkcache_refresh_rate;
+  if (tuning.use_silence_profile >= 0) config_.use_silence_profile = (tuning.use_silence_profile != 0);
+  if (tuning.fifo_len >= 0) config_.fifo_len = tuning.fifo_len;
 }
 
 void SortformerDiarizer::Initialize(const core::DiarizationConfig& config) {
@@ -506,55 +538,142 @@ void SortformerDiarizer::StreamMelChunk(const float* mel_buf, int n_mels,
   }
   out_frames += chunk_center_len;
 
-  // --- streaming_update (sync, fifo_len=0) ---
-  // chunk center embeddings + preds become the pop-out appended to spkcache.
-  std::vector<float> pop_embs(static_cast<size_t>(chunk_center_len) * D);
-  std::vector<float> pop_preds(static_cast<size_t>(chunk_center_len) * n_spk);
-  for (int f = 0; f < chunk_center_len; ++f) {
-    int ce = lc_sub + f;  // chunk[lc:chunk_len+lc]
-    for (int d = 0; d < D; ++d)
-      pop_embs[static_cast<size_t>(f) * D + d] =
-          chunk_embs[static_cast<size_t>(ce) * D + d];
-    int pp = cp_start + f;
-    for (int s = 0; s < n_spk; ++s)
-      pop_preds[static_cast<size_t>(f) * n_spk + s] =
-          preds[static_cast<size_t>(pp) * n_spk + s];
-  }
+  // --- streaming_update (sync when fifo_len==0, FIFO path otherwise) ---
+  const int fifo_cap = config_.fifo_len;
+  int pop_out_len;
+  std::vector<float> pop_embs;
+  std::vector<float> pop_preds;
 
-  UpdateSilenceProfile(pop_embs, pop_preds, chunk_center_len, n_spk, D,
-                       stream_state_.mean_sil_emb, stream_state_.n_sil_frames);
-
-  // append pop-out to spkcache
-  const int new_len = spk_len + chunk_center_len;
-  stream_state_.spkcache.insert(stream_state_.spkcache.end(), pop_embs.begin(),
-                                pop_embs.end());
-  if (stream_state_.spkcache_preds_valid) {
-    stream_state_.spkcache_preds.insert(stream_state_.spkcache_preds.end(),
-                                        pop_preds.begin(), pop_preds.end());
-  }
-  stream_state_.spk_len = new_len;
-
-  if (new_len > spkcache_len) {
-    if (!stream_state_.spkcache_preds_valid) {
-      // first compression: spkcache_preds = [preds[:spk_len], pop_preds]
-      stream_state_.spkcache_preds.assign(static_cast<size_t>(new_len) * n_spk,
-                                          0.0f);
-      for (int f = 0; f < spk_len; ++f)
-        for (int s = 0; s < n_spk; ++s)
-          stream_state_.spkcache_preds[static_cast<size_t>(f) * n_spk + s] =
-              preds[static_cast<size_t>(f) * n_spk + s];
-      std::copy(pop_preds.begin(), pop_preds.end(),
-                stream_state_.spkcache_preds.begin() +
-                    static_cast<size_t>(spk_len) * n_spk);
-      stream_state_.spkcache_preds_valid = true;
+  if (fifo_cap > 0) {
+    // FIFO mode (NeMo streaming_update_async). Lazy-init on first use.
+    if (stream_state_.fifo_max_len == 0) {
+      stream_state_.InitFifo(D, n_spk, fifo_cap);
     }
-    std::vector<float> comp_emb, comp_preds;
-    CompressSpkcache(stream_state_.spkcache, stream_state_.spkcache_preds,
-                     new_len, n_spk, D, spkcache_len,
-                     stream_state_.mean_sil_emb, comp_emb, comp_preds);
-    stream_state_.spkcache.swap(comp_emb);
-    stream_state_.spkcache_preds.swap(comp_preds);
-    stream_state_.spk_len = spkcache_len;
+    const int cap = stream_state_.fifo_max_len;
+
+    // Append chunk center frames to FIFO, keeping only the most recent
+    // `cap` frames. When chunk_center_len alone exceeds cap, drop the
+    // earlier chunk frames and keep only the tail. When total occupancy
+    // would exceed cap, shift existing content left (drop oldest).
+    int keep_new = chunk_center_len;
+    int keep_old = 0;
+    if (keep_new > cap) {
+      keep_new = cap;          // keep only the last `cap` chunk frames
+      keep_old = 0;            // discard all existing FIFO content
+    } else {
+      int total = stream_state_.fifo_count + keep_new;
+      if (total > cap) {
+        keep_old = std::max(0, stream_state_.fifo_count - (total - cap));
+        if (keep_old > 0 && keep_old < stream_state_.fifo_count) {
+          int drop = stream_state_.fifo_count - keep_old;
+          std::memmove(stream_state_.fifo_embs.data(),
+                       stream_state_.fifo_embs.data() + static_cast<size_t>(drop) * D,
+                       static_cast<size_t>(keep_old) * D * sizeof(float));
+          std::memmove(stream_state_.fifo_preds.data(),
+                       stream_state_.fifo_preds.data() + static_cast<size_t>(drop) * n_spk,
+                       static_cast<size_t>(keep_old) * n_spk * sizeof(float));
+        } else {
+          keep_old = stream_state_.fifo_count;  // no drop needed
+        }
+      } else {
+        keep_old = stream_state_.fifo_count;
+      }
+    }
+    int wpos = keep_old;
+    int start_f = chunk_center_len - keep_new;
+    for (int f = 0; f < keep_new; ++f) {
+      int dst = wpos + f;
+      int ce = lc_sub + start_f + f;
+      for (int d = 0; d < D; ++d)
+        stream_state_.fifo_embs[static_cast<size_t>(dst) * D + d] =
+            chunk_embs[static_cast<size_t>(ce) * D + d];
+      int pp = cp_start + start_f + f;
+      for (int s = 0; s < n_spk; ++s)
+        stream_state_.fifo_preds[static_cast<size_t>(dst) * n_spk + s] =
+            preds[static_cast<size_t>(pp) * n_spk + s];
+    }
+    stream_state_.fifo_count = keep_old + keep_new;
+
+    // Dynamic pop_out_len (NeMo formula).
+    int ref_rate = config_.spkcache_refresh_rate;
+    int occupancy = stream_state_.fifo_count;
+    if (ref_rate == 0) {
+      pop_out_len = std::min(occupancy, fifo_cap);
+    } else {
+      pop_out_len = std::min(std::max(ref_rate, chunk_center_len), occupancy);
+    }
+
+    // Pop pop_out_len frames (oldest first) from FIFO.
+    pop_out_len = std::min(pop_out_len, stream_state_.fifo_count);
+    pop_embs.resize(static_cast<size_t>(pop_out_len) * D);
+    pop_preds.resize(static_cast<size_t>(pop_out_len) * n_spk);
+    std::memcpy(pop_embs.data(), stream_state_.fifo_embs.data(),
+                static_cast<size_t>(pop_out_len) * D * sizeof(float));
+    std::memcpy(pop_preds.data(), stream_state_.fifo_preds.data(),
+                static_cast<size_t>(pop_out_len) * n_spk * sizeof(float));
+    // Shift remaining content left.
+    int remain = stream_state_.fifo_count - pop_out_len;
+    if (remain > 0) {
+      std::memmove(stream_state_.fifo_embs.data(),
+                   stream_state_.fifo_embs.data() + static_cast<size_t>(pop_out_len) * D,
+                   static_cast<size_t>(remain) * D * sizeof(float));
+      std::memmove(stream_state_.fifo_preds.data(),
+                   stream_state_.fifo_preds.data() + static_cast<size_t>(pop_out_len) * n_spk,
+                   static_cast<size_t>(remain) * n_spk * sizeof(float));
+    }
+    stream_state_.fifo_count = remain;
+  } else {
+    // Sync mode (fifo_len==0): chunk center frames become the pop-out directly.
+    pop_out_len = chunk_center_len;
+    pop_embs.resize(static_cast<size_t>(pop_out_len) * D);
+    pop_preds.resize(static_cast<size_t>(pop_out_len) * n_spk);
+    for (int f = 0; f < pop_out_len; ++f) {
+      int ce = lc_sub + f;
+      for (int d = 0; d < D; ++d)
+        pop_embs[static_cast<size_t>(f) * D + d] =
+            chunk_embs[static_cast<size_t>(ce) * D + d];
+      int pp = cp_start + f;
+      for (int s = 0; s < n_spk; ++s)
+        pop_preds[static_cast<size_t>(f) * n_spk + s] =
+            preds[static_cast<size_t>(pp) * n_spk + s];
+    }
+  }
+
+  if (pop_out_len > 0) {
+    UpdateSilenceProfile(pop_embs, pop_preds, pop_out_len, n_spk, D,
+                         stream_state_.mean_sil_emb, stream_state_.n_sil_frames);
+
+    const int new_len = spk_len + pop_out_len;
+    stream_state_.spkcache.insert(stream_state_.spkcache.end(),
+                                  pop_embs.begin(), pop_embs.end());
+    if (stream_state_.spkcache_preds_valid) {
+      stream_state_.spkcache_preds.insert(stream_state_.spkcache_preds.end(),
+                                          pop_preds.begin(), pop_preds.end());
+    }
+    stream_state_.spk_len = new_len;
+
+    if (new_len > spkcache_len) {
+      if (!stream_state_.spkcache_preds_valid) {
+        stream_state_.spkcache_preds.assign(static_cast<size_t>(new_len) * n_spk,
+                                            0.0f);
+        for (int f = 0; f < spk_len; ++f)
+          for (int s = 0; s < n_spk; ++s)
+            stream_state_.spkcache_preds[static_cast<size_t>(f) * n_spk + s] =
+                preds[static_cast<size_t>(f) * n_spk + s];
+        std::copy(pop_preds.begin(), pop_preds.end(),
+                  stream_state_.spkcache_preds.begin() +
+                      static_cast<size_t>(spk_len) * n_spk);
+        stream_state_.spkcache_preds_valid = true;
+      }
+      std::vector<float> comp_emb, comp_preds;
+      CompressSpkcache(stream_state_.spkcache, stream_state_.spkcache_preds,
+                       new_len, n_spk, D, spkcache_len,
+                       stream_state_.mean_sil_emb,
+                       config_.use_silence_profile, comp_emb, comp_preds);
+      stream_state_.spkcache.swap(comp_emb);
+      stream_state_.spkcache_preds.swap(comp_preds);
+      stream_state_.spk_len = spkcache_len;
+    }
   }
 }
 

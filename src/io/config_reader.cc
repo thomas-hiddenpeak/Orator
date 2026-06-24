@@ -135,6 +135,15 @@ bool ApplyTomlConfig(const std::string& path,
     if (auto v = sec->get("spkcache_sil_frames")) {
       if (auto n = v->value<int>()) cfg.diar_spkcache_sil_frames = *n;
     }
+    if (auto v = sec->get("fifo_len")) {
+      if (auto n = v->value<int>()) cfg.diar_fifo_len = *n;
+    }
+    if (auto v = sec->get("spkcache_refresh_rate")) {
+      if (auto n = v->value<int>()) cfg.diar_spkcache_refresh_rate = *n;
+    }
+    if (auto v = sec->get("use_silence_profile")) {
+      if (auto b = v->value<bool>()) cfg.diar_use_silence_profile = *b;
+    }
     if (auto v = sec->get("onset")) {
       if (auto d = v->value<double>()) cfg.diar_onset = *d;
     }

@@ -100,6 +100,9 @@ class AuditoryStream {
     int diar_chunk_left_context = 1;       // left context chunks
     int diar_chunk_right_context = 40;     // right context chunks
     int diar_spkcache_sil_frames = 5;      // silent frames before cache reset
+    int diar_fifo_len = 0;                // FIFO length for async streaming (0=off)
+    int diar_spkcache_refresh_rate = 0;   // cache refresh cadence (0=drain all)
+    bool diar_use_silence_profile = false;// v2.1: use silence profile in cache
     // Onset/offset post-processing (NeMo-style double threshold)
     double diar_onset = 0.45;              // probability to START a segment
     double diar_offset = 0.25;             // probability to END a segment (lower = sticky)

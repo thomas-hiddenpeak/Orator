@@ -132,10 +132,11 @@ void Sha1::Finalize() {
 
   uint64_t bits = count_ * 8;
   buffer_.push_back(0x80);
-  while (buffer_.size() < 56) buffer_.push_back(0);
+  while ((buffer_.size() % 64) != 56) buffer_.push_back(0);
   for (int i = 7; i >= 0; --i) buffer_.push_back(uint8_t((bits >> (i * 8)) & 0xff));
 
-  Transform(buffer_.data());
+  for (size_t off = 0; off < buffer_.size(); off += 64)
+    Transform(buffer_.data() + off);
   buffer_.clear();
 
   for (int i = 0; i < 5; ++i) {

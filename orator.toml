@@ -124,6 +124,15 @@
 # Silent frames before resetting speaker cache. Higher = fewer speaker splits. (default 3)
 # spkcache_sil_frames = 3
 
+# FIFO buffer length for async streaming (NeMo streaming_update_async). 0=off (sync mode).
+# fifo_len = 0
+
+# Speaker cache refresh cadence. 0=drain all FIFO after each chunk. Used only with fifo_len>0.
+# spkcache_refresh_rate = 0
+
+# Use silence profile in speaker cache compression (v2.1 model only).
+# use_silence_profile = false
+
 # Onset/offset double-threshold post-processing (NeMo-style, default 0.45/0.25)
 # onset: probability to START a segment. Higher = fewer, more confident segments.
 # offset: probability to END a segment. Lower than onset creates "sticky" segments.

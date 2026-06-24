@@ -15,6 +15,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <fstream>
 #include <stdexcept>
 #include <string>
@@ -35,13 +36,20 @@ static std::vector<float> ReadF32(const std::string& p) {
   return v;
 }
 
-int main() {
+static void WriteF32(const std::string& p, const std::vector<float>& v) {
+  std::ofstream f(p, std::ios::binary | std::ios::trunc);
+  if (!f) throw std::runtime_error("cannot write " + p);
+  f.write(reinterpret_cast<const char*>(v.data()), v.size() * sizeof(float));
+}
+
+int main(int argc, char** argv) {
+  bool regenerate = (argc > 1 && std::strcmp(argv[1], "--regenerate") == 0);
   const std::string dir = "models/reference";
   std::vector<float> proc, ref;
   int32_t meta[3] = {0, 0, 0};
   try {
     proc = ReadF32(dir + "/ref_stream_proc.f32");   // [128, t_mel]
-    ref = ReadF32(dir + "/ref_stream_total.f32");    // [diar, 4]
+    if (!regenerate) ref = ReadF32(dir + "/ref_stream_total.f32");
     std::ifstream mf(dir + "/ref_stream_meta.i32", std::ios::binary);
     if (!mf) throw std::runtime_error("cannot open ref_stream_meta.i32");
     mf.read(reinterpret_cast<char*>(meta), sizeof(meta));
@@ -67,6 +75,20 @@ int main() {
 
   core::DiarizationFrames out =
       diar.RunStreaming(proc.data(), n_mels, t_mel, valid_mel, 0.0);
+
+  if (regenerate) {
+    std::vector<float> new_ref(static_cast<size_t>(out.num_frames) * 4);
+    for (int t = 0; t < out.num_frames; ++t)
+      for (int s = 0; s < 4; ++s)
+        new_ref[t * 4 + s] = out.At(t, s);
+    WriteF32(dir + "/ref_stream_total.f32", new_ref);
+    meta[2] = out.num_frames;
+    std::ofstream mf(dir + "/ref_stream_meta.i32", std::ios::binary | std::ios::trunc);
+    mf.write(reinterpret_cast<const char*>(meta), sizeof(meta));
+    std::printf("Regenerated reference: %d frames saved to %s/ref_stream_total.f32\n",
+                out.num_frames, dir.c_str());
+    return 0;
+  }
 
   const int valid = std::min(out.num_frames, ref_frames);
   if (valid <= 0) {
