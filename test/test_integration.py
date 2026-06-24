@@ -89,23 +89,23 @@ def eval_single(duration_sec: int, port: int, overrides: dict = None) -> dict:
         ws = websocket.create_connection(f'ws://127.0.0.1:{port}', timeout=10)
         ws.recv()  # ready
 
-    # Push at 1x, drain server responses to avoid buffer fill
-    t0 = time.time()
-    sent = 0
-    ws.settimeout(0.01)
-    while sent < len(audio):
-        ws.send(audio[sent:sent + 16000], opcode=0x02)
-        sent += 16000
-        elapsed = time.time() - t0
-        if elapsed < sent / 32000:
-            time.sleep(sent / 32000 - elapsed)
-        # Drain server responses to prevent WS buffer blocking
-        while True:
-            try:
-                ws.recv()
-            except:
-                break
+        # Push at 1x, drain server responses to avoid buffer fill
+        t0 = time.time()
+        sent = 0
         ws.settimeout(0.01)
+        while sent < len(audio):
+            ws.send(audio[sent:sent + 16000], opcode=0x02)
+            sent += 16000
+            elapsed = time.time() - t0
+            if elapsed < sent / 32000:
+                time.sleep(sent / 32000 - elapsed)
+            # Drain server responses to prevent WS buffer blocking
+            while True:
+                try:
+                    ws.recv()
+                except:
+                    break
+            ws.settimeout(0.01)
 
         push_sec = time.time() - t0
         ws.send(json.dumps({'end': True}))
