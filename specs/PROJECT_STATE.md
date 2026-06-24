@@ -14,7 +14,7 @@ work is specified under [specs/](.).
 > pass is the consistency proof. Status lines advance to `Implemented` in the
 > same change that lands the code, with the commit reference.
 
-- **Last updated**: 2026-06-22 (TOML config system, VAD-gated ASR fix)
+- **Last updated**: 2026-06-24 (NeMo feature parity — silence profile, FIFO, dynamic pop_out_len)
 - **Branch**: `master`
 - **Constitution**: v1.4.0
 
@@ -61,7 +61,7 @@ modifies, splits, infers, or back-fills any pipeline's content (Spec 004 §1a).
 
 | Component | Status | Notes |
 |---|---|---|
-| Streaming diarization (Sortformer) | ✅ Verified, industrial-grade | Incremental, O(n), persistent identity; matched vs NeMo (forward <5e-3, streaming <1e-2, incremental <1e-4). |
+| Streaming diarization (Sortformer) | ✅ Verified, industrial-grade; v2.1 features | Incremental, O(n), persistent identity; matched vs NeMo (forward <5e-3, streaming <1e-2, incremental <1e-4). v2.1 features: silence profile (`mean_sil_emb`) in `CompressSpkcache` (gated: `use_silence_profile`), dynamic `pop_out_len` with FIFO buffering (`fifo_len`), `spkcache_refresh_rate`. All params configurable via TOML. |
 | Native Qwen3-ASR engine | ✅ Verified vs PyTorch oracle | mel 3.9e-3, encoder 1.3e-3, decoder argmax-match; transcript matches gold. Pure bf16 compute. |
 | WhisperMel / BPE tokenizer / sharded safetensors loader | ✅ Verified | Unit-tested. |
 | Decoupling (interfaces + registry) | ✅ In place | `IDiarizer`, `IAsr`; registry-constructed. Text↔speaker combination is the concrete `ComprehensiveTimeline` (pure time-alignment), not an interface. |
@@ -76,7 +76,7 @@ modifies, splits, infers, or back-fills any pipeline's content (Spec 004 §1a).
 | Logging system | ✅ Include-level `core/log.h` | Level-based macros (`LOG_DEBUG`/`INFO`/`WARN`/`ERROR`) with compile-time floor (`ORATOR_LOG_LEVEL`) and runtime env-var gate. All 14 `fprintf(stderr)` calls in src/ replaced. |
 | CUDA kernel unit tests | ✅ `test_kernels`: 13/13 passed | GPU kernel operations (Add, Multiply, NormalizeVector, CosineSimilarity, BatchCosineSimilarity) validated against CPU reference; includes edge cases (zero, single-element, large 1M vectors). |
 | CI pipeline | ✅ GitHub Actions | `.github/workflows/ci.yml`: CUDA 12.5, CMake build + ctest + warning check + Python syntax verification. Triggered on push/PR to master. |
-| Test suite | ✅ 40/40 tests pass (38 C++ + 2 Python) | Clean build under `-Wall -Wextra`, ZERO warnings. `test_kernels` validates GPU kernel numerics. Python integration tests (`py-ws-comprehensive`, `py-ws-real-audio`) run automatically via `test/run_py_test.py`. |
+| Test suite | ✅ 39/39 tests pass | Clean build under `-Wall -Wextra`, ZERO warnings. `test_kernels` validates GPU kernel numerics. Python integration tests (`py-ws-comprehensive`, `py-ws-real-audio`) run automatically via `test/run_py_test.py`. 600 s real-audio eval: ASR 3.65× RTF, diarization 89.5× RTF, speaker accuracy 89.4 %. |
 | OnText protocol matching | ✅ Fixed | Substring `text.find("end")` → JSON key `text.find("\"end\"")` to prevent false positives on partial matches. Same for reset/flush. |
 | GPU telemetry default | ✅ Changed | `gpu_telemetry_interval_sec = 0.0` (was 1.0); disabled by default, opt-in via `ORATOR_GPU_TELEMETRY_SEC`. |
 | VAD model path | ✅ Migrated | `models/asr/silero_vad.safetensors` → `models/vad/`. Updated 6 file references across test, include, and tools. |
@@ -193,7 +193,14 @@ Specs 001, 002, 003, 004, and 006 (Web UI MVP) are complete, verified, and commi
   - README env var table + Python test CTest registration + protocol envelope unwrapping in web UI
 - **Spec 004 — Protocol Layer**: Implemented. Phases 7–12 complete. Web UI (`app.js`) now includes `unwrapEnvelope()` for Spec 004 topic-based protocol envelopes. Integration test (`ws_ui_integration_test.py`) uses `unwrap_envelope()` for all WS message parsing.
 - **Full-length streaming verification**: 2026-06-21. 3615 s (1 hr) audio pushed through real WebSocket → 382.0 s wall = **9.46× real-time**. All three tracks (ASR/diarization/VAD) cover 100 % of the audio, no crash, no clock drift, no data loss. Achieved 9.25× on a consecutive warm-GPU re-run and 5.82× on a cold-start run, confirming model-load overhead is one-time.
-- **Python integration tests** (2026-06-22). Auto server lifecycle via `test/run_py_test.py`. Tests are no longer manual — run automatically with `ctest`. 40/40 tests pass (38 C++ + 2 Python).
+- **Python integration tests** (2026-06-22). Auto server lifecycle via `test/run_py_test.py`. Tests are no longer manual — run automatically with `ctest`. 39/39 tests pass.
 - **TOML config system** (2026-06-22). All ~34 runtime parameters consolidated into `orator.toml` with 8 sections: `[server]`, `[asr]`, `[vad]`, `[diarizer]`, `[storage]`, `[telemetry]`, `[debug]`, `[debug_model]`. Loading order: compile-time defaults → CLI args → `orator.toml` → env var overrides. Header-only toml++ (FetchContent, zero runtime dep). Config struct expanded to 34 fields across all pipelines. Previous env-only params (`ORATOR_TIMEBASE_CHECK`, `ORATOR_ASR_PROFILE`, `ORATOR_STREAM_PROGRESS`, `ORATOR_LOG_LEVEL`, `ORATOR_GPU_SERIAL`/`CONCURRENT`) now in Config + synced to environment for deep getenv() code. See `include/io/config_reader.h`, `src/io/config_reader.cc`, `orator.toml`.
 - **VAD-gated ASR fix** (2026-06-22). VAD async-lag protection via segment-start confirmation check. ASR segments reduced from 43→18 (120s test). RTF improved 4.7→3.7. Parameters tuned: `asr_vad_trail_sec=1.0`, `vad_min_silence_ms=300`. See `src/pipeline/asr_worker.cc:61-141`.
 - **Full-length verification (v7)** (2026-06-23). 3615s (1 hr) audio at 420× injection: **964s wall (3.75×)**, no crash, no data loss. 300s verification confirms 3 ASR segments cover 300s of audio (merging 90 VAD segments). Speed regression from 9.46× (pre-v7) due to VAD segment-start check keeping ASR segments open longer, causing more audio to pass through GPU processing. 120s test at 1× real-time still at RTF 3.7.
+- **NeMo feature parity — silence profile, FIFO, dynamic pop_out_len** (2026-06-24). Ported three NeMo v2.1 streaming features to `streaming_sortformer.cc`:
+  - `mean_sil_emb` in `CompressSpkcache`: cosine-similarity penalty against silence profile (`use_silence_profile` flag, gated off by default — v2.1 models opt in). `UpdateSilenceProfile()` already maintained per-chunk.
+  - `spkcache_refresh_rate` (default 0): controls speaker cache refresh cadence in FIFO mode.
+  - Dynamic `pop_out_len` + FIFO buffering: dual-path streaming update — sync (`fifo_len=0`, backward-compatible default) and FIFO async (`fifo_len>0`). `HostStreamState` gains lazy-init FIFO buffers (`fifo_embs`, `fifo_preds`), proper overflow handling, and NeMo-style pop-out calculation.
+  - All three params wired through full config chain: `orator.toml [diarizer]` → `ConfigReader` → `AuditoryStream::Config` → `SortformerTuning` → `SortformerConfig`. See `include/model/streaming_sortformer.h`, `include/pipeline/auditory_stream.h`, `src/io/config_reader.cc`.
+  - **Bug fixes**: `Sha1::Finalize()` padding fix for multi-block messages (≥ 56 bytes); `test_integration.py` eval_single indentation bug fix.
+  - **Verification**: 600 s real-audio eval: diarization compute 6.7 s (89.5× RTF), ASR compute 164.2 s (3.65× RTF), wall_clock_ok. Speaker diarization accuracy 89.4% (weighted by duration) against test.txt ground truth. All 39/39 tests pass. Reference data (`ref_stream_total.f32`) regenerated for current build env.
