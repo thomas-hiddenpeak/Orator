@@ -57,11 +57,11 @@ struct SortformerConfig {
   int transformer_heads = 8;
 
   int spkcache_len = 188;
-  int fifo_len = 0;
-  int chunk_len = 188;
-  int spkcache_update_period = 188;
+  int fifo_len = 40;
+  int chunk_len = 340;
+  int spkcache_update_period = 300;
   int chunk_left_context = 1;
-  int chunk_right_context = 1;
+  int chunk_right_context = 40;
   int spkcache_sil_frames_per_spk = 3;
 
   bool Validate() const;

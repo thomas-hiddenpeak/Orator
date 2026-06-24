@@ -71,6 +71,59 @@ class OratorTestHarness:
         env['ORATOR_GPU_TELEMETRY_SEC'] = '0'
         if self.vad:
             env['ORATOR_VAD_MODEL'] = self.vad
+        if self.config_overrides:
+            # Map Config struct field names to TOML key names.
+            FIELD_TO_TOML = {
+                'diar_threshold': ('diarizer', 'threshold'),
+                'diar_merge_gap_sec': ('diarizer', 'merge_gap_sec'),
+                'diar_deliver_interval_sec': ('diarizer', 'deliver_interval_sec'),
+                'diar_spkcache_len': ('diarizer', 'spkcache_len'),
+                'diar_chunk_len': ('diarizer', 'chunk_len'),
+                'diar_spkcache_update_period': ('diarizer', 'spkcache_update_period'),
+                'diar_chunk_left_context': ('diarizer', 'chunk_left_context'),
+                'diar_chunk_right_context': ('diarizer', 'chunk_right_context'),
+                'diar_spkcache_sil_frames': ('diarizer', 'spkcache_sil_frames'),
+            }
+            # Group overrides by TOML section
+            sections = {}
+            for field, v in self.config_overrides.items():
+                if field in FIELD_TO_TOML:
+                    sec, key = FIELD_TO_TOML[field]
+                    sections.setdefault(sec, {})[key] = v
+            # Write temp config with proper TOML keys
+            if sections:
+                import tempfile
+                self._config_file = os.path.join(tempfile.gettempdir(), f'orator_test_{os.getpid()}.toml')
+                lines = ['[server]', f'port = {self.port}']
+                # Diarizer section: model path + overrides
+                if self.diarizer:
+                    lines.append('[diarizer]')
+                    lines.append(f'model = "{self.diarizer}"')
+                    # Add diarizer overrides in same section (no duplicate header)
+                    if 'diarizer' in sections:
+                        for k, v in sections['diarizer'].items():
+                            if isinstance(v, str): lines.append(f'{k} = "{v}"')
+                            elif isinstance(v, bool): lines.append(f'{k} = {"true" if v else "false"}')
+                            else: lines.append(f'{k} = {v}')
+                if 'asr' in sections:
+                    lines.append('[asr]')
+                    for k, v in sections['asr'].items():
+                        if isinstance(v, str): lines.append(f'{k} = "{v}"')
+                        else: lines.append(f'{k} = {v}')
+                if self.asr:
+                    if 'asr' not in sections:
+                        lines.append('[asr]')
+                    lines.append(f'model_dir = "{self.asr}"')
+                if self.vad:
+                    lines.append('[vad]')
+                    lines.append(f'model = "{self.vad}"')
+                    lines.append('stream = true')
+                with open(self._config_file, 'w') as f:
+                    f.write('\n'.join(lines) + '\n')
+                env['ORATOR_CONFIG'] = self._config_file
+            with open(self._config_file, 'w') as f:
+                f.write('\n'.join(lines) + '\n')
+            env['ORATOR_CONFIG'] = self._config_file
 
         cmd = [SERVER_BIN, str(self.port)]
         if self.diarizer:

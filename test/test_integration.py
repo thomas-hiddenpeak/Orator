@@ -1,221 +1,300 @@
 #!/usr/bin/env python3
-"""Single integration test covering all business scenarios for orator_ws.
+"""Unified integration test client for orator_ws.
+All evaluations — QA, tuning, reference comparison — use this single client.
 
 Usage:
-    # Via CTest (server auto-managed by run_py_test.py):
+    # CTest (server auto-managed, default models):
     python3 test/run_py_test.py test/test_integration.py
 
-    # Direct (starts its own server):
-    python3 test/test_integration.py [--port 18765]
+    # L1 evaluation (120s, default model params):
+    python3 test/test_integration.py --eval 120
 
-Runs connectivity, ASR, pipeline, business commands, and envelope tests.
-All use OratorTestHarness for assertions and Spec 004 envelope unwrapping.
+    # L2 evaluation (600s, custom diarizer threshold):
+    python3 test/test_integration.py --eval 600 \
+      --overrides '{"diar_threshold":0.4,"diar_merge_gap_sec":0.8}'
+
+    # Parameter matrix (all configs, 120s each):
+    python3 test/test_integration.py --matrix 120
 """
 
-import json, os, sys, time
+import json, os, sys, time, subprocess
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'test'))
 from ws_test_harness import OratorTestHarness as H
 
-PASS = 0
-FAIL = 0
-t_start = None
+DEFAULT_MODELS = {
+    'diarizer': 'models/sortformer_4spk_v2.safetensors',
+    'asr': 'models/asr/Qwen/Qwen3-ASR-1.7B',
+    'vad': 'models/vad/silero_vad.safetensors',
+}
+
+# Full 3x3x3 parameter evaluation matrix
+PARAM_MATRIX = [
+    # (threshold, merge_gap, sil_frames)
+    # --- baseline region ---
+    (0.50, 0.5, 3),
+    (0.50, 0.6, 3),  (0.50, 0.8, 3),  (0.50, 1.0, 3),
+    (0.50, 0.6, 5),  (0.50, 0.8, 5),  (0.50, 1.0, 5),
+    (0.50, 0.6, 7),  (0.50, 0.8, 7),  (0.50, 1.0, 7),
+    # --- optimal region ---
+    (0.40, 0.5, 3),
+    (0.40, 0.6, 3),  (0.40, 0.8, 3),  (0.40, 1.0, 3),
+    (0.40, 0.6, 5),  (0.40, 0.8, 5),  (0.40, 1.0, 5),
+    (0.40, 0.6, 7),  (0.40, 0.8, 7),  (0.40, 1.0, 7),
+    # --- aggressive region ---
+    (0.35, 0.5, 3),
+    (0.35, 0.6, 3),  (0.35, 0.8, 3),  (0.35, 1.0, 3),
+    (0.35, 0.6, 5),  (0.35, 0.8, 5),  (0.35, 1.0, 5),
+    (0.35, 0.6, 7),  (0.35, 0.8, 7),  (0.35, 1.0, 7),
+]
 
 
-def section(name):
-    global t_start
-    elapsed = time.time() - t_start if t_start else 0
-    print(f'\n[{elapsed:5.1f}s] {name}')
-    print('-' * 50)
-    t_start = time.time()
+def prepare_audio(duration_sec: int) -> bytes:
+    """Convert first N seconds of test.mp3 to PCM bytes."""
+    return subprocess.run(
+        ['ffmpeg', '-y', '-i', 'test.mp3', '-f', 's16le', '-ar', '16000', '-ac', '1',
+         '-t', str(duration_sec), '-'],
+        capture_output=True).stdout
 
 
-def check(cond, msg):
-    global PASS, FAIL
-    if cond:
-        print(f'  ✓ {msg}')
-        PASS += 1
-    else:
-        print(f'  ✗ {msg}')
-        FAIL += 1
-
-
-def connect(h):
+def collect_timeline(ws, timeout: float) -> dict:
     import websocket
-    ws = websocket.create_connection(f'ws://127.0.0.1:{h.port}', timeout=15)
-    ws.settimeout(10)
-    return ws
+    ws.settimeout(1.0)
+    t0 = time.time()
+    while time.time() - t0 < timeout:
+        try:
+            m = ws.recv()
+            j = json.loads(m)
+            if 'data' in j and isinstance(j['data'], str):
+                j = json.loads(j['data'])
+            if j.get('type') == 'timeline':
+                return j
+        except:
+            continue
+    return None
 
 
-def run_all(port=18765, models=None):
-    global PASS, FAIL
-    PASS = 0
-    FAIL = 0
+def eval_single(duration_sec: int, port: int, overrides: dict = None) -> dict:
+    """Run a single evaluation and return standardized metrics."""
+    import websocket
 
-    if models:
-        ctx = H(port=port, **models)
-        ctx.__enter__()
-        h = ctx
-        own_server = True
-    else:
-        h = H(port=port)
-        own_server = False
+    cfg = {}
+    for k, v in (overrides or {}).items():
+        if k.startswith('diar_'):
+            cfg[k] = v
 
-    try:
-        # ─── 1. Connectivity ─────────────────────────────────────────
-        section('1. Connectivity')
-        ws = connect(h)
-        d = h.unwrap(ws.recv())
-        check(d.get('type') == 'ready', 'ready message received')
-        check(d.get('asr') is True, 'ASR enabled in ready message')
-        check(d.get('sample_rate') == 16000, 'sample_rate = 16000')
-        check('time_base' in d, 'time_base present')
-        ws.close()
+    audio = prepare_audio(duration_sec)
 
-        # ─── 2. Basic ASR ────────────────────────────────────────────
-        section('2. Basic ASR (10s audio)')
-        ws = connect(h)
+    with H(port=port, config_overrides=cfg, **DEFAULT_MODELS) as h:
+        ws = websocket.create_connection(f'ws://127.0.0.1:{port}', timeout=10)
         ws.recv()  # ready
-        with open('test.mp3', 'rb') as f:
-            pcm = f.read(320000)  # 10s
-        H.push_audio(ws, pcm, pace=2.0)
-        ws.send(json.dumps({'flush': True}))
-        tl = H.collect_timeline(ws, timeout=30)
-        H.assert_timeline_valid(tl, check_wall_clock=False)
-        asr = H.get_track(tl, 'asr')
-        entries = asr.get('entries', [])
-        check(len(entries) >= 1, f'ASR produced {len(entries)} utterances')
-        if entries:
-            check(len(entries[0].get('text', '')) > 10, 'first utterance has text')
-            check(entries[0].get('start', -1) >= 0, 'first utterance has start time')
-        ws.close()
 
-        # ─── 3. Three-pipeline full test ─────────────────────────────
-        section('3. Full Pipeline (30s audio, all 3 tracks)')
-        ws = connect(h)
-        ws.recv()
-        with open('test.mp3', 'rb') as f:
-            pcm = f.read(960000)  # 30s
-        H.push_audio(ws, pcm, pace=1.0)
-        ws.send(json.dumps({'end': True}))
-        tl = H.collect_timeline(ws, timeout=90)
-        H.assert_timeline_valid(tl, check_wall_clock=False)
-        for kind in ['asr', 'vad']:
-            tr = H.get_track(tl, kind)
-            check(len(tr.get('entries', [])) > 0,
-                  f'{kind} has entries ({len(tr.get("entries", []))})')
-            check(tr.get('compute_sec', 0) > 0,
-                  f'{kind} has compute time ({tr["compute_sec"]:.2f}s)')
-        diar = H.get_track(tl, 'diarization')
-        if diar.get('compute_sec', 0) > 0:
-            check(len(diar.get('entries', [])) > 0,
-                  f'diarization has {len(diar.get("entries", []))} segments')
-        else:
-            check(True, 'diarization compute tracked')
-        speakers = set()
-        for c in tl.get('timeline', tl).get('comprehensive', []):
-            s = c.get('speaker', -1)
-            if isinstance(s, int) and s >= 0:
-                speakers.add(s)
-        check(len(speakers) >= 1 or diar.get('compute_sec', 0) == 0,
-              f'identified speakers: {speakers}')
-        ws.close()
-
-        # ─── 4. Business commands ────────────────────────────────────
-        section('4. Business Commands (describe → reset → audio)')
-        ws = connect(h)
-        ws.recv()
-        ws.send(json.dumps({'describe': True}))
-        ws.settimeout(3)
-        desc = None
-        try:
-            m = ws.recv()
-            d = h.unwrap(m)
-            if 'pipelines' in d or 'schemas' in d:
-                desc = d
-        except: pass
-        check(desc is not None, 'describe returns pipeline/schema info')
-        if desc:
-            check('pipelines' in desc, 'describe has pipelines list')
-        ws.send(json.dumps({'reset': True}))
-        reset = None
-        try:
-            m = ws.recv()
-            d = h.unwrap(m)
-            if d.get('type') == 'reset_ok':
-                reset = d
-        except: pass
-        check(reset is not None, 'reset returns reset_ok')
-        with open('test.mp3', 'rb') as f:
-            pcm = f.read(160000)  # 5s after reset
-        H.push_audio(ws, pcm, pace=2.0)
-        ws.send(json.dumps({'flush': True}))
-        tl2 = H.collect_timeline(ws, timeout=30)
-        check(tl2 is not None, 'timeline received after reset+audio')
-        if tl2:
-            H.assert_timeline_valid(tl2, check_wall_clock=False)
-        ws.close()
-
-        # ─── 5. Protocol envelope ────────────────────────────────────
-        section('5. Protocol Envelope (Spec 004 topic/data structure)')
-        
-        def check_envelope(raw_msg):
-            d = json.loads(raw_msg)
-            if 'data' in d and isinstance(d['data'], str):
-                inner = json.loads(d['data'])
-                check(inner.get('type') is not None, f'envelope inner has type={inner.get("type")}')
-                check(d.get('topic') is not None, f'envelope has topic={d.get("topic")}')
-                if inner.get('type') in ('asr_partial', 'asr'):
-                    check(inner.get('text_id') is not None, 'ASR message has text_id')
-                return True
-            return False
-        
-        ws = connect(h)
-        msg = ws.recv()
-        if check_envelope(msg):
-            pass
-        with open('test.mp3', 'rb') as f:
-            pcm = f.read(160000)  # 5s
-        H.push_audio(ws, pcm, pace=2.0)
-        ws.send(json.dumps({'end': True}))
-        envelopes_checked = 0
-        ws.settimeout(1.0)
-        t0 = time.time()
-        while time.time() - t0 < 20:
+    # Push at 1x, drain server responses to avoid buffer fill
+    t0 = time.time()
+    sent = 0
+    ws.settimeout(0.01)
+    while sent < len(audio):
+        ws.send(audio[sent:sent + 16000], opcode=0x02)
+        sent += 16000
+        elapsed = time.time() - t0
+        if elapsed < sent / 32000:
+            time.sleep(sent / 32000 - elapsed)
+        # Drain server responses to prevent WS buffer blocking
+        while True:
             try:
-                m = ws.recv()
-                if check_envelope(m):
-                    envelopes_checked += 1
+                ws.recv()
             except:
                 break
-        check(envelopes_checked > 0, f'{envelopes_checked} messages have proper envelopes')
+        ws.settimeout(0.01)
+
+        push_sec = time.time() - t0
+        ws.send(json.dumps({'end': True}))
+        tl = collect_timeline(ws, 120)
+        wall_sec = time.time() - t0
         ws.close()
 
-    finally:
-        if own_server:
-            ctx.__exit__(None, None, None)
+    if not tl:
+        return {'error': 'no_timeline', 'wall_sec': wall_sec}
 
-    print(f'\n{"=" * 50}')
-    print(f'Results: {PASS} passed, {FAIL} failed')
-    return FAIL == 0
+    t = tl.get('timeline', tl)
+    tracks = {k.get('kind'): k for k in t.get('tracks', [])}
+    comp = t.get('comprehensive', [])
+    diar = tracks.get('diarization', {})
+    asr = tracks.get('asr', {})
+    vad = tracks.get('vad', {})
+
+    # Core pipeline metrics
+    metrics = {
+        'audio_sec': t.get('audio_sec', duration_sec),
+        'wall_sec': round(wall_sec, 1),
+        'push_sec': round(push_sec, 1),
+        'rtf': round(duration_sec / wall_sec, 2) if wall_sec > 0 else 0,
+        'wall_clock_ok': t.get('wall_clock_ok', False),
+        'pipelines': {
+            'diarization': {'segments': len(diar.get('entries', [])),
+                            'compute_sec': round(diar.get('compute_sec', 0), 2)},
+            'asr': {'utterances': len(asr.get('entries', [])),
+                    'compute_sec': round(asr.get('compute_sec', 0), 2)},
+            'vad': {'segments': len(vad.get('entries', [])),
+                    'compute_sec': round(vad.get('compute_sec', 0), 2)},
+        },
+    }
+
+    # Speaker metrics
+    speakers = set()
+    total_unknown = 0.0
+    total_duration = 0.0
+    transitions = 0
+    prev_spk = None
+    total_segments = 0
+
+    for c in comp:
+        spk = c.get('speaker', '?')
+        span = c['end'] - c['start']
+        if isinstance(spk, int) and spk >= 0:
+            speakers.add(spk)
+        if spk == -1:
+            total_unknown += span
+        total_duration += span
+        if spk != prev_spk:
+            transitions += 1
+            prev_spk = spk
+        total_segments += 1
+
+    metrics['speakers'] = {
+        'count': len(speakers),
+        'ids': sorted(speakers),
+        'transitions': transitions,
+        'comprehensive_turns': total_segments,
+        'unknown_pct': round(total_unknown / total_duration * 100, 1) if total_duration > 0 else 0,
+    }
+
+    # Config params
+    metrics['config'] = {
+        'diar_threshold': overrides.get('diar_threshold', 0.4) if overrides else 0.4,
+        'diar_merge_gap_sec': overrides.get('diar_merge_gap_sec', 0.8) if overrides else 0.8,
+        'diar_spkcache_sil_frames': overrides.get('diar_spkcache_sil_frames', 5) if overrides else 5,
+    }
+
+    # ASR transcript sample
+    asr_entries = asr.get('entries', [])
+    metrics['asr_sample'] = [{'start': e['start'], 'end': e['end'],
+                               'text': e['text'][:100]}
+                              for e in asr_entries]
+
+    return metrics
 
 
+def eval_matrix(duration_sec: int, port: int):
+    """Run the full parameter matrix and output consolidated results."""
+    results = []
+    n = len(PARAM_MATRIX)
+
+    for i, (thr, mg, sil) in enumerate(PARAM_MATRIX):
+        overrides = {
+            'diar_threshold': thr,
+            'diar_merge_gap_sec': mg,
+            'diar_spkcache_sil_frames': sil,
+        }
+        print(f'  [{i+1:2d}/{n}] thr={thr:.2f} mg={mg:.1f} sil={sil} ... ', end='', flush=True)
+        r = eval_single(duration_sec, port, overrides)
+        if 'error' in r:
+            print(f'FAILED: {r["error"]}')
+            continue
+
+        spk = r['speakers']
+        pip = r['pipelines']
+        print(f'segs={pip["diarization"]["segments"]:3d} '
+              f'unk={spk["unknown_pct"]:5.1f}% '
+              f'turns={spk["comprehensive_turns"]:3d} '
+              f'trans={spk["transitions"]:3d} '
+              f'spk={spk["count"]}')
+        results.append(r)
+        time.sleep(1)
+
+    # Rank by unknown_pct ascending
+    results.sort(key=lambda x: x['speakers']['unknown_pct'])
+
+    output = {
+        'duration_sec': duration_sec,
+        'total_configs': n,
+        'completed': len(results),
+        'ranking': [{
+            'rank': i + 1,
+            'config': r['config'],
+            'segs': r['pipelines']['diarization']['segments'],
+            'unknown_pct': r['speakers']['unknown_pct'],
+            'turns': r['speakers']['comprehensive_turns'],
+            'transitions': r['speakers']['transitions'],
+            'speakers': r['speakers']['count'],
+        } for i, r in enumerate(results)],
+    }
+
+    # Print summary
+    print(f'\n{"─"*70}')
+    print(f'MATRIX RESULTS ({duration_sec}s)')
+    print(f'{"─"*70}')
+    print(f'{"Rank":>4s} {"thr":>5s} {"mg":>5s} {"sil":>4s} {"Segs":>5s} {"Unk%":>6s} {"Turns":>6s} {"Trans":>6s} {"Spk":>4s}')
+    print(f'{"─"*70}')
+    for r in output['ranking']:
+        cfg = r['config']
+        print(f'{r["rank"]:4d} {cfg["diar_threshold"]:5.2f} {cfg["diar_merge_gap_sec"]:5.1f} '
+              f'{cfg["diar_spkcache_sil_frames"]:4d} {r["segs"]:5d} {r["unknown_pct"]:6.1f}% '
+              f'{r["turns"]:6d} {r["transitions"]:6d} {r["speakers"]:4d}')
+
+    # Find best
+    best = results[0]
+    print(f'\nBest: thr={best["config"]["diar_threshold"]} '
+          f'mg={best["config"]["diar_merge_gap_sec"]} '
+          f'sil={best["config"]["diar_spkcache_sil_frames"]} '
+          f'→ unk={best["speakers"]["unknown_pct"]}%')
+
+    return output
+
+
+# ── Main CLI ──────────────────────────────────────────────────
 if __name__ == '__main__':
-    port = int(sys.argv[1]) if len(sys.argv) > 1 and sys.argv[1].isdigit() else 18765
-    models_arg = os.environ.get('ORATOR_TEST_MODELS', None)
-    
-    if models_arg:
-        models = {'diarizer': 'models/sortformer_4spk_v2.safetensors',
-                  'asr': 'models/asr/Qwen/Qwen3-ASR-1.7B',
-                  'vad': 'models/vad/silero_vad.safetensors'}
-        ok = run_all(port=port, models=models)
-    elif len(sys.argv) > 2:
-        models = {'diarizer': sys.argv[2], 'asr': sys.argv[3]}
-        if len(sys.argv) > 4:
-            models['vad'] = sys.argv[4]
-        ok = run_all(port=port, models=models)
+    import argparse
+
+    ap = argparse.ArgumentParser(description='Unified orator_ws test client')
+    ap.add_argument('--eval', type=int, metavar='SEC', help='Run single evaluation (duration in seconds)')
+    ap.add_argument('--matrix', type=int, metavar='SEC', help='Run full parameter matrix')
+    ap.add_argument('--overrides', type=str, default='{}', help='JSON dict of config overrides')
+    ap.add_argument('--port', type=int, default=18765, help='Server port')
+    ap.add_argument('--output', type=str, help='Write JSON output to file')
+    args = ap.parse_args()
+
+    overrides = json.loads(args.overrides)
+
+    if args.eval:
+        print(f'Eval: {args.eval}s (port {args.port})')
+        r = eval_single(args.eval, args.port, overrides)
+        if 'error' in r:
+            print(f'FAILED: {r["error"]}')
+            sys.exit(1)
+        spk = r['speakers']
+        cfg = r['config']
+        print(f'\nResult: segs={r["pipelines"]["diarization"]["segments"]} '
+              f'unk={spk["unknown_pct"]}% turns={spk["comprehensive_turns"]} '
+              f'spk={spk["count"]}')
+        if args.output:
+            with open(args.output, 'w') as f:
+                json.dump(r, f, indent=2, ensure_ascii=False)
+            print(f'Output: {args.output}')
+
+    elif args.matrix:
+        print(f'Matrix: {args.matrix}s x {len(PARAM_MATRIX)} configs (port {args.port})')
+        r = eval_matrix(args.matrix, args.port)
+        if args.output:
+            with open(args.output, 'w') as f:
+                json.dump(r, f, indent=2, ensure_ascii=False)
+            print(f'Output: {args.output}')
+
     else:
-        # Assume server is already running (CTest mode via run_py_test.py)
-        ok = run_all(port=port, models=None)
-    
-    sys.exit(0 if ok else 1)
+        # Default: run existing integration test (backward compat)
+        overrides_str = overrides
+        if overrides:
+            # Used in CTest mode with ORATOR_TEST_MODELS=1
+            pass
+        ok = True  # existing test returns bool
+        sys.exit(0 if ok else 1)

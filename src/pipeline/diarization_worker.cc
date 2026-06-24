@@ -1,6 +1,8 @@
 #include "pipeline/diarization_worker.h"
 
+#include <algorithm>
 #include <chrono>
+#include <cmath>
 
 #include "model/streaming_sortformer.h"
 #include "pipeline/diar_postprocess.h"
@@ -10,6 +12,81 @@ namespace orator {
 namespace pipeline {
 
 using namespace worker;
+
+// ── Post-processing: sliding-window median smoothing ─────────────────
+// Smooths per-frame speaker probabilities to eliminate single-frame noise
+// that causes fragmentation. Window of 11 frames (~0.9s at 0.08s/frame).
+static void SmoothDiarProbs(std::vector<float>& probs, int frames, int n_spk,
+                             int window = 11) {
+  if (frames <= 1 || window <= 1) return;
+  std::vector<float> result(probs.size());
+  const int half = window / 2;
+  for (int f = 0; f < frames; ++f) {
+    for (int s = 0; s < n_spk; ++s) {
+      std::vector<float> vals;
+      vals.reserve(window);
+      for (int w = -half; w <= half; ++w) {
+        int fi = f + w;
+        if (fi < 0) fi = 0;
+        if (fi >= frames) fi = frames - 1;
+        vals.push_back(probs[static_cast<size_t>(fi) * n_spk + s]);
+      }
+      std::sort(vals.begin(), vals.end());
+      result[static_cast<size_t>(f) * n_spk + s] = vals[vals.size() / 2];
+    }
+  }
+  probs.swap(result);
+}
+
+// ── Post-processing: minimum segment duration filter ─────────────────
+// Removes segments shorter than min_dur_sec, merging their content
+// into adjacent same-speaker segments.
+static void FilterShortSegments(std::vector<core::DiarSegment>& segs,
+                                 double min_dur_sec) {
+  if (segs.empty() || min_dur_sec <= 0.0) return;
+  std::vector<core::DiarSegment> out;
+  out.reserve(segs.size());
+  for (auto& s : segs) {
+    if (s.end_sec - s.start_sec < min_dur_sec && !out.empty()) {
+      // Merge short segment into the last output segment
+      auto& prev = out.back();
+      prev.end_sec = s.end_sec;
+      prev.confidence = std::max(prev.confidence, s.confidence);
+    } else {
+      out.push_back(s);
+    }
+  }
+  segs.swap(out);
+}
+
+// ── Post-processing: cross-speaker_-1 merge ─────────────────────────
+// Merges same-speaker segments separated by a brief speaker_-1 gap.
+static void MergeAcrossUnknown(std::vector<core::DiarSegment>& segs,
+                                double gap_threshold_sec) {
+  if (segs.size() < 3 || gap_threshold_sec <= 0.0) return;
+  std::vector<core::DiarSegment> out;
+  out.push_back(segs[0]);
+  for (size_t i = 1; i < segs.size(); ++i) {
+    auto& prev = out.back();
+    const auto& cur = segs[i];
+    // If current is speaker_-1 and gap is short, skip it
+    if (cur.speaker_id.empty() && cur.local_speaker < 0 &&
+        cur.end_sec - cur.start_sec < gap_threshold_sec) {
+      prev.end_sec = cur.end_sec;
+      continue;
+    }
+    // If same speaker as prev and gap was brief unknown, merge
+    if (cur.speaker_id == prev.speaker_id &&
+        cur.local_speaker == prev.local_speaker &&
+        cur.start_sec - prev.end_sec < gap_threshold_sec) {
+      prev.end_sec = cur.end_sec;
+      prev.confidence = std::max(prev.confidence, cur.confidence);
+    } else {
+      out.push_back(cur);
+    }
+  }
+  segs.swap(out);
+}
 
 DiarizationWorker::DiarizationWorker(core::IDiarizer* diarizer,
                                        Params params, core::TimeBase tb,
@@ -38,8 +115,9 @@ void DiarizationWorker::DeliverSpeakers(bool force) {
   // The diarization frame stream begins at the common-clock origin (absolute
   // sample 0). Set the segment time origin through this pipeline's common base.
   frames.t_start_sec = tb_.SecondsAt(0);
-  auto segs = FramesToSegments(frames, params_.threshold, params_.merge_gap_sec);
-  segs = CoalesceSegments(std::move(segs), params_.merge_gap_sec);
+  auto segs = OnsetOffsetSegments(frames, /*onset=*/0.45, /*offset=*/0.25,
+                                   /*pad_onset=*/0.0, /*pad_offset=*/0.0,
+                                   /*min_dur_on=*/0.5, /*min_dur_off=*/1.0);
   speaker_sink_(segs);
 }
 
