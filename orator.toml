@@ -124,6 +124,23 @@
 # Silent frames before resetting speaker cache. Higher = fewer speaker splits. (default 3)
 # spkcache_sil_frames = 3
 
+# Onset/offset double-threshold post-processing (NeMo-style, default 0.45/0.25)
+# onset: probability to START a segment. Higher = fewer, more confident segments.
+# offset: probability to END a segment. Lower than onset creates "sticky" segments.
+#   offset < onset means an active segment persists through probability dips.
+# onset = 0.45
+# offset = 0.25
+
+# Extra time before/after each segment (seconds). (default 0.0)
+# pad_onset = 0.0
+# pad_offset = 0.0
+
+# Minimum segment duration (seconds). Shorter segments are removed. (default 0.5)
+# min_dur_on = 0.5
+
+# Minimum gap to merge same-speaker segments (seconds). Larger = fewer fragments. (default 1.0)
+# min_dur_off = 1.0
+
 # ══════════════════════════════════════════════════════════════════════════════
 # Storage — protocol timeline persistence
 # ══════════════════════════════════════════════════════════════════════════════

@@ -100,6 +100,13 @@ class AuditoryStream {
     int diar_chunk_left_context = 1;       // left context chunks
     int diar_chunk_right_context = 40;     // right context chunks
     int diar_spkcache_sil_frames = 5;      // silent frames before cache reset
+    // Onset/offset post-processing (NeMo-style double threshold)
+    double diar_onset = 0.45;              // probability to START a segment
+    double diar_offset = 0.25;             // probability to END a segment (lower = sticky)
+    double diar_pad_onset = 0.0;           // extra time added before each segment start
+    double diar_pad_offset = 0.0;          // extra time added after each segment end
+    double diar_min_dur_on = 0.5;          // minimum segment duration (seconds)
+    double diar_min_dur_off = 1.0;         // minimum gap to merge segments (seconds)
 
     // ── Storage ──────────────────────────────────────────────────────
     std::string storage_disk_path = "/tmp/orator/storage/";

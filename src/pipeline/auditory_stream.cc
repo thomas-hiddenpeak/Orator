@@ -134,6 +134,12 @@ void AuditoryStream::StartWorkers() {
     dp.merge_gap_sec = config_.diar_merge_gap_sec;
     dp.deliver_interval_sec = config_.diar_deliver_interval_sec;
     dp.sample_rate = config_.sample_rate;
+    dp.onset = config_.diar_onset;
+    dp.offset = config_.diar_offset;
+    dp.pad_onset = config_.diar_pad_onset;
+    dp.pad_offset = config_.diar_pad_offset;
+    dp.min_dur_on = config_.diar_min_dur_on;
+    dp.min_dur_off = config_.diar_min_dur_off;
     diar_worker_ =
         std::make_unique<DiarizationWorker>(diarizer_.get(), dp,
             buffer_.time_base(), diar_stream_);

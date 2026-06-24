@@ -115,9 +115,9 @@ void DiarizationWorker::DeliverSpeakers(bool force) {
   // The diarization frame stream begins at the common-clock origin (absolute
   // sample 0). Set the segment time origin through this pipeline's common base.
   frames.t_start_sec = tb_.SecondsAt(0);
-  auto segs = OnsetOffsetSegments(frames, /*onset=*/0.45, /*offset=*/0.25,
-                                   /*pad_onset=*/0.0, /*pad_offset=*/0.0,
-                                   /*min_dur_on=*/0.5, /*min_dur_off=*/1.0);
+  auto segs = OnsetOffsetSegments(frames, params_.onset, params_.offset,
+                                   params_.pad_onset, params_.pad_offset,
+                                   params_.min_dur_on, params_.min_dur_off);
   speaker_sink_(segs);
 }
 

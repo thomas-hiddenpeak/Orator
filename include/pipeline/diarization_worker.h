@@ -24,10 +24,17 @@ class DiarizationWorker {
  public:
   // Tuning for frame->segment derivation and live delivery cadence.
   struct Params {
-    float threshold = 0.5f;        // per-speaker activity threshold
+    float threshold = 0.5f;        // per-speaker activity threshold (FramesToSegments)
     double merge_gap_sec = 0.5;    // coalesce same-speaker gaps up to this
     double deliver_interval_sec = 1.0;  // min audio between live deliveries
     int sample_rate = 16000;
+    // Onset/offset double-threshold post-processing (used by OnsetOffsetSegments)
+    double onset = 0.45;            // segment start probability threshold
+    double offset = 0.25;           // segment end probability threshold
+    double pad_onset = 0.0;         // extra time before segment start
+    double pad_offset = 0.0;        // extra time after segment end
+    double min_dur_on = 0.5;        // minimum segment duration (seconds)
+    double min_dur_off = 1.0;       // minimum gap for merging (seconds)
   };
 
   // Spec 004: delivers the pipeline's current speaker view (who/when) to the

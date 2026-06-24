@@ -135,6 +135,24 @@ bool ApplyTomlConfig(const std::string& path,
     if (auto v = sec->get("spkcache_sil_frames")) {
       if (auto n = v->value<int>()) cfg.diar_spkcache_sil_frames = *n;
     }
+    if (auto v = sec->get("onset")) {
+      if (auto d = v->value<double>()) cfg.diar_onset = *d;
+    }
+    if (auto v = sec->get("offset")) {
+      if (auto d = v->value<double>()) cfg.diar_offset = *d;
+    }
+    if (auto v = sec->get("pad_onset")) {
+      if (auto d = v->value<double>()) cfg.diar_pad_onset = *d;
+    }
+    if (auto v = sec->get("pad_offset")) {
+      if (auto d = v->value<double>()) cfg.diar_pad_offset = *d;
+    }
+    if (auto v = sec->get("min_dur_on")) {
+      if (auto d = v->value<double>()) cfg.diar_min_dur_on = *d;
+    }
+    if (auto v = sec->get("min_dur_off")) {
+      if (auto d = v->value<double>()) cfg.diar_min_dur_off = *d;
+    }
   }
 
   // ── [storage] ─────────────────────────────────────────────────────
