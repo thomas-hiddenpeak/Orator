@@ -132,14 +132,14 @@ endif()
 # ---------------------------------------------------------------------------
 # orator_ws: real-time diarization + ASR WebSocket server (the realtime entry).
 # ---------------------------------------------------------------------------
-add_executable(orator_ws src/ws_main.cc)
+add_executable(orator_ws src/net/ws_main.cc)
 set_property(TARGET orator_ws PROPERTY CUDA_ARCHITECTURES native)
 target_link_libraries(orator_ws PRIVATE orator_core)
 
 # ---------------------------------------------------------------------------
 # asr_testmp3: native Qwen3-ASR end-to-end on an audio clip.
 # ---------------------------------------------------------------------------
-add_executable(asr_testmp3 tools/asr_testmp3.cc)
+add_executable(asr_testmp3 tools/verify/cc/asr_testmp3.cc)
 set_property(TARGET asr_testmp3 PROPERTY CUDA_ARCHITECTURES native)
 target_link_libraries(asr_testmp3 PRIVATE orator_core)
 
@@ -147,7 +147,7 @@ target_link_libraries(asr_testmp3 PRIVATE orator_core)
 # asr_stream_test: drive the streaming AuditoryStream (diar + asr) frame by
 # frame, exactly like the WebSocket server -- the real streaming path.
 # ---------------------------------------------------------------------------
-add_executable(asr_stream_test tools/asr_stream_test.cc)
+add_executable(asr_stream_test tools/verify/cc/asr_stream_test.cc)
 set_property(TARGET asr_stream_test PROPERTY CUDA_ARCHITECTURES native)
 target_link_libraries(asr_stream_test PRIVATE orator_core)
 
@@ -155,7 +155,7 @@ target_link_libraries(asr_stream_test PRIVATE orator_core)
 # asr_stream_window_probe: evaluate the official growing-window streaming
 # method (audio_accum + prefix rollback) and observe memory / RTF growth.
 # ---------------------------------------------------------------------------
-add_executable(asr_stream_window_probe tools/asr_stream_window_probe.cc)
+add_executable(asr_stream_window_probe tools/probes/asr_stream_window_probe.cc)
 set_property(TARGET asr_stream_window_probe PROPERTY CUDA_ARCHITECTURES native)
 target_link_libraries(asr_stream_window_probe PRIVATE orator_core)
 
@@ -163,7 +163,7 @@ target_link_libraries(asr_stream_window_probe PRIVATE orator_core)
 # asr_encoder_chunk_probe (Spec 003 T011): verify windowed-encoder chunk-local
 # equivalence (standalone window encode == slice of full encode).
 # ---------------------------------------------------------------------------
-add_executable(asr_encoder_chunk_probe tools/asr_encoder_chunk_probe.cc)
+add_executable(asr_encoder_chunk_probe tools/probes/asr_encoder_chunk_probe.cc)
 set_property(TARGET asr_encoder_chunk_probe PROPERTY CUDA_ARCHITECTURES native)
 target_link_libraries(asr_encoder_chunk_probe PRIVATE orator_core)
 
@@ -171,7 +171,7 @@ target_link_libraries(asr_encoder_chunk_probe PRIVATE orator_core)
 # asr_stream_incremental_probe (Spec 003 T031): drive the incremental KV-cache
 # streaming session; measure per-step cost, RTF, memory; write transcript JSON.
 # ---------------------------------------------------------------------------
-add_executable(asr_stream_incremental_probe tools/asr_stream_incremental_probe.cc)
+add_executable(asr_stream_incremental_probe tools/probes/asr_stream_incremental_probe.cc)
 set_property(TARGET asr_stream_incremental_probe PROPERTY CUDA_ARCHITECTURES native)
 target_link_libraries(asr_stream_incremental_probe PRIVATE orator_core)
 

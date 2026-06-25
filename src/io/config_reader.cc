@@ -102,7 +102,7 @@ bool ApplyTomlConfig(const std::string& path,
 
   // ── [diarizer] ────────────────────────────────────────────────────
   if (auto* sec = config["diarizer"].as_table()) {
-    if (auto v = sec->get("model")) {
+    if (auto v = sec->get("model_weights")) {
       if (auto s = v->value<std::string>()) cfg.diarizer_weights = *s;
     }
     if (auto v = sec->get("max_speakers")) {

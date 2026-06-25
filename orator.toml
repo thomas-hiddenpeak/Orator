@@ -96,7 +96,7 @@
 # ══════════════════════════════════════════════════════════════════════════════
 [diarizer]
 # Model weights path (CLI arg overrides). Empty = disable diarization
-# model = "models/sortformer_4spk_v2.safetensors"
+# model_weights = "models/sortformer_4spk_v2.safetensors"
 
 # Maximum number of speakers
 # max_speakers = 4
@@ -112,9 +112,7 @@
 
 # Sortformer streaming tuning — affects speaker segmentation quality
 # Speaker cache length (frames). Larger = more stable speaker identity, slower adaptation. (default 188)
-# spkcache_len = 188
-# Processing chunk size (frames). Must match spkcache_len for streaming mode. (default 188)
-# chunk_len = 188
+spkcache_len = 5000
 # Cache update interval (frames). (default 188)
 # spkcache_update_period = 188
 # Left context chunks. Higher = better context, more compute. (default 1)
@@ -125,10 +123,10 @@
 # spkcache_sil_frames = 3
 
 # FIFO buffer length for async streaming (NeMo streaming_update_async). 0=off (sync mode).
-# fifo_len = 0
+fifo_len = 188
 
 # Speaker cache refresh cadence. 0=drain all FIFO after each chunk. Used only with fifo_len>0.
-# spkcache_refresh_rate = 0
+spkcache_refresh_rate = 100
 
 # Use silence profile in speaker cache compression (v2.1 model only).
 # use_silence_profile = false
