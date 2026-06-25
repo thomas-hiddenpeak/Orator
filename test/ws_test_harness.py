@@ -83,6 +83,12 @@ class OratorTestHarness:
                 'diar_chunk_left_context': ('diarizer', 'chunk_left_context'),
                 'diar_chunk_right_context': ('diarizer', 'chunk_right_context'),
                 'diar_spkcache_sil_frames': ('diarizer', 'spkcache_sil_frames'),
+                'diar_onset': ('diarizer', 'onset'),
+                'diar_offset': ('diarizer', 'offset'),
+                'diar_pad_onset': ('diarizer', 'pad_onset'),
+                'diar_pad_offset': ('diarizer', 'pad_offset'),
+                'diar_min_dur_on': ('diarizer', 'min_dur_on'),
+                'diar_min_dur_off': ('diarizer', 'min_dur_off'),
             }
             # Group overrides by TOML section
             sections = {}

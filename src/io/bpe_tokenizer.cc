@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <fstream>
 #include <sstream>
+#include <stdexcept>
 
 namespace orator {
 namespace io {
@@ -88,7 +89,9 @@ std::string Unescape(const std::string& s) {
       case '/': out += '/'; break;
       case 'u': {
         if (i + 4 < s.size()) {
-          int cp = std::stoi(s.substr(i + 1, 4), nullptr, 16);
+          int cp = 0;
+          try { cp = std::stoi(s.substr(i + 1, 4), nullptr, 16); }
+          catch (const std::exception&) { cp = 0xFFFD; }
           out += Utf8(cp);
           i += 4;
         }
@@ -137,7 +140,9 @@ bool BpeTokenizer::Load(const std::string& model_dir) {
     size_t ne = ns;
     while (ne < vjson.size() && (isdigit(vjson[ne]) || vjson[ne] == '-')) ++ne;
     if (ne == ns) break;
-    int id = std::stoi(vjson.substr(ns, ne - ns));
+    int id = -1;
+    try { id = std::stoi(vjson.substr(ns, ne - ns)); }
+    catch (const std::exception&) { break; }
     token_to_id_[key] = id;
     id_to_token_[id] = key;
     pos = ne;
@@ -187,7 +192,8 @@ bool BpeTokenizer::Load(const std::string& model_dir) {
             std::string obj = tj.substr(brace, braceEnd - brace);
             if (obj.find("\"special\": true") != std::string::npos ||
                 obj.find("\"special\":true") != std::string::npos) {
-              special_ids_[std::stoi(key)] = true;
+              try { special_ids_[std::stoi(key)] = true; }
+              catch (const std::exception&) { /* skip malformed key */ }
             }
             p = braceEnd;
             continue;

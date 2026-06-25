@@ -110,7 +110,7 @@ set(ORATOR_CORE_SOURCES
     src/protocol/disk_backend.cc
     src/protocol/time_index.cc
     src/protocol/protocol_timeline.cc
-    src/protocol/ws_envelope.cc
+    # src/protocol/ws_envelope.cc — removed (dead code, zero callers)
     src/protocol/session_store.cc
 )
 

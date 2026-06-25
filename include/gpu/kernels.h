@@ -1,11 +1,14 @@
 #pragma once
 
+// CUDA kernel collection: basic vector operations (Add, Multiply,
+// NormalizeVector, CosineSimilarity, BatchCosineSimilarity). Each kernel
+// is validated against a CPU reference in test_kernels. Used by the GPU
+// VAD detector and potentially by model inference layers.
+
 #include <cuda_runtime.h>
 
 namespace orator {
 namespace gpu {
-
-// Basic vector operations kernels
 class Kernels {
  public:
   // Normalize vector (L2 norm)

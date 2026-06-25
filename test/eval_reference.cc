@@ -20,7 +20,9 @@
 #include <unordered_map>
 
 #include "io/reference_transcript.h"
-#include "pipeline/comprehensive_timeline.h"
+#include "test_comprehensive_timeline_access.h"
+
+using orator::pipeline::TestComprehensiveTimeline;
 
 using namespace orator;
 
@@ -55,11 +57,11 @@ int main(int argc, char** argv) {
   // Deposit into the runtime ComprehensiveTimeline. Diarization provides the
   // speaker set (who/when); ASR provides text (what/when); the timeline
   // attributes each text segment to a speaker purely by time overlap.
-  pipeline::ComprehensiveTimeline timeline;
-  std::vector<pipeline::ComprehensiveTimeline::SpeakerInput> spk;
+  pipeline::TestComprehensiveTimeline timeline;
+  std::vector<pipeline::TestComprehensiveTimeline::SpeakerInput> spk;
   spk.reserve(diar.size());
   for (const auto& d : diar) {
-    pipeline::ComprehensiveTimeline::SpeakerInput s;
+    pipeline::TestComprehensiveTimeline::SpeakerInput s;
     s.start = d.start_sec;
     s.end = d.end_sec;
     s.speaker = d.speaker_id.empty()

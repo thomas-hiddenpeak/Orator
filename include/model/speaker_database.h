@@ -1,5 +1,10 @@
 #pragma once
 
+// SpeakerDatabase: GPU-accelerated speaker embedding registry implementing
+// ISpeakerRegistry. Stores enrolled speaker embeddings in device memory and
+// provides 1:N cosine-similarity matching against query embeddings.
+// Retained but inactive — not currently wired into any runtime pipeline.
+
 #include <cstdint>
 #include <string>
 #include <unordered_map>

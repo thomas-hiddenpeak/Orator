@@ -69,22 +69,23 @@ class Qwen3Asr final : public core::IAsr {
 
   // Begin a new segment. `base_sample` is the absolute sample index of the
   // first sample fed after this call (for timeline anchoring by the caller).
-  void StreamReset(long base_sample = 0);
+  void StreamReset(long base_sample = 0) override;
 
   // Feed mono-16k samples. Once at least one full 8 s window has accumulated,
   // encodes the new window(s), appends their KV, re-prefills the suffix and
   // decodes. Returns the current live transcript (language tag stripped). If no
   // new window has completed, returns the unchanged live transcript.
-  std::string StreamChunk(const float* pcm, int n, cudaStream_t stream = 0);
+  std::string StreamChunk(const float* pcm, int n,
+                          cudaStream_t stream = 0) override;
 
   // Flush the residual (< 8 s) tail: encode it, append, decode once, and return
   // the final transcript for the segment. Ends the session.
-  std::string StreamFinalize(cudaStream_t stream = 0);
+  std::string StreamFinalize(cudaStream_t stream = 0) override;
 
   // Streaming knobs (mirror the official unfixed_chunk_num / unfixed_token_num).
   void set_stream_unfixed_chunks(int n) { stream_unfixed_chunks_ = n; }
   void set_stream_unfixed_tokens(int n) { stream_unfixed_tokens_ = n; }
-  int stream_audio_tokens() const { return stream_audio_tokens_; }
+  int stream_audio_tokens() const override { return stream_audio_tokens_; }
   int stream_chunk_id() const { return stream_chunk_id_; }
 
 

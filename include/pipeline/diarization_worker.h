@@ -68,7 +68,7 @@ class DiarizationWorker {
 
   // Absolute sample count consumed and committed so far (monotonic).
   long processed_samples() const { return processed_samples_.load(); }
-  double compute_sec() const { return compute_sec_; }
+  double compute_sec() const { return compute_sec_.load(); }
 
  private:
   // Derive the current speaker view from all accumulated frames and deliver it
@@ -87,7 +87,7 @@ class DiarizationWorker {
   SpeakerSink speaker_sink_;
   long last_deliver_sample_ = 0;
   std::atomic<long> processed_samples_{0};
-  double compute_sec_ = 0.0;
+  std::atomic<double> compute_sec_{0.0};
 };
 
 }  // namespace pipeline

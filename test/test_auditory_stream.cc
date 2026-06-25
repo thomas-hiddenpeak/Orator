@@ -37,16 +37,10 @@ static int g_fail = 0;
 // ============================================================================
 // Mock model implementations
 //
-// These implement the core::IDiarizer, core::IAsr, and core::IVad interfaces
-// with call-tracking counters and no-op behavior. They are registered in the
-// global Registry so they can be instantiated by name, but the current worker
-// implementations (DiarizationWorker, AsrWorker) internally use dynamic_cast
-// to concrete types (SortformerDiarizer, Qwen3Asr), so the mocks cannot be
-// used through the full pipeline without modifying the workers. They are
-// provided here for:
-//   1. Interface contract verification
-//   2. Future use when workers are fully decoupled from concrete types
-//   3. Documentation of the expected interface behavior
+// These implement core::IDiarizer, core::IAsr, and core::IVad with
+// call-tracking counters and no-op behavior. Workers now call interface
+// methods directly (no dynamic_cast). Mocks are usable through the full
+// pipeline provided they implement all pure virtual methods on the interface.
 //
 // All test cases below use empty model paths (no workers created), which
 // exercises the AuditoryStream controller shell without requiring GPU compute
@@ -69,6 +63,11 @@ class TestDiarizer : public IDiarizer {
     ++process_count;
     return DiarizationFrames{};
   }
+  DiarizationFrames StreamAudio(const float* /*samples*/, int /*n*/,
+                                 bool /*final*/,
+                                 cudaStream_t /*stream*/) override {
+    return DiarizationFrames{};
+  }
   int max_speakers() const override { return 4; }
   double frame_period_sec() const override { return 0.032; }
   std::string name() const override { return "test_diarizer"; }
@@ -89,6 +88,11 @@ class TestAsr : public IAsr {
     return Transcript{};
   }
   void set_max_new_tokens(int /*max_tokens*/) override {}
+  void StreamReset(long /*base_sample*/) override {}
+  std::string StreamChunk(const float* /*pcm*/, int /*n*/,
+                          cudaStream_t /*stream*/) override { return ""; }
+  std::string StreamFinalize(cudaStream_t /*stream*/) override { return ""; }
+  int stream_audio_tokens() const override { return 0; }
   std::string name() const override { return "test_asr"; }
 };
 

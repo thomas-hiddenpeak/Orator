@@ -1,5 +1,10 @@
 #pragma once
 
+// RingBuffer<T>: a GPU-accessible circular buffer for streaming audio in
+// unified memory. Supports lock-free single-producer single-consumer access
+// via head/tail indices. Used by SharedAudioBuffer for the audio ingestion
+// ring buffer shared across all pipeline consumers.
+
 #include <cstddef>
 #include <vector>
 

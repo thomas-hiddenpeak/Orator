@@ -1,5 +1,9 @@
 #pragma once
 
+// Common worker utilities shared by pipeline worker threads. Provides a
+// monotonic clock alias (Clock) and a Secs() helper for measuring elapsed
+// time between two clock samples.
+
 #include <chrono>
 
 namespace orator {

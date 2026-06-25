@@ -8,6 +8,7 @@
 // pipeline. This is what makes "模型解耦" (model decoupling) real: swapping a
 // model is a config/registration change, not a code change in consumers.
 
+#include <cuda_runtime.h>
 #include <string>
 #include <vector>
 
@@ -38,12 +39,21 @@ class IDiarizer {
   // Consume one audio chunk and return frame-level activity for that chunk.
   virtual DiarizationFrames ProcessChunk(const AudioChunk& chunk) = 0;
 
+  // ── Streaming incremental diarization ────────────────────────────
+  // Feed mono-16k samples and return frame-level speaker probabilities.
+  // `final` flushes any residual frames. `stream` is the CUDA stream.
+  virtual DiarizationFrames StreamAudio(const float* samples,
+                                        int num_samples, bool final,
+                                        cudaStream_t stream) = 0;
+
   virtual int max_speakers() const = 0;
   virtual double frame_period_sec() const = 0;
   virtual std::string name() const = 0;
 };
 
 // Extracts a fixed-dimension speaker embedding from an audio span.
+// RETAINED BUT INACTIVE — no concrete implementation is wired into any
+// runtime pipeline. Retained for future speaker-identification features.
 class ISpeakerEmbedder {
  public:
   virtual ~ISpeakerEmbedder() = default;
@@ -54,6 +64,9 @@ class ISpeakerEmbedder {
 };
 
 // Persistent registry of enrolled speakers, supporting 1:N matching.
+// RETAINED BUT INACTIVE — the concrete implementation (speaker_database.h)
+// compiles but is not wired into any runtime pipeline. Retained for
+// future speaker-identification features.
 class ISpeakerRegistry {
  public:
   virtual ~ISpeakerRegistry() = default;
@@ -94,10 +107,25 @@ class IAsr {
 
   virtual void set_max_new_tokens(int /*max_tokens*/) {}
 
+  // ── Streaming incremental decode ─────────────────────────────────
+  // Begin a new segment at absolute sample position `base_sample`.
+  virtual void StreamReset(long base_sample) = 0;
+  // Feed mono-16k PCM samples; returns the current live transcript.
+  // `stream` is the CUDA stream for GPU work in this call.
+  virtual std::string StreamChunk(const float* pcm, int n,
+                                  cudaStream_t stream) = 0;
+  // Flush residual tail; returns the final transcript for the segment.
+  virtual std::string StreamFinalize(cudaStream_t stream) = 0;
+  // Total accumulated audio tokens in the current segment.
+  virtual int stream_audio_tokens() const = 0;
+
   virtual std::string name() const = 0;
 };
 
 // Terminal consumer of a timeline (e.g. JSON for an LLM, a socket, a file).
+// RETAINED BUT INACTIVE — the runtime pipeline uses Emit callbacks
+// (std::function) rather than this interface. Retained as a contract
+// option for future non-callback consumers.
 class ISink {
  public:
   virtual ~ISink() = default;

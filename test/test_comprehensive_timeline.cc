@@ -2,9 +2,9 @@
 #include <cstdio>
 #include <string>
 
-#include "pipeline/comprehensive_timeline.h"
+#include "test_comprehensive_timeline_access.h"
 
-using orator::pipeline::ComprehensiveTimeline;
+using orator::pipeline::TestComprehensiveTimeline;
 
 static int g_fail = 0;
 #define CHECK(cond, msg)                                  \
@@ -20,7 +20,7 @@ int main() {
 
   // ---- 1. Out-of-order upserts: text arrives before its speaker ----
   {
-    ComprehensiveTimeline tl;
+    TestComprehensiveTimeline tl;
     // Text 0 at [0,5) arrives first; no speaker yet -> attributed "unknown".
     auto r0 = tl.UpsertText(0, 0.0, 5.0, "hello");
     CHECK(r0.size() == 1, "first text yields one revision (new entry)");
@@ -40,7 +40,7 @@ int main() {
   // ---- 2. A text spanning two speakers is SPLIT at the diarization boundary
   // (diar-driven view), not attributed wholly to the max-overlap speaker. ----
   {
-    ComprehensiveTimeline tl;
+    TestComprehensiveTimeline tl;
     // Speaker_0 [0,3), Speaker_1 [3,10).
     tl.UpsertSpeaker(0.0, 3.0, "speaker_0", 0.9f);
     tl.UpsertSpeaker(3.0, 10.0, "speaker_1", 0.9f);
@@ -60,7 +60,7 @@ int main() {
 
   // ---- 3. A later speaker update flips a prior attribution (revisable) ----
   {
-    ComprehensiveTimeline tl;
+    TestComprehensiveTimeline tl;
     tl.UpsertSpeaker(0.0, 10.0, "speaker_0", 0.6f);
     auto r0 = tl.UpsertText(0, 4.0, 6.0, "mid");
     CHECK(r0[0].entries[0].speaker == "speaker_0", "initial attribution spk0");
@@ -77,7 +77,7 @@ int main() {
 
   // ---- 4. Incrementality: a speaker update far from a text does not revise ----
   {
-    ComprehensiveTimeline tl;
+    TestComprehensiveTimeline tl;
     tl.UpsertSpeaker(0.0, 5.0, "speaker_0", 0.9f);
     tl.UpsertText(0, 0.0, 5.0, "a");
     // Speaker far away [100,105) -> no overlap with the text -> no revision.
@@ -88,7 +88,7 @@ int main() {
   // ---- 4b. Pure alignment: text with no overlapping speaker is "unknown",
   // NOT borrowed from the nearest segment (Spec 004 invariant). ----
   {
-    ComprehensiveTimeline tl;
+    TestComprehensiveTimeline tl;
     // A speaker exists only at [20,25); text at [0,5) has NO overlap.
     tl.UpsertSpeaker(20.0, 25.0, "speaker_0", 0.9f);
     auto r = tl.UpsertText(0, 0.0, 5.0, "head");
@@ -106,7 +106,7 @@ int main() {
 
   // ---- 5. Snapshot coalesces consecutive same-speaker entries ----
   {
-    ComprehensiveTimeline tl;
+    TestComprehensiveTimeline tl;
     tl.UpsertSpeaker(0.0, 20.0, "speaker_0", 0.9f);
     tl.UpsertText(0, 0.0, 5.0, "one");
     tl.UpsertText(1, 5.0, 10.0, "two");
@@ -119,7 +119,7 @@ int main() {
 
   // ---- 6. ReplaceSpeakers: diarization's whole-view delivery re-projects text ----
   {
-    ComprehensiveTimeline tl;
+    TestComprehensiveTimeline tl;
     tl.UpsertText(0, 0.0, 5.0, "x");
     tl.UpsertText(1, 5.0, 10.0, "y");
     // First diar view: one speaker covering everything -> both texts -> spk0.
@@ -137,8 +137,8 @@ int main() {
       // ---- 7. Interleaved convergence: ASR self-revisions and diar updates in
       // different arrival orders must converge to the SAME final view. ----
       {
-        ComprehensiveTimeline a;
-        ComprehensiveTimeline b;
+    TestComprehensiveTimeline a;
+    TestComprehensiveTimeline b;
 
         // Order A: diar baseline -> text -> text revision -> diar refinement.
         a.ReplaceSpeakers({{0.0, 4.0, "speaker_0", 0.8f},

@@ -257,6 +257,10 @@ class AuditoryStream {
   long diar_sub_id_ = 0;
   long asr_sub_id_ = 0;
 
+  // VAD gate: local cache populated by ProtocolTimeline subscription.
+  // Avoids O(N^2) Replay calls on the ASR worker hot path.
+  std::unique_ptr<orator::pipeline::AsrWorker::VadCache> vad_cache_;
+
   // Spec 004 Phase 13: session persistence store. Saves timeline JSON on
   // Reset(). Null when persistence is disabled (empty storage_disk_path).
   std::unique_ptr<protocol::SessionStore> session_store_;

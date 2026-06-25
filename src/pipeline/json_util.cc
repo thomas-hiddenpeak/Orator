@@ -1,5 +1,9 @@
 #include "pipeline/json_util.h"
 
+#include "pipeline/comprehensive_timeline.h"
+
+#include <cstdio>
+#include <stdexcept>
 #include <string>
 
 namespace orator {
@@ -54,6 +58,36 @@ long JsonParseLong(const std::string& data, const char* key) {
   } catch (const std::exception&) {
     return -1;
   }
+}
+
+std::string SerializeRevisionToJson(
+    const ComprehensiveTimeline::Revision& r,
+    const char* source) {
+  char buf[160];
+  std::string out = "{\"type\":\"revision\",\"source\":\"";
+  out += source;
+  out += "\",";
+  std::snprintf(buf, sizeof(buf),
+                "\"dirty_start\":%.3f,\"dirty_end\":%.3f,\"entries\":[",
+                r.dirty_start, r.dirty_end);
+  out += buf;
+  for (size_t i = 0; i < r.entries.size(); ++i) {
+    const auto& e = r.entries[i];
+    int spk_idx = -1;
+    if (e.speaker.size() > 8 && e.speaker.substr(0, 8) == "speaker_") {
+      try { spk_idx = std::stoi(e.speaker.substr(8)); }
+      catch (const std::invalid_argument&) { spk_idx = -1; }
+      catch (const std::out_of_range&) { spk_idx = -1; }
+    }
+    std::snprintf(buf, sizeof(buf),
+                  "{\"start\":%.3f,\"end\":%.3f,\"text_id\":%ld,\"speaker\":%d,"
+                  "\"text\":\"",
+                  e.start, e.end, e.text_id, spk_idx);
+    out += std::string(buf) + JsonEscape(e.text) + "\"}";
+    if (i + 1 < r.entries.size()) out += ",";
+  }
+  out += "]}";
+  return out;
 }
 
 }  // namespace pipeline

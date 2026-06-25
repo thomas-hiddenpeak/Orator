@@ -62,11 +62,21 @@ Real-time edge-deployed (Jetson Orin/Thor) auditory pipeline. Ingests mono PCM a
 - Functions small, single-purpose
 
 ### Layering (strict, enforced in review)
-Dependencies point inward toward `core/`:
+Dependencies point toward the bottom layers, with `core/` as the base:
 ```
-gpu/ io/ → core/ → model/ → pipeline/ → net/ → protocol/
+protocol/  net/
+    ↑       ↑
+    pipeline/
+    ↑
+  model/
+    ↑
+  gpu/ io/ feature/
+    ↑     ↑
+      core/
 ```
-Consumers depend on interfaces, never on concrete models.
+Note: `protocol/` is consumed by both `pipeline/` (protocol timeline, session store)
+and `net/` (WS envelope wrapping). It functions as a shared dependency layer below
+pipeline and net, not as an outermost layer above them.
 
 ### SDD workflow (mandatory for non-trivial work)
 1. Read constitution → spec (WHAT/WHY) → plan (HOW) → tasks (verifiable steps)
@@ -187,3 +197,4 @@ cmake --build build -j 2>&1 | grep -E "warning:|error:" || true  # Warning check
 - **Log level** controlled by `ORATOR_LOG_LEVEL` env var or `[debug].log_level` in `orator.toml` (0=DEBUG .. 3=ERROR)
 - **Runtime config** via `orator.toml` (TOML format). All ~35 runtime parameters in 8 sections. Loading order: defaults → CLI → `orator.toml` → env. See `include/io/config_reader.h`.
 - **Specs 001-004 completed and verified.** Spec 006 (Web UI MVP) implemented. Active work follows Spec 004 protocol layer.
+- **VAD gate optimization** (2026-06-25): Replaced O(N²) `ProtocolTimeline::Replay(0.0)` per `ProcessSpan` call with `ProtocolTimeline` subscription → local `VadCache` (O(1) `GetAll()`). Eliminated O(N²) Replay overhead on ASR hot path, enabling real-time 1× streaming for full 3615s session. `VadCache` subscribes to `vad/speech_segment` via `ProtocolTimeline::SubscribeInternal`, populated by VAD thread's `Publish`. ASR worker reads O(1) from local `VadCache::GetAll()`.

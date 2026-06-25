@@ -101,7 +101,10 @@ std::string WrapMessageInEnvelope(const std::string& json, int64_t msg_id) {
   // Escape the original JSON for embedding in the "data" field.
   std::string escapedData = EscapeJsonString(json);
 
-  // Build envelope.
+  // Build envelope. Known limitation: ts is always 0 because the emit
+  // callback only passes raw JSON strings, not timestamps. Consumers
+  // should read the actual timestamp from envelope.data.start or
+  // envelope.data.time_sec.
   std::string envelope = "{\"topic\":\"" + topic
                          + "\",\"pipeline\":\"" + type
                          + "\",\"pipeline_version\":\"1.0.0\""

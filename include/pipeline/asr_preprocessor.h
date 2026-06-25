@@ -1,13 +1,14 @@
 #pragma once
 
+// AsrPreprocessor: audio preprocessing pipeline for ASR input. Applies
+// noise reduction (spectral subtraction), optional DC offset removal, and
+// gain normalization to raw PCM before feeding the ASR model.
+
 #include <string>
 #include <vector>
 
 namespace orator {
 namespace pipeline {
-
-// ASR-only audio preprocessor.
-//
 // Runs AFTER ASR VAD segmentation and BEFORE ASR decode so it never affects
 // the diarization pipeline features.
 class AsrPreprocessor {
@@ -21,7 +22,8 @@ class AsrPreprocessor {
 
   explicit AsrPreprocessor(const Params& params);
 
-  // Process one utterance. Output size equals input size.
+  // Apply noise reduction and normalization to one utterance.
+  // Input and output have identical sample count.
   void Process(const float* samples, int n, std::vector<float>* out) const;
 
  private:
@@ -33,8 +35,11 @@ class AsrPreprocessor {
   };
 
   Mode ParseMode(const std::string& mode) const;
+  // Classical DSP pipeline: spectral subtraction + DC removal + gain.
   void ClassicalEnhance(const float* in, int n, std::vector<float>* out) const;
+  // FRCRN neural enhancement (not yet wired — returns false).
   bool RunFrcrnModelScope(const float* in, int n, std::vector<float>* out) const;
+  // Issue a warning at most once per instance lifetime.
   void WarnOnce(const char* msg) const;
 
   Params params_;

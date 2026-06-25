@@ -1,5 +1,10 @@
 #pragma once
 
+// GPU memory allocators and RAII buffers. Provides four allocation types
+// (Device, Unified, Pinned, Host, Mmap) via CudaAlloc and a templated
+// GpuBuffer<T> RAII wrapper with move semantics. Every CUDA allocation is
+// error-checked; no raw cudaMalloc/cudaFree appears in user code.
+
 #include <cstddef>
 #include <stdexcept>
 #include <string>

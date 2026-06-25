@@ -1,12 +1,14 @@
 #pragma once
 
+// HttpStaticServer: a dependency-free HTTP/1.0 static file server for
+// serving the Web UI (web/ directory). GET-only, one request per TCP
+// connection, Content-Type inferred from file extension. Serves on a
+// dedicated port (default ws_port+1) alongside the WebSocket server.
+
 #include <string>
 
 namespace orator {
 namespace net {
-
-// Minimal dependency-free HTTP static file server for local UI hosting.
-// It is intentionally simple: GET-only, one request per connection, no TLS.
 class HttpStaticServer {
  public:
   HttpStaticServer(int port, std::string web_root);

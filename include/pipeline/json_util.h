@@ -1,11 +1,11 @@
 #pragma once
 
-// Minimal JSON string escaping for the timeline/event serializers. Shared so
-// the ASR worker (incremental events) and the controller (timeline document)
-// escape UTF-8 text identically without duplicating the logic.
+// Minimal JSON string escaping and serialization for the timeline/event
+// serializers. Shared so the ASR worker (incremental events) and the
+// controller (timeline document) escape UTF-8 text identically without
+// duplicating the logic.
 //
-// Also provides JSON key-value parsing helpers extracted from duplicated
-// inline lambdas in auditory_stream.cc subscription callbacks.
+// Also provides JSON key-value parsing helpers.
 
 #include <cstdio>
 #include <string>

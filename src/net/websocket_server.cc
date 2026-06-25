@@ -70,7 +70,7 @@ void Sha1::Init() {
   h[4] = 0xC3D2E1F0;
 }
 
-static uint32_t rotl(uint32_t x, int n) { return (x << n) | (x >> (32 - n)); }
+static uint32_t Rotl(uint32_t x, int n) { return (x << n) | (x >> (32 - n)); }
 
 void Sha1::Transform(const uint8_t block[64]) {
   std::array<uint32_t, 80> w;
@@ -79,7 +79,7 @@ void Sha1::Transform(const uint8_t block[64]) {
            (uint32_t(block[4 * i + 2]) << 8) | uint32_t(block[4 * i + 3]);
   }
   for (int i = 16; i < 80; ++i) {
-    w[i] = rotl(w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16], 1);
+    w[i] = Rotl(w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16], 1);
   }
 
   uint32_t a = h[0], b = h[1], c = h[2], d = h[3], e = h[4];
@@ -99,10 +99,10 @@ void Sha1::Transform(const uint8_t block[64]) {
       f = b ^ c ^ d;
       k = 0xCA62C1D6;
     }
-    uint32_t t = rotl(a, 5) + f + e + k + w[i];
+    uint32_t t = Rotl(a, 5) + f + e + k + w[i];
     e = d;
     d = c;
-    c = rotl(b, 30);
+    c = Rotl(b, 30);
     b = a;
     a = t;
   }

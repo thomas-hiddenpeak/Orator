@@ -2,7 +2,7 @@
 
 - **Feature**: `004-comprehensive-timeline`
 - **Spec**: [spec.md](spec.md) · **Plan**: [plan.md](plan.md)
-- **Status**: Phases 1–6 Implemented. Phases 7–12 (protocol layer) Implemented. Phase 13 (session persistence) In Progress.
+- **Status**: Phases 1–6 Implemented. Phases 7–12 (protocol layer) Implemented. Phase 13 (session persistence): T130–T134 Implemented, T135 NOT YET IMPLEMENTED.
 - **Constitution**: v1.3.0
 
 > Ordered, independently verifiable steps. Each phase builds + tests before the
@@ -305,7 +305,7 @@ Target: save timeline JSON on `Reset()`, expose session list/load over WS.
 | T132 | Wire `AuditoryStream::Reset()` — call `Serialize()` before clearing state, pass to `SessionStore::Save()` with UUID-like session ID (`<wall_sec_hex>-<pid_hex>`). Guarded by optional `store_`: if unset (no disk path), skip. | After Reset, file appears in session dir. |
 | T133 | Add WS command `{"cmd":"sessions"}` → returns `{"type":"sessions","list":[...]}`. Add `{"cmd":"load_session","session_id":"<id>"}` → returns full timeline message. Both handled in `ws_main.cc`. | WS client receives session list; load returns matching JSON. |
 | T134 | Add `ORATOR_SESSION_DIR` env var to `ws_main.cc`. Default: `<ORATOR_STORAGE_DISK_PATH>/sessions/`. When empty, persistence disabled. | Env var controls directory; empty = no-op. |
-| T135 | Web UI: session history panel in sidebar, list on load, click to restore + reset + load. | Visual: sessions appear after reset, click loads timeline. |
+| T135 | Web UI: session history panel in sidebar, list on load, click to restore + reset + load. | NOT YET IMPLEMENTED. Visual: sessions appear after reset, click loads timeline. |
 
 ## Definition of Done (Phases 7–12)
 Protocol layer replaces hard-coded pipeline interfaces; pipelines register via
@@ -314,5 +314,19 @@ storage with MEMORY + DISK backends; WS messages use topic-based envelope with
 backward compatibility; full 1-hour streaming run produces byte-identical output;
 build + tests green; docs updated; commit. **DONE** (2026-06-19).
 
-## Definition of Done (Phase 13)
-SessionStore created + tested; Reset() auto-saves timeline; WS supports sessions/load_session commands; Web UI panel shows session history; build + tests green; docs updated; commit.
+## VAD Gate O(N²) Fix — 2026-06-25
+**Problem**: ASR Worker's VAD gate used `protocol_timeline_->Replay(0.0)` per `ProcessSpan` call (O(N²) — every call deserializes all VAD segments). At 3615s (972 VAD segments, ~400 ProcessSpan calls) → ~389K deserializations + mutex contention → wall time >> audio duration.
+
+**Solution**: `ProtocolTimeline` subscription → local `VadCache` (O(1) `GetAll()`).
+1. `VadCache` class in `AsrWorker` with thread-safe `AddSegment`/`GetAll`.
+2. `AuditoryStream` owns `VadCache`, subscribes to `vad/speech_segment` via `ProtocolTimeline::SubscribeInternal`, cache populated by VAD thread's `Publish`.
+3. ASR worker reads `vad_cache_->GetAll()` (O(1)) on hot path.
+4. Result: Wall time 3615s → 3616s (1× real-time); O(N²) eliminated.
+
+**Files changed**:
+- `include/pipeline/asr_worker.h` — added `VadCache` class + `VadCache*` member
+- `src/pipeline/asr_worker.cc` — `ProcessSpan` reads `vad_cache_->GetAll()`
+- `src/pipeline/auditory_stream.cc` — `vad_cache_` member, `ProtocolTimeline::SubscribeInternal` in `StartWorkers`, `AsrWorker` receives `VadCache*`
+- `include/pipeline/asr_worker.h` — `VadCache` class + `VadCache* vad_cache_` member
+
+**VAD cache fix**: Replaced O(N²) `Replay(0.0)` (deserialize all VAD segments per `ProcessSpan`) with O(1) local cache read via ProtocolTimeline subscription. Result: 3615s wall time ≈ 3616s (1× real-time), O(N²) overhead eliminated.

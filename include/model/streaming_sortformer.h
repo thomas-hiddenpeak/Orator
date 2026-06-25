@@ -156,7 +156,8 @@ class SortformerDiarizer final : public core::IDiarizer {
   // audio. The returned frames' t_start_sec is the absolute stream time.
   // `stream` is the CUDA stream for all GPU work in this call.
   core::DiarizationFrames StreamAudio(const float* samples, int num_samples,
-                                       bool final, cudaStream_t stream);
+                                       bool final,
+                                       cudaStream_t stream) override;
 
   int max_speakers() const override { return config_.max_num_speakers; }
   double frame_period_sec() const override { return config_.FramePeriodSec(); }

@@ -42,14 +42,24 @@ class AsrWorker {
   // The worker holds it as a member and derives all time codes from it.
   // Text segments are delivered via text_sink_ (→ ProtocolTimeline → comp_);
   // raw tokens are no longer written to an external StreamTimeline.
-  // `vad_reader` is a callable that returns VAD speech segments from the
-  // ComprehensiveTimeline (Constitution Art. III §8 — pipelines communicate
-  // only through the timeline, never via direct callbacks).
-  using VadSegmentReader = std::function<std::vector<std::pair<double, double>>()>;
+  class VadCache {
+   public:
+    void AddSegment(double start, double end) {
+      std::lock_guard<std::mutex> lk(mutex_);
+      segments_.emplace_back(start, end);
+    }
+    std::vector<std::pair<double, double>> GetAll() const {
+      std::lock_guard<std::mutex> lk(mutex_);
+      return segments_;
+    }
+   private:
+    mutable std::mutex mutex_;
+    std::vector<std::pair<double, double>> segments_;
+  };
 
   AsrWorker(core::IAsr* asr, const Params& params,
-              Emit emit, core::TimeBase tb, cudaStream_t stream = 0,
-              VadSegmentReader vad_reader = nullptr);
+            Emit emit, core::TimeBase tb, cudaStream_t stream = 0,
+            VadCache* vad_cache = nullptr);
 
   void set_text_sink(TextSegmentSink sink) { text_sink_ = std::move(sink); }
 
@@ -58,7 +68,7 @@ class AsrWorker {
   void Reset();
 
   long processed_samples() const { return processed_samples_.load(); }
-  double compute_sec() const { return compute_sec_; }
+  double compute_sec() const { return compute_sec_.load(); }
 
  private:
   void ProcessIncremental(const float* samples, int n, bool finalize);
@@ -70,15 +80,14 @@ class AsrWorker {
   TextSegmentSink text_sink_;
   core::TimeBase tb_;
 
-  // VAD segments reader — fetches speech segments from ComprehensiveTimeline.
-  // Called from ProcessSpan() on the ASR worker thread; the reader handles its
-  // own synchronization (Constitution Art. III §8).
-  VadSegmentReader vad_reader_;
+  // Local VAD segment cache — updated by subscribing to VAD events via
+  // ProtocolTimeline. Eliminates O(N^2) Replay calls on hot path.
+  VadCache* vad_cache_ = nullptr;
 
   std::atomic<long> processed_samples_{0};
   std::atomic<int> debug_segments_started_{0};
   std::atomic<int> debug_segments_finalized_{0};
-  double compute_sec_ = 0.0;
+  std::atomic<double> compute_sec_{0.0};
   cudaStream_t stream_ = 0;
 
   bool inc_in_segment_ = false;

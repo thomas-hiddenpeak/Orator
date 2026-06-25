@@ -110,7 +110,11 @@ int main(int argc, char** argv) {
   ReadEnvDouble("ORATOR_ASR_SEGMENT_SEC", &cfg.asr_segment_sec);
   ReadEnvString("ORATOR_ASR_LANGUAGE", &cfg.asr_language);
   ReadEnvString("ORATOR_ASR_MODEL_DIR", &cfg.asr_model_dir);
-  if (std::getenv("ORATOR_ASR_DISABLE")) cfg.asr_model_dir.clear();
+  {
+    const char* asr_disable = std::getenv("ORATOR_ASR_DISABLE");
+    if (asr_disable && asr_disable[0] == '1')
+      cfg.asr_model_dir.clear();
+  }
   ReadEnvInt("ORATOR_PORT", &cfg.port);
   ReadEnvInt("ORATOR_UI_PORT", &cfg.ui_port);
   ReadEnvString("ORATOR_UI_ROOT", &cfg.ui_root);
@@ -129,6 +133,12 @@ int main(int argc, char** argv) {
   ReadEnvInt("ORATOR_ASR_DECODE_BATCH", &cfg.asr_decode_batch);
   cfg.stream_progress = ReadEnvFlag("ORATOR_STREAM_PROGRESS", cfg.stream_progress);
   ReadEnvString("ORATOR_ASR_SYSTEM_PROMPT", &cfg.asr_system_prompt);
+  ReadEnvDouble("ORATOR_DIAR_ONSET", &cfg.diar_onset);
+  ReadEnvDouble("ORATOR_DIAR_OFFSET", &cfg.diar_offset);
+  ReadEnvDouble("ORATOR_DIAR_PAD_ONSET", &cfg.diar_pad_onset);
+  ReadEnvDouble("ORATOR_DIAR_PAD_OFFSET", &cfg.diar_pad_offset);
+  ReadEnvDouble("ORATOR_DIAR_MIN_DUR_ON", &cfg.diar_min_dur_on);
+  ReadEnvDouble("ORATOR_DIAR_MIN_DUR_OFF", &cfg.diar_min_dur_off);
   // gpu_scheduling_mode: env ORATOR_GPU_SERIAL=1 → mode 1, ORATOR_GPU_CONCURRENT=1 → mode 2
   int gpu_mode = 0;
   if (ReadEnvInt("ORATOR_GPU_SERIAL", &gpu_mode) && gpu_mode == 1) {

@@ -7,7 +7,6 @@
 #include <thread>
 
 #include "gpu/gpu_lock.h"
-#include "model/qwen3_asr.h"
 #include "pipeline/json_util.h"
 #include "pipeline/worker_common.h"
 
@@ -19,11 +18,10 @@ using namespace worker;
 AsrWorker::AsrWorker(core::IAsr* asr,
                        const Params& params, Emit emit, core::TimeBase tb,
                        cudaStream_t stream,
-                       VadSegmentReader vad_reader)
+                       VadCache* vad_cache)
     : asr_(asr), params_(params), emit_(std::move(emit)),
       tb_(std::move(tb)),
-      vad_reader_(vad_reader ? std::move(vad_reader)
-                  : []() { return std::vector<std::pair<double, double>>{}; }),
+      vad_cache_(vad_cache),
       stream_(stream),
       ring_buffer_(kRingBufferSamples) {
 }
@@ -34,19 +32,20 @@ void AsrWorker::ProcessSpan(const float* samples, int n) {
   // Push into ring buffer regardless of VAD state (for lead buffer on speech onset)
   RingPush(samples, n, inc_abs_pos_);
 
-  if (params_.asr_vad_gate) {
-    const double current_sec = tb_.SecondsAt(inc_abs_pos_ + n);
+    if (params_.asr_vad_gate) {
+      const double current_sec = tb_.SecondsAt(inc_abs_pos_ + n);
 
-    // Read VAD segments from ComprehensiveTimeline via the reader.
-    // The reader handles its own synchronization (Constitution Art. III §8).
-    auto vad_segs = vad_reader_();
+      // Read VAD segments from local cache populated by ProtocolTimeline subscription.
+      // Eliminates O(N^2) Replay calls on hot path.
+      const auto& vad_segs = vad_cache_ ? vad_cache_->GetAll()
+                                         : std::vector<std::pair<double, double>>{};
 
-    auto in_speech = [&](double sec) {
-      for (const auto& [s, e] : vad_segs) {
-        if (sec >= s && sec < e) return true;
-      }
-      return false;
-    };
+      auto in_speech = [&](double sec) {
+        for (const auto& [s, e] : vad_segs) {
+          if (sec >= s && sec < e) return true;
+        }
+        return false;
+      };
 
     // Re-evaluate when VAD segments arrive during fallback processing.
     // Three cases:
@@ -183,11 +182,6 @@ void AsrWorker::ProcessIncremental(const float* samples, int n, bool finalize) {
 }
 
 void AsrWorker::EmitIncrementalChunk(const float* samples, int n, bool finalize) {
-  // TODO: Temporary bridge — IAsr interface only exposes Transcribe().
-  // Streaming methods (StreamReset, StreamChunk, StreamFinalize,
-  // stream_audio_tokens) are Qwen3Asr-specific. Add them to IAsr
-  // to eliminate this cast.
-  auto* qwen = dynamic_cast<model::Qwen3Asr*>(asr_);
   const auto t0 = Clock::now();
   {
     gpu::DeviceGuard gpu(/*own_stream=*/true);
@@ -196,16 +190,16 @@ void AsrWorker::EmitIncrementalChunk(const float* samples, int n, bool finalize)
         inc_seg_start_sample_ = inc_abs_pos_;
         inc_seg_samples_ = 0;
         inc_live_text_.clear();
-        qwen->StreamReset(inc_seg_start_sample_);
+        asr_->StreamReset(inc_seg_start_sample_);
         inc_in_segment_ = true;
       }
-      inc_live_text_ = qwen->StreamChunk(samples, n, stream_);
+      inc_live_text_ = asr_->StreamChunk(samples, n, stream_);
       inc_seg_samples_ += n;
       inc_abs_pos_ += n;
       inc_seg_end_sample_ = inc_abs_pos_;
     }
     if (inc_in_segment_ && finalize) {
-      inc_live_text_ = qwen->StreamFinalize(stream_);
+      inc_live_text_ = asr_->StreamFinalize(stream_);
       inc_in_segment_ = false;
     }
     // KV-cache safety cap: force-finalize before GPU memory crash.
@@ -219,12 +213,12 @@ void AsrWorker::EmitIncrementalChunk(const float* samples, int n, bool finalize)
     // the margin increases and the per-segment cap is ~115s of audio. VAD
     // trailing window normally closes segments before the cap is reached.
     if (inc_in_segment_ && params_.max_audio_tokens > 0 &&
-        qwen->stream_audio_tokens() >= params_.max_audio_tokens) {
-      inc_live_text_ = qwen->StreamFinalize(stream_);
+        asr_->stream_audio_tokens() >= params_.max_audio_tokens) {
+      inc_live_text_ = asr_->StreamFinalize(stream_);
       inc_in_segment_ = false;
     }
   }
-  compute_sec_ += Secs(t0, Clock::now());
+  compute_sec_.fetch_add(Secs(t0, Clock::now()), std::memory_order_relaxed);
 
   const bool segment_closed = !inc_in_segment_ && !inc_live_text_.empty();
   if (segment_closed) {
@@ -274,7 +268,7 @@ void AsrWorker::Reset() {
   inc_text_id_ = 0;
   inc_delivered_text_.clear();
   processed_samples_.store(0);
-  compute_sec_ = 0.0;
+  compute_sec_.store(0.0, std::memory_order_relaxed);
   asr_->Reset();
 
   vad_state_ = VadState::IDLE;

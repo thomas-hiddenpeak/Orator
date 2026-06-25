@@ -5,6 +5,7 @@
 #include "core/registry.h"
 #include "model/builtin_registration.h"
 #include "model/streaming_sortformer.h"
+#include "pipeline/json_util.h"
 #include "protocol/protocol_timeline.h"
 #include "protocol/session_store.h"
 
@@ -16,6 +17,8 @@
 #include <utility>
 
 #include <cuda_runtime.h>
+
+using VadCache = orator::pipeline::AsrWorker::VadCache;
 
 namespace orator {
 namespace pipeline {
@@ -172,20 +175,23 @@ void AuditoryStream::StartWorkers() {
     p.asr_vad_lead_ms = config_.asr_vad_lead_ms;
     p.asr_vad_trail_sec = config_.asr_vad_trail_sec;
     p.max_audio_tokens = config_.asr_max_audio_tokens;
-    AsrWorker::VadSegmentReader vad_reader =
-        [this]() -> std::vector<std::pair<double, double>> {
-      std::lock_guard<std::mutex> lk(comp_mutex_);
-      auto vad_segs = comp_.SnapshotVad();
-      std::vector<std::pair<double, double>> result;
-      result.reserve(vad_segs.size());
-      for (const auto& s : vad_segs) {
-        result.emplace_back(s.start, s.end);
-      }
-      return result;
-    };
+
+    // VAD gate: ASR reads VAD speech segments from local cache populated by
+    // ProtocolTimeline subscription. Eliminates O(N^2) Replay calls on hot path.
+    vad_cache_ = std::make_unique<orator::pipeline::AsrWorker::VadCache>();
+
+    // Subscribe to VAD events from ProtocolTimeline to populate the cache.
+    vad_sub_id_ = protocol_timeline_->SubscribeInternal(
+        protocol::TopicPattern(protocol::kVadSpeechSegment.to_string()),
+        [this](const protocol::Message& msg) {
+          double s = JsonParseNum(msg.data, "start");
+          double e = JsonParseNum(msg.data, "end");
+          if (s >= 0.0 && e > s) vad_cache_->AddSegment(s, e);
+        });
+
     asr_worker_ = std::make_unique<AsrWorker>(asr_.get(), p,
         [this](const std::string& json) { EmitLocked(json); },
-        buffer_.time_base(), asr_stream_, vad_reader);
+        buffer_.time_base(), asr_stream_, vad_cache_.get());
     asr_worker_->set_text_sink(
         [this](long id, double start, double end, const std::string& text) {
           HandleTextSink(protocol_timeline_.get(), asr_handle_.get(),
