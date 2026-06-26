@@ -74,6 +74,18 @@ class AsrWorker {
   void ProcessIncremental(const float* samples, int n, bool finalize);
   void EmitIncrementalChunk(const float* samples, int n, bool finalize);
 
+  // Event-driven VAD gate. ProcessSpan cuts the incoming audio span at the VAD
+  // segment boundaries that fall inside it (VadCutSamples) so each sub-span lies
+  // wholly within one VAD region, then ProcessGateSubSpan acts on it: process
+  // speech and UNCONFIRMED audio (never drop speech), skip only CONFIRMED
+  // silence (the GPU saving), committing the open utterance after its trailing
+  // window. Cut points are VAD audio times, so coverage does not depend on how
+  // large the span is (chunk-invariant): a flooded multi-minute span is no
+  // longer skipped wholesale because its end happens to land in a silence gap.
+  // This never blocks on VAD -- it only consults what VAD has already published.
+  void ProcessGateSubSpan(const float* sub, int sub_n);
+  std::vector<long> VadCutSamples(long span_start, long span_end) const;
+
   core::IAsr* asr_;
   Params params_;
   Emit emit_;
@@ -109,10 +121,15 @@ class AsrWorker {
   int ring_count_ = 0;
   long ring_base_abs_pos_ = 0;  // absolute sample of ring_buffer_[0]
 
-  // VAD state machine
+  // VAD gate state: IDLE = skipping silence / between utterances; PROCESSING =
+  // an engine segment is being fed. (TRAILING is retained for ABI but unused by
+  // the event-driven gate, which commits inline at confirmed silence.)
   enum class VadState { IDLE, PROCESSING, TRAILING };
   VadState vad_state_ = VadState::IDLE;
-  double vad_trail_start_sec_ = 0.0;  // when trailing started (common clock)
+  double vad_trail_start_sec_ = 0.0;  // retained; unused by event-driven gate
+  // End (common clock, sec) of the most recently fed speech, for the trailing
+  // window measurement at a confirmed silence gap.
+  double last_speech_end_sec_ = -1e9;
 };
 
 }  // namespace pipeline

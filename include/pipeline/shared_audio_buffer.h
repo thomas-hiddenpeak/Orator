@@ -1,7 +1,18 @@
 #pragma once
 
-// SharedAudioBuffer: the single point of coupling between the ingest producer
-// and the independent pipeline consumers (diarization, ASR).
+// SharedAudioBuffer: RETAINED BUT INACTIVE (Constitution Art. VIII).
+//
+// As of the per-pipeline cache refactor (2026-06-27) this class is NO LONGER on
+// the production runtime path. `AuditoryStream` now gives each pipeline its own
+// private `PipelineAudioCache` (single producer / single consumer, consumed
+// prefix freed immediately) instead of one shared store with multiple cursors.
+// This header is kept only as a reference implementation and for its
+// concurrency test (`test/unit/core/test_shared_buffer.cc`); no `src/`, `net/`,
+// or `pipeline/` code constructs it. Do not treat it as live behaviour.
+//
+// ----------------------------------------------------------------------------
+// Original design (for reference): the single point of coupling between the
+// ingest producer and the independent pipeline consumers (diarization, ASR).
 //
 // Per the architecture (Spec 001 / plan.md §2.1), the input audio is the only
 // data the two pipelines share. The producer appends decoded mono PCM indexed
@@ -66,8 +77,16 @@ class SharedAudioBuffer {
   // receives the ABSOLUTE sample index (on the common clock) of out->front() --
   // i.e. the cursor's position before this read -- so a consumer can anchor its
   // local time codes onto the common time base.
+  //
+  // `max_batch_samples` caps how many samples a single read returns (0 = no cap,
+  // return everything available). This lets a consumer pull the backlog in
+  // fixed-size batches at its own (device-determined) maximum speed, so its
+  // per-batch behaviour does not depend on how fast the producer floods the
+  // buffer -- the consumer sees the same batch sequence whether audio arrives in
+  // real time or all at once. The cursor advances only by what is returned, so
+  // the next call continues from where this one stopped.
   bool WaitAndRead(int cursor, std::vector<float>* out,
-                   long* span_start_abs = nullptr);
+                   long* span_start_abs = nullptr, long max_batch_samples = 0);
 
   // Clear all state for a fresh session. Consumers MUST be stopped (joined)
   // first; this resets cursors and re-initializes the buffer.
@@ -109,14 +128,13 @@ class SharedAudioBuffer {
   const int sample_rate_;
   Config config_;
   
-  // In-memory ring buffer: holds the latest 'max_memory_samples' data
+  // Append-only sample store. The consumed prefix is erased once every cursor
+  // has passed it (RemovePassedPrefix), so retained memory tracks the in-flight
+  // window -- which stays small because every consumer runs faster than realtime.
   std::vector<float> memory_buffer_;
   long memory_start_sample_ = 0; // absolute sample index of memory_buffer_.front()
-  
-  // Disk storage for overflow data
-  class DiskAudioStorage* disk_storage_;
 
-  long base_sample_ = 0;        // absolute index of the oldest retained sample (memory or disk)
+  long base_sample_ = 0;        // absolute index of the oldest retained sample
   long total_samples_ = 0;      // absolute count appended this session
   std::vector<long> cursors_;   // absolute read position per consumer
   bool closed_ = false;

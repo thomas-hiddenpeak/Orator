@@ -29,128 +29,121 @@ AsrWorker::AsrWorker(core::IAsr* asr,
 void AsrWorker::ProcessSpan(const float* samples, int n) {
   if (samples == nullptr || n <= 0) return;
 
-  // Push into ring buffer regardless of VAD state (for lead buffer on speech onset)
-  RingPush(samples, n, inc_abs_pos_);
-
-    if (params_.asr_vad_gate) {
-      const double current_sec = tb_.SecondsAt(inc_abs_pos_ + n);
-
-      // Read VAD segments from local cache populated by ProtocolTimeline subscription.
-      // Eliminates O(N^2) Replay calls on hot path.
-      const auto& vad_segs = vad_cache_ ? vad_cache_->GetAll()
-                                         : std::vector<std::pair<double, double>>{};
-
-      auto in_speech = [&](double sec) {
-        for (const auto& [s, e] : vad_segs) {
-          if (sec >= s && sec < e) return true;
-        }
-        return false;
-      };
-
-    // Re-evaluate when VAD segments arrive during fallback processing.
-    // Three cases:
-    //   in_speech=true              → VAD confirms speech at current position.
-    //   current_sec past last VAD end ≥ trail_sec → VAD confirmed silence long
-    //     enough for a segment boundary. Enter TRAILING so the trailing timer
-    //     can commit the current segment.
-    //   otherwise                   → stay IDLE, keep processing audio via line 97.
-    if (vad_state_ == VadState::IDLE && !vad_segs.empty() && inc_in_segment_) {
-      if (in_speech(current_sec)) {
-        vad_state_ = VadState::PROCESSING;
-      } else {
-        // Only trail when VAD has confirmed speech within this ASR segment.
-        // If no VAD segment START falls within [seg_start, current_sec), VAD
-        // may still be processing this speech segment (async pipeline lag).
-        // Trailing on stale data would cut the segment short.
-        double seg_start_sec = tb_.SecondsAt(inc_seg_start_sample_);
-        bool vad_confirmed_this_segment = false;
-        for (const auto& s : vad_segs) {
-          if (s.first >= seg_start_sec && s.first < current_sec) {
-            vad_confirmed_this_segment = true;
-            break;
-          }
-        }
-        if (vad_confirmed_this_segment &&
-            current_sec - vad_segs.back().second >= params_.asr_vad_trail_sec) {
-          vad_state_ = VadState::TRAILING;
-          vad_trail_start_sec_ = current_sec;
-        }
-      }
-    }
-
-    if (vad_state_ == VadState::IDLE) {
-      if (in_speech(current_sec)) {
-        const int lead_samples = std::max(0, params_.asr_vad_lead_ms * params_.sample_rate / 1000);
-        std::vector<float> lead;
-        RingPop(lead_samples, &lead);
-        ProcessIncremental(lead.data(), static_cast<int>(lead.size()), /*finalize=*/false);
-        vad_state_ = VadState::PROCESSING;
-      } else if (!vad_segs.empty()) {
-        // Only skip audio when current_sec is CONFIRMED non-speech: it falls
-        // inside a known silence gap between two VAD speech segments.
-        // If current_sec is past the last known segment end, VAD might still
-        // detect speech here (async pipeline lag) — fall through to line 97
-        // to process the audio rather than skip it.
-        bool confirmed_silence = false;
-        for (size_t i = 0; i + 1 < vad_segs.size(); ++i) {
-          if (current_sec > vad_segs[i].second && current_sec < vad_segs[i + 1].first) {
-            confirmed_silence = true;
-            break;
-          }
-        }
-        if (!confirmed_silence) {
-          // VAD hasn't confirmed this position yet — process audio
-          // (fall through to line 97)
-        } else {
-          inc_abs_pos_ += n;
-          processed_samples_.fetch_add(n);
-          return;
-        }
-      }
-    }
-
-    if (vad_state_ == VadState::PROCESSING) {
-      if (!in_speech(current_sec)) {
-        // Only transition to TRAILING when VAD has confirmed speech within
-        // this ASR segment (i.e., a VAD segment START falls in this segment's
-        // time range). Without this guard, VAD async lag causes premature
-        // trailing: the cache reports no speech at current_sec because the
-        // VAD segment hasn't been published yet, but VAD is still processing
-        // it. Staying in PROCESSING lets VAD catch up and avoids splitting
-        // long VAD segments. Once VAD confirms the segment, the normal
-        // trail_sec silence window applies.
-        double seg_start_sec = tb_.SecondsAt(inc_seg_start_sample_);
-        bool vad_confirmed_this_segment = false;
-        for (const auto& s : vad_segs) {
-          if (s.first >= seg_start_sec && s.first < current_sec) {
-            vad_confirmed_this_segment = true;
-            break;
-          }
-        }
-        if (vad_confirmed_this_segment &&
-            current_sec > vad_segs.back().second + params_.asr_vad_trail_sec) {
-          vad_state_ = VadState::TRAILING;
-          vad_trail_start_sec_ = current_sec;
-        }
-        // If VAD hasn't confirmed speech in this segment: stay in PROCESSING,
-        // keep processing audio. VAD segments will catch up eventually.
-      }
-    }
-
-    if (vad_state_ == VadState::TRAILING) {
-      if (current_sec - vad_trail_start_sec_ >= params_.asr_vad_trail_sec) {
-        ProcessIncremental(nullptr, 0, /*finalize=*/true);
-        vad_state_ = VadState::IDLE;
-        inc_in_segment_ = false;
-        inc_abs_pos_ += n;
-        processed_samples_.fetch_add(n);
-        return;
-      }
-    }
+  if (!params_.asr_vad_gate) {
+    ProcessIncremental(samples, n, /*finalize=*/false);
+    processed_samples_.fetch_add(n);
+    return;
   }
 
-  ProcessIncremental(samples, n, /*finalize=*/false);
-  processed_samples_.fetch_add(n);
+  // Event-driven, non-blocking VAD gate. The incoming span may be a few
+  // milliseconds (real-time pacing) or several minutes (flooded ingest, when
+  // WaitAndRead returns the whole backlog). Cut it at the VAD segment boundaries
+  // that fall inside it so each sub-span lies entirely within one VAD region,
+  // then act per sub-span in ProcessGateSubSpan. Because the cut points are VAD
+  // audio times, coverage no longer depends on the span size: previously a large
+  // flooded span whose END landed in a silence gap was dropped in full
+  // (`inc_abs_pos_ += n; return`), discarding all the speech inside it -- the
+  // measured flood coverage collapse. inc_abs_pos_ advances by exactly the
+  // consumed audio per sub-span, so it stays equal to the absolute clock head
+  // and the cut math below is exact.
+  const long span_start = inc_abs_pos_;
+  const long span_end = inc_abs_pos_ + n;
+  const std::vector<long> cuts = VadCutSamples(span_start, span_end);
+  long pos = span_start;
+  size_t ci = 0;
+  while (pos < span_end) {
+    while (ci < cuts.size() && cuts[ci] <= pos) ++ci;
+    long next = span_end;
+    if (ci < cuts.size() && cuts[ci] < next) next = cuts[ci];
+    const int sub_n = static_cast<int>(next - pos);
+    ProcessGateSubSpan(samples + (pos - span_start), sub_n);
+    pos = next;
+  }
+}
+
+// Absolute sample indices of the VAD segment boundaries (each segment's start
+// and end) that fall strictly inside (span_start, span_end), sorted unique.
+// These are the only points where the speech/silence classification can change,
+// so cutting the span here makes each sub-span homogeneous.
+std::vector<long> AsrWorker::VadCutSamples(long span_start, long span_end) const {
+  std::vector<long> cuts;
+  if (!vad_cache_) return cuts;
+  const auto segs = vad_cache_->GetAll();
+  cuts.reserve(segs.size() * 2);
+  for (const auto& [s, e] : segs) {
+    const long ss = tb_.SampleAt(s);
+    const long es = tb_.SampleAt(e);
+    if (ss > span_start && ss < span_end) cuts.push_back(ss);
+    if (es > span_start && es < span_end) cuts.push_back(es);
+  }
+  std::sort(cuts.begin(), cuts.end());
+  cuts.erase(std::unique(cuts.begin(), cuts.end()), cuts.end());
+  return cuts;
+}
+
+// Act on one VAD-boundary-aligned sub-span [inc_abs_pos_, inc_abs_pos_+sub_n).
+// Policy (priority: never drop speech > save GPU on confirmed silence; exact
+// segmentation is irrelevant -- downstream alignment provides the time codes):
+//   * speech                 -> feed the engine;
+//   * confirmed silence       -> commit the open utterance after its trailing
+//                                window, then skip the rest (the GPU saving);
+//   * unconfirmed (past the VAD horizon, e.g. the first flooded span before VAD
+//                                has caught up) -> feed, never skip.
+// Non-blocking: it only reads what VAD has already published (Constitution
+// Art. III -- ASR does not wait for VAD).
+void AsrWorker::ProcessGateSubSpan(const float* sub, int sub_n) {
+  if (sub_n <= 0) return;
+  const auto vad_segs = vad_cache_ ? vad_cache_->GetAll()
+                                   : std::vector<std::pair<double, double>>{};
+  const long base = inc_abs_pos_;
+  const double mid_sec = tb_.SecondsAt(base + sub_n / 2);
+  const double end_sec = tb_.SecondsAt(base + sub_n);
+  const double horizon = vad_segs.empty() ? -1.0 : vad_segs.back().second;
+
+  bool is_speech = false;
+  for (const auto& [s, e] : vad_segs) {
+    if (mid_sec >= s && mid_sec < e) { is_speech = true; break; }
+  }
+
+  if (is_speech) {
+    ProcessIncremental(sub, sub_n, /*finalize=*/false);
+    processed_samples_.fetch_add(sub_n);
+    vad_state_ = VadState::PROCESSING;
+    last_speech_end_sec_ = end_sec;
+    return;
+  }
+
+  // Gap / silence sub-span. "Confirmed" means VAD has already labeled this far
+  // (its end is within the published range), i.e. it is genuinely a gap between
+  // known speech segments -- safe to skip. Beyond the horizon VAD may still
+  // detect speech here, so we must process rather than drop.
+  const bool confirmed = end_sec <= horizon;
+  if (confirmed) {
+    if (inc_in_segment_) {
+      // Feed the trailing window (acoustic context for the last word), commit,
+      // then skip the remaining silence.
+      const long trail_end =
+          tb_.SampleAt(last_speech_end_sec_ + params_.asr_vad_trail_sec);
+      const long feed_l =
+          std::min<long>(sub_n, std::max<long>(0, trail_end - base));
+      const int feed_n = static_cast<int>(feed_l);
+      if (feed_n > 0) ProcessIncremental(sub, feed_n, /*finalize=*/false);
+      ProcessIncremental(nullptr, 0, /*finalize=*/true);
+      inc_abs_pos_ += (sub_n - feed_n);
+    } else {
+      inc_abs_pos_ += sub_n;  // nothing open; skip the whole gap
+    }
+    processed_samples_.fetch_add(sub_n);
+    vad_state_ = VadState::IDLE;
+    return;
+  }
+
+  // Unconfirmed: process rather than skip, so no speech is lost. Under burst
+  // this may spend some GPU on silence until VAD catches up; acceptable, since
+  // correctness (full coverage) outranks the GPU saving.
+  ProcessIncremental(sub, sub_n, /*finalize=*/false);
+  processed_samples_.fetch_add(sub_n);
+  vad_state_ = VadState::PROCESSING;
 }
 
 
@@ -273,6 +266,7 @@ void AsrWorker::Reset() {
 
   vad_state_ = VadState::IDLE;
   vad_trail_start_sec_ = 0.0;
+  last_speech_end_sec_ = -1e9;
   ring_write_pos_ = 0;
   ring_count_ = 0;
   ring_base_abs_pos_ = 0;

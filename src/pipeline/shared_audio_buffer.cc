@@ -1,5 +1,4 @@
 #include "pipeline/shared_audio_buffer.h"
-#include "pipeline/disk_audio_storage.h"
 
 #include <algorithm>
 
@@ -7,14 +6,12 @@ namespace orator {
 namespace pipeline {
 
 SharedAudioBuffer::SharedAudioBuffer(int sample_rate)
-    : sample_rate_(sample_rate), config_(), disk_storage_(nullptr) {}
+    : sample_rate_(sample_rate), config_() {}
 
 SharedAudioBuffer::SharedAudioBuffer(int sample_rate, const Config& config)
-    : sample_rate_(sample_rate), config_(config), disk_storage_(nullptr) {}
+    : sample_rate_(sample_rate), config_(config) {}
 
-SharedAudioBuffer::~SharedAudioBuffer() {
-  delete disk_storage_;
-}
+SharedAudioBuffer::~SharedAudioBuffer() = default;
 
 int SharedAudioBuffer::AddConsumer() {
   std::lock_guard<std::mutex> lock(mutex_);
@@ -24,42 +21,9 @@ int SharedAudioBuffer::AddConsumer() {
 
 void SharedAudioBuffer::Append(const float* samples, int n) {
   if (samples == nullptr || n <= 0) return;
-  
+
   {
     std::lock_guard<std::mutex> lock(mutex_);
-    
-    // Check in-memory buffer size limit
-    if (config_.max_memory_samples > 0 && (memory_buffer_.size() + n > config_.max_memory_samples)) {
-      // Memory buffer full, write overflow to disk
-      const size_t overflow = (memory_buffer_.size() + n) - config_.max_memory_samples;
-      
-      // Calculate samples to write to disk
-      long samples_to_disk_start = memory_start_sample_;
-      int samples_to_disk_count = static_cast<int>(std::min(static_cast<size_t>(overflow), memory_buffer_.size()));
-      
-      // Write to disk if disk storage is available
-      if (disk_storage_ && samples_to_disk_count > 0) {
-        disk_storage_->Write(samples_to_disk_start, memory_buffer_.data(), samples_to_disk_count);
-      }
-      
-      // Remove written samples from memory buffer
-      if (samples_to_disk_count > 0) {
-        memory_buffer_.erase(memory_buffer_.begin(), memory_buffer_.begin() + samples_to_disk_count);
-        memory_start_sample_ += samples_to_disk_count;
-      }
-      
-      // If memory buffer is now empty after writing to disk, reset base
-      if (memory_buffer_.empty()) {
-        memory_start_sample_ = total_samples_;
-      }
-    }
-    
-    // Pre-allocate to avoid repeated reallocations
-    if (memory_buffer_.size() + n > memory_buffer_.capacity()) {
-      memory_buffer_.reserve(memory_buffer_.size() + n + 1024); // Add buffer for future growth
-    }
-    
-    // Append new samples to memory buffer
     memory_buffer_.insert(memory_buffer_.end(), samples, samples + n);
     total_samples_ += n;
   }
@@ -75,7 +39,7 @@ void SharedAudioBuffer::Close() {
 }
 
 bool SharedAudioBuffer::WaitAndRead(int cursor, std::vector<float>* out,
-                                    long* span_start_abs) {
+                                    long* span_start_abs, long max_batch_samples) {
   std::unique_lock<std::mutex> lock(mutex_);
   cv_.wait(lock, [&] { return cursors_[cursor] < total_samples_ || closed_; });
 
@@ -87,43 +51,22 @@ bool SharedAudioBuffer::WaitAndRead(int cursor, std::vector<float>* out,
   if (span_start_abs != nullptr) *span_start_abs = cursors_[cursor];
 
   const long requested_start = cursors_[cursor];
-  const long requested_end = total_samples_;
-  const long count = requested_end - requested_start;
-  
-  // Capture memory state while holding the lock
-  const long current_memory_start_sample = memory_start_sample_;
-  const size_t current_memory_buffer_size = memory_buffer_.size();
-  
-  // Release lock before doing the copy to reduce lock contention
-  lock.unlock();
-  
-  // Read from memory or disk
-  out->clear();
-  if (requested_start >= current_memory_start_sample && (requested_start + count) <= (current_memory_start_sample + static_cast<long>(current_memory_buffer_size))) {
-    // All requested data is in memory buffer
-    long from_in_buffer = requested_start - current_memory_start_sample;
-    out->assign(memory_buffer_.begin() + from_in_buffer, memory_buffer_.begin() + from_in_buffer + count);
-  } else if (disk_storage_) {
-    // Data spans memory and disk, or is entirely on disk
-    // Read from disk if not fully in memory
-    disk_storage_->Read(requested_start, static_cast<int>(count), out);
-  } else {
-    // Fallback: try to read from memory buffer if possible
-    std::lock_guard<std::mutex> mem_lock(mutex_); // Re-acquire to read memory_buffer safely
-    long from_in_buffer = std::max(0L, requested_start - memory_start_sample_);
-    long available_in_memory = static_cast<long>(memory_buffer_.size()) - from_in_buffer;
-    if (available_in_memory > 0 && requested_start >= memory_start_sample_) {
-      int read_count = static_cast<int>(std::min(static_cast<long>(count), available_in_memory));
-      out->assign(memory_buffer_.begin() + from_in_buffer, memory_buffer_.begin() + from_in_buffer + read_count);
-    }
-  }
-  
-  // Re-acquire lock to update cursor and remove passed prefix
-  {
-    std::lock_guard<std::mutex> lock(mutex_);
-    cursors_[cursor] = total_samples_;
-    RemovePassedPrefix();
-  }
+  long count = total_samples_ - requested_start;
+  // Cap the batch so a consumer pulls a flooded backlog in fixed-size pieces at
+  // its own max speed (rate-independent per-batch behaviour). 0 = no cap.
+  if (max_batch_samples > 0 && count > max_batch_samples) count = max_batch_samples;
+
+  // Copy under the lock: Append (insert -> possible reallocation) and other
+  // consumers' RemovePassedPrefix (erase) mutate memory_buffer_, so reading its
+  // iterators without the lock would be a data race / use-after-free.
+  // requested_start >= min_cursor >= memory_start_sample_, so the slice is
+  // always fully inside memory_buffer_.
+  const long from_in_buffer = requested_start - memory_start_sample_;
+  out->assign(memory_buffer_.begin() + from_in_buffer,
+              memory_buffer_.begin() + from_in_buffer + count);
+
+  cursors_[cursor] = requested_start + count;  // advance only by what we returned
+  RemovePassedPrefix();
   return true;
 }
 

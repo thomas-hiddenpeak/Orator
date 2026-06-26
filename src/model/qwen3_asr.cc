@@ -50,6 +50,8 @@ void Qwen3Asr::Reset() {
   if (decoder_) decoder_->ResetCache();
   seg_pcm_.clear();
   seg_encoded_frames_ = 0;
+  seg_pcm_frame_offset_ = 0;
+  seg_logmel_max_ = -1e30f;
   stream_cache_ckpt_ = 0;
   stream_audio_tokens_ = 0;
   stream_chunk_id_ = 0;
@@ -208,6 +210,8 @@ void Qwen3Asr::StreamReset(long base_sample) {
   seg_pcm_.clear();
   seg_base_sample_ = base_sample;
   seg_encoded_frames_ = 0;
+  seg_pcm_frame_offset_ = 0;
+  seg_logmel_max_ = -1e30f;
   stream_audio_tokens_ = 0;
   stream_chunk_id_ = 0;
   stream_raw_decoded_.clear();
@@ -239,29 +243,42 @@ std::string Qwen3Asr::StreamChunk(const float* pcm, int n, cudaStream_t stream) 
   if (pcm != nullptr && n > 0)
     seg_pcm_.insert(seg_pcm_.end(), pcm, pcm + n);
 
-  // Only do work once at least one full 8 s window of new audio is available.
+  // Frames are indexed from the segment start. `seg_pcm_frame_offset_` is the
+  // segment-absolute frame index of the frame computed from seg_pcm_[0]; the
+  // already-encoded prefix is trimmed below so the per-call mel cost and GPU
+  // allocation stay O(window) instead of O(segment length).
   const int hop = 160;  // WhisperFeatureExtractor hop
-  const int avail_frames = static_cast<int>(seg_pcm_.size() / hop);
+  const int local_frames = static_cast<int>(seg_pcm_.size() / hop);
+  const int avail_frames = seg_pcm_frame_offset_ + local_frames;
   if (avail_frames - seg_encoded_frames_ < kStreamWindowMel) {
     return CurrentLiveText();
   }
 
-  // Mel over the full (bounded) segment; interior frames are stream-stable.
+  // Mel only over the retained tail (new window + left context), not the whole
+  // segment. The Whisper global-max normalization is preserved exactly by
+  // threading a running per-segment log-mel max; the first reflect-padded
+  // boundary frames of a trimmed tail are excluded from the running max (they
+  // are context, never encoded, and the real frames they shadow were already
+  // counted by the earlier untrimmed tail).
   int n_frames = 0;
+  const int max_valid_from = (seg_pcm_frame_offset_ > 0) ? 2 : 0;
   std::vector<float> mel =
       mel_->Compute(seg_pcm_.data(), static_cast<int>(seg_pcm_.size()),
-                    &n_frames, stream);
+                    &n_frames, stream, &seg_logmel_max_, max_valid_from);
 
   bool changed = false;
   const int F = 128;
-  while (n_frames - seg_encoded_frames_ >= kStreamWindowMel) {
-    // Slice this window's mel columns [seg_encoded_frames_, +kStreamWindowMel)
-    // into a contiguous [128, 800] for a standalone (chunk-local) encode.
+  while ((seg_pcm_frame_offset_ + n_frames) - seg_encoded_frames_ >=
+         kStreamWindowMel) {
+    const int local_start = seg_encoded_frames_ - seg_pcm_frame_offset_;
+    if (local_start < 0 || local_start + kStreamWindowMel > n_frames) break;
+    // Slice this window's mel columns [local_start, +kStreamWindowMel) into a
+    // contiguous [128, kStreamWindowMel] for a standalone (chunk-local) encode.
     std::vector<float> sub(static_cast<size_t>(F) * kStreamWindowMel);
     for (int f = 0; f < F; ++f)
       for (int t = 0; t < kStreamWindowMel; ++t)
         sub[static_cast<size_t>(f) * kStreamWindowMel + t] =
-            mel[static_cast<size_t>(f) * n_frames + (seg_encoded_frames_ + t)];
+            mel[static_cast<size_t>(f) * n_frames + (local_start + t)];
 
     int toks = 0;
     std::vector<float> enc =
@@ -278,6 +295,20 @@ std::string Qwen3Asr::StreamChunk(const float* pcm, int n, cudaStream_t stream) 
     seg_encoded_frames_ += kStreamWindowMel;
     changed = true;
   }
+
+  // Trim the consumed prefix of seg_pcm_, retaining a small left context so the
+  // next window's centered-STFT frames stay numerically identical.
+  constexpr int kLeftCtxFrames = 4;  // > n_fft/2/hop (=1.25) reflect-pad reach
+  const int keep_from_frame = std::max(0, seg_encoded_frames_ - kLeftCtxFrames);
+  const int drop_frames = keep_from_frame - seg_pcm_frame_offset_;
+  if (drop_frames > 0) {
+    const size_t drop_samples = static_cast<size_t>(drop_frames) * hop;
+    if (drop_samples <= seg_pcm_.size()) {
+      seg_pcm_.erase(seg_pcm_.begin(), seg_pcm_.begin() + drop_samples);
+      seg_pcm_frame_offset_ += drop_frames;
+    }
+  }
+
   if (!changed) return CurrentLiveText();
   return StreamDecodeStep(stream);
 }
@@ -343,28 +374,31 @@ std::string Qwen3Asr::StreamFinalize(cudaStream_t stream) {
   // Flush the residual (< 8 s) tail, if any: encode the remaining mel frames
   // (the last conv chunk is padded, as in the single-segment path) and append.
   const int hop = 160;
-  const int avail_frames = static_cast<int>(seg_pcm_.size() / hop);
+  const int local_frames = static_cast<int>(seg_pcm_.size() / hop);
+  const int avail_frames = seg_pcm_frame_offset_ + local_frames;
   bool appended = false;
   if (avail_frames - seg_encoded_frames_ > 0) {
     int n_frames = 0;
+    const int max_valid_from = (seg_pcm_frame_offset_ > 0) ? 2 : 0;
     std::vector<float> mel =
         mel_->Compute(seg_pcm_.data(), static_cast<int>(seg_pcm_.size()),
-                      &n_frames, stream);
-    const int rem = n_frames - seg_encoded_frames_;
-    if (rem > 0) {
+                      &n_frames, stream, &seg_logmel_max_, max_valid_from);
+    const int local_start = seg_encoded_frames_ - seg_pcm_frame_offset_;
+    const int rem = n_frames - local_start;
+    if (rem > 0 && local_start >= 0) {
       const int F = 128;
       std::vector<float> sub(static_cast<size_t>(F) * rem);
       for (int f = 0; f < F; ++f)
         for (int t = 0; t < rem; ++t)
           sub[static_cast<size_t>(f) * rem + t] =
-              mel[static_cast<size_t>(f) * n_frames + (seg_encoded_frames_ + t)];
+              mel[static_cast<size_t>(f) * n_frames + (local_start + t)];
       int toks = 0;
       std::vector<float> enc = encoder_->Forward(sub.data(), rem, &toks, stream);
       if (toks > 0) {
         decoder_->PrefillAt(enc.data(), toks, stream_cache_ckpt_, stream);
         stream_cache_ckpt_ += toks;
         stream_audio_tokens_ += toks;
-        seg_encoded_frames_ = n_frames;
+        seg_encoded_frames_ = seg_pcm_frame_offset_ + n_frames;
         appended = true;
       }
     }

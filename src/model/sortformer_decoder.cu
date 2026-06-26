@@ -213,38 +213,54 @@ void SortformerDecoder::LoadWeights(const io::SafeTensorReader& reader) {
   }
 }
 
+void SortformerDecoder::Scratch::Ensure(int T, int D, int H, int Dff,
+                                        int n_spk) {
+  if (T <= cap_T) return;
+  const size_t TD = static_cast<size_t>(T) * D * sizeof(float);
+  const size_t TFF = static_cast<size_t>(T) * Dff * sizeof(float);
+  const size_t HTT = static_cast<size_t>(H) * T * T * sizeof(float);
+  const size_t TS = static_cast<size_t>(T) * n_spk * sizeof(float);
+  xb = gpu::UnifiedBuffer(TD);
+  lnb = gpu::UnifiedBuffer(TD);
+  qb = gpu::UnifiedBuffer(TD);
+  kb = gpu::UnifiedBuffer(TD);
+  vb = gpu::UnifiedBuffer(TD);
+  cb = gpu::UnifiedBuffer(TD);
+  tb = gpu::UnifiedBuffer(TD);
+  ffb = gpu::UnifiedBuffer(TFF);
+  qhb = gpu::UnifiedBuffer(TD);
+  khb = gpu::UnifiedBuffer(TD);
+  vtb = gpu::UnifiedBuffer(TD);
+  scb = gpu::UnifiedBuffer(HTT);
+  predb = gpu::DeviceBuffer(TS);
+  cap_T = T;
+}
+
 std::vector<float> SortformerDecoder::Forward(const float* conformer_out, int T,
                                                int valid_len,
                                                cudaStream_t stream) {
   const int De = d_enc_, D = d_model_, H = n_heads_, Dk = d_k_, Dff = d_ff_;
   const float eps = 1e-5f;
-  size_t TD = static_cast<size_t>(T) * D;
 
-  UnifiedBuffer xb(TD * sizeof(float));
-  float* x = static_cast<float*>(xb.data());
+  // Reused persistent scratch (allocated once, grown when T increases).
+  scr_.Ensure(T, D, H, Dff, n_spk_);
+  float* x = static_cast<float*>(scr_.xb.data());
   // encoder_proj: 512 -> 192
   LaunchLinear(conformer_out,
       W("sortformer_modules.encoder_proj.weight"),
       W("sortformer_modules.encoder_proj.bias"), x, T, De, D, 0, stream);
 
-  UnifiedBuffer lnb(TD * sizeof(float)), qb(TD * sizeof(float)), kb(TD * sizeof(float));
-  UnifiedBuffer vb(TD * sizeof(float)), cb(TD * sizeof(float)), tb(TD * sizeof(float));
-  UnifiedBuffer ffb(static_cast<size_t>(T) * Dff * sizeof(float));
-  // Head-major attention scratch for GEMM-decomposed MHA.
-  UnifiedBuffer qhb(TD * sizeof(float)), khb(TD * sizeof(float));
-  UnifiedBuffer vtb(TD * sizeof(float));
-  UnifiedBuffer scb(static_cast<size_t>(H) * T * T * sizeof(float));
-  float* lnp = static_cast<float*>(lnb.data());
-  float* qp = static_cast<float*>(qb.data());
-  float* kp = static_cast<float*>(kb.data());
-  float* vp = static_cast<float*>(vb.data());
-  float* cp = static_cast<float*>(cb.data());
-  float* tp = static_cast<float*>(tb.data());
-  float* ffp = static_cast<float*>(ffb.data());
-  float* qhp = static_cast<float*>(qhb.data());
-  float* khp = static_cast<float*>(khb.data());
-  float* vtp = static_cast<float*>(vtb.data());
-  float* scp = static_cast<float*>(scb.data());
+  float* lnp = static_cast<float*>(scr_.lnb.data());
+  float* qp = static_cast<float*>(scr_.qb.data());
+  float* kp = static_cast<float*>(scr_.kb.data());
+  float* vp = static_cast<float*>(scr_.vb.data());
+  float* cp = static_cast<float*>(scr_.cb.data());
+  float* tp = static_cast<float*>(scr_.tb.data());
+  float* ffp = static_cast<float*>(scr_.ffb.data());
+  float* qhp = static_cast<float*>(scr_.qhb.data());
+  float* khp = static_cast<float*>(scr_.khb.data());
+  float* vtp = static_cast<float*>(scr_.vtb.data());
+  float* scp = static_cast<float*>(scr_.scb.data());
 
   // q/k pre-divided by sqrt(sqrt(Dk)) in NeMo -> scores scale == 1/sqrt(Dk).
   float attn_scale = 1.0f / std::sqrt(static_cast<float>(Dk));
@@ -301,8 +317,7 @@ std::vector<float> SortformerDecoder::Forward(const float* conformer_out, int T,
   // kernel faults on Tegra (R1). Device memory does not page-migrate, so the
   // DtoH copy is safe regardless of concurrent kernels. GPU-only working buffers
   // above stay managed (only the GPU touches them).
-  DeviceBuffer predb(static_cast<size_t>(T) * n_spk_ * sizeof(float));
-  float* predp = static_cast<float*>(predb.data());
+  float* predp = static_cast<float*>(scr_.predb.data());
   LaunchLinear(tp,
       W("sortformer_modules.single_hidden_to_spks.weight"),
       W("sortformer_modules.single_hidden_to_spks.bias"), predp, T, D, n_spk_, 2, stream);

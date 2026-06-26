@@ -24,8 +24,7 @@ namespace orator {
 namespace pipeline {
 
 AuditoryStream::AuditoryStream(const Config& config, Emit emit)
-    : config_(config), emit_(std::move(emit)), 
-      buffer_(config.sample_rate, SharedAudioBuffer::Config{config.buffer_max_samples, config.buffer_shrink_threshold}) {}
+    : config_(config), emit_(std::move(emit)) {}
 
 AuditoryStream::~AuditoryStream() { StopWorkers(); }
 
@@ -149,18 +148,18 @@ void AuditoryStream::StartWorkers() {
     dp.min_dur_off = config_.diar_min_dur_off;
     diar_worker_ =
         std::make_unique<DiarizationWorker>(diarizer_.get(), dp,
-            buffer_.time_base(), diar_stream_);
+            common_time_base(), diar_stream_);
     diar_worker_->set_speaker_sink(
         [this](const std::vector<core::DiarSegment>& segs) {
           HandleSpeakerSink(comp_mutex_, last_segments_,
                             protocol_timeline_.get(), diar_handle_.get(),
                             segs);
         });
-    diar_cursor_ = buffer_.AddConsumer();
+    diar_audio_ = MakeAudioCache();
     diar_thread_ = std::thread([this] {
       std::vector<float> chunk;
       long span_start_abs = 0;
-      while (buffer_.WaitAndRead(diar_cursor_, &chunk, &span_start_abs)) {
+      while (diar_audio_->WaitAndRead(&chunk, &span_start_abs)) {
         diar_worker_->ProcessSpan(chunk.data(), static_cast<int>(chunk.size()));
         progress_cv_.notify_all();
       }
@@ -192,17 +191,21 @@ void AuditoryStream::StartWorkers() {
 
     asr_worker_ = std::make_unique<AsrWorker>(asr_.get(), p,
         [this](const std::string& json) { EmitLocked(json); },
-        buffer_.time_base(), asr_stream_, vad_cache_.get());
+        common_time_base(), asr_stream_, vad_cache_.get());
     asr_worker_->set_text_sink(
         [this](long id, double start, double end, const std::string& text) {
           HandleTextSink(protocol_timeline_.get(), asr_handle_.get(),
                          id, start, end, text);
         });
-    asr_cursor_ = buffer_.AddConsumer();
+    asr_audio_ = MakeAudioCache();
     asr_thread_ = std::thread([this] {
       std::vector<float> chunk;
       long span_start_abs = 0;
-      while (buffer_.WaitAndRead(asr_cursor_, &chunk, &span_start_abs)) {
+      // Drain the whole (possibly flooded) backlog each read and run it at the
+      // device's max speed. The ASR's VAD gate correlates speech boundaries by
+      // AUDIO time (not by read size), so transcription is identical whether
+      // audio arrived in real time or all at once -- no throttling here.
+      while (asr_audio_->WaitAndRead(&chunk, &span_start_abs)) {
         asr_worker_->ProcessSpan(chunk.data(), static_cast<int>(chunk.size()));
         progress_cv_.notify_all();
       }
@@ -228,9 +231,9 @@ void AuditoryStream::StartWorkers() {
         [vad_params_ptr] { return std::make_unique<GpuVad>(*vad_params_ptr); });
     vad_detector_ =
         core::Registry<core::IVad>::Instance().Create("silero_vad");
-    vad_cursor_ = buffer_.AddConsumer();
+    vad_audio_ = MakeAudioCache();
     vad_thread_ = std::thread([this] {
-      const core::TimeBase tb = buffer_.time_base();
+      const core::TimeBase tb = common_time_base();
       std::vector<float> chunk;
       std::vector<core::VadSegmentResult> segs;
       auto drain = [this, &tb, &segs](bool finalize) {
@@ -238,7 +241,7 @@ void AuditoryStream::StartWorkers() {
                        vad_handle_.get(), tb, &segs, finalize);
       };
       long span_start_abs = 0;
-      while (buffer_.WaitAndRead(vad_cursor_, &chunk, &span_start_abs)) {
+      while (vad_audio_->WaitAndRead(&chunk, &span_start_abs)) {
         vad_detector_->Push(chunk.data(), static_cast<int>(chunk.size()));
         drain(/*finalize=*/false);
         {
@@ -309,7 +312,9 @@ void AuditoryStream::StopWorkers() {
   cursor_telemetry_cv_.notify_all();
   if (cursor_telemetry_thread_.joinable()) cursor_telemetry_thread_.join();
   
-  buffer_.Close();
+  if (diar_audio_) diar_audio_->Close();
+  if (asr_audio_) asr_audio_->Close();
+  if (vad_audio_) vad_audio_->Close();
   if (diar_thread_.joinable()) diar_thread_.join();
   if (asr_thread_.joinable()) asr_thread_.join();
   if (vad_thread_.joinable()) vad_thread_.join();
@@ -317,7 +322,7 @@ void AuditoryStream::StopWorkers() {
 }
 
 double AuditoryStream::audio_sec() const {
-  return buffer_.time_base().Duration(buffer_.total_samples());
+  return common_time_base().Duration(total_samples_.load());
 }
 
 double AuditoryStream::diar_compute_sec() const {
@@ -329,53 +334,66 @@ double AuditoryStream::asr_compute_sec() const {
 }
 
 std::string AuditoryStream::SerializeCursorTelemetry() const {
-  auto progress = buffer_.GetCursorProgress();
+  const long total = total_samples_.load();
   std::string json = "{\"type\":\"cursor_progress\",\"total_samples\":";
-  json += std::to_string(progress.total_samples);
-  json += ",\"base_sample\":";
-  json += std::to_string(progress.base_sample);
-  json += ",\"buffer_size\":";
-  json += std::to_string(progress.buffer_size);
+  json += std::to_string(total);
+
+  // Per-pipeline cache progress: read position (absolute) and unread backlog.
+  // With per-pipeline caches there is no shared base sample; each cache frees
+  // its consumed prefix independently, so "lag" is each pipeline's own backlog.
+  const std::pair<const char*, PipelineAudioCache*> caches[] = {
+      {"diar", diar_audio_.get()},
+      {"asr", asr_audio_.get()},
+      {"vad", vad_audio_.get()},
+  };
+
   json += ",\"cursors\":[";
-  
   bool first = true;
-  for (const auto& cp : progress.cursors) {
+  for (const auto& c : caches) {
+    if (!c.second) continue;
     if (!first) json += ",";
-    json += "{\"id\":" + std::to_string(cp.first) + ",\"position\":";
-    json += std::to_string(cp.second) + "}";
+    json += "{\"id\":\"" + std::string(c.first) + "\",\"position\":";
+    json += std::to_string(c.second->read_position());
+    json += ",\"pending\":" + std::to_string(c.second->pending_samples()) + "}";
     first = false;
   }
-  
   json += "]";
-  
-  // Add lag warnings if configured
+
+  // Add lag warnings if configured.
   if (config_.cursor_lag_warn_samples > 0 || config_.cursor_lag_critical_samples > 0) {
     json += ",\"lags\":{";
     bool first_lag = true;
-    for (const auto& cp : progress.cursors) {
-      long lag = progress.total_samples - cp.second;
-      if (lag > 0) {
-        if (!first_lag) json += ",";
-        json += "\"cursor_" + std::to_string(cp.first) + "\":" + std::to_string(lag);
-        first_lag = false;
-        
-        // Check warning/critical thresholds
-        if (config_.cursor_lag_critical_samples > 0 && lag >= static_cast<long>(config_.cursor_lag_critical_samples)) {
-          json += ",\"status\":\"critical\"";
-        } else if (config_.cursor_lag_warn_samples > 0 && lag >= static_cast<long>(config_.cursor_lag_warn_samples)) {
-          json += ",\"status\":\"warn\"";
-        }
+    for (const auto& c : caches) {
+      if (!c.second) continue;
+      const long lag = c.second->pending_samples();
+      if (lag <= 0) continue;
+      if (!first_lag) json += ",";
+      json += "\"" + std::string(c.first) + "\":" + std::to_string(lag);
+      first_lag = false;
+      if (config_.cursor_lag_critical_samples > 0 &&
+          lag >= static_cast<long>(config_.cursor_lag_critical_samples)) {
+        json += ",\"status\":\"critical\"";
+      } else if (config_.cursor_lag_warn_samples > 0 &&
+                 lag >= static_cast<long>(config_.cursor_lag_warn_samples)) {
+        json += ",\"status\":\"warn\"";
       }
     }
     json += "}";
   }
-  
+
   json += "}";
   return json;
 }
 
 void AuditoryStream::PushAudio(const float* samples, int n) {
-  buffer_.Append(samples, n);
+  if (n <= 0) return;
+  // Fan the frame out to every active pipeline cache on the common clock, then
+  // advance the shared clock head. Each cache holds the same audio at the same
+  // absolute sample index, so the time base stays valid across pipelines.
+  if (diar_audio_) diar_audio_->Append(samples, n);
+  if (asr_audio_) asr_audio_->Append(samples, n);
+  if (vad_audio_) vad_audio_->Append(samples, n);
+  total_samples_.fetch_add(n, std::memory_order_relaxed);
 }
 
 void AuditoryStream::WaitForBarrier(long target) {
@@ -405,10 +423,10 @@ void AuditoryStream::EmitTimeline(bool finalize) {
     const double drift = std::fabs(exit_sec - entry_sec) - audio_sec();
     if (drift > 1.0) wall_clock_ok_.store(false);
   } else {
-    WaitForBarrier(buffer_.total_samples());
+    WaitForBarrier(total_samples_.load());
   }
   if (const char* c = std::getenv("ORATOR_TIMEBASE_CHECK"); c && c[0] == '1') {
-    const long total = buffer_.total_samples();
+    const long total = total_samples_.load();
     auto report = [total](const char* who, long processed) {
       const long gap = core::TimeBase::ReconcileExtent(processed, total);
       if (gap != 0)
@@ -435,7 +453,10 @@ void AuditoryStream::Reset() {
                   static_cast<unsigned>(::getpid()));
     session_store_->Save(session_id_buf, timeline_json);
   }
-  buffer_.Reset();
+  if (diar_audio_) diar_audio_->Reset();
+  if (asr_audio_) asr_audio_->Reset();
+  if (vad_audio_) vad_audio_->Reset();
+  total_samples_.store(0);
   last_segments_.clear();
   last_transcript_.tokens.clear();
   {

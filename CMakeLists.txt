@@ -96,7 +96,7 @@ set(ORATOR_CORE_SOURCES
     src/pipeline/comprehensive_timeline.cc
     src/pipeline/gpu_vad.cu
     src/pipeline/shared_audio_buffer.cc
-    src/pipeline/disk_audio_storage.cc
+    src/pipeline/pipeline_audio_cache.cc
     src/pipeline/diarization_worker.cc
     src/pipeline/asr_worker.cc
     # networking (libwebsockets-based WebSocket server)

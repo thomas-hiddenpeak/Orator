@@ -37,7 +37,7 @@
 #include "pipeline/gpu_vad.h"
 #include "pipeline/comprehensive_timeline.h"
 #include "pipeline/diarization_worker.h"
-#include "pipeline/shared_audio_buffer.h"
+#include "pipeline/pipeline_audio_cache.h"
 // Forward declarations for protocol types (layering: pipeline depends on protocol
 // interfaces only, not includes).
 namespace orator {
@@ -199,25 +199,46 @@ class AuditoryStream {
   // Build the periodic cursor progress telemetry message.
   std::string SerializeCursorTelemetry() const;
 
+  // The session's common time base (origin = stream start, sample 0). Every
+  // pipeline cache and worker derives its time codes from this, so all
+  // pipelines align by construction rather than each counting from 0.
+  core::TimeBase common_time_base() const {
+    return core::TimeBase(config_.sample_rate, 0);
+  }
+
+  // Build a fresh private audio cache for one pipeline. All caches share the
+  // common clock and the same backlog cap; the cap is an interface placeholder
+  // (enforced once SSD spill-over lands -- see PipelineAudioCache::Config).
+  std::unique_ptr<PipelineAudioCache> MakeAudioCache() const {
+    PipelineAudioCache::Config cc;
+    cc.max_memory_samples = config_.buffer_max_samples;
+    return std::make_unique<PipelineAudioCache>(config_.sample_rate, cc);
+  }
+
   Config config_;
   Emit emit_;
 
   std::unique_ptr<core::IDiarizer> diarizer_;
   std::unique_ptr<core::IAsr> asr_;  // null when ASR disabled
 
-  SharedAudioBuffer buffer_;
+  // Per-pipeline private audio caches (Constitution Art. III). PushAudio fans
+  // each frame out to every active cache; each worker drains only its own.
+  // A cache exists iff its pipeline is active. `total_samples_` is the common
+  // clock head (samples appended this session), shared by all caches by
+  // construction so the absolute time base stays valid across pipelines.
+  std::unique_ptr<PipelineAudioCache> diar_audio_;
+  std::unique_ptr<PipelineAudioCache> asr_audio_;
+  std::unique_ptr<PipelineAudioCache> vad_audio_;
+  std::atomic<long> total_samples_{0};
   std::unique_ptr<DiarizationWorker> diar_worker_;
   std::unique_ptr<AsrWorker> asr_worker_;
-  int diar_cursor_ = -1;
-  int asr_cursor_ = -1;
 
   std::thread diar_thread_;
   std::thread asr_thread_;
   bool running_ = false;
 
-  // Spec 004: independent VAD detector (third buffer consumer).
+  // Spec 004: independent VAD detector (third pipeline consumer).
   std::unique_ptr<core::IVad> vad_detector_;
-  int vad_cursor_ = -1;
   std::thread vad_thread_;
 
   // Spec 002: per-pipeline GPU stream priority registry. Each pipeline declares

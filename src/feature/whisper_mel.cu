@@ -152,7 +152,9 @@ void WhisperMel::BuildMelFilterbank() {
 
 std::vector<float> WhisperMel::Compute(const float* samples, int num_samples,
                                        int* out_num_frames,
-                                       cudaStream_t stream) const {
+                                       cudaStream_t stream,
+                                       float* running_max,
+                                       int max_valid_from) const {
   const int n_fft = config_.n_fft;
   const int hop = config_.hop_length;
   const int nfreq = n_freqs();
@@ -210,11 +212,29 @@ std::vector<float> WhisperMel::Compute(const float* samples, int num_samples,
       __FILE__, __LINE__);
   CheckCudaError(cudaStreamSynchronize(stream), __FILE__, __LINE__);
 
-  float gmax = -1e30f;
-  for (int i = 0; i < total; ++i)
-    gmax = logmel[static_cast<size_t>(i)] > gmax
-               ? logmel[static_cast<size_t>(i)]
-               : gmax;
+  // Local maximum over the valid frame range [max_valid_from, num_frames) for
+  // every mel bin (logmel is row-major [n_mels, num_frames]).
+  float local_max = -1e30f;
+  if (max_valid_from <= 0) {
+    for (int i = 0; i < total; ++i)
+      local_max = logmel[static_cast<size_t>(i)] > local_max
+                      ? logmel[static_cast<size_t>(i)]
+                      : local_max;
+  } else {
+    for (int m = 0; m < n_mels; ++m)
+      for (int fr = max_valid_from; fr < num_frames; ++fr) {
+        const float v = logmel[static_cast<size_t>(m) * num_frames + fr];
+        local_max = v > local_max ? v : local_max;
+      }
+  }
+
+  // Fold into the caller's running per-segment maximum so windowed calls match
+  // a single full-segment computation.
+  float gmax = local_max;
+  if (running_max != nullptr) {
+    gmax = *running_max > local_max ? *running_max : local_max;
+    *running_max = gmax;
+  }
 
   WhisperNormKernel<<<(total + 255) / 256, 256, 0, stream>>>(
       static_cast<float*>(d_out.data()), total, gmax);

@@ -37,6 +37,20 @@ class SortformerDecoder {
 
  private:
   const float* W(const std::string& name) const;
+
+  // Persistent per-call scratch (grown lazily with T) to avoid per-call
+  // cudaMallocManaged/cudaFree churn across 18 layers x many streaming chunks,
+  // which accumulates as RSS on Tegra unified memory under high chunk rates.
+  // `predb` stays device memory (host-copied while other pipelines run kernels).
+  struct Scratch {
+    gpu::UnifiedBuffer xb{0}, lnb{0}, qb{0}, kb{0}, vb{0}, cb{0}, tb{0}, ffb{0},
+        qhb{0}, khb{0}, vtb{0}, scb{0};
+    gpu::DeviceBuffer predb{0};
+    int cap_T = 0;
+    void Ensure(int T, int D, int H, int Dff, int n_spk);
+  };
+  Scratch scr_;
+
   int d_enc_, d_model_, n_heads_, d_ff_, d_k_, n_layers_, n_spk_;
   std::map<std::string, std::unique_ptr<gpu::UnifiedBuffer>> w_;
 };

@@ -112,7 +112,13 @@ model_weights = "models/sortformer_4spk_v2.safetensors"
 
 # Sortformer streaming tuning — affects speaker segmentation quality
 # Speaker cache length (frames). Larger = more stable speaker identity, slower adaptation. (default 188)
-spkcache_len = 5000
+# NOTE: this is the speaker-cache size the model was TRAINED with; it also sets
+# the transformer sequence length T = spkcache_len + chunk (~381). The encoder
+# attention scratch is O(T^2) across all 17 conformer layers, so oversizing this
+# (e.g. 5000) makes T ~5400 and needs tens of GB of GPU/unified memory and stalls
+# the stream. Keep at the model default unless you have measured both accuracy
+# and memory.
+spkcache_len = 188
 # Cache update interval (frames). (default 188)
 # spkcache_update_period = 188
 # Left context chunks. Higher = better context, more compute. (default 1)

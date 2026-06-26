@@ -133,9 +133,11 @@ class Qwen3Asr final : public core::IAsr {
   io::BpeTokenizer tokenizer_;
 
   // --- incremental streaming session state (Spec 003) ---
-  std::vector<float> seg_pcm_;        // accumulated segment PCM (mono 16k)
+  std::vector<float> seg_pcm_;        // retained segment PCM tail (mono 16k)
   long seg_base_sample_ = 0;          // absolute index of seg_pcm_[0]
   int seg_encoded_frames_ = 0;        // mel frames already turned into audio tokens
+  int seg_pcm_frame_offset_ = 0;      // segment-absolute frame index of seg_pcm_[0] after trimming
+  float seg_logmel_max_ = -1e30f;     // running Whisper log-mel max across the segment (norm consistency)
   int stream_cache_ckpt_ = 0;         // cache length after [system][audio block]
   int stream_audio_tokens_ = 0;       // N audio tokens encoded so far
   int stream_chunk_id_ = 0;           // completed-window counter

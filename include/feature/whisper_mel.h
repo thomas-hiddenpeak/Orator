@@ -34,8 +34,20 @@ class WhisperMel {
 
   // Computes the log-mel spectrogram for a mono 16 kHz signal.
   // Returns row-major [n_mels * num_frames]; *out_num_frames gets num_frames.
+  //
+  // Whisper normalization clamps each value to `max(value, gmax - 8)` where
+  // `gmax` is the global log-mel maximum. For incremental (windowed) streaming
+  // the maximum must be kept consistent across calls: pass `running_max` to a
+  // caller-owned float seeded to -inf at segment start; each call folds its
+  // local max into it and normalizes with the running value, so a windowed
+  // computation matches a single full-segment computation exactly. Frames in
+  // [0, max_valid_from) are excluded from the local-max scan (used to skip the
+  // reflect-padded boundary frames of a trimmed tail). running_max == nullptr
+  // reproduces the legacy per-call local-max behavior.
   std::vector<float> Compute(const float* samples, int num_samples,
-                               int* out_num_frames, cudaStream_t stream = 0) const;
+                               int* out_num_frames, cudaStream_t stream = 0,
+                               float* running_max = nullptr,
+                               int max_valid_from = 0) const;
 
   int n_mels() const { return config_.n_mels; }
   int n_freqs() const { return config_.n_fft / 2 + 1; }
