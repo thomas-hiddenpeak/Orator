@@ -183,6 +183,33 @@ spkcache_refresh_rate = 100
 # gpu_scheduling = "auto"
 
 # ══════════════════════════════════════════════════════════════════════════════
+# Buffer — shared audio buffer configuration
+# ══════════════════════════════════════════════════════════════════════════════
+[buffer]
+# Maximum buffer size in samples. 0 = no limit (default).
+# Recommended: 32000000 (32M samples = 2s at 16kHz) for real-time streaming
+# or 64000000 (64M samples = 4s at 16kHz) for higher tolerance to pipeline delays.
+# max_samples = 0
+
+# Shrink-to-fit threshold in samples. When buffer capacity exceeds this,
+# memory is reclaimed. Default: 10000000 (10M samples = ~40MB).
+# shrink_threshold = 10000000
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Telemetry — cursor progress and health monitoring
+# ══════════════════════════════════════════════════════════════════════════════
+[telemetry.cursor]
+# Enable cursor progress telemetry. 0 = disabled, >0 = interval in seconds.
+# When enabled, periodic {"type":"cursor_progress",...} messages are sent.
+# interval_sec = 0.0
+
+# Maximum allowed lag in samples before warning. 0 = no limit.
+# lag_warn_samples = 0
+
+# Maximum allowed lag in samples before critical. 0 = no limit.
+# lag_critical_samples = 0
+
+# ══════════════════════════════════════════════════════════════════════════════
 # Debug — ASR model development knobs (read via std::getenv, not via Config)
 # ══════════════════════════════════════════════════════════════════════════════
 [debug_model]

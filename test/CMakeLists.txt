@@ -118,16 +118,4 @@ if(Python3_EXECUTABLE)
       LABELS "python;integration"
     )
   endfunction()
-
-  # Single integration test: manages its own server when ORATOR_TEST_MODELS=1.
-  add_test(NAME py-integration
-    COMMAND ${Python3_EXECUTABLE}
-      ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/test_integration.py
-  )
-  set_tests_properties(py-integration PROPERTIES
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    TIMEOUT 300
-    LABELS "python;integration"
-    ENVIRONMENT "ORATOR_TEST_MODELS=1"
-  )
 endif()

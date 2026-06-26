@@ -24,7 +24,8 @@ namespace orator {
 namespace pipeline {
 
 AuditoryStream::AuditoryStream(const Config& config, Emit emit)
-    : config_(config), emit_(std::move(emit)), buffer_(config.sample_rate) {}
+    : config_(config), emit_(std::move(emit)), 
+      buffer_(config.sample_rate, SharedAudioBuffer::Config{config.buffer_max_samples, config.buffer_shrink_threshold}) {}
 
 AuditoryStream::~AuditoryStream() { StopWorkers(); }
 
@@ -270,6 +271,25 @@ void AuditoryStream::StartWorkers() {
       }
     });
   }
+  
+  // Cursor progress telemetry thread
+  if (config_.cursor_telemetry_interval_sec > 0.0) {
+    cursor_telemetry_stop_ = false;
+    cursor_telemetry_thread_ = std::thread([this] {
+      const auto interval = std::chrono::duration<double>(
+          config_.cursor_telemetry_interval_sec);
+      for (;;) {
+        {
+          std::unique_lock<std::mutex> lk(cursor_telemetry_mutex_);
+          cursor_telemetry_cv_.wait_for(lk, interval,
+                                        [this] { return cursor_telemetry_stop_; });
+          if (cursor_telemetry_stop_) break;
+        }
+        const std::string msg = SerializeCursorTelemetry();
+        if (!msg.empty()) EmitLocked(msg);
+      }
+    });
+  }
   running_ = true;
 }
 
@@ -281,6 +301,14 @@ void AuditoryStream::StopWorkers() {
   }
   telemetry_cv_.notify_all();
   if (telemetry_thread_.joinable()) telemetry_thread_.join();
+  
+  {
+    std::lock_guard<std::mutex> lk(cursor_telemetry_mutex_);
+    cursor_telemetry_stop_ = true;
+  }
+  cursor_telemetry_cv_.notify_all();
+  if (cursor_telemetry_thread_.joinable()) cursor_telemetry_thread_.join();
+  
   buffer_.Close();
   if (diar_thread_.joinable()) diar_thread_.join();
   if (asr_thread_.joinable()) asr_thread_.join();
@@ -298,6 +326,52 @@ double AuditoryStream::diar_compute_sec() const {
 
 double AuditoryStream::asr_compute_sec() const {
   return asr_worker_ ? asr_worker_->compute_sec() : 0.0;
+}
+
+std::string AuditoryStream::SerializeCursorTelemetry() const {
+  auto progress = buffer_.GetCursorProgress();
+  std::string json = "{\"type\":\"cursor_progress\",\"total_samples\":";
+  json += std::to_string(progress.total_samples);
+  json += ",\"base_sample\":";
+  json += std::to_string(progress.base_sample);
+  json += ",\"buffer_size\":";
+  json += std::to_string(progress.buffer_size);
+  json += ",\"cursors\":[";
+  
+  bool first = true;
+  for (const auto& cp : progress.cursors) {
+    if (!first) json += ",";
+    json += "{\"id\":" + std::to_string(cp.first) + ",\"position\":";
+    json += std::to_string(cp.second) + "}";
+    first = false;
+  }
+  
+  json += "]";
+  
+  // Add lag warnings if configured
+  if (config_.cursor_lag_warn_samples > 0 || config_.cursor_lag_critical_samples > 0) {
+    json += ",\"lags\":{";
+    bool first_lag = true;
+    for (const auto& cp : progress.cursors) {
+      long lag = progress.total_samples - cp.second;
+      if (lag > 0) {
+        if (!first_lag) json += ",";
+        json += "\"cursor_" + std::to_string(cp.first) + "\":" + std::to_string(lag);
+        first_lag = false;
+        
+        // Check warning/critical thresholds
+        if (config_.cursor_lag_critical_samples > 0 && lag >= static_cast<long>(config_.cursor_lag_critical_samples)) {
+          json += ",\"status\":\"critical\"";
+        } else if (config_.cursor_lag_warn_samples > 0 && lag >= static_cast<long>(config_.cursor_lag_warn_samples)) {
+          json += ",\"status\":\"warn\"";
+        }
+      }
+    }
+    json += "}";
+  }
+  
+  json += "}";
+  return json;
 }
 
 void AuditoryStream::PushAudio(const float* samples, int n) {

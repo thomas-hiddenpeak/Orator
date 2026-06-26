@@ -50,6 +50,16 @@ bool ReadEnvFloat(const char* name, float* out) {
   return true;
 }
 
+bool ReadEnvSizeT(const char* name, size_t* out) {
+  const char* v = std::getenv(name);
+  if (v == nullptr || out == nullptr) return false;
+  char* end = nullptr;
+  const unsigned long x = std::strtoul(v, &end, 10);
+  if (end == v || *end != '\0') return false;
+  *out = static_cast<size_t>(x);
+  return true;
+}
+
 void ReadEnvString(const char* name, std::string* out) {
   const char* v = std::getenv(name);
   if (v == nullptr || out == nullptr) return;
@@ -124,6 +134,11 @@ int main(int argc, char** argv) {
   ReadEnvInt("ORATOR_VAD_MIN_SPEECH_MS", &cfg.vad_min_speech_ms);
   ReadEnvInt("ORATOR_VAD_MIN_SILENCE_MS", &cfg.vad_min_silence_ms);
   ReadEnvDouble("ORATOR_GPU_TELEMETRY_SEC", &cfg.gpu_telemetry_interval_sec);
+  ReadEnvSizeT("ORATOR_BUFFER_MAX_SAMPLES", &cfg.buffer_max_samples);
+  ReadEnvSizeT("ORATOR_BUFFER_SHRINK_THRESHOLD", &cfg.buffer_shrink_threshold);
+  ReadEnvDouble("ORATOR_CURSOR_TELEMETRY_SEC", &cfg.cursor_telemetry_interval_sec);
+  ReadEnvSizeT("ORATOR_CURSOR_LAG_WARN_SAMPLES", &cfg.cursor_lag_warn_samples);
+  ReadEnvSizeT("ORATOR_CURSOR_LAG_CRITICAL_SAMPLES", &cfg.cursor_lag_critical_samples);
   ReadEnvString("ORATOR_STORAGE_DISK_PATH", &cfg.storage_disk_path);
   ReadEnvString("ORATOR_SESSION_DIR", &cfg.session_dir);
   ReadEnvInt("ORATOR_LOG_LEVEL", &cfg.log_level);

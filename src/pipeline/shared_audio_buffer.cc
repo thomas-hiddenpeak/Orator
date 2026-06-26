@@ -6,7 +6,10 @@ namespace orator {
 namespace pipeline {
 
 SharedAudioBuffer::SharedAudioBuffer(int sample_rate)
-    : sample_rate_(sample_rate) {}
+    : sample_rate_(sample_rate), config_() {}
+
+SharedAudioBuffer::SharedAudioBuffer(int sample_rate, const Config& config)
+    : sample_rate_(sample_rate), config_(config) {}
 
 int SharedAudioBuffer::AddConsumer() {
   std::lock_guard<std::mutex> lock(mutex_);
@@ -18,6 +21,20 @@ void SharedAudioBuffer::Append(const float* samples, int n) {
   if (samples == nullptr || n <= 0) return;
   {
     std::lock_guard<std::mutex> lock(mutex_);
+    
+    // Check buffer size limit
+    if (config_.max_samples > 0 && (samples_.size() + n > config_.max_samples)) {
+      // Buffer size limit reached, truncate old data
+      const size_t overflow = (samples_.size() + n) - config_.max_samples;
+      if (overflow >= samples_.size()) {
+        samples_.clear();
+        base_sample_ = total_samples_; // Reset base to current total
+      } else {
+        samples_.erase(samples_.begin(), samples_.begin() + overflow);
+        base_sample_ += overflow;
+      }
+    }
+    
     // Pre-allocate to avoid repeated reallocations
     if (samples_.size() + n > samples_.capacity()) {
       samples_.reserve(samples_.size() + n + 1024); // Add buffer for future growth
@@ -74,7 +91,7 @@ void SharedAudioBuffer::RemovePassedPrefix() {
   base_sample_ = min_cursor;
   
   // Shrink to fit to release memory if buffer is too large
-  if (samples_.capacity() > 10000000) { // If capacity > 10M samples (~40MB)
+  if (samples_.capacity() > config_.shrink_threshold) {
     std::vector<float> temp(std::move(samples_));
     samples_.swap(temp);
   }
@@ -103,6 +120,19 @@ long SharedAudioBuffer::cursor_position(int idx) const {
   std::lock_guard<std::mutex> lock(mutex_);
   if (idx < 0 || idx >= static_cast<int>(cursors_.size())) return 0;
   return cursors_[idx];
+}
+
+SharedAudioBuffer::CursorProgress SharedAudioBuffer::GetCursorProgress() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  CursorProgress progress;
+  progress.total_samples = total_samples_;
+  progress.base_sample = base_sample_;
+  progress.buffer_size = samples_.size();
+  progress.cursors.reserve(cursors_.size());
+  for (size_t i = 0; i < cursors_.size(); ++i) {
+    progress.cursors.push_back({static_cast<int>(i), cursors_[i]});
+  }
+  return progress;
 }
 
 }  // namespace pipeline

@@ -174,10 +174,33 @@ bool ApplyTomlConfig(const std::string& path,
     }
   }
 
+  // ── [buffer] ──────────────────────────────────────────────────────
+  if (auto* sec = config["buffer"].as_table()) {
+    if (auto v = sec->get("max_samples")) {
+      if (auto u = v->value<uint64_t>()) cfg.buffer_max_samples = static_cast<size_t>(*u);
+    }
+    if (auto v = sec->get("shrink_threshold")) {
+      if (auto u = v->value<uint64_t>()) cfg.buffer_shrink_threshold = static_cast<size_t>(*u);
+    }
+  }
+
   // ── [telemetry] ───────────────────────────────────────────────────
   if (auto* sec = config["telemetry"].as_table()) {
     if (auto v = sec->get("gpu_interval_sec")) {
       if (auto d = v->value<double>()) cfg.gpu_telemetry_interval_sec = *d;
+    }
+  }
+
+  // ── [telemetry.cursor] ────────────────────────────────────────────
+  if (auto* sec = config["telemetry.cursor"].as_table()) {
+    if (auto v = sec->get("interval_sec")) {
+      if (auto d = v->value<double>()) cfg.cursor_telemetry_interval_sec = *d;
+    }
+    if (auto v = sec->get("lag_warn_samples")) {
+      if (auto u = v->value<uint64_t>()) cfg.cursor_lag_warn_samples = static_cast<size_t>(*u);
+    }
+    if (auto v = sec->get("lag_critical_samples")) {
+      if (auto u = v->value<uint64_t>()) cfg.cursor_lag_critical_samples = static_cast<size_t>(*u);
     }
   }
 

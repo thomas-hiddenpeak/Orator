@@ -115,8 +115,17 @@ class AuditoryStream {
     std::string storage_disk_path = "/tmp/orator/storage/";
     std::string session_dir;
 
+    // ── Buffer ───────────────────────────────────────────────────────
+    size_t buffer_max_samples = 0;        // 0 = no limit
+    size_t buffer_shrink_threshold = 10000000; // 10M samples ~ 40MB
+
     // ── Telemetry ────────────────────────────────────────────────────
     double gpu_telemetry_interval_sec = 0.0;
+
+    // ── Cursor Telemetry ─────────────────────────────────────────────
+    double cursor_telemetry_interval_sec = 0.0;
+    size_t cursor_lag_warn_samples = 0;
+    size_t cursor_lag_critical_samples = 0;
 
     // ── Debug ────────────────────────────────────────────────────────
     int log_level = 2;   // 0=DEBUG, 1=INFO, 2=WARN, 3=ERROR
@@ -187,6 +196,8 @@ class AuditoryStream {
   // Spec 002 FR7: build the periodic GPU-scheduling telemetry message from the
   // priority registry + each pipeline's compute/occupancy summary.
   std::string SerializeGpuTelemetry() const;
+  // Build the periodic cursor progress telemetry message.
+  std::string SerializeCursorTelemetry() const;
 
   Config config_;
   Emit emit_;
@@ -231,6 +242,12 @@ class AuditoryStream {
   std::mutex telemetry_mutex_;
   std::condition_variable telemetry_cv_;
   bool telemetry_stop_ = false;
+
+  // Cursor progress telemetry thread.
+  std::thread cursor_telemetry_thread_;
+  std::mutex cursor_telemetry_mutex_;
+  std::condition_variable cursor_telemetry_cv_;
+  bool cursor_telemetry_stop_ = false;
 
   // Last serialized snapshots, exposed for inspection by the test tool.
   std::vector<core::DiarSegment> last_segments_;

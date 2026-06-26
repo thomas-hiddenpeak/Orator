@@ -30,7 +30,16 @@ namespace pipeline {
 
 class SharedAudioBuffer {
  public:
+  struct Config {
+    size_t max_samples;           // 0 = no limit
+    size_t shrink_threshold; // 10M samples ~ 40MB
+    
+    Config() : max_samples(0), shrink_threshold(10000000) {}
+    Config(size_t max_s, size_t shrink_t) : max_samples(max_s), shrink_threshold(shrink_t) {}
+  };
+
   explicit SharedAudioBuffer(int sample_rate = 16000);
+  explicit SharedAudioBuffer(int sample_rate, const Config& config);
 
   SharedAudioBuffer(const SharedAudioBuffer&) = delete;
   SharedAudioBuffer& operator=(const SharedAudioBuffer&) = delete;
@@ -79,6 +88,15 @@ class SharedAudioBuffer {
   // Returns the absolute read position of cursor `idx`. Thread-safe.
   long cursor_position(int idx) const;
 
+  // Get cursor progress info for telemetry. Thread-safe.
+  struct CursorProgress {
+    long total_samples;
+    long base_sample;
+    std::vector<std::pair<int, long>> cursors; // (cursor_id, position)
+    size_t buffer_size; // current buffer size in samples
+  };
+  CursorProgress GetCursorProgress() const;
+
  private:
   // Remove the leading samples that every consumer has already read. The caller
   // holds `mutex_`.
@@ -88,6 +106,7 @@ class SharedAudioBuffer {
   std::condition_variable cv_;
 
   const int sample_rate_;
+  Config config_;
   std::vector<float> samples_;  // retained window; samples_[0] == base_sample_
   long base_sample_ = 0;        // absolute index of samples_.front()
   long total_samples_ = 0;      // absolute count appended this session
