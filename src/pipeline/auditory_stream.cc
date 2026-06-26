@@ -122,8 +122,8 @@ void AuditoryStream::Start() {
     asr_->Initialize(ac);
     asr_->set_max_new_tokens(config_.asr_max_new_tokens);
     asr_->LoadWeights(config_.asr_model_dir);
-    asr_stream_ = scheduler_.Register("asr", /*priority_index=*/1,
-                                      /*background=*/false,
+    asr_stream_ = scheduler_.Register("asr", /*priority_index=*/2,
+                                      /*background=*/true,
                                       /*create_stream=*/true);
     int greatest = 0, least = 0;
     scheduler_.PriorityRange(&greatest, &least);
@@ -211,8 +211,8 @@ void AuditoryStream::StartWorkers() {
     });
   }
   if (config_.vad_stream) {
-    vad_stream_ = scheduler_.Register("vad", /*priority_index=*/2,
-                                      /*background=*/true,
+    vad_stream_ = scheduler_.Register("vad", /*priority_index=*/1,
+                                      /*background=*/false,
                                       /*create_stream=*/true);
     GpuVad::Params vp;
     vp.sample_rate = config_.sample_rate;
