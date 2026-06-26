@@ -10,11 +10,7 @@ SharedAudioBuffer::SharedAudioBuffer(int sample_rate)
     : sample_rate_(sample_rate), config_(), disk_storage_(nullptr) {}
 
 SharedAudioBuffer::SharedAudioBuffer(int sample_rate, const Config& config)
-    : sample_rate_(sample_rate), config_(config), disk_storage_(nullptr) {
-  // Initialize disk storage if configured
-  // For now, we don't have a disk_storage_dir in Config, so we'll skip disk storage
-  // until it's explicitly added to Config. But we keep the structure ready.
-}
+    : sample_rate_(sample_rate), config_(config), disk_storage_(nullptr) {}
 
 SharedAudioBuffer::~SharedAudioBuffer() {
   delete disk_storage_;
@@ -107,38 +103,27 @@ bool SharedAudioBuffer::WaitAndRead(int cursor, std::vector<float>* out,
     // All requested data is in memory buffer
     long from_in_buffer = requested_start - current_memory_start_sample;
     out->assign(memory_buffer_.begin() + from_in_buffer, memory_buffer_.begin() + from_in_buffer + count);
-  } else {
+  } else if (disk_storage_) {
     // Data spans memory and disk, or is entirely on disk
-    // For simplicity and correctness, read from disk if not fully in memory
-    // Note: This is a simplified implementation. A full implementation would handle partial memory/disk splits.
-    if (disk_storage_) {
-      std::lock_guard<std::mutex> disk_lock(mutex_); // Re-acquire lock for disk access if needed, but DiskAudioStorage has its own lock
-      disk_storage_->Read(requested_start, static_cast<int>(count), out);
-    } else {
-      // Fallback: try to read from memory buffer if possible
-      std::lock_guard<std::mutex> mem_lock(mutex_); // Re-acquire to read memory_buffer safely
-      long from_in_buffer = std::max(0L, requested_start - memory_start_sample_);
-      long available_in_memory = static_cast<long>(memory_buffer_.size()) - from_in_buffer;
-      if (available_in_memory > 0 && requested_start >= memory_start_sample_) {
-        int read_count = static_cast<int>(std::min(static_cast<long>(count), available_in_memory));
-        out->assign(memory_buffer_.begin() + from_in_buffer, memory_buffer_.begin() + from_in_buffer + read_count);
-      }
+    // Read from disk if not fully in memory
+    disk_storage_->Read(requested_start, static_cast<int>(count), out);
+  } else {
+    // Fallback: try to read from memory buffer if possible
+    std::lock_guard<std::mutex> mem_lock(mutex_); // Re-acquire to read memory_buffer safely
+    long from_in_buffer = std::max(0L, requested_start - memory_start_sample_);
+    long available_in_memory = static_cast<long>(memory_buffer_.size()) - from_in_buffer;
+    if (available_in_memory > 0 && requested_start >= memory_start_sample_) {
+      int read_count = static_cast<int>(std::min(static_cast<long>(count), available_in_memory));
+      out->assign(memory_buffer_.begin() + from_in_buffer, memory_buffer_.begin() + from_in_buffer + read_count);
     }
   }
   
   // Re-acquire lock to update cursor and remove passed prefix
-  lock.lock();
-  cursors_[cursor] = total_samples_;
-
-  RemovePassedPrefix();
-  return true;
-}
-  
-  // Re-acquire lock to update cursor and remove passed prefix
-  lock.lock();
-  cursors_[cursor] = total_samples_;
-
-  RemovePassedPrefix();
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    cursors_[cursor] = total_samples_;
+    RemovePassedPrefix();
+  }
   return true;
 }
 
@@ -155,16 +140,6 @@ void SharedAudioBuffer::RemovePassedPrefix() {
     if (samples_to_remove_from_memory > 0) {
       memory_buffer_.erase(memory_buffer_.begin(), memory_buffer_.begin() + static_cast<size_t>(samples_to_remove_from_memory));
       memory_start_sample_ += samples_to_remove_from_memory;
-    }
-    
-    // If memory buffer is empty or min_cursor is far ahead, write remaining memory to disk and clear
-    if (memory_buffer_.empty() || (config_.max_memory_samples > 0 && memory_buffer_.size() >= config_.max_memory_samples)) {
-      // Write remaining memory buffer to disk if not empty
-      if (!memory_buffer_.empty() && disk_storage_) {
-        disk_storage_->Write(memory_start_sample_, memory_buffer_.data(), static_cast<int>(memory_buffer_.size()));
-        memory_buffer_.clear();
-        memory_start_sample_ = min_cursor;
-      }
     }
   }
 }
