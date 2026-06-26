@@ -123,7 +123,7 @@ void AuditoryStream::Start() {
     asr_->set_max_new_tokens(config_.asr_max_new_tokens);
     asr_->LoadWeights(config_.asr_model_dir);
     asr_stream_ = scheduler_.Register("asr", /*priority_index=*/2,
-                                      /*background=*/true,
+                                      /*background=*/false,
                                       /*create_stream=*/true);
     int greatest = 0, least = 0;
     scheduler_.PriorityRange(&greatest, &least);

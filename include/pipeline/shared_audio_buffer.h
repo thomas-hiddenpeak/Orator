@@ -31,15 +31,16 @@ namespace pipeline {
 class SharedAudioBuffer {
  public:
   struct Config {
-    size_t max_samples;           // 0 = no limit
-    size_t shrink_threshold; // 10M samples ~ 40MB
+    size_t max_memory_samples;  // Fixed size of in-memory ring buffer (0 = no limit, defaults to 60s @ 16kHz = 960000)
+    size_t shrink_threshold;    // 10M samples ~ 40MB
     
-    Config() : max_samples(0), shrink_threshold(10000000) {}
-    Config(size_t max_s, size_t shrink_t) : max_samples(max_s), shrink_threshold(shrink_t) {}
+    Config() : max_memory_samples(960000), shrink_threshold(10000000) {}
+    Config(size_t max_mem, size_t shrink_t) : max_memory_samples(max_mem), shrink_threshold(shrink_t) {}
   };
 
   explicit SharedAudioBuffer(int sample_rate = 16000);
   explicit SharedAudioBuffer(int sample_rate, const Config& config);
+  ~SharedAudioBuffer();
 
   SharedAudioBuffer(const SharedAudioBuffer&) = delete;
   SharedAudioBuffer& operator=(const SharedAudioBuffer&) = delete;
@@ -107,8 +108,15 @@ class SharedAudioBuffer {
 
   const int sample_rate_;
   Config config_;
-  std::vector<float> samples_;  // retained window; samples_[0] == base_sample_
-  long base_sample_ = 0;        // absolute index of samples_.front()
+  
+  // In-memory ring buffer: holds the latest 'max_memory_samples' data
+  std::vector<float> memory_buffer_;
+  long memory_start_sample_ = 0; // absolute sample index of memory_buffer_.front()
+  
+  // Disk storage for overflow data
+  class DiskAudioStorage* disk_storage_;
+
+  long base_sample_ = 0;        // absolute index of the oldest retained sample (memory or disk)
   long total_samples_ = 0;      // absolute count appended this session
   std::vector<long> cursors_;   // absolute read position per consumer
   bool closed_ = false;
