@@ -148,6 +148,44 @@ a pipeline that violates any one of them is rejected.
 This project is delivered to a high standard of code quality. The following are
 acceptance criteria, enforced in review:
 
+- Readability, organization, maintainability, extensibility, concurrency safety.
+- No metaphors or jargon in documentation; precise engineering language only.
+- No speculative features or unrelated refactors; make only the requested change.
+
+## Article VI — Testing Principles
+
+### 6.1 — Test Audio and Reference Standard
+
+1. All tests except unit tests MUST use `test.mp3` as the audio source and `test.txt` as the reference for actual pipeline testing.
+2. Actual pipeline testing MAY use different speeds for testing.
+3. When comparing results, NO script analysis MUST be used for accuracy evaluation, and NO scripts MUST be temporarily created in the command line for analysis. The test results MUST be compared item by item with the reference file by placing them in the context.
+
+### 6.2 — Test Levels and Device Metrics
+
+1. Tests are divided into 120s, 360s, 600s, and full-length tests.
+2. During testing, device operation metrics such as power, CPU, GPU, and RAM usage MUST be observed in addition to business metrics.
+3. Since the device is Jetson, support for `nvidia-smi` is incomplete; related data MUST be obtained through `tegrastats`.
+
+### 6.3 — Speaker Diarization Accuracy Evaluation
+
+1. When comparing results placed in context, the speaker separation accuracy statistics MUST provide the accuracy of the total comparison of speaker segmentation time blocks.
+2. If there are offsets, the offsets MUST be annotated.
+3. Other metrics of speaker segmentation MUST also be annotated and their meanings explained.
+
+### 6.4 — ASR Accuracy Evaluation
+
+1. The ASR accuracy comparison MUST use semantic comparison, meaning character-level comparison MUST NOT be used.
+2. For example: the number 1 and the Chinese character "一" (one) should be considered equivalent.
+
+### 6.5 — Unified Test Script Requirement
+
+1. There MUST be only one Python script for the test WebSocket client globally, using a unified script for testing to ensure semantic consistency of test parameters. This script is for test execution only, not for result comparison or accuracy analysis.
+2. If test parameter meanings or test conditions/methods change, the values of the same state before and after the change MUST be recorded and compared.
+
+---
+
+## Article VII — Amendment Process
+
 1. **Readability**
    - Google C++ Style: 2-space indent, `PascalCase` types/methods,
      `lower_snake_case` locals, trailing-underscore `member_` fields,
@@ -197,7 +235,7 @@ acceptance criteria, enforced in review:
    - Validate every change: it builds with no new warnings (`-Wall -Wextra`),
      the full test suite passes, and any behavioral claim is supported by a run.
 
-## Article VI — Documentation and Terminology Standards
+## Article VIII — Documentation and Terminology Standards
 
 All project documents (the Constitution, specs, plans, tasks, READMEs, code
 comments, and commit messages) MUST be written so that a reader unfamiliar with
@@ -230,7 +268,11 @@ enforced in review:
 A document that relies on metaphor or undefined jargon is rejected in review and
 rewritten in plain, standard terminology.
 
-## Article VII — Process: Spec-Driven Development
+## Article IX — Configuration Consistency
+
+1. **Configuration consistency**: always use `orator.toml` configuration file to ensure parameter consistency across all server starts and tests. Do not hardcode parameters in command lines or code. Follow the configuration loading order: 1) Compile-time defaults, 2) `orator.toml`, 3) Environment variables (ORATOR_*), 4) CLI arguments.
+
+## Article X — Process: Spec-Driven Development
 
 1. Work of non-trivial scope follows the SDD flow, adapted from spec-kit:
    `constitution → spec → plan → tasks → implement`. Each artifact lives under
@@ -246,7 +288,7 @@ rewritten in plain, standard terminology.
    duty applies to every state document (`specs/PROJECT_STATE.md`, each spec's
    and tasks' status line): see Article VIII.
 
-## Article VIII — Documentation–Code Consistency
+## Article XI — Documentation–Code Consistency
 
 State documents describe the project; the code IS the project. When the two
 disagree, the code is authoritative and the document is a defect to be corrected

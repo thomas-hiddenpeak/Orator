@@ -18,6 +18,10 @@ void SharedAudioBuffer::Append(const float* samples, int n) {
   if (samples == nullptr || n <= 0) return;
   {
     std::lock_guard<std::mutex> lock(mutex_);
+    // Pre-allocate to avoid repeated reallocations
+    if (samples_.size() + n > samples_.capacity()) {
+      samples_.reserve(samples_.size() + n + 1024); // Add buffer for future growth
+    }
     samples_.insert(samples_.end(), samples, samples + n);
     total_samples_ += n;
   }
@@ -46,7 +50,13 @@ bool SharedAudioBuffer::WaitAndRead(int cursor, std::vector<float>* out,
 
   const long from = cursors_[cursor] - base_sample_;
   const long count = total_samples_ - cursors_[cursor];
+  
+  // Release lock before doing the copy to reduce lock contention
+  lock.unlock();
   out->assign(samples_.begin() + from, samples_.begin() + from + count);
+  
+  // Re-acquire lock to update cursor and remove passed prefix
+  lock.lock();
   cursors_[cursor] = total_samples_;
 
   RemovePassedPrefix();
@@ -58,8 +68,16 @@ void SharedAudioBuffer::RemovePassedPrefix() {
   const long min_cursor = *std::min_element(cursors_.begin(), cursors_.end());
   const long remove_count = min_cursor - base_sample_;
   if (remove_count <= 0) return;
+  
+  // Remove passed prefix and shrink to fit to release memory
   samples_.erase(samples_.begin(), samples_.begin() + remove_count);
   base_sample_ = min_cursor;
+  
+  // Shrink to fit to release memory if buffer is too large
+  if (samples_.capacity() > 10000000) { // If capacity > 10M samples (~40MB)
+    std::vector<float> temp(std::move(samples_));
+    samples_.swap(temp);
+  }
 }
 
 void SharedAudioBuffer::Reset() {

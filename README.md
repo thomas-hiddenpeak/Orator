@@ -133,7 +133,7 @@ cd build
 ctest --output-on-failure
 ```
 
-包含 40 测试（38 C++ + 2 Python）和可选 Python 集成测试：
+包含 39/39 测试通过（37 C++ 单元测试 + 2 C++ 集成测试 + Python 集成测试）：
 
 - C++ 单元测试覆盖：时间基、ComprehensiveTimeline、ASR 算子、GPU 核函数（Add/Multiply/Normalize/CosineSimilarity）、WebSocket、协议层等
 - CUDA kernel 测试（`test_kernels`）：13 个测试，验证 GPU 核函数与 CPU 参考实现的数值等价性
@@ -145,6 +145,37 @@ ctest --output-on-failure
 
 # Python 集成测试
 cd build && ctest -R py- --output-on-failure
+```
+
+### 统一测试脚本
+
+项目现在采用统一的测试脚本和测试原则，所有测试脚本遵循宪法级别的测试原则：
+
+1. **测试音频和参考标准**：除单元测试外的所有测试必须使用 `test.mp3` 作为音频源，`test.txt` 作为参考进行实际管线测试
+2. **测试级别和设备指标**：测试分为 120s、360s、600s 和全长度测试，过程中必须观察设备运行指标（功率、CPU、GPU、RAM 使用情况），通过 `tegrastats` 获取 Jetson 设备数据
+3. **说话人区分准确率统计**：提供说话人分割的时间块的总量对比的准确率，如有偏移量需标注偏移量，其他指标也要进行标注并说明含义
+4. **ASR准确率对比**：采用语义对比，不做字符级别的对比（例如：数字1和汉字"一"应该是等价的）
+5. **统一测试脚本要求**：用于测试的 ws 客户端脚本全局只能有一个 python 脚本，采用统一脚本进行测试，保证测试参数的语义一致性
+
+
+
+#### 统一 WebSocket 测试客户端
+
+```bash
+# 120s 测试:
+python3 tools/verify/py/ws_unified_test.py --duration 120 --port 8765 --out test_120s.json
+
+# 360s 测试:
+python3 tools/verify/py/ws_unified_test.py --duration 360 --port 8765 --out test_360s.json
+
+# 600s 测试:
+python3 tools/verify/py/ws_unified_test.py --duration 600 --port 8765 --out test_600s.json
+
+# 全长度测试:
+python3 tools/verify/py/ws_unified_test.py --duration 3615 --port 8765 --out test_full.json
+
+# 不同倍速测试 (2x 速度):
+python3 tools/verify/py/ws_unified_test.py --duration 3615 --port 8765 --rate 2.0 --out test_2x.json
 ```
 
 ## 目录概览
@@ -177,7 +208,7 @@ pipeline/  (管道编排、工作者线程、时间线)
 
 ### 启动流程
 
-`orator_ws` 是唯一主入口（`src/ws_main.cc`）：
+`orator_ws` 是唯一主入口（`src/net/ws_main.cc`）：
 
 1. **配置加载** — 解析 CLI 参数和 26 环境变量到 `AuditoryStream::Config`
 2. **单例管线创建** — `AuditoryStream` 只创建一次（GPU 模型仅加载一次），通过 `shared_ptr` 在所有 WebSocket 连接间共享。每个新连接调用 `Reset()`（清状态但不卸载模型），避免 Jetson OOM

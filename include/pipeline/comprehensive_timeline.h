@@ -133,6 +133,9 @@ class ComprehensiveTimeline {
   // Deposit a VAD speech segment.
   void AddVad(double start, double end);
 
+  // Clean up old data to prevent memory accumulation
+  void CleanupOldData(double keep_until_sec);
+
  private:
   struct SpeakerSeg {
     double start = 0.0;

@@ -36,6 +36,9 @@ class TimeIndex {
   // Remove messages older than `cutoff_sec` for a topic.
   void Retain(const std::string& topic, double cutoff_sec);
 
+  // Clean up old entries across all topics to prevent memory accumulation
+  void CleanupOldEntries(double keep_until_sec);
+
  private:
   std::map<std::string, std::vector<IndexedMessage>> index_;
   mutable std::mutex mutex_;

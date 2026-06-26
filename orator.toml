@@ -29,7 +29,7 @@
 # ══════════════════════════════════════════════════════════════════════════════
 [asr]
 # Model directory path (CLI arg overrides)
-# model_dir = "models/asr/Qwen/Qwen3-ASR-1.7B"
+model_dir = "models/asr/Qwen/Qwen3-ASR-1.7B"
 
 # Master switch for VAD-gated processing
 # vad_gate = true
@@ -96,7 +96,7 @@
 # ══════════════════════════════════════════════════════════════════════════════
 [diarizer]
 # Model weights path (CLI arg overrides). Empty = disable diarization
-# model_weights = "models/sortformer_4spk_v2.safetensors"
+model_weights = "models/sortformer_4spk_v2.safetensors"
 
 # Maximum number of speakers
 # max_speakers = 4

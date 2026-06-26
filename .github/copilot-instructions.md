@@ -48,6 +48,7 @@ rework. Enforce these every session:
 - Streaming validation: validate through the real WebSocket streaming path, not whole-file shortcut runs.
 - Engineering quality is mandatory: readability, layering, RAII, race-free concurrency, small focused functions.
 - Terminology standard: precise engineering language, no metaphor-heavy wording in docs.
+- Configuration consistency: always use `orator.toml` configuration file to ensure parameter consistency across all server starts and tests. Do not hardcode parameters in command lines or code. Follow the configuration loading order: 1) Compile-time defaults, 2) `orator.toml`, 3) Environment variables (ORATOR_*), 4) CLI arguments.
 
 ## Implementation boundaries
 - Prefer minimal, targeted changes. Avoid unrelated refactors.
@@ -72,6 +73,18 @@ rework. Enforce these every session:
 - Distinguish facts from assumptions.
 - If blocked, state blocker, impact, and the smallest next action.
 - For reviews, prioritize findings (bugs, risks, regressions, missing tests) over summaries.
+
+## Specialized Skills Documentation
+
+For complex or cross-cutting tasks, the project uses specialized skill documentation stored in `.agents/skills/`:
+- Frontend architecture: `.agents/skills/frontend-arch/SKILL.md`
+- Model validation: `.agents/skills/model-validation/SKILL.md`
+- Performance profiling: `.agents/skills/perf-profiling/SKILL.md`
+- Security review: `.agents/skills/security-review/SKILL.md`
+- Cloud deploy: `.agents/skills/cloud-deploy/SKILL.md`
+- Refactor large: `.agents/skills/refactor-large/SKILL.md`
+
+When working on tasks that fall into these categories, you should reference the corresponding skill documentation in addition to these instructions and the Constitution.
 
 ## Quick start commands
 - Configure: `cmake -S . -B build`

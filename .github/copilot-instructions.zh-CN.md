@@ -47,7 +47,17 @@
 - 结论要可量化、可复现，区分“事实”与“假设”。
 - 出现阻塞时，明确：阻塞点、影响范围、最小下一步动作。
 - 做 review 时，先报问题（缺陷/风险/回归/缺测），后给摘要。
+## 专项技能文档
 
+对于复杂或跨领域的任务，项目使用了存储在 `.agents/skills/` 中的专项技能文档：
+- 前端架构：`.agents/skills/frontend-arch/SKILL.md`
+- 模型验证：`.agents/skills/model-validation/SKILL.md`
+- 性能分析：`.agents/skills/perf-profiling/SKILL.md`
+- 安全审查：`.agents/skills/security-review/SKILL.md`
+- 云部署：`.agents/skills/cloud-deploy/SKILL.md`
+- 大规模重构：`.agents/skills/refactor-large/SKILL.md`
+
+在处理属于这些类别的任务时，除了这些指令和宪法外，你还应该参考相应的技能文档。
 ## 常用命令
 - 配置：`cmake -S . -B build`
 - 构建：`cmake --build build -j`

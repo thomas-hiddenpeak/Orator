@@ -1,31 +1,75 @@
 # All tests link the orator_core library.
 
+# Add test utils directory to include path for test helper headers
+set(TEST_UTILS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/utils)
+
 function(orator_add_test name source)
   add_executable(${name} ${CMAKE_CURRENT_SOURCE_DIR}/${source})
   set_property(TARGET ${name} PROPERTY CUDA_ARCHITECTURES native)
   target_link_libraries(${name} PRIVATE orator_core)
+  target_include_directories(${name} PRIVATE ${TEST_UTILS_DIR})
   add_test(NAME ${name} COMMAND ${name})
 endfunction()
 
-orator_add_test(test_memory      test_memory.cc)
-orator_add_test(test_buffer      test_buffer.cc)
-orator_add_test(test_shared_buffer test_shared_buffer.cc)
+# Core unit tests
+orator_add_test(test_memory      unit/core/test_memory.cc)
+orator_add_test(test_buffer      unit/core/test_buffer.cc)
+orator_add_test(test_time_base   unit/core/test_time_base.cc)
+orator_add_test(test_tensor      unit/core/test_tensor.cc)
+orator_add_test(test_shared_buffer unit/core/test_shared_buffer.cc)
 target_link_libraries(test_shared_buffer PRIVATE pthread)
-orator_add_test(test_postprocess test_postprocess.cc)
-orator_add_test(test_comprehensive_timeline test_comprehensive_timeline.cc)
-orator_add_test(test_time_base   test_time_base.cc)
-add_executable(test_vad ${CMAKE_CURRENT_SOURCE_DIR}/test_vad.cc ${CMAKE_CURRENT_SOURCE_DIR}/asr_vad_cpu.cc)
-  set_property(TARGET test_vad PROPERTY CUDA_ARCHITECTURES native)
-  target_link_libraries(test_vad PRIVATE orator_core)
-  add_test(NAME test_vad COMMAND test_vad)
-orator_add_test(test_speaker_db  test_speaker_db.cc)
-orator_add_test(test_diar_stream test_diar_stream.cc)
-orator_add_test(test_asr_ops     test_asr_ops.cc)
-orator_add_test(test_asr_weights test_asr_weights.cc)
-orator_add_test(test_whisper_mel test_whisper_mel.cc)
-orator_add_test(test_asr_encoder test_asr_encoder.cc)
-orator_add_test(test_asr_decoder test_asr_decoder.cc)
-orator_add_test(test_bpe         test_bpe.cc)
+orator_add_test(test_postprocess unit/core/test_postprocess.cc)
+orator_add_test(test_speaker_db  unit/core/test_speaker_db.cc)
+orator_add_test(test_audio       unit/core/test_audio.cc)
+orator_add_test(test_reference   unit/core/test_reference.cc)
+orator_add_test(test_safetensors unit/core/test_safetensors.cc)
+orator_add_test(test_bpe         unit/core/test_bpe.cc)
+orator_add_test(test_config      unit/core/test_config.cc)
+orator_add_test(test_json        unit/core/test_json.cc)
+orator_add_test(test_storage     unit/core/test_storage.cc)
+orator_add_test(test_session_store unit/core/test_session_store.cc)
+orator_add_test(test_pipeline_registry unit/core/test_pipeline_registry.cc)
+
+# Model unit tests
+orator_add_test(test_asr_ops     unit/model/test_asr_ops.cc)
+orator_add_test(test_asr_weights unit/model/test_asr_weights.cc)
+orator_add_test(test_whisper_mel unit/model/test_whisper_mel.cc)
+orator_add_test(test_asr_encoder unit/model/test_asr_encoder.cc)
+orator_add_test(test_asr_decoder unit/model/test_asr_decoder.cc)
+orator_add_test(test_asr_gemm    unit/model/test_asr_gemm.cc)
+orator_add_test(test_mel         unit/model/test_mel.cc)
+orator_add_test(test_preprocessor unit/model/test_preprocessor.cc)
+orator_add_test(test_qwen3       unit/model/test_qwen3.cc)
+orator_add_test(test_kernels     unit/model/test_kernels.cc)
+
+# Pipeline unit tests
+add_executable(test_vad unit/pipeline/test_vad.cc utils/asr_vad_cpu.cc)
+set_property(TARGET test_vad PROPERTY CUDA_ARCHITECTURES native)
+target_link_libraries(test_vad PRIVATE orator_core)
+target_include_directories(test_vad PRIVATE ${TEST_UTILS_DIR})
+add_test(NAME test_vad COMMAND test_vad)
+
+orator_add_test(test_diar_stream unit/pipeline/test_diar_stream.cc)
+orator_add_test(test_auditory_stream unit/pipeline/test_auditory_stream.cc)
+target_link_libraries(test_auditory_stream PRIVATE pthread)
+
+# Protocol unit tests
+orator_add_test(test_topic_router unit/protocol/test_topic_router.cc)
+orator_add_test(test_protocol_types unit/protocol/test_protocol_types.cc)
+orator_add_test(test_protocol_timeline unit/protocol/test_protocol_timeline.cc)
+
+# Infrastructure unit tests
+orator_add_test(test_gpu_lock    unit/infrastructure/test_gpu_lock.cc)
+orator_add_test(test_scheduler   unit/infrastructure/test_scheduler.cc)
+orator_add_test(test_websocket   unit/infrastructure/test_websocket.cc)
+target_link_libraries(test_websocket PRIVATE pthread)
+orator_add_test(test_http_server unit/infrastructure/test_http_server.cc)
+target_link_libraries(test_http_server PRIVATE pthread)
+
+# Integration tests
+orator_add_test(test_comprehensive_timeline integration/cc/test_comprehensive_timeline.cc)
+orator_add_test(test_registration integration/cc/test_registration.cc)
+
 # test_asr_ops reads PyTorch-GPU reference activations under models/reference;
 # run it from the repo root so those relative paths resolve.
 set_tests_properties(test_asr_ops PROPERTIES
@@ -38,43 +82,20 @@ set_tests_properties(test_asr_encoder PROPERTIES
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_asr_decoder PROPERTIES
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_asr_gemm PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_bpe PROPERTIES
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_vad PROPERTIES
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_diar_stream PROPERTIES
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
-orator_add_test(test_mel         test_mel.cc)
-orator_add_test(test_audio       test_audio.cc)
-orator_add_test(test_reference   test_reference.cc)
-orator_add_test(test_safetensors test_safetensors.cc)
-orator_add_test(test_kernels test_kernels.cc)
-orator_add_test(test_asr_gemm test_asr_gemm.cc)
-orator_add_test(test_preprocessor test_preprocessor.cc)
-orator_add_test(test_qwen3 test_qwen3.cc)
-orator_add_test(test_websocket   test_websocket.cc)
-target_link_libraries(test_websocket PRIVATE pthread)
-orator_add_test(test_topic_router test_topic_router.cc)
-orator_add_test(test_protocol_types test_protocol_types.cc)
-orator_add_test(test_pipeline_registry test_pipeline_registry.cc)
-orator_add_test(test_storage test_storage.cc)
-orator_add_test(test_protocol_timeline test_protocol_timeline.cc)
-orator_add_test(test_auditory_stream test_auditory_stream.cc)
-target_link_libraries(test_auditory_stream PRIVATE pthread)
-orator_add_test(test_http_server test_http_server.cc)
-target_link_libraries(test_http_server PRIVATE pthread)
-orator_add_test(test_session_store test_session_store.cc)
-orator_add_test(test_tensor      test_tensor.cc)
-orator_add_test(test_config      test_config.cc)
-orator_add_test(test_json        test_json.cc)
-orator_add_test(test_gpu_lock     test_gpu_lock.cc)
-orator_add_test(test_scheduler    test_scheduler.cc)
-orator_add_test(test_registration test_registration.cc)
 
 # Manual evaluation tool (not a ctest): runs against a real reference file.
 add_executable(orator_eval ${CMAKE_CURRENT_SOURCE_DIR}/eval_reference.cc)
 set_property(TARGET orator_eval PROPERTY CUDA_ARCHITECTURES native)
 target_link_libraries(orator_eval PRIVATE orator_core)
+target_include_directories(orator_eval PRIVATE ${TEST_UTILS_DIR})
 
 # ---------------------------------------------------------------------------
 # Python integration tests registered as CTest tests.
@@ -88,7 +109,7 @@ if(Python3_EXECUTABLE)
     # automatically around the test.
     add_test(NAME ${name}
       COMMAND ${Python3_EXECUTABLE}
-        ${CMAKE_CURRENT_SOURCE_DIR}/run_py_test.py
+        ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/run_py_test.py
         ${script}
     )
     set_tests_properties(${name} PROPERTIES
@@ -101,7 +122,7 @@ if(Python3_EXECUTABLE)
   # Single integration test: manages its own server when ORATOR_TEST_MODELS=1.
   add_test(NAME py-integration
     COMMAND ${Python3_EXECUTABLE}
-      ${CMAKE_CURRENT_SOURCE_DIR}/test_integration.py
+      ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/test_integration.py
   )
   set_tests_properties(py-integration PROPERTIES
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}

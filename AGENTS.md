@@ -125,8 +125,7 @@ This project uses a **Google Agent Skills** routing mechanism for complex multi-
    - `cloud-deploy` — Deployment, containerization, CI/CD
    - `perf-profiling` — GPU/CPU profiling methodology
    - `security-review` — Vulnerability auditing protocols
-   - `refactor-large` — Large-scale refactoring strategies
-
+   - `refactor-large` — Large-scale refactoring strategies   - `model-validation` — Accuracy verification against reference oracles
 ### Fallback behavior
 If `.agents/skills/` does not exist or no matching skill is found, proceed using this AGENTS.md + the Constitution as the sole guidance. The skills mechanism is an optional augmentation layer.
 
@@ -166,6 +165,7 @@ This project follows **Spec-Driven Development (SDD)** adapted from spec-kit. Th
 - **Engineering quality mandatory** (Art. V) — readability, RAII, race-free, small functions
 - **Precise terminology** — no metaphors, no jargon (Art. VI)
 - **Docs match code** — status advances in same change (Art. VIII)
+- **Configuration consistency** — always use `orator.toml` configuration file to ensure parameter consistency across all server starts and tests. Do not hardcode parameters in command lines or code. Follow the configuration loading order: 1) Compile-time defaults, 2) `orator.toml`, 3) Environment variables (ORATOR_*), 4) CLI arguments.
 
 ### Source files
 - `.specify/memory/constitution.md` — the Constitution
@@ -183,7 +183,7 @@ cmake -S . -B build                           # Configure
 cmake --build build -j                         # Build
 cd build && ctest --output-on-failure          # Test
 cmake --build build -j 2>&1 | grep -E "warning:|error:" || true  # Warning check
-./build/orator_ws 8765 "" models/asr/Qwen/Qwen3-ASR-1.7B  # Run WS server
+ORATOR_CONFIG=orator.toml ./build/orator_ws 8765  # Run WS server with config file
 ```
 
 ---

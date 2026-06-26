@@ -95,6 +95,9 @@ class StorageManager {
   // Get retention config for a topic (defaults to MEMORY, 120s).
   TopicRetention GetTopicRetention(const std::string& topic) const;
 
+  // Get memory backend for direct access (e.g., for cleanup operations)
+  MemoryBackend* GetMemoryBackend() const { return mem_backend_.get(); }
+
  private:
   // Serialize a Message to a length-prefixed byte vector.
   // Format: uint32_t size (LE) + data bytes.

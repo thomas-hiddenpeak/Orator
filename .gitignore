@@ -1,5 +1,6 @@
 # Build output
 build/
+build_debug/
 *.o
 *.a
 *.so
@@ -20,12 +21,14 @@ tools/.venv/
 tools/venv/
 __pycache__/
 *.pyc
+.pytest_cache/
 
 # Test audio (large media) + private reference transcript (CER gold)
 test.mp3
 test.txt
 asrTest2Final.txt
 *.pcm
+test_audio.pcm
 
 # Editor / OS
 .vscode/
@@ -42,5 +45,6 @@ tools/tmp_*
 # CTest temporary files
 Testing/
 
-# Debug build directory
-build_debug/
+# Runtime log files
+*.log
+orator_ws.log

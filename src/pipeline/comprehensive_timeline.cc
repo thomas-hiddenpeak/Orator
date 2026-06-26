@@ -16,6 +16,7 @@ double Overlap(double a0, double a1, double b0, double b1) {
 // Used to split text on codepoint (character) boundaries, not bytes (Chinese).
 std::vector<std::size_t> Utf8Offsets(const std::string& s) {
   std::vector<std::size_t> o;
+  o.reserve(s.size() + 1); // Pre-allocate to avoid repeated reallocations
   for (std::size_t i = 0; i < s.size();) {
     o.push_back(i);
     const unsigned char c = static_cast<unsigned char>(s[i]);
@@ -84,7 +85,10 @@ std::vector<ComprehensiveTimeline::Entry> ComprehensiveTimeline::SplitTextByDiar
   // allocate the text's characters to each resulting turn proportionally by
   // time (the ASR model emits no per-word timestamps, so a time-proportional
   // split is the faithful approximation).
-  std::vector<double> bounds = {t.start, t.end};
+  std::vector<double> bounds;
+  bounds.reserve(speakers_.size() * 2 + 2); // Pre-allocate to avoid repeated reallocations
+  bounds.push_back(t.start);
+  bounds.push_back(t.end);
   for (const auto& s : speakers_) {
     if (s.start > t.start + 1e-9 && s.start < t.end - 1e-9) bounds.push_back(s.start);
     if (s.end > t.start + 1e-9 && s.end < t.end - 1e-9) bounds.push_back(s.end);
@@ -100,6 +104,7 @@ std::vector<ComprehensiveTimeline::Entry> ComprehensiveTimeline::SplitTextByDiar
     std::string speaker;
   };
   std::vector<Turn> turns;
+  turns.reserve(bounds.size()); // Pre-allocate to avoid repeated reallocations
   for (std::size_t i = 0; i + 1 < bounds.size(); ++i) {
     const double s = bounds[i];
     const double e = bounds[i + 1];
@@ -124,6 +129,7 @@ std::vector<ComprehensiveTimeline::Entry> ComprehensiveTimeline::SplitTextByDiar
   const int ncp = static_cast<int>(offs.size()) - 1;
   const double total = t.end - t.start;
   std::vector<Entry> out;
+  out.reserve(turns.size()); // Pre-allocate to avoid repeated reallocations
   int cp_used = 0;
   for (std::size_t k = 0; k < turns.size(); ++k) {
     int cp_end;
@@ -177,6 +183,8 @@ std::vector<ComprehensiveTimeline::Revision> ComprehensiveTimeline::UpsertSpeake
   speakers_.insert(pos, std::move(s));
 
   std::vector<Revision> revs;
+  // Pre-allocate to avoid repeated reallocations
+  revs.reserve(1); // Typically 0 or 1 revision
   ReprojectRange(start, end, &revs);
   return revs;
 }
@@ -202,6 +210,8 @@ std::vector<ComprehensiveTimeline::Revision> ComprehensiveTimeline::UpsertText(
     it->text = text;
   }
   std::vector<Revision> revs;
+  // Pre-allocate to avoid repeated reallocations
+  revs.reserve(1); // Typically 0 or 1 revision
   ReprojectText(*it, &revs);
   return revs;
 }
@@ -212,6 +222,7 @@ std::vector<ComprehensiveTimeline::Revision> ComprehensiveTimeline::ReplaceSpeak
   // replace the speaker set wholesale and re-project ALL text. Emit a revision
   // for every text whose attributed result changed.
   speakers_.clear();
+  speakers_.reserve(segs.size()); // Pre-allocate to avoid repeated reallocations
   for (const auto& s : segs) {
     SpeakerSeg seg;
     seg.start = s.start;
@@ -224,6 +235,8 @@ std::vector<ComprehensiveTimeline::Revision> ComprehensiveTimeline::ReplaceSpeak
     speakers_.insert(pos, std::move(seg));
   }
   std::vector<Revision> revs;
+  // Pre-allocate to avoid repeated reallocations
+  revs.reserve(texts_.size()); // Maximum possible revisions
   for (const auto& t : texts_) ReprojectText(t, &revs);
   return revs;
 }
@@ -241,6 +254,8 @@ std::vector<ComprehensiveTimeline::Entry> ComprehensiveTimeline::Snapshot()
   // The comprehensive view is the diarization-split projection of every text
   // segment, time-ordered, with consecutive same-speaker entries coalesced.
   std::vector<Entry> all;
+  // Pre-allocate to avoid repeated reallocations
+  all.reserve(texts_.size() * 2); // Estimate maximum entries
   for (const auto& kv : pieces_) {
     for (const auto& e : kv.second) all.push_back(e);
   }
@@ -274,6 +289,58 @@ void ComprehensiveTimeline::Clear() {
   texts_.clear();
   vad_.clear();
   pieces_.clear();
+}
+
+void ComprehensiveTimeline::CleanupOldData(double keep_until_sec) {
+  // Remove speaker segments that end before keep_until_sec
+  auto speaker_it = speakers_.begin();
+  while (speaker_it != speakers_.end()) {
+    if (speaker_it->end <= keep_until_sec) {
+      speaker_it = speakers_.erase(speaker_it);
+    } else {
+      ++speaker_it;
+    }
+  }
+
+  // Remove text segments that end before keep_until_sec
+  auto text_it = texts_.begin();
+  while (text_it != texts_.end()) {
+    if (text_it->end <= keep_until_sec) {
+      // Remove from pieces_ map as well
+      pieces_.erase(text_it->id);
+      text_it = texts_.erase(text_it);
+    } else {
+      ++text_it;
+    }
+  }
+
+  // Remove VAD segments that end before keep_until_sec
+  auto vad_it = vad_.begin();
+  while (vad_it != vad_.end()) {
+    if (vad_it->end <= keep_until_sec) {
+      vad_it = vad_.erase(vad_it);
+    } else {
+      ++vad_it;
+    }
+  }
+
+  // Clean up pieces_ map for any remaining texts
+  std::vector<long> texts_to_remove;
+  for (const auto& kv : pieces_) {
+    bool found = false;
+    for (const auto& t : texts_) {
+      if (t.id == kv.first) {
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      texts_to_remove.push_back(kv.first);
+    }
+  }
+  for (long id : texts_to_remove) {
+    pieces_.erase(id);
+  }
 }
 
 }  // namespace pipeline

@@ -210,6 +210,7 @@ void AuditoryWsHandler::OnText(WebSocketConnection& conn, const std::string& tex
   }
   if (text.find("\"flush\"") != std::string::npos) {
     stream_->EmitTimeline(/*finalize=*/false);
+    return;
   }
   if (text.find("\"sessions\"") != std::string::npos) {
     auto* store = stream_->session_store();

@@ -74,6 +74,9 @@ class ProtocolTimeline {
   // Configure per-topic retention/backend.
   void SetTopicRetention(const std::string& topic, const TopicRetention& config);
 
+  // Clean up old data to prevent memory accumulation
+  void CleanupOldData(double keep_until_sec);
+
   // Internal: subscribe to a topic pattern for routing callbacks.
   // Used by ComprehensiveTimeline to receive pipeline data.
   using MessageHandler = std::function<void(const Message&)>;

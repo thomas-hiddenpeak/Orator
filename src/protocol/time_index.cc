@@ -82,5 +82,29 @@ void TimeIndex::Retain(const std::string& topic, double cutoff_sec) {
   }
 }
 
+void TimeIndex::CleanupOldEntries(double keep_until_sec) {
+  std::lock_guard<std::mutex> lock(mutex_);
+
+  for (auto it = index_.begin(); it != index_.end();) {
+    auto& entries = it->second;
+    auto start = std::lower_bound(
+        entries.begin(), entries.end(), keep_until_sec,
+        [](const IndexedMessage& e, double ts) {
+          return e.timestamp_sec < ts;
+        });
+
+    if (start != entries.begin()) {
+      entries.erase(entries.begin(), start);
+    }
+
+    // If no entries remain for this topic, remove the topic from the index
+    if (entries.empty()) {
+      it = index_.erase(it);
+    } else {
+      ++it;
+    }
+  }
+}
+
 }  // namespace protocol
 }  // namespace orator

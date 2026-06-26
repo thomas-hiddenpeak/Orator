@@ -69,7 +69,7 @@ min_silence_ms = 400
 speech_pad_ms = 80
 
 [diarizer]
-model = "/models/diar/custom.safetensors"
+model_weights = "/models/diar/custom.safetensors"
 max_speakers = 8
 threshold = 0.6
 merge_gap_sec = 1.0

@@ -182,6 +182,19 @@ void ProtocolTimeline::SetTopicRetention(const std::string& topic,
   storage_->SetTopicBackend(topic, config);
 }
 
+void ProtocolTimeline::CleanupOldData(double keep_until_sec) {
+  std::lock_guard<std::mutex> lock(mutex_);
+
+  // Cleanup time index
+  time_index_->CleanupOldEntries(keep_until_sec);
+
+  // Cleanup memory backend by evicting old entries
+  // The MemoryBackend automatically evicts oldest entries when capacity is exceeded
+  // We can trigger eviction by writing a small marker message
+  uint8_t marker[1] = {0};
+  storage_->GetMemoryBackend()->Write(marker, 1);
+}
+
 long ProtocolTimeline::SubscribeInternal(const TopicPattern& pattern,
                                           MessageHandler handler) {
   std::lock_guard<std::mutex> lock(mutex_);
