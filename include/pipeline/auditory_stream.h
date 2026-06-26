@@ -292,6 +292,7 @@ class AuditoryStream {
   // Spec 004 Phase 12: internal subscription IDs bridging ProtocolTimeline
   // messages back to ComprehensiveTimeline. Unsubscribed in Reset().
   long vad_sub_id_ = 0;
+  long vad_progress_sub_id_ = 0;
   long diar_sub_id_ = 0;
   long asr_sub_id_ = 0;
 

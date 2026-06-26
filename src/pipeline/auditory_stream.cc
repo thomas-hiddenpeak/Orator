@@ -53,7 +53,7 @@ void AuditoryStream::Start() {
   protocol::PipelineDescriptor vad_desc;
   vad_desc.name = "vad";
   vad_desc.version = "1.0.0";
-  vad_desc.produces = {protocol::kVadSpeechSegment};
+  vad_desc.produces = {protocol::kVadSpeechSegment, protocol::kVadProgress};
   vad_desc.consumes = {protocol::TopicPattern{"audio/+"}};
   vad_handle_ = protocol_timeline_->RegisterPipeline(std::move(vad_desc));
 
@@ -189,6 +189,15 @@ void AuditoryStream::StartWorkers() {
           if (s >= 0.0 && e > s) vad_cache_->AddSegment(s, e);
         });
 
+    // Subscribe to the VAD progress/horizon heartbeat so the gate can skip
+    // confirmed silence at real-time pacing (non-blocking: snapshot read).
+    vad_progress_sub_id_ = protocol_timeline_->SubscribeInternal(
+        protocol::TopicPattern(protocol::kVadProgress.to_string()),
+        [this](const protocol::Message& msg) {
+          double h = JsonParseNum(msg.data, "horizon");
+          if (h >= 0.0) vad_cache_->set_horizon(h);
+        });
+
     asr_worker_ = std::make_unique<AsrWorker>(asr_.get(), p,
         [this](const std::string& json) { EmitLocked(json); },
         common_time_base(), asr_stream_, vad_cache_.get());
@@ -240,10 +249,26 @@ void AuditoryStream::StartWorkers() {
         HandleVadDrain(vad_detector_.get(), protocol_timeline_.get(),
                        vad_handle_.get(), tb, &segs, finalize);
       };
+      // VAD progress heartbeat: while VAD is in confirmed silence, advance the
+      // horizon it publishes so ASR can skip silence at real-time pacing. The
+      // guard keeps the horizon a safe margin behind the fed edge so a just-
+      // starting onset (detected a frame later) is never skipped; throttling
+      // bounds the heartbeat rate.
+      constexpr double kGuardSec = 0.3;
+      constexpr double kMinAdvanceSec = 0.25;
+      double last_horizon = -1e9;
       long span_start_abs = 0;
       while (vad_audio_->WaitAndRead(&chunk, &span_start_abs)) {
         vad_detector_->Push(chunk.data(), static_cast<int>(chunk.size()));
         drain(/*finalize=*/false);
+        const long fed = span_start_abs + static_cast<long>(chunk.size());
+        if (!vad_detector_->is_in_speech()) {
+          const double h = tb.SecondsAt(fed) - kGuardSec;
+          if (h >= last_horizon + kMinAdvanceSec) {
+            PublishVadProgress(protocol_timeline_.get(), vad_handle_.get(), h);
+            last_horizon = h;
+          }
+        }
         {
           char buf[64];
           std::snprintf(buf, sizeof(buf),
@@ -254,6 +279,11 @@ void AuditoryStream::StartWorkers() {
         progress_cv_.notify_all();
       }
       drain(/*finalize=*/true);
+      // Final horizon = everything fed is now decided; lets ASR skip any
+      // trailing silence before its own finalize.
+      PublishVadProgress(protocol_timeline_.get(), vad_handle_.get(),
+                         tb.SecondsAt(span_start_abs +
+                                      static_cast<long>(chunk.size())));
       progress_cv_.notify_all();
     });
   }

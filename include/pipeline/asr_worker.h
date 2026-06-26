@@ -52,9 +52,24 @@ class AsrWorker {
       std::lock_guard<std::mutex> lk(mutex_);
       return segments_;
     }
+    // The absolute time (common clock, sec) up to which VAD has processed and
+    // confirmed its speech/silence decision. ASR treats a silence sub-span as
+    // skippable only when its end is within this horizon, so at real-time pacing
+    // (VAD ~= ASR at the leading edge) ASR can still skip confirmed silence
+    // instead of spending GPU on it. Published by the VAD pipeline via
+    // `vad/progress` and consumed here -- ASR never blocks on VAD.
+    void set_horizon(double sec) {
+      std::lock_guard<std::mutex> lk(mutex_);
+      horizon_ = sec;
+    }
+    double horizon() const {
+      std::lock_guard<std::mutex> lk(mutex_);
+      return horizon_;
+    }
    private:
     mutable std::mutex mutex_;
     std::vector<std::pair<double, double>> segments_;
+    double horizon_ = -1e9;
   };
 
   AsrWorker(core::IAsr* asr, const Params& params,

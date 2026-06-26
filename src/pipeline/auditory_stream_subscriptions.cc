@@ -45,6 +45,9 @@ void DoEmitRevision(const ComprehensiveTimeline::Revision& r,
 void HandleVadSubscription(ComprehensiveTimeline& comp,
                            std::mutex& comp_mutex,
                            const protocol::Message& msg) {
+  // Only speech segments populate the timeline; vad/progress heartbeats (same
+  // vad/+ subscription) carry no segment and must not create vad entries.
+  if (msg.topic != protocol::kVadSpeechSegment.to_string()) return;
   double start = JsonParseNum(msg.data, "start");
   double end = JsonParseNum(msg.data, "end");
   std::lock_guard<std::mutex> lk(comp_mutex);
@@ -227,6 +230,25 @@ void HandleVadDrain(core::IVad* vad_detector,
     protocol_timeline->Publish(*vad_handle, protocol::kVadSpeechSegment,
                                 msg, protocol::QoS::AT_LEAST_ONCE);
   }
+}
+
+void PublishVadProgress(protocol::ProtocolTimeline* protocol_timeline,
+                        protocol::PipelineHandle* vad_handle,
+                        double horizon_sec) {
+  if (horizon_sec < 0.0) return;
+  protocol::Message msg;
+  msg.topic = protocol::kVadProgress.to_string();
+  msg.pipeline = "vad";
+  msg.pipeline_version = "1.0.0";
+  msg.timestamp_sec = horizon_sec;
+  msg.qos = static_cast<uint8_t>(protocol::QoS::AT_MOST_ONCE);
+  msg.schema_version = 1;
+  char buf[64];
+  std::snprintf(buf, sizeof(buf), "{\"horizon\":%.3f}", horizon_sec);
+  msg.data = buf;
+  // AT_MOST_ONCE: a frequent, lossy heartbeat -- the next one supersedes it.
+  protocol_timeline->Publish(*vad_handle, protocol::kVadProgress, msg,
+                             protocol::QoS::AT_MOST_ONCE);
 }
 
 }  // namespace pipeline

@@ -42,6 +42,7 @@ class Topic {
 // Standard topic constants for the pipeline.
 inline Topic kAudioRaw{"audio/raw"};
 inline Topic kVadSpeechSegment{"vad/speech_segment"};
+inline Topic kVadProgress{"vad/progress"};
 inline Topic kAsrTranscript{"asr/transcript"};
 inline Topic kAsrTranscriptPartial{"asr/transcript_partial"};
 inline Topic kDiarSpeakerSegment{"diar/speaker_segment"};

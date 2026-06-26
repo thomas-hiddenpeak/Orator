@@ -70,5 +70,12 @@ void HandleVadDrain(core::IVad* vad_detector,
                     std::vector<core::VadSegmentResult>* segs,
                     bool finalize);
 
+// Publish a VAD progress/horizon heartbeat: the absolute time (common clock)
+// up to which VAD has processed and confirmed silence, so ASR can skip
+// confirmed silence at real-time pacing. Frequent + lossy (AT_MOST_ONCE).
+void PublishVadProgress(protocol::ProtocolTimeline* protocol_timeline,
+                        protocol::PipelineHandle* vad_handle,
+                        double horizon_sec);
+
 }  // namespace pipeline
 }  // namespace orator

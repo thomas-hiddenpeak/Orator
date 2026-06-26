@@ -98,7 +98,12 @@ void AsrWorker::ProcessGateSubSpan(const float* sub, int sub_n) {
   const long base = inc_abs_pos_;
   const double mid_sec = tb_.SecondsAt(base + sub_n / 2);
   const double end_sec = tb_.SecondsAt(base + sub_n);
-  const double horizon = vad_segs.empty() ? -1.0 : vad_segs.back().second;
+  // Horizon = how far VAD has confirmed its decision. Use the later of the last
+  // published speech segment's end (always valid) and the VAD progress horizon
+  // (advances through silence at real-time pacing). A silence sub-span is
+  // skippable only when its end is within this horizon.
+  double horizon = vad_segs.empty() ? -1e9 : vad_segs.back().second;
+  if (vad_cache_) horizon = std::max(horizon, vad_cache_->horizon());
 
   bool is_speech = false;
   for (const auto& [s, e] : vad_segs) {
