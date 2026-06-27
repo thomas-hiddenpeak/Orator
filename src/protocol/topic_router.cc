@@ -16,8 +16,11 @@ TopicRouter::SubscriptionId TopicRouter::Subscribe(
   entry.sub.pattern = pattern;
   entry.sub.requested_qos = qos;
   entry.sub.no_local = no_local;
+  // Capture the id before the move: reading entry.id after std::move(entry)
+  // would be a use-after-move (bugprone-use-after-move).
+  const SubscriptionId id = entry.id;
   subscriptions_.push_back(std::move(entry));
-  return entry.id;
+  return id;
 }
 
 void TopicRouter::Unsubscribe(SubscriptionId sub_id) {

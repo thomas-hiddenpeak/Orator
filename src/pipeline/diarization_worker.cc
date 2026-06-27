@@ -14,10 +14,7 @@ using namespace worker;
 
 DiarizationWorker::DiarizationWorker(core::IDiarizer* diarizer, Params params,
                                      core::TimeBase tb, cudaStream_t stream)
-    : diarizer_(diarizer),
-      params_(params),
-      tb_(std::move(tb)),
-      stream_(stream) {}
+    : diarizer_(diarizer), params_(params), tb_(tb), stream_(stream) {}
 
 void DiarizationWorker::DeliverSpeakers(bool force) {
   if (!speaker_sink_) return;

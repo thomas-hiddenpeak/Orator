@@ -230,6 +230,9 @@ bool BpeTokenizer::Load(const std::string& model_dir) {
                 obj.find("\"special\":true") != std::string::npos) {
               try {
                 special_ids_[std::stoi(key)] = true;
+                // Intentionally skip a malformed special-token key rather than
+                // abort tokenizer load.
+                // NOLINTNEXTLINE(bugprone-empty-catch)
               } catch (const std::exception&) { /* skip malformed key */
               }
             }

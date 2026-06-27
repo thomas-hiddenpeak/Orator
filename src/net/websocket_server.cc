@@ -220,9 +220,8 @@ int ws_callback(struct lws* wsi, enum lws_callback_reasons reason, void* user,
       break;
 
     case LWS_CALLBACK_LOCK_POLL:
-      break;
-
     case LWS_CALLBACK_UNLOCK_POLL:
+      // Distinct lws poll-lock callbacks, both intentionally no-ops here.
       break;
 
     case LWS_CALLBACK_EVENT_WAIT_CANCELLED: {

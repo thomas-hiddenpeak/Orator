@@ -64,7 +64,7 @@ class SchemaRegistry {
     }
   }
 
-  TopicSchema const* Get(Topic topic, uint32_t version = 0) const {
+  TopicSchema const* Get(const Topic& topic, uint32_t version = 0) const {
     std::string key = topic.to_string();
     auto it = schemas_.find(key);
     if (it == schemas_.end()) return nullptr;

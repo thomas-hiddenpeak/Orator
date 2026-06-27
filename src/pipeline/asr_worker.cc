@@ -21,7 +21,7 @@ AsrWorker::AsrWorker(core::IAsr* asr, const Params& params, Emit emit,
     : asr_(asr),
       params_(params),
       emit_(std::move(emit)),
-      tb_(std::move(tb)),
+      tb_(tb),
       vad_cache_(vad_cache),
       stream_(stream),
       ring_buffer_(kRingBufferSamples) {}

@@ -127,12 +127,12 @@ class ComprehensiveTimeline {
   // Friend the three protocol subscription bridge functions.
   friend void HandleVadSubscription(ComprehensiveTimeline&, std::mutex&,
                                     const orator::protocol::Message&);
-  friend void HandleDiarSubscription(ComprehensiveTimeline&, std::mutex&,
-                                     const orator::protocol::Message&,
-                                     std::function<void(const std::string&)>);
-  friend void HandleAsrSubscription(ComprehensiveTimeline&, std::mutex&,
-                                    const orator::protocol::Message&,
-                                    std::function<void(const std::string&)>);
+  friend void HandleDiarSubscription(
+      ComprehensiveTimeline&, std::mutex&, const orator::protocol::Message&,
+      const std::function<void(const std::string&)>&);
+  friend void HandleAsrSubscription(
+      ComprehensiveTimeline&, std::mutex&, const orator::protocol::Message&,
+      const std::function<void(const std::string&)>&);
   friend void HandleAlignSubscription(ComprehensiveTimeline&, std::mutex&,
                                       const orator::protocol::Message&);
   // Deposit a speaker segment (who/when). Returns revisions caused by

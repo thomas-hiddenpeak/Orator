@@ -22,7 +22,7 @@ bool TimeIndex::Append(const std::string& topic, double timestamp_sec,
   auto it = std::lower_bound(
       entries.begin(), entries.end(), timestamp_sec,
       [](const IndexedMessage& e, double ts) { return e.timestamp_sec < ts; });
-  entries.insert(it, std::move(im));
+  entries.insert(it, im);
 
   return out_of_order;
 }

@@ -19,7 +19,7 @@ namespace protocol {
 class Topic {
  public:
   Topic() = default;
-  explicit Topic(std::string s);
+  explicit Topic(const std::string& s);
 
   static Topic FromString(std::string_view s) { return Topic{std::string{s}}; }
 
@@ -73,7 +73,7 @@ class TopicPattern {
 // Topic implementation
 // ---------------------------------------------------------------------------
 
-inline Topic::Topic(std::string s) {
+inline Topic::Topic(const std::string& s) {
   if (s.empty()) return;
   std::string::size_type start = 0;
   while (start < s.size()) {

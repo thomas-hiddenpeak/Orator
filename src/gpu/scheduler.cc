@@ -1,6 +1,7 @@
 #include "gpu/scheduler.h"
 
 #include <algorithm>
+#include <cstdio>
 #include <stdexcept>
 #include <string>
 
@@ -27,7 +28,11 @@ GpuScheduler::GpuScheduler() {
 GpuScheduler::~GpuScheduler() {
   for (auto& e : entries_) {
     if (e.stream_active && e.stream != nullptr) {
-      CheckCuda(cudaStreamDestroy(e.stream), "cudaStreamDestroy");
+      // Destructors must not throw: report a stream-destroy failure instead of
+      // letting an exception escape (bugprone-exception-escape).
+      if (cudaStreamDestroy(e.stream) != cudaSuccess) {
+        std::fprintf(stderr, "~GpuScheduler: cudaStreamDestroy failed\n");
+      }
     }
   }
 }

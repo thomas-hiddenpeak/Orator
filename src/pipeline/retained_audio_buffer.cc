@@ -1,13 +1,14 @@
 #include "pipeline/retained_audio_buffer.h"
 
 #include <algorithm>
+#include <cmath>
 
 namespace orator {
 namespace pipeline {
 
 RetainedAudioBuffer::RetainedAudioBuffer(int sample_rate, double retain_sec)
     : sample_rate_(sample_rate),
-      retain_samples_(static_cast<long>(retain_sec * sample_rate + 0.5)) {}
+      retain_samples_(std::lround(retain_sec * sample_rate)) {}
 
 void RetainedAudioBuffer::Append(const float* samples, int n) {
   if (n <= 0) return;

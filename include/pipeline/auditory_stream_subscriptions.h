@@ -37,14 +37,14 @@ void HandleVadSubscription(ComprehensiveTimeline& comp, std::mutex& comp_mutex,
 // emit_rev is called outside comp_mutex for each revision produced.
 void HandleDiarSubscription(ComprehensiveTimeline& comp, std::mutex& comp_mutex,
                             const protocol::Message& msg,
-                            RevisionEmitter emit_rev);
+                            const RevisionEmitter& emit_rev);
 
 // ASR subscription: parse {"id":..., "start":..., "end":..., "text":"..."}
 // → comp_.UpsertText(). emit_rev is called outside comp_mutex for each
 // revision produced.
 void HandleAsrSubscription(ComprehensiveTimeline& comp, std::mutex& comp_mutex,
                            const protocol::Message& msg,
-                           RevisionEmitter emit_rev);
+                           const RevisionEmitter& emit_rev);
 
 // Align subscription: parse {"id":..,"start":..,"end":..,"units":[{...}]}
 // → comp_.UpsertAlign(). Incorporates the forced-alignment per-unit timestamps

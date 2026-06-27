@@ -62,10 +62,10 @@ std::filesystem::path ResolveToolPath(const char* rel) {
   std::error_code ec;
   const fs::path cwd = fs::current_path(ec);
   if (!ec) {
-    const fs::path p1 = cwd / rel;
+    fs::path p1 = cwd / rel;
     if (fs::exists(p1, ec)) return p1;
     if (!ec) {
-      const fs::path p2 = cwd.parent_path() / rel;
+      fs::path p2 = cwd.parent_path() / rel;
       if (fs::exists(p2, ec)) return p2;
     }
   }

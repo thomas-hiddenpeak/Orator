@@ -35,7 +35,7 @@ std::string SerializeRevisionToJson(const ComprehensiveTimeline::Revision& r,
 // ---------------------------------------------------------------------------
 namespace {
 void DoEmitRevision(const ComprehensiveTimeline::Revision& r,
-                    const char* source, RevisionEmitter emit_rev) {
+                    const char* source, const RevisionEmitter& emit_rev) {
   emit_rev(SerializeRevisionToJson(r, source));
 }
 }  // namespace
@@ -59,7 +59,7 @@ void HandleVadSubscription(ComprehensiveTimeline& comp, std::mutex& comp_mutex,
 // ---------------------------------------------------------------------------
 void HandleDiarSubscription(ComprehensiveTimeline& comp, std::mutex& comp_mutex,
                             const protocol::Message& msg,
-                            RevisionEmitter emit_rev) {
+                            const RevisionEmitter& emit_rev) {
   const std::string& data = msg.data;
   auto seg_start = data.find("\"segments\":[");
   if (seg_start == std::string::npos) return;
@@ -113,7 +113,7 @@ void HandleDiarSubscription(ComprehensiveTimeline& comp, std::mutex& comp_mutex,
 // ---------------------------------------------------------------------------
 void HandleAsrSubscription(ComprehensiveTimeline& comp, std::mutex& comp_mutex,
                            const protocol::Message& msg,
-                           RevisionEmitter emit_rev) {
+                           const RevisionEmitter& emit_rev) {
   const std::string& data = msg.data;
 
   long id = JsonParseLong(data, "id");
