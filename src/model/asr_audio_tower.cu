@@ -151,6 +151,40 @@ __global__ void ReshapeC3Kernel(const float* __restrict__ c3, float* __restrict_
   feat[idx] = c3[(((static_cast<long>(b) * dh + co) * Hc3 + f) * Wc) + t];
 }
 
+// Build the padded conv input [chunks, F, max_cl] from mel [F, n_frames] on the
+// GPU (replaces the host fill + HtoD). Element (c,f,t) = mel[f, c*win+t] when
+// that frame exists (t < chunk_len[c] <=> c*win+t < n_frames), else 0.
+__global__ void BuildConvInputKernel(const float* __restrict__ mel,
+                                     float* __restrict__ d_in, int chunks, int F,
+                                     int max_cl, int win, int n_frames) {
+  const long idx = static_cast<long>(blockIdx.x) * blockDim.x + threadIdx.x;
+  const long total = static_cast<long>(chunks) * F * max_cl;
+  if (idx >= total) return;
+  const int t = static_cast<int>(idx % max_cl);
+  const int f = static_cast<int>((idx / max_cl) % F);
+  const int c = static_cast<int>(idx / (static_cast<long>(max_cl) * F));
+  const int src = c * win + t;
+  d_in[idx] = (src < n_frames) ? mel[static_cast<long>(f) * n_frames + src] : 0.0f;
+}
+
+// Drop per-chunk padding on the GPU: output row r belongs to chunk c (found via
+// the cumulative valid_prefix [chunks+1]) at local time t = r - valid_prefix[c];
+// copy d_h[(c*Wc+t), :] -> d_hid[r, :]. Replaces DtoH -> host gather -> HtoD.
+__global__ void DropPadGatherKernel(const float* __restrict__ d_h,
+                                    float* __restrict__ d_hid,
+                                    const int* __restrict__ valid_prefix,
+                                    int chunks, int Wc, int D, int N) {
+  const long idx = static_cast<long>(blockIdx.x) * blockDim.x + threadIdx.x;
+  const long total = static_cast<long>(N) * D;
+  if (idx >= total) return;
+  const int d = static_cast<int>(idx % D);
+  const int r = static_cast<int>(idx / D);
+  int c = 0;
+  while (c < chunks - 1 && valid_prefix[c + 1] <= r) ++c;
+  const int t = r - valid_prefix[c];
+  d_hid[idx] = d_h[(static_cast<long>(c) * Wc + t) * D + d];
+}
+
 // Windowed bidirectional attention. q/k/v: [N, H, Dh] (row-major after reshape).
 // Each query token i attends to keys j in [seg_start[i], seg_end[i]).
 // One warp per (token, head); Dh=64 -> 2 elems/lane. Online softmax.
@@ -333,26 +367,21 @@ std::vector<float> AsrAudioTower::Forward(const float* mel, int n_frames,
   const int Wc = ConvOut(ConvOut(ConvOut(max_cl)));                    // time after cnn
   const int CF = config_.downsample_hidden * Hc3;                      // 7680
 
-  // ---- Build padded conv input [chunks, 1, F, max_cl] (freq=H, time=W) ----
-  // Spec 002 Phase 7 (T072): the host fills this from `mel` then a GEMM reads it.
-  // The host fill runs on PINNED memory (never page-faults under concurrent
-  // kernels, unlike managed); the GEMM reads a DEVICE copy. Identical values.
+  // ---- Build padded conv input [chunks, 1, F, max_cl] on the GPU ----
+  // Upload mel [F, n_frames] to the device, then scatter it into [chunks, F,
+  // max_cl] with zero padding (replaces the host fill + memset + HtoD). All
+  // device memory; values identical.
   const size_t in_elems = static_cast<size_t>(chunks) * F * max_cl;
-  PinnedBuffer h_in(sizeof(float) * in_elems);
-  std::memset(h_in.data(), 0, sizeof(float) * in_elems);
-  float* hin_p = static_cast<float*>(h_in.data());
-  // mel is [F, n_frames]; chunk c covers mel frames [c*win, c*win+chunk_len[c]).
-  for (int c = 0; c < chunks; ++c) {
-    const int off = c * win;
-    for (int f = 0; f < F; ++f)
-      for (int t = 0; t < chunk_len[c]; ++t)
-        hin_p[(static_cast<size_t>(c) * F + f) * max_cl + t] =
-            mel[static_cast<size_t>(f) * n_frames + (off + t)];
-  }
-  DeviceBuffer d_in(sizeof(float) * in_elems);
-  CheckCudaError(cudaMemcpyAsync(d_in.data(), hin_p, sizeof(float) * in_elems,
+  DeviceBuffer d_mel(sizeof(float) * static_cast<size_t>(F) * n_frames);
+  CheckCudaError(cudaMemcpyAsync(d_mel.data(), mel,
+                                 sizeof(float) * static_cast<size_t>(F) * n_frames,
                                  cudaMemcpyHostToDevice, stream),
                  __FILE__, __LINE__);
+  DeviceBuffer d_in(sizeof(float) * in_elems);
+  BuildConvInputKernel<<<Blocks(static_cast<long>(in_elems)), kThreads, 0, stream>>>(
+      static_cast<const float*>(d_mel.data()), static_cast<float*>(d_in.data()),
+      chunks, F, max_cl, win, n_frames);
+  CheckCudaError(cudaGetLastError(), __FILE__, __LINE__);
   float* in_p = static_cast<float*>(d_in.data());
 
   // ---- Conv2d x3 + GELU via im2col + bf16 tensor-core GEMM ----
@@ -431,30 +460,28 @@ std::vector<float> AsrAudioTower::Forward(const float* mel, int n_frames,
 
 // Drop padding: keep valid frames per chunk -> hidden [N, D] ----
   std::vector<int> valid(chunks);
+  std::vector<int> valid_prefix(chunks + 1, 0);
   int N = 0;
-  for (int c = 0; c < chunks; ++c) { valid[c] = OutputLength(chunk_len[c]); N += valid[c]; }
-  // Spec 002 Phase 7 (T072): the drop-padding gather runs on the HOST. Stage
-  // d_h (device) to PINNED host memory, gather there, then upload the result to
-  // a DEVICE buffer for the transformer layers. Host touches only pinned memory.
-  PinnedBuffer h_h(sizeof(float) * static_cast<size_t>(rows) * D);
-  CheckCudaError(cudaMemcpyAsync(h_h.data(), d_h.data(),
-                                 sizeof(float) * static_cast<size_t>(rows) * D,
-                                 cudaMemcpyDeviceToHost, stream),
-                 __FILE__, __LINE__);
-  CheckCudaError(cudaStreamSynchronize(stream), __FILE__, __LINE__);
-  PinnedBuffer h_hid(sizeof(float) * static_cast<size_t>(N) * D);
-  float* hid = static_cast<float*>(h_hid.data());
-  const float* hp = static_cast<const float*>(h_h.data());
-  int row = 0;
-  for (int c = 0; c < chunks; ++c)
-    for (int t = 0; t < valid[c]; ++t, ++row)
-      std::memcpy(hid + static_cast<size_t>(row) * D,
-                  hp + (static_cast<size_t>(c) * Wc + t) * D, sizeof(float) * D);
-  DeviceBuffer d_hid(sizeof(float) * static_cast<size_t>(N) * D);
-  CheckCudaError(cudaMemcpyAsync(d_hid.data(), hid,
-                                 sizeof(float) * static_cast<size_t>(N) * D,
+  for (int c = 0; c < chunks; ++c) {
+    valid[c] = OutputLength(chunk_len[c]);
+    valid_prefix[c + 1] = valid_prefix[c] + valid[c];
+    N += valid[c];
+  }
+  // Drop the per-chunk padding on the GPU: upload the cumulative valid_prefix,
+  // then gather d_h[(c*Wc+t), :] -> d_hid[r, :] (replaces DtoH -> host gather
+  // -> HtoD and its sync). All device memory; values identical.
+  DeviceBuffer d_vp(sizeof(int) * (chunks + 1));
+  CheckCudaError(cudaMemcpyAsync(d_vp.data(), valid_prefix.data(),
+                                 sizeof(int) * (chunks + 1),
                                  cudaMemcpyHostToDevice, stream),
                  __FILE__, __LINE__);
+  DeviceBuffer d_hid(sizeof(float) * static_cast<size_t>(N) * D);
+  DropPadGatherKernel<<<Blocks(static_cast<long>(N) * D), kThreads, 0, stream>>>(
+      static_cast<const float*>(d_h.data()), static_cast<float*>(d_hid.data()),
+      static_cast<const int*>(d_vp.data()), chunks, Wc, D, N);
+  CheckCudaError(cudaGetLastError(), __FILE__, __LINE__);
+  // The transformer layers operate in place on the device hidden state.
+  float* hid = static_cast<float*>(d_hid.data());
 
   // ---- Attention windows (cu_seqlens) ----
   const int window_aftercnn = Wc * (config_.n_window_infer / win);  // 13*8=104
