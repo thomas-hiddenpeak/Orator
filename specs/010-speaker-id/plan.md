@@ -88,3 +88,46 @@ Each phase gates on build clean + ctest + (A) oracle + (D) real-WS 600 s.
   main new kernel work; reuse existing conv/GEMM where possible.
 - **Privacy** (non-goal here but noted): voiceprints are biometric; storage and
   consent are a later governance item.
+
+## 6. Weight layout (A1 done — blueprint for A3)
+
+Source: `nvidia/speakerverification_en_titanet_large` (NeMo `.nemo`, 102 MB).
+Converted to `models/speaker/titanet_large.safetensors` (108 tensors, F32, with
+`tools/convert/convert_nemo_to_safetensors.py`; config extracted to
+`models/speaker/titanet_large_config.yaml`). The `decoder.final.weight`
+[16681, 192] classifier head is **inference-irrelevant** (we stop at the 192-d
+embedding). Inference forward:
+
+Reproduce (weights are gitignored under `models/`, regenerate locally):
+```
+python -c "from huggingface_hub import hf_hub_download as d; \
+  d('nvidia/speakerverification_en_titanet_large', \
+    'speakerverification_en_titanet_large.nemo', local_dir='models/speaker')"
+python tools/convert/convert_nemo_to_safetensors.py \
+  models/speaker/speakerverification_en_titanet_large.nemo \
+  models/speaker/titanet_large.safetensors
+```
+
+Front-end: `AudioToMelSpectrogramPreprocessor` — 16 kHz, 80 mel, window 25 ms,
+stride 10 ms, n_fft 512, Hann, `normalize: per_feature` (per-utterance per-mel
+mean/std normalization — NOTE: differs from ASR mel; verify against oracle).
+
+Encoder `ConvASREncoder` (ContextNet, all `separable: true`, `se: true`,
+`relu`), 5 blocks `encoder.encoder.{0..4}`:
+- Each conv = depthwise (`mconv.N.conv.weight` shape `[C,1,k]`) + pointwise
+  (`mconv.N+1.conv.weight` shape `[Cout,Cin,1]`) + BN (`mconv.N+2`).
+- Block 0 (prolog): k=3, →1024, repeat 1, no residual, SE `mconv.3.fc.{0,2}`
+  (squeeze 1024→128→1024).
+- Blocks 1/2/3: 1024 ch, k=7/11/15, repeat 3 (three dw-sep conv+BN+relu sub-
+  units at mconv idx 0-2 / 5-7 / 10-12), SE at `mconv.13`, residual
+  `res.0.0`(pointwise) + `res.0.1`(BN) added before the final relu.
+- Block 4 (epilog): pointwise k=1, →3072, repeat 1.
+
+Decoder `SpeakerDecoder` attentive statistics pooling (`pool_mode: attention`):
+- Attention: `_pooling.attention_layer.0.conv_layer` [128, 9216, 1] — input is
+  per-frame encoder out (3072) concatenated with broadcast global mean(3072)+
+  std(3072) = 9216 → 128, BN, tanh, then `attention_layer.2` [3072,128,1] →
+  per-frame per-channel attention logits → softmax over time.
+- Pool: attention-weighted mean(3072) ⊕ std(3072) = 6144.
+- Embed: `emb_layers.0.0` BN(6144) → `emb_layers.0.1` linear [192,6144,1] →
+  192-d. (NeMo returns the pre-final-BN embedding; **L2-normalize** for cosine.)

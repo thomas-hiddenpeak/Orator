@@ -4,10 +4,12 @@ Ordered, independently verifiable. `[ ]` todo · `[~]` in progress · `[x]` done
 Each task gates on build clean `-Wall -Wextra` + relevant test.
 
 ## Phase A — Voiceprint model + oracle
-- [~] **A1** Acquire `titanet_large` (NeMo) and convert its weights to the
-  project safetensors layout under `models/speaker/`. Tool:
-  `tools/convert/convert_titanet_to_safetensors.py`. Record the exact NeMo
-  version + checkpoint hash.
+- [x] **A1** Acquired `titanet_large` (`nvidia/speakerverification_en_titanet_large`,
+  NeMo .nemo 102 MB) → `models/speaker/titanet_large.safetensors` (108 tensors)
+  via `tools/convert/convert_nemo_to_safetensors.py` (extended to auto-detect the
+  torch-zip `archive/` prefix and tolerate a missing `byteorder` entry). Config
+  at `models/speaker/titanet_large_config.yaml`. Full weight layout / forward
+  blueprint recorded in plan.md §6.
 - [ ] **A2** NeMo Python oracle: dump reference 192-d embeddings (and key
   intermediate activations) for a few clean spans of `test.mp3` to
   `models/reference/speaker/`. Tool: `tools/reference/titanet_oracle.py`.

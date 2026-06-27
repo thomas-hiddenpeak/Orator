@@ -32,7 +32,7 @@ STORAGE_DTYPE = {
 }
 
 
-def parse_state_dict(ckpt_zip):
+def parse_state_dict(ckpt_zip, prefix):
     """Return list of (name, storage_key, dtype_str, elem_size, shape)."""
     storages = {}
 
@@ -65,7 +65,7 @@ def parse_state_dict(ckpt_zip):
             except Exception:
                 return lambda *a, **k: ("OBJ", mod + "." + name, a)
 
-    obj = Unp(io.BytesIO(ckpt_zip.read("model_weights/data.pkl"))).load()
+    obj = Unp(io.BytesIO(ckpt_zip.read(prefix + "/data.pkl"))).load()
     out = []
     for name, v in obj.items():
         if not (isinstance(v, tuple) and v and v[0] == "TENSOR"):
@@ -78,10 +78,21 @@ def parse_state_dict(ckpt_zip):
     return out
 
 
+def _detect_prefix(zf):
+    """Locate the directory prefix containing data.pkl (e.g. 'model_weights'
+    in older NeMo checkpoints, 'archive' in newer torch.save zips)."""
+    for n in zf.namelist():
+        if n.endswith("/data.pkl"):
+            return n[: -len("/data.pkl")]
+    raise SystemExit("data.pkl not found inside checkpoint zip")
+
+
 def open_ckpt(path):
-    """Accept a .nemo (tar) or a raw model_weights.ckpt (zip). Returns ZipFile."""
+    """Accept a .nemo (tar) or a raw model_weights.ckpt (zip). Returns
+    (ZipFile, prefix)."""
     if zipfile.is_zipfile(path):
-        return zipfile.ZipFile(path), None
+        zf = zipfile.ZipFile(path)
+        return zf, _detect_prefix(zf)
     # assume tar (.nemo)
     tf = tarfile.open(path)
     member = None
@@ -92,7 +103,8 @@ def open_ckpt(path):
     if member is None:
         raise SystemExit("model_weights.ckpt not found inside archive")
     data = tf.extractfile(member).read()
-    return zipfile.ZipFile(io.BytesIO(data)), None
+    zf = zipfile.ZipFile(io.BytesIO(data))
+    return zf, _detect_prefix(zf)
 
 
 def main():
@@ -103,12 +115,15 @@ def main():
                     help="keep integer bookkeeping tensors (num_batches_tracked)")
     args = ap.parse_args()
 
-    zf, _ = open_ckpt(args.input)
-    byteorder = zf.read("model_weights/byteorder")
-    if byteorder != b"little":
-        raise SystemExit(f"unexpected byteorder {byteorder!r}; need little-endian")
+    zf, prefix = open_ckpt(args.input)
+    if (prefix + "/byteorder") in zf.namelist():
+        byteorder = zf.read(prefix + "/byteorder")
+        if byteorder != b"little":
+            raise SystemExit(
+                f"unexpected byteorder {byteorder!r}; need little-endian")
+    # else: torch.save zips without a byteorder entry are little-endian.
 
-    tensors = parse_state_dict(zf)
+    tensors = parse_state_dict(zf, prefix)
 
     # Build header + plan data layout.
     header = {}
@@ -123,7 +138,7 @@ def main():
         for s in shape:
             numel *= s
         nbytes = numel * elem
-        raw = zf.read("model_weights/data/" + str(key))
+        raw = zf.read(prefix + "/data/" + str(key))
         if len(raw) != nbytes:
             raise SystemExit(
                 f"size mismatch {name}: storage {len(raw)} != {nbytes}")
