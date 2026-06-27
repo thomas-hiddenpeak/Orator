@@ -19,9 +19,19 @@ namespace {
 constexpr int kThreads = 256;
 inline int Blocks(long n) { return static_cast<int>((n + kThreads - 1) / kThreads); }
 
-cublasHandle_t g_handle = nullptr;
-uint16_t* g_scratch = nullptr;   // bf16 cast scratch for the `in` operand
-long g_scratch_cap = 0;
+// Per-THREAD cuBLAS handle + bf16 cast scratch. asr_gemm::Linear is called
+// concurrently from independent pipeline threads (the ASR worker on asr_stream
+// and the forced-alignment worker on the default stream) which, in the
+// production lock-free concurrency mode, are NOT mutually excluded. A single
+// shared handle/scratch would race: cublasSetStream mutates the handle's stream
+// from two threads at once, and Scratch()'s grow path (cudaFree + cudaMalloc)
+// could free the buffer out from under another thread's queued GEMM
+// (use-after-free on device memory). thread_local gives each pipeline thread its
+// own handle and scratch, removing the race and letting the pipelines run truly
+// concurrently. (Per-thread buffers are reclaimed at process exit.)
+thread_local cublasHandle_t g_handle = nullptr;
+thread_local uint16_t* g_scratch = nullptr;   // bf16 cast scratch for the `in` operand
+thread_local long g_scratch_cap = 0;
 
 cublasHandle_t Handle() {
   if (g_handle == nullptr) {
