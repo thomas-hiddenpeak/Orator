@@ -32,6 +32,7 @@
 #include <cuda_runtime.h>
 
 #include "core/stages.h"
+#include "gpu/device_scratch.h"
 
 namespace orator {
 namespace pipeline {
@@ -113,6 +114,11 @@ class GpuVad : public core::IVad {
   float dec_b_ = 0.0f;
 
   // Device weights.
+  // Owning device-memory pool: every device pointer below is a non-owning view
+  // into a fixed scratch slot here (slot map in UploadWeights). Replaces 24 raw
+  // cudaMalloc/cudaFree sites with one RAII owner (Constitution Art. V); the
+  // GpuVad instance is single-thread-of-control, so the pool is race-free.
+  gpu::DeviceScratch dev_buffers_;
   float* d_stft_basis_ = nullptr;
   float* d_enc_w_[4] = {nullptr, nullptr, nullptr, nullptr};
   float* d_enc_b_[4] = {nullptr, nullptr, nullptr, nullptr};

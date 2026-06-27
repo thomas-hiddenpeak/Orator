@@ -180,9 +180,9 @@ void LoadVec(const io::SafeTensorReader& r, const char* name,
   r.ReadWeight(name, dst->data(), n * sizeof(T));
 }
 
-float* DeviceUpload(const std::vector<float>& host) {
-  float* d = nullptr;
-  CUDA_CHECK(cudaMalloc(&d, host.size() * sizeof(float)));
+float* DeviceUpload(gpu::DeviceScratch& pool, int slot,
+                    const std::vector<float>& host) {
+  float* d = pool.GetT<float>(slot, host.size());
   CUDA_CHECK(cudaMemcpy(d, host.data(), host.size() * sizeof(float),
                         cudaMemcpyHostToDevice));
   return d;
@@ -201,43 +201,28 @@ GpuVad::GpuVad(const Params& params) : params_(params), stream_(params.stream) {
 GpuVad::~GpuVad() { FreeDeviceMemory(); }
 
 void GpuVad::FreeDeviceMemory() {
-  CUDA_CHECK(cudaFree(d_stft_basis_));
+  // dev_buffers_ (DeviceScratch) owns all device memory and frees it on
+  // destruction; here we only drop the non-owning views. LoadWeights calls this
+  // then UploadWeights, which re-acquires the same slots from the pool.
   d_stft_basis_ = nullptr;
   for (int i = 0; i < 4; ++i) {
-    CUDA_CHECK(cudaFree(d_enc_w_[i]));
     d_enc_w_[i] = nullptr;
-    CUDA_CHECK(cudaFree(d_enc_b_[i]));
     d_enc_b_[i] = nullptr;
   }
-  CUDA_CHECK(cudaFree(d_lstm_wih_));
   d_lstm_wih_ = nullptr;
-  CUDA_CHECK(cudaFree(d_lstm_whh_));
   d_lstm_whh_ = nullptr;
-  CUDA_CHECK(cudaFree(d_lstm_bih_));
   d_lstm_bih_ = nullptr;
-  CUDA_CHECK(cudaFree(d_lstm_bhh_));
   d_lstm_bhh_ = nullptr;
-  CUDA_CHECK(cudaFree(d_dec_w_));
   d_dec_w_ = nullptr;
-  CUDA_CHECK(cudaFree(d_ext_));
   d_ext_ = nullptr;
-  CUDA_CHECK(cudaFree(d_padded_));
   d_padded_ = nullptr;
-  CUDA_CHECK(cudaFree(d_mag_));
   d_mag_ = nullptr;
-  CUDA_CHECK(cudaFree(d_enc0_));
   d_enc0_ = nullptr;
-  CUDA_CHECK(cudaFree(d_enc1_));
   d_enc1_ = nullptr;
-  CUDA_CHECK(cudaFree(d_enc2_));
   d_enc2_ = nullptr;
-  CUDA_CHECK(cudaFree(d_enc3_));
   d_enc3_ = nullptr;
-  CUDA_CHECK(cudaFree(d_prob_));
   d_prob_ = nullptr;
-  CUDA_CHECK(cudaFree(d_h_));
   d_h_ = nullptr;
-  CUDA_CHECK(cudaFree(d_c_));
   d_c_ = nullptr;
 }
 
@@ -286,29 +271,30 @@ void GpuVad::InitModel() {
 }
 
 void GpuVad::UploadWeights() {
-  d_stft_basis_ = DeviceUpload(stft_basis_);
+  // Fixed scratch-slot map for dev_buffers_ (the owning pool). Re-uploading
+  // (LoadWeights) reuses the same slots: GetT returns the existing buffer and
+  // DeviceUpload re-copies, so no reallocation churn.
+  d_stft_basis_ = DeviceUpload(dev_buffers_, 0, stft_basis_);
   for (int i = 0; i < 4; ++i) {
-    d_enc_w_[i] = DeviceUpload(enc_w_[i]);
-    d_enc_b_[i] = DeviceUpload(enc_b_[i]);
+    d_enc_w_[i] = DeviceUpload(dev_buffers_, 1 + i, enc_w_[i]);
+    d_enc_b_[i] = DeviceUpload(dev_buffers_, 5 + i, enc_b_[i]);
   }
-  d_lstm_wih_ = DeviceUpload(lstm_wih_);
-  d_lstm_whh_ = DeviceUpload(lstm_whh_);
-  d_lstm_bih_ = DeviceUpload(lstm_bih_);
-  d_lstm_bhh_ = DeviceUpload(lstm_bhh_);
-  d_dec_w_ = DeviceUpload(dec_w_);
+  d_lstm_wih_ = DeviceUpload(dev_buffers_, 9, lstm_wih_);
+  d_lstm_whh_ = DeviceUpload(dev_buffers_, 10, lstm_whh_);
+  d_lstm_bih_ = DeviceUpload(dev_buffers_, 11, lstm_bih_);
+  d_lstm_bhh_ = DeviceUpload(dev_buffers_, 12, lstm_bhh_);
+  d_dec_w_ = DeviceUpload(dev_buffers_, 13, dec_w_);
 
-  CUDA_CHECK(
-      cudaMalloc(&d_ext_, (kContext + kMaxBatch * kWindow) * sizeof(float)));
-  CUDA_CHECK(cudaMalloc(&d_padded_, kMaxBatch * kPadded * sizeof(float)));
-  CUDA_CHECK(
-      cudaMalloc(&d_mag_, kMaxBatch * kStftBins * kStftFrames * sizeof(float)));
-  CUDA_CHECK(cudaMalloc(&d_enc0_, kMaxBatch * 128 * 4 * sizeof(float)));
-  CUDA_CHECK(cudaMalloc(&d_enc1_, kMaxBatch * 64 * 2 * sizeof(float)));
-  CUDA_CHECK(cudaMalloc(&d_enc2_, kMaxBatch * 64 * 1 * sizeof(float)));
-  CUDA_CHECK(cudaMalloc(&d_enc3_, kMaxBatch * 128 * 1 * sizeof(float)));
-  CUDA_CHECK(cudaMalloc(&d_prob_, kMaxBatch * sizeof(float)));
-  CUDA_CHECK(cudaMalloc(&d_h_, kHidden * sizeof(float)));
-  CUDA_CHECK(cudaMalloc(&d_c_, kHidden * sizeof(float)));
+  d_ext_ = dev_buffers_.GetT<float>(14, kContext + kMaxBatch * kWindow);
+  d_padded_ = dev_buffers_.GetT<float>(15, kMaxBatch * kPadded);
+  d_mag_ = dev_buffers_.GetT<float>(16, kMaxBatch * kStftBins * kStftFrames);
+  d_enc0_ = dev_buffers_.GetT<float>(17, kMaxBatch * 128 * 4);
+  d_enc1_ = dev_buffers_.GetT<float>(18, kMaxBatch * 64 * 2);
+  d_enc2_ = dev_buffers_.GetT<float>(19, kMaxBatch * 64 * 1);
+  d_enc3_ = dev_buffers_.GetT<float>(20, kMaxBatch * 128 * 1);
+  d_prob_ = dev_buffers_.GetT<float>(21, kMaxBatch);
+  d_h_ = dev_buffers_.GetT<float>(22, kHidden);
+  d_c_ = dev_buffers_.GetT<float>(23, kHidden);
   CUDA_CHECK(cudaMemset(d_h_, 0, kHidden * sizeof(float)));
   CUDA_CHECK(cudaMemset(d_c_, 0, kHidden * sizeof(float)));
 }
