@@ -32,18 +32,32 @@ Each task gates on build clean `-Wall -Wextra` + relevant test.
   1.000000; cross-span matrix matches the oracle to 4 decimals.** ctest 46/46.
 
 ## Phase B — Identity stage
-- [ ] **B5** Clean-segment gate: VAD-confirmed + single-speaker (no diar
-  overlap) + duration ≥ min + diar conf ≥ cutoff.
-- [ ] **B6** Per-local-speaker audio accumulation → embed → `SpeakerDatabase`
-  Match/Enroll; moving-average `Update` of an enrolled embedding.
-- [ ] **B7** Revisable local→global map: tentative early, revised as audio
-  accumulates; emit a revision on firm-up/flip.
+- [x] **B5** Clean-segment gate (`pipeline::SpeakerIdentityStage::IsClean`):
+  duration >= min_embed_sec, diar mean-activity confidence >= cutoff,
+  single-speaker (no other-local-speaker overlap beyond a tolerance), and
+  VAD-confirmed (>= coverage fraction; skipped when VAD is unavailable). Also
+  fixed `OnsetOffsetSegments` to compute `DiarSegment::confidence` as the mean
+  per-frame activity over the span (was hard-coded 0.0), making the gate real.
+- [x] **B6** Per-local-speaker embed + match/enroll: the longest fresh clean
+  span per local speaker is read from a `RetainedAudioBuffer`, embedded with
+  `TitaNetEmbedder`, blended into a per-local moving average, and matched
+  against `SpeakerDatabase` (cosine >= tau => known global id, else auto-enroll
+  `spk_<N>`; own enrollments are refined via `Update`).
+- [x] **B7** Revisable local->global map: re-resolved each delivery from the
+  refined embedding; the diar worker re-derives the full segment view every
+  delivery so any id change propagates on the next publish. Wired into the diar
+  pipeline behind a `DiarizationWorker` segment-processor hook + `[speaker]`
+  config; **validated: deterministic `test_speaker_id_stage` (gate / enroll /
+  cross-local re-id / overlap+low-conf gating) + real WS 120 s: 2 speakers
+  auto-enrolled (spk_0 x21, spk_1 x5), diar confidence 0.50-0.97. ctest 47/47.**
 
 ## Phase C — Injection
-- [ ] **C8** Publish diar segments carrying the resolved GLOBAL id on the diar
-  protocol topic; `ComprehensiveTimeline` speaker turns use the global id
-  (revisable). Backward-compatible with the local-label path when speaker-id is
-  disabled.
+- [~] **C8** Diar segments now carry the resolved global id: the published
+  `diar/speaker_segment` message and the serialized diar track expose a
+  `speaker_id` field alongside the integer local `speaker` (backward
+  compatible — done in Phase B). **Remaining**: thread `speaker_id` through
+  `ComprehensiveTimeline` (`SpeakerInput`→`SpeakerSeg`→`Entry`) so the
+  comprehensive speaker turns also carry the global id (revisable).
 - [ ] **C9** Naming hook: `SetDisplayName(global_id, name)` + `id -> name`
   sidecar persisted alongside the registry; serialized into the timeline view.
   No UI.

@@ -63,6 +63,9 @@ target_link_libraries(test_auditory_stream PRIVATE pthread)
 orator_add_test(test_retained_audio unit/pipeline/test_retained_audio.cc)
 target_link_libraries(test_retained_audio PRIVATE pthread)
 
+orator_add_test(test_speaker_id_stage unit/pipeline/test_speaker_id_stage.cc)
+target_link_libraries(test_speaker_id_stage PRIVATE pthread)
+
 # Protocol unit tests
 orator_add_test(test_topic_router unit/protocol/test_topic_router.cc)
 orator_add_test(test_protocol_types unit/protocol/test_protocol_types.cc)

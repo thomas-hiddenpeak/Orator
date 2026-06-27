@@ -141,10 +141,20 @@ std::string AuditoryStream::Serialize() {
   out += buf;
   for (size_t i = 0; i < diar_view.size(); ++i) {
     const auto& s = diar_view[i];
-    std::snprintf(buf, sizeof(buf),
-                  "{\"start\":%.3f,\"end\":%.3f,\"speaker\":%d,"
-                  "\"confidence\":%.3f}",
-                  s.start_sec, s.end_sec, s.local_speaker, s.confidence);
+    if (s.speaker_id.empty()) {
+      std::snprintf(buf, sizeof(buf),
+                    "{\"start\":%.3f,\"end\":%.3f,\"speaker\":%d,"
+                    "\"confidence\":%.3f}",
+                    s.start_sec, s.end_sec, s.local_speaker, s.confidence);
+    } else {
+      // Spec 010: surface the resolved global voiceprint identity alongside the
+      // diarizer-local index (backward compatible: "speaker" stays integer).
+      std::snprintf(buf, sizeof(buf),
+                    "{\"start\":%.3f,\"end\":%.3f,\"speaker\":%d,"
+                    "\"speaker_id\":\"%s\",\"confidence\":%.3f}",
+                    s.start_sec, s.end_sec, s.local_speaker,
+                    s.speaker_id.c_str(), s.confidence);
+    }
     out += buf;
     if (i + 1 < diar_view.size()) out += ",";
   }

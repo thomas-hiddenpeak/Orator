@@ -41,6 +41,9 @@ void DiarizationWorker::DeliverSpeakers(bool force) {
   auto segs = OnsetOffsetSegments(frames, params_.onset, params_.offset,
                                   params_.pad_onset, params_.pad_offset,
                                   params_.min_dur_on, params_.min_dur_off);
+  // Spec 010: resolve global voiceprint identities on the segment view before
+  // delivery (no-op when speaker identity is disabled).
+  if (segment_processor_) segment_processor_(segs);
   speaker_sink_(segs);
 }
 

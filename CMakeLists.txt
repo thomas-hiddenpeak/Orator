@@ -108,6 +108,7 @@ set(ORATOR_CORE_SOURCES
     src/pipeline/asr_worker.cc
     src/pipeline/retained_audio_buffer.cc
     src/pipeline/align_worker.cc
+    src/pipeline/speaker_identity_stage.cc
     # networking (libwebsockets-based WebSocket server)
     src/net/http_static_server.cc
     src/net/websocket_server.cc

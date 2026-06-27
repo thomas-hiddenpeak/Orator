@@ -51,7 +51,16 @@ class PipelineHandle;
 }  // namespace orator
 
 namespace orator {
+namespace model {
+class TitaNetEmbedder;
+class SpeakerDatabase;
+}  // namespace model
+}  // namespace orator
+
+namespace orator {
 namespace pipeline {
+
+class SpeakerIdentityStage;
 
 class AuditoryStream {
  public:
@@ -123,6 +132,15 @@ class AuditoryStream {
     double diar_pad_offset = 0.0;  // extra time added after each segment end
     double diar_min_dur_on = 0.5;  // minimum segment duration (seconds)
     double diar_min_dur_off = 1.0;  // minimum gap to merge segments (seconds)
+
+    // ── Speaker identity (Spec 010, post-diarization stage) ──────────
+    bool speaker_enable = false;  // master switch (also needs model dir)
+    std::string speaker_model_dir = "";  // dir holding titanet_large.safetensors
+    std::string speaker_registry_path = "";  // persistence file ("" = none)
+    float speaker_match_threshold = 0.45f;   // cosine tau for re-identification
+    double speaker_min_embed_sec = 1.5;      // shortest clean span to embed
+    float speaker_min_confidence = 0.5f;     // diar mean-activity gate
+    double speaker_retain_sec = 180.0;       // audio retention window
 
     // ── Storage ──────────────────────────────────────────────────────
     std::string storage_disk_path = "/tmp/orator/storage/";
@@ -257,6 +275,14 @@ class AuditoryStream {
   std::thread diar_thread_;
   std::thread asr_thread_;
   bool running_ = false;
+
+  // Spec 010: speaker identity as a post-diarization stage inside the diar
+  // pipeline (null when disabled). The stage owns the voiceprint embedder +
+  // registry and resolves a global identity for each diarizer-local speaker.
+  std::unique_ptr<model::TitaNetEmbedder> speaker_embedder_;
+  std::unique_ptr<model::SpeakerDatabase> speaker_db_;
+  std::unique_ptr<SpeakerIdentityStage> speaker_id_stage_;
+  long speaker_vad_sub_id_ = 0;
 
   // Spec 004: independent VAD detector (third pipeline consumer).
   std::unique_ptr<core::IVad> vad_detector_;

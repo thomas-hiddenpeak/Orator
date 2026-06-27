@@ -96,6 +96,33 @@ bool ApplyTomlConfig(const std::string& path,
     }
   }
 
+  // ── [speaker] ─────────────────────────────────────────────────────
+  if (auto* sec = config["speaker"].as_table()) {
+    if (auto v = sec->get("enable")) {
+      if (auto b = v->value<bool>()) cfg.speaker_enable = *b;
+    }
+    if (auto v = sec->get("model_dir")) {
+      if (auto s = v->value<std::string>()) cfg.speaker_model_dir = *s;
+    }
+    if (auto v = sec->get("registry_path")) {
+      if (auto s = v->value<std::string>()) cfg.speaker_registry_path = *s;
+    }
+    if (auto v = sec->get("match_threshold")) {
+      if (auto d = v->value<double>())
+        cfg.speaker_match_threshold = static_cast<float>(*d);
+    }
+    if (auto v = sec->get("min_embed_sec")) {
+      if (auto d = v->value<double>()) cfg.speaker_min_embed_sec = *d;
+    }
+    if (auto v = sec->get("min_confidence")) {
+      if (auto d = v->value<double>())
+        cfg.speaker_min_confidence = static_cast<float>(*d);
+    }
+    if (auto v = sec->get("retain_sec")) {
+      if (auto d = v->value<double>()) cfg.speaker_retain_sec = *d;
+    }
+  }
+
   // ── [vad] ─────────────────────────────────────────────────────────
   if (auto* sec = config["vad"].as_table()) {
     if (auto v = sec->get("model")) {

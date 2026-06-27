@@ -4,8 +4,11 @@
 #include "core/log.h"
 #include "core/registry.h"
 #include "model/builtin_registration.h"
+#include "model/speaker_database.h"
 #include "model/streaming_sortformer.h"
+#include "model/titanet_embedder.h"
 #include "pipeline/json_util.h"
+#include "pipeline/speaker_identity_stage.h"
 #include "protocol/protocol_timeline.h"
 #include "protocol/session_store.h"
 
@@ -173,6 +176,35 @@ void AuditoryStream::Start() {
         "qwen3_forced_aligner");
     aligner_->LoadWeights(config_.align_model_dir);
   }
+
+  // Spec 010: speaker identity (post-diarization stage inside the diar
+  // pipeline). Gated on config; needs the diarizer and the TitaNet weights.
+  const bool speaker_on = config_.speaker_enable &&
+                          !config_.speaker_model_dir.empty() && diarizer_;
+  if (speaker_on) {
+    std::string wpath = config_.speaker_model_dir;
+    if (!wpath.empty() && wpath.back() != '/') wpath += '/';
+    wpath += "titanet_large.safetensors";
+    speaker_embedder_ = std::make_unique<model::TitaNetEmbedder>();
+    speaker_embedder_->LoadWeights(wpath);
+    speaker_db_ = std::make_unique<model::SpeakerDatabase>(
+        /*max_speakers=*/256, speaker_embedder_->dim());
+    if (!config_.speaker_registry_path.empty()) {
+      speaker_db_->Load(config_.speaker_registry_path);  // ok if absent
+    }
+    SpeakerIdConfig sc;
+    sc.embedding_dim = speaker_embedder_->dim();
+    sc.match_threshold = config_.speaker_match_threshold;
+    sc.min_embed_sec = config_.speaker_min_embed_sec;
+    sc.min_confidence = config_.speaker_min_confidence;
+    sc.retain_sec = config_.speaker_retain_sec;
+    speaker_id_stage_ = std::make_unique<SpeakerIdentityStage>(
+        speaker_embedder_.get(), speaker_db_.get(), common_time_base(), sc);
+    LOG_INFO("[speaker-id] enabled: %s (registry %s)\n", wpath.c_str(),
+             config_.speaker_registry_path.empty()
+                 ? "(none)"
+                 : config_.speaker_registry_path.c_str());
+  }
   StartWorkers();
 }
 
@@ -196,11 +228,30 @@ void AuditoryStream::StartWorkers() {
           HandleSpeakerSink(comp_mutex_, last_segments_,
                             protocol_timeline_.get(), diar_handle_.get(), segs);
         });
+    // Spec 010: resolve global voiceprint identities on the segment view before
+    // it is delivered. The worker depends only on a std::function (Art. III).
+    if (speaker_id_stage_) {
+      diar_worker_->set_segment_processor(
+          [this](std::vector<core::DiarSegment>& segs) {
+            speaker_id_stage_->Process(segs);
+          });
+      speaker_vad_sub_id_ = protocol_timeline_->SubscribeInternal(
+          protocol::TopicPattern(protocol::kVadSpeechSegment.to_string()),
+          [this](const protocol::Message& msg) {
+            double s = JsonParseNum(msg.data, "start");
+            double e = JsonParseNum(msg.data, "end");
+            if (s >= 0.0 && e > s) speaker_id_stage_->AddVadSegment(s, e);
+          });
+    }
     diar_audio_ = MakeAudioCache();
     diar_thread_ = std::thread([this] {
       std::vector<float> chunk;
       long span_start_abs = 0;
       while (diar_audio_->WaitAndRead(&chunk, &span_start_abs)) {
+        if (speaker_id_stage_) {
+          speaker_id_stage_->AppendAudio(chunk.data(),
+                                         static_cast<int>(chunk.size()));
+        }
         diar_worker_->ProcessSpan(chunk.data(), static_cast<int>(chunk.size()));
         progress_cv_.notify_all();
       }

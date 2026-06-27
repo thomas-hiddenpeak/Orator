@@ -117,7 +117,13 @@ std::vector<DiarSegment> OnsetOffsetSegments(const DiarizationFrames& frames,
           seg.start_sec = frames.t_start_sec + (seg_start * period) - pad_onset;
           seg.end_sec = frames.t_start_sec + (f * period) + pad_offset;
           seg.local_speaker = spk;
-          seg.confidence = 0.0f;
+          // Mean per-frame activity probability over the segment span: the
+          // documented DiarSegment::confidence, used by the speaker-identity
+          // clean-segment gate (Spec 010).
+          float prob_sum = 0.0f;
+          for (int g = seg_start; g < f; ++g) prob_sum += frames.At(g, spk);
+          const int count = f - seg_start;
+          seg.confidence = count > 0 ? prob_sum / count : 0.0f;
           segments.push_back(seg);
         }
         active = false;

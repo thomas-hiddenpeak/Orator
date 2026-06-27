@@ -59,6 +59,17 @@ class DiarizationWorker {
   // Set the comprehensive-timeline speaker-view sink (Spec 004). Optional.
   void set_speaker_sink(SpeakerSink sink) { speaker_sink_ = std::move(sink); }
 
+  // Post-diarization segment processor (Spec 010): a hook invoked on the freshly
+  // derived segment view BEFORE it is delivered to the sink, allowed to mutate
+  // the segments in place (e.g. fill DiarSegment::speaker_id with a resolved
+  // global voiceprint identity). Optional; the worker depends only on this
+  // std::function, never on a concrete speaker-identity stage (Art. III).
+  using SegmentProcessor =
+      std::function<void(std::vector<core::DiarSegment>&)>;
+  void set_segment_processor(SegmentProcessor p) {
+    segment_processor_ = std::move(p);
+  }
+
   // Consume `n` contiguous samples at the current stream position. Runs the
   // diarizer incrementally and appends any stabilized frames to the timeline.
   void ProcessSpan(const float* samples, int n);
@@ -89,6 +100,7 @@ class DiarizationWorker {
   core::TimeBase tb_;
   cudaStream_t stream_;
   SpeakerSink speaker_sink_;
+  SegmentProcessor segment_processor_;
   long last_deliver_sample_ = 0;
   std::atomic<long> processed_samples_{0};
   std::atomic<double> compute_sec_{0.0};

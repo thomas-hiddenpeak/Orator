@@ -208,14 +208,24 @@ void HandleSpeakerSink(std::mutex& comp_mutex,
     last_segments = segs;
     for (size_t i = 0; i < segs.size(); ++i) {
       const auto& s = segs[i];
-      const std::string label =
-          s.speaker_id.empty() ? ("speaker_" + std::to_string(s.local_speaker))
-                               : s.speaker_id;
-      char b[160];
-      std::snprintf(b, sizeof(b),
-                    "{\"start\":%.3f,\"end\":%.3f,\"speaker\":\"%s\","
-                    "\"confidence\":%.3f}",
-                    s.start_sec, s.end_sec, label.c_str(), s.confidence);
+      // Keep "speaker" as the diarizer-local label (preserves the integer
+      // mapping consumers derive from "speaker_<n>"); expose the resolved
+      // global voiceprint identity, when any, in a separate "speaker_id" field
+      // (Spec 010, backward compatible).
+      const std::string label = "speaker_" + std::to_string(s.local_speaker);
+      char b[200];
+      if (s.speaker_id.empty()) {
+        std::snprintf(b, sizeof(b),
+                      "{\"start\":%.3f,\"end\":%.3f,\"speaker\":\"%s\","
+                      "\"confidence\":%.3f}",
+                      s.start_sec, s.end_sec, label.c_str(), s.confidence);
+      } else {
+        std::snprintf(b, sizeof(b),
+                      "{\"start\":%.3f,\"end\":%.3f,\"speaker\":\"%s\","
+                      "\"speaker_id\":\"%s\",\"confidence\":%.3f}",
+                      s.start_sec, s.end_sec, label.c_str(),
+                      s.speaker_id.c_str(), s.confidence);
+      }
       segments_json += b;
       if (i + 1 < segs.size()) segments_json += ",";
     }

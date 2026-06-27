@@ -91,6 +91,34 @@ model_dir = "models/asr/Qwen/Qwen3-ASR-1.7B"
 # retain_sec = 180.0
 
 # ══════════════════════════════════════════════════════════════════════════════
+# Speaker identity — voiceprint enrollment / re-identification (Spec 010)
+# Post-diarization stage inside the diarization pipeline: embeds clean
+# single-speaker audio with TitaNet-Large and resolves a persistent GLOBAL
+# identity per diarizer-local speaker (auto-enroll unseen / re-identify known).
+# ══════════════════════════════════════════════════════════════════════════════
+[speaker]
+# Enable speaker identity (also requires model_dir + the diarizer pipeline)
+# enable = false
+
+# Directory holding titanet_large.safetensors
+# model_dir = "models/speaker"
+
+# Registry persistence file (loaded at start, "" = in-memory only)
+# registry_path = ""
+
+# Cosine threshold for "same speaker" (re-identification). Higher = stricter.
+# match_threshold = 0.45
+
+# Shortest clean single-speaker span worth embedding (seconds)
+# min_embed_sec = 1.5
+
+# Minimum diarization mean-activity confidence for a span to be embedded
+# min_confidence = 0.5
+
+# Retained audio window (seconds) for span readback
+# retain_sec = 180.0
+
+# ══════════════════════════════════════════════════════════════════════════════
 # VAD — voice activity detection pipeline
 # ══════════════════════════════════════════════════════════════════════════════
 [vad]
