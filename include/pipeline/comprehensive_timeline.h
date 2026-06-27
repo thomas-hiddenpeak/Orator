@@ -83,12 +83,35 @@ class ComprehensiveTimeline {
     double end = 0.0;
   };
 
+  // One forced-alignment unit (word/character) with its time span on the common
+  // clock. A REFINEMENT of an ASR text segment: per-unit timestamps the ASR
+  // engine itself does not emit. Times are already on the common time base.
+  struct AlignUnitSeg {
+    double start = 0.0;
+    double end = 0.0;
+    std::string text;
+  };
+
+  // One aligned ASR segment: the source text_id, its bounds, and the per-unit
+  // timestamps, for the serialized align track.
+  struct AlignGroup {
+    long text_id = -1;
+    double start = 0.0;
+    double end = 0.0;
+    std::vector<AlignUnitSeg> units;
+  };
+
   // The comprehensive view: diarization-driven speaker turns with their text,
   // time-ordered, consecutive same-speaker entries coalesced. Derived product.
   std::vector<Entry> Snapshot() const;
 
   // The recorded VAD speech segments (sorted), for the serialized vad track.
   std::vector<VadSeg> SnapshotVad() const { return vad_; }
+
+  // The forced-alignment groups (one per aligned text segment, ordered by
+  // start), for the serialized align track. Each refines an ASR segment into
+  // per-unit timestamps on the common time base.
+  std::vector<AlignGroup> SnapshotAlign() const;
 
   void Clear();
 
@@ -111,7 +134,9 @@ class ComprehensiveTimeline {
                                     std::mutex&,
                                     const orator::protocol::Message&,
                                     std::function<void(const std::string&)>);
-
+  friend void HandleAlignSubscription(ComprehensiveTimeline&,
+                                      std::mutex&,
+                                      const orator::protocol::Message&);
   // Deposit a speaker segment (who/when). Returns revisions caused by
   // attribution changes in overlapping text segments.
   std::vector<Revision> UpsertSpeaker(double start, double end,
@@ -132,6 +157,12 @@ class ComprehensiveTimeline {
 
   // Deposit a VAD speech segment.
   void AddVad(double start, double end);
+
+  // Deposit (or replace) the forced-alignment units for one ASR text segment,
+  // keyed by its source text_id. Idempotent: re-depositing the same id replaces
+  // its units. Times must already be on the common time base.
+  void UpsertAlign(long text_id, double start, double end,
+                   const std::vector<AlignUnitSeg>& units);
 
   // Clean up old data to prevent memory accumulation
   void CleanupOldData(double keep_until_sec);
@@ -168,6 +199,8 @@ class ComprehensiveTimeline {
   std::vector<SpeakerSeg> speakers_;  // diar track: who/when (overlaps allowed)
   std::vector<TextSeg> texts_;        // asr track: what/when, keyed by id
   std::vector<VadSeg> vad_;           // vad track: speech segments
+  // align track: per-unit timestamps refining an ASR segment, keyed by text_id.
+  std::map<long, AlignGroup> align_;
   // Current diarization-split projection per text id (kept in sync).
   std::map<long, std::vector<Entry>> pieces_;
 };

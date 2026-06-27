@@ -49,8 +49,23 @@ class AsrAudioTower {
  public:
   explicit AsrAudioTower(const AsrAudioConfig& config = {});
 
+  // Checkpoint tensor names. The Qwen3-ASR encoder and the Qwen3 Forced Aligner
+  // encoder are the same architecture but differ in (a) the module prefix and
+  // (b) where the output projection lives: ASR keeps proj1/proj2 inside the
+  // tower; the aligner uses a separate multi_modal_projector. The defaults match
+  // ASR; the aligner overrides them.
+  struct WeightNames {
+    std::string prefix = "thinker.audio_tower.";       // conv/layers/ln_post
+    std::string proj1 = "thinker.audio_tower.proj1";   // D -> output_dim
+    std::string proj2 = "thinker.audio_tower.proj2";   // output_dim -> output_dim
+  };
+
   // Loads + upcasts all audio_tower weights from the sharded checkpoint.
-  void LoadWeights(const io::ShardedSafeTensors& weights);
+  void LoadWeights(const io::ShardedSafeTensors& weights) {
+    LoadWeights(weights, WeightNames{});
+  }
+  void LoadWeights(const io::ShardedSafeTensors& weights,
+                   const WeightNames& names);
 
   // mel: row-major [num_mel_bins, n_frames] FP32 (host). Returns row-major
   // [N_out, output_dim] FP32 (host); *out_tokens receives N_out.

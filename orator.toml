@@ -68,6 +68,29 @@ model_dir = "models/asr/Qwen/Qwen3-ASR-1.7B"
 # profile = false
 
 # ══════════════════════════════════════════════════════════════════════════════
+# Forced alignment — aligns each finalized ASR transcript segment to its audio,
+# producing precise per-word/character timestamps in a single non-autoregressive
+# pass (Qwen3-ForcedAligner). Independent pipeline: consumes the published
+# asr/transcript only, never ASR internal state.
+# ══════════════════════════════════════════════════════════════════════════════
+[align]
+# Enable the forced-alignment pipeline (also requires model_dir)
+# enable = false
+
+# Model directory (Qwen3-ForcedAligner-0.6B)
+# model_dir = "models/ForcedAligner"
+
+# Transcript language (full name, e.g. "Chinese", "English")
+# language = "Chinese"
+
+# Skip alignment for segments longer than this (seconds) — safety cap
+# max_segment_sec = 300.0
+
+# Retained audio window (seconds) for span readback. Must exceed the longest
+# segment plus the ASR-to-alignment lag, bounded to cap memory.
+# retain_sec = 180.0
+
+# ══════════════════════════════════════════════════════════════════════════════
 # VAD — voice activity detection pipeline
 # ══════════════════════════════════════════════════════════════════════════════
 [vad]

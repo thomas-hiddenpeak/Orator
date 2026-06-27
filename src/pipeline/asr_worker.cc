@@ -226,7 +226,8 @@ void AsrWorker::EmitIncrementalChunk(const float* samples, int n, bool finalize)
     tok.text = inc_live_text_;
     // Text segment goes through ProtocolTimeline → comp_ via text_sink_.
     // StreamTimeline was removed; raw text is read from comp_.SnapshotRawTexts().
-    if (text_sink_) text_sink_(inc_text_id_, tok.start_sec, tok.end_sec, tok.text);
+    if (text_sink_) text_sink_(inc_text_id_, tok.start_sec, tok.end_sec, tok.text,
+                               /*is_final=*/true);
     ++inc_text_id_;
     inc_delivered_text_.clear();
     if (emit_) {
@@ -241,7 +242,8 @@ void AsrWorker::EmitIncrementalChunk(const float* samples, int n, bool finalize)
   } else if (inc_in_segment_) {
     if (text_sink_ && inc_live_text_ != inc_delivered_text_) {
       text_sink_(inc_text_id_, tb_.SecondsAt(inc_seg_start_sample_),
-                 tb_.SecondsAt(inc_seg_end_sample_), inc_live_text_);
+                 tb_.SecondsAt(inc_seg_end_sample_), inc_live_text_,
+                 /*is_final=*/false);
       inc_delivered_text_ = inc_live_text_;
     }
     if (emit_ && !inc_live_text_.empty()) {

@@ -5,6 +5,7 @@
 #include "core/registry.h"
 #include "core/stages.h"
 #include "model/qwen3_asr.h"
+#include "model/qwen3_forced_aligner.h"
 #include "model/streaming_sortformer.h"
 #include "pipeline/gpu_vad.h"
 
@@ -29,6 +30,10 @@ void EnsureBuiltinsRegistered() {
   vad.Register("silero_vad", [] {
     return std::make_unique<pipeline::GpuVad>(pipeline::GpuVad::Params{});
   });
+
+  auto& aligner = core::Registry<core::IForcedAligner>::Instance();
+  aligner.Register("qwen3_forced_aligner",
+                   [] { return std::make_unique<Qwen3ForcedAligner>(); });
 }
 
 }  // namespace model

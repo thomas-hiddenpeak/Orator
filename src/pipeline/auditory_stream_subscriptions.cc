@@ -134,6 +134,56 @@ void HandleAsrSubscription(ComprehensiveTimeline& comp,
 }
 
 // ---------------------------------------------------------------------------
+// Align subscription: parse {"id":..,"start":..,"end":..,"units":[{...}]}
+// → comp_.UpsertAlign(). Brings the forced-alignment per-unit timestamps into
+// the comprehensive timeline's align track. Times are already on the common
+// time base (the align worker offset them); this is a pure container deposit.
+// ---------------------------------------------------------------------------
+void HandleAlignSubscription(ComprehensiveTimeline& comp,
+                             std::mutex& comp_mutex,
+                             const protocol::Message& msg) {
+  const std::string& data = msg.data;
+  const long id = JsonParseLong(data, "id");
+  if (id < 0) return;
+  const double seg_start = JsonParseNum(data, "start");
+  const double seg_end = JsonParseNum(data, "end");
+
+  auto arr_start = data.find("\"units\":[");
+  if (arr_start == std::string::npos) return;
+  arr_start += 9;  // len of "\"units\":["
+  int depth = 1;
+  size_t pos = arr_start;
+  while (pos < data.size() && depth > 0) {
+    if (data[pos] == '[') depth++;
+    else if (data[pos] == ']') depth--;
+    pos++;
+  }
+  if (depth != 0) return;
+  const std::string units_json = data.substr(arr_start, pos - arr_start - 1);
+
+  std::vector<ComprehensiveTimeline::AlignUnitSeg> units;
+  size_t obj_pos = 0;
+  while (obj_pos < units_json.size()) {
+    size_t brace = units_json.find('{', obj_pos);
+    if (brace == std::string::npos) break;
+    size_t brace_end = units_json.find('}', brace);
+    if (brace_end == std::string::npos) break;
+    const std::string obj = units_json.substr(brace, brace_end - brace + 1);
+
+    ComprehensiveTimeline::AlignUnitSeg u;
+    u.text = JsonParseStr(obj, "text");
+    u.start = JsonParseNum(obj, "start");
+    u.end = JsonParseNum(obj, "end");
+    units.push_back(std::move(u));
+
+    obj_pos = brace_end + 1;
+  }
+
+  std::lock_guard<std::mutex> lk(comp_mutex);
+  comp.UpsertAlign(id, seg_start, seg_end, units);
+}
+
+// ---------------------------------------------------------------------------
 // Speaker sink callback: diarization worker → protocol publish
 // Stores last_segments_ under comp_mutex_ for Serialize(), then publishes
 // to the protocol timeline on the diar/speaker_segment topic.
@@ -185,9 +235,15 @@ void HandleSpeakerSink(std::mutex& comp_mutex,
 void HandleTextSink(protocol::ProtocolTimeline* protocol_timeline,
                     protocol::PipelineHandle* asr_handle,
                     long id, double start, double end,
-                    const std::string& text) {
+                    const std::string& text, bool is_final) {
+  // Finals go to asr/transcript, in-progress partials to asr/transcript_partial.
+  // The comprehensive timeline subscribes to asr/+ (both, in-place revision by
+  // id); the forced aligner subscribes to asr/transcript only, so it aligns each
+  // segment exactly once against its finalized text.
+  const protocol::Topic& topic =
+      is_final ? protocol::kAsrTranscript : protocol::kAsrTranscriptPartial;
   protocol::Message msg;
-  msg.topic = protocol::kAsrTranscript.to_string();
+  msg.topic = topic.to_string();
   msg.pipeline = "asr";
   msg.pipeline_version = "1.0.0";
   msg.timestamp_sec = start;
@@ -197,8 +253,49 @@ void HandleTextSink(protocol::ProtocolTimeline* protocol_timeline,
              + ",\"start\":" + std::to_string(start)
              + ",\"end\":" + std::to_string(end)
              + ",\"text\":\"" + JsonEscape(text) + "\"}";
-  protocol_timeline->Publish(*asr_handle, protocol::kAsrTranscript,
+  protocol_timeline->Publish(*asr_handle, topic, msg,
+                             protocol::QoS::AT_LEAST_ONCE);
+}
+
+// ---------------------------------------------------------------------------
+// Align sink callback: forced-alignment worker → protocol publish + WS emit
+// Builds the align/units message (per-unit timestamps for one transcript
+// segment) and publishes it; `emit` forwards the same JSON to the transport.
+// ---------------------------------------------------------------------------
+void HandleAlignSink(protocol::ProtocolTimeline* protocol_timeline,
+                     protocol::PipelineHandle* align_handle,
+                     const RevisionEmitter& emit,
+                     long id, double seg_start, double seg_end,
+                     const std::vector<core::AlignUnit>& units) {
+  std::string units_json = "[";
+  for (size_t i = 0; i < units.size(); ++i) {
+    const auto& u = units[i];
+    char b[256];
+    std::snprintf(b, sizeof(b),
+                  "{\"text\":\"%s\",\"start\":%.3f,\"end\":%.3f}",
+                  JsonEscape(u.text).c_str(), u.start_sec, u.end_sec);
+    units_json += b;
+    if (i + 1 < units.size()) units_json += ",";
+  }
+  units_json += "]";
+
+  std::string payload = "{\"id\":" + std::to_string(id)
+      + ",\"start\":" + std::to_string(seg_start)
+      + ",\"end\":" + std::to_string(seg_end)
+      + ",\"units\":" + units_json + "}";
+
+  protocol::Message msg;
+  msg.topic = protocol::kAlignUnits.to_string();
+  msg.pipeline = "align";
+  msg.pipeline_version = "1.0.0";
+  msg.timestamp_sec = seg_start;
+  msg.qos = static_cast<uint8_t>(protocol::QoS::AT_LEAST_ONCE);
+  msg.schema_version = 1;
+  msg.data = payload;
+  protocol_timeline->Publish(*align_handle, protocol::kAlignUnits,
                              msg, protocol::QoS::AT_LEAST_ONCE);
+
+  if (emit) emit("{\"type\":\"align\"," + payload.substr(1));
 }
 
 // ---------------------------------------------------------------------------

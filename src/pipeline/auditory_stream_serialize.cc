@@ -94,12 +94,14 @@ std::string AuditoryStream::Serialize() {
   std::vector<ComprehensiveTimeline::Entry> comp_view;
   std::vector<ComprehensiveTimeline::VadSeg> vad_view;
   std::vector<ComprehensiveTimeline::RawTextSeg> raw_texts;
+  std::vector<ComprehensiveTimeline::AlignGroup> align_view;
   {
     std::lock_guard<std::mutex> lk(comp_mutex_);
     diar_view = last_segments_;
     comp_view = comp_.Snapshot();
     vad_view = comp_.SnapshotVad();
     raw_texts = comp_.SnapshotRawTexts();
+    align_view = comp_.SnapshotAlign();
   }
   // Populate last_transcript_ from raw_texts for the transcript() accessor.
   {
@@ -177,6 +179,35 @@ std::string AuditoryStream::Serialize() {
                     vad_view[i].start, vad_view[i].end);
       out += buf;
       if (i + 1 < vad_view.size()) out += ",";
+    }
+    out += "]}";
+  }
+
+  // Track: forced alignment (present only when the aligner is enabled). Refines
+  // each ASR segment into per-unit timestamps on the common time base, grouped
+  // by the source text_id so consumers can tie units back to the asr track.
+  if (aligner_) {
+    const double align_c = align_worker_ ? align_worker_->compute_sec() : 0.0;
+    std::snprintf(buf, sizeof(buf),
+                  ",{\"kind\":\"align\",\"source\":\"qwen3_forced_aligner\","
+                  "\"compute_sec\":%.3f,\"real_time_factor\":%.3f,\"entries\":[",
+                  align_c, align_c > 0 ? audio / align_c : 0.0);
+    out += buf;
+    for (size_t i = 0; i < align_view.size(); ++i) {
+      const auto& g = align_view[i];
+      std::snprintf(buf, sizeof(buf),
+                    "{\"text_id\":%ld,\"start\":%.3f,\"end\":%.3f,\"units\":[",
+                    g.text_id, g.start, g.end);
+      out += buf;
+      for (size_t j = 0; j < g.units.size(); ++j) {
+        const auto& u = g.units[j];
+        std::snprintf(buf, sizeof(buf), "{\"start\":%.3f,\"end\":%.3f,\"text\":\"",
+                      u.start, u.end);
+        out += std::string(buf) + JsonEscape(u.text) + "\"}";
+        if (j + 1 < g.units.size()) out += ",";
+      }
+      out += "]}";
+      if (i + 1 < align_view.size()) out += ",";
     }
     out += "]}";
   }

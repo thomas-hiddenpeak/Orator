@@ -177,5 +177,29 @@ class IVad {
   virtual double compute_sec() const = 0;
 };
 
+// A forced-alignment unit: a word/character and its time span (seconds, on the
+// local clock of the aligned audio span).
+struct AlignUnit {
+  std::string text;
+  double start_sec = 0.0;
+  double end_sec = 0.0;
+};
+
+// Forced alignment: aligns a known transcript to its audio, producing precise
+// per-unit timestamps in a single non-autoregressive pass. Generalizes any
+// forced aligner; the pipeline depends only on this contract.
+class IForcedAligner {
+ public:
+  virtual ~IForcedAligner() = default;
+  // Load weights from a model directory.
+  virtual void LoadWeights(const std::string& path) = 0;
+  // Align `transcript` to `pcm` (mono 16 kHz, `n` samples). `language` is a full
+  // name (e.g. "Chinese") or empty. Times are seconds relative to pcm start.
+  virtual std::vector<AlignUnit> Align(const float* pcm, int n,
+                                       const std::string& transcript,
+                                       const std::string& language) const = 0;
+  virtual std::string name() const = 0;
+};
+
 }  // namespace core
 }  // namespace orator

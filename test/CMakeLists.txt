@@ -32,6 +32,12 @@ orator_add_test(test_pipeline_registry unit/core/test_pipeline_registry.cc)
 
 # Model unit tests
 orator_add_test(test_asr_ops     unit/model/test_asr_ops.cc)
+orator_add_test(test_forced_align_decode unit/model/test_forced_align_decode.cc)
+orator_add_test(test_aligner_tokenizer unit/model/test_aligner_tokenizer.cc)
+orator_add_test(test_aligner_audio unit/model/test_aligner_audio.cc)
+orator_add_test(test_aligner_lm unit/model/test_aligner_lm.cc)
+orator_add_test(test_aligner_e2e unit/model/test_aligner_e2e.cc)
+orator_add_test(test_aligner_mel unit/model/test_aligner_mel.cc)
 orator_add_test(test_asr_weights unit/model/test_asr_weights.cc)
 orator_add_test(test_whisper_mel unit/model/test_whisper_mel.cc)
 orator_add_test(test_asr_encoder unit/model/test_asr_encoder.cc)
@@ -52,6 +58,9 @@ add_test(NAME test_vad COMMAND test_vad)
 orator_add_test(test_diar_stream unit/pipeline/test_diar_stream.cc)
 orator_add_test(test_auditory_stream unit/pipeline/test_auditory_stream.cc)
 target_link_libraries(test_auditory_stream PRIVATE pthread)
+
+orator_add_test(test_retained_audio unit/pipeline/test_retained_audio.cc)
+target_link_libraries(test_retained_audio PRIVATE pthread)
 
 # Protocol unit tests
 orator_add_test(test_topic_router unit/protocol/test_topic_router.cc)

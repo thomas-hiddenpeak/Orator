@@ -36,7 +36,7 @@ class AsrWorker {
 
   using TextSegmentSink =
       std::function<void(long id, double start, double end,
-                         const std::string& text)>;
+                         const std::string& text, bool is_final)>;
 
   // `tb` is the common time base inherited from SharedAudioBuffer::time_base().
   // The worker holds it as a member and derives all time codes from it.

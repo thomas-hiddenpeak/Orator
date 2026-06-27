@@ -33,11 +33,13 @@
 #include "core/stages.h"
 #include "core/types.h"
 #include "gpu/scheduler.h"
+#include "pipeline/align_worker.h"
 #include "pipeline/asr_worker.h"
 #include "pipeline/gpu_vad.h"
 #include "pipeline/comprehensive_timeline.h"
 #include "pipeline/diarization_worker.h"
 #include "pipeline/pipeline_audio_cache.h"
+#include "pipeline/retained_audio_buffer.h"
 // Forward declarations for protocol types (layering: pipeline depends on protocol
 // interfaces only, not includes).
 namespace orator {
@@ -80,6 +82,13 @@ class AuditoryStream {
     int asr_ban_steps = 3;
     int asr_decode_batch = 4;
     bool asr_profile = false;
+
+    // ── Forced alignment pipeline ────────────────────────────────────
+    std::string align_model_dir = "";   // empty = forced aligner disabled
+    bool align_enable = false;           // master switch (also needs model dir)
+    std::string align_language = "Chinese";
+    double align_max_segment_sec = 300.0;  // skip absurdly long spans
+    double align_retain_sec = 180.0;       // retained audio window for readback
 
     // ── VAD pipeline ─────────────────────────────────────────────────
     bool vad_stream = true;
@@ -220,6 +229,7 @@ class AuditoryStream {
 
   std::unique_ptr<core::IDiarizer> diarizer_;
   std::unique_ptr<core::IAsr> asr_;  // null when ASR disabled
+  std::unique_ptr<core::IForcedAligner> aligner_;  // null when alignment disabled
 
   // Per-pipeline private audio caches (Constitution Art. III). PushAudio fans
   // each frame out to every active cache; each worker drains only its own.
@@ -229,10 +239,14 @@ class AuditoryStream {
   std::unique_ptr<PipelineAudioCache> diar_audio_;
   std::unique_ptr<PipelineAudioCache> asr_audio_;
   std::unique_ptr<PipelineAudioCache> vad_audio_;
+  // Retained-window audio for forced alignment: read back by absolute sample
+  // span when a transcript segment arrives (the transcript lags its audio), so
+  // this is a sliding window rather than a read-then-free cache.
+  std::unique_ptr<RetainedAudioBuffer> align_audio_;
   std::atomic<long> total_samples_{0};
   std::unique_ptr<DiarizationWorker> diar_worker_;
   std::unique_ptr<AsrWorker> asr_worker_;
-
+  std::unique_ptr<AlignWorker> align_worker_;
   std::thread diar_thread_;
   std::thread asr_thread_;
   bool running_ = false;
@@ -288,13 +302,17 @@ class AuditoryStream {
   std::unique_ptr<protocol::PipelineHandle> vad_handle_;
   std::unique_ptr<protocol::PipelineHandle> asr_handle_;
   std::unique_ptr<protocol::PipelineHandle> diar_handle_;
-
   // Spec 004 Phase 12: internal subscription IDs bridging ProtocolTimeline
   // messages back to ComprehensiveTimeline. Unsubscribed in Reset().
   long vad_sub_id_ = 0;
   long vad_progress_sub_id_ = 0;
   long diar_sub_id_ = 0;
   long asr_sub_id_ = 0;
+  // Forced-alignment pipeline handle + asr/transcript subscription. The aligner
+  // consumes published transcripts only (never ASR internal state, Art. III).
+  std::unique_ptr<protocol::PipelineHandle> align_handle_;
+  long align_sub_id_ = 0;
+  long align_units_sub_id_ = 0;
 
   // VAD gate: local cache populated by ProtocolTimeline subscription.
   // Avoids O(N^2) Replay calls on the ASR worker hot path.

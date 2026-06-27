@@ -49,6 +49,13 @@ void HandleAsrSubscription(ComprehensiveTimeline& comp,
                            const protocol::Message& msg,
                            RevisionEmitter emit_rev);
 
+// Align subscription: parse {"id":..,"start":..,"end":..,"units":[{...}]}
+// → comp_.UpsertAlign(). Incorporates the forced-alignment per-unit timestamps
+// into the comprehensive timeline's align track (time-base consistent).
+void HandleAlignSubscription(ComprehensiveTimeline& comp,
+                             std::mutex& comp_mutex,
+                             const protocol::Message& msg);
+
 // Speaker sink callback: diarization worker → protocol publish
 void HandleSpeakerSink(std::mutex& comp_mutex,
                        std::vector<core::DiarSegment>& last_segments,
@@ -56,11 +63,24 @@ void HandleSpeakerSink(std::mutex& comp_mutex,
                        protocol::PipelineHandle* diar_handle,
                        const std::vector<core::DiarSegment>& segs);
 
-// Text sink callback: ASR worker → protocol publish
+// Text sink callback: ASR worker → protocol publish. Finals are published on
+// asr/transcript; in-progress partials on asr/transcript_partial. The forced
+// aligner subscribes to asr/transcript only, so it aligns each segment once,
+// against its finalized text -- not every partial revision.
 void HandleTextSink(protocol::ProtocolTimeline* protocol_timeline,
                     protocol::PipelineHandle* asr_handle,
                     long id, double start, double end,
-                    const std::string& text);
+                    const std::string& text, bool is_final);
+
+// Align sink callback: forced-alignment worker → protocol publish + WS emit.
+// Builds the align/units message (per-unit timestamps for one transcript
+// segment) and publishes it on align/units; `emit` forwards the same JSON to
+// the transport so the client receives the alignment incrementally.
+void HandleAlignSink(protocol::ProtocolTimeline* protocol_timeline,
+                     protocol::PipelineHandle* align_handle,
+                     const RevisionEmitter& emit,
+                     long id, double seg_start, double seg_end,
+                     const std::vector<core::AlignUnit>& units);
 
 // VAD drain: extract segments from IVad and publish to protocol timeline.
 void HandleVadDrain(core::IVad* vad_detector,

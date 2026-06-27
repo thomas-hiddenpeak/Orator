@@ -284,11 +284,34 @@ std::vector<ComprehensiveTimeline::RawTextSeg> ComprehensiveTimeline::SnapshotRa
   return out;
 }
 
+void ComprehensiveTimeline::UpsertAlign(long text_id, double start, double end,
+                                        const std::vector<AlignUnitSeg>& units) {
+  AlignGroup g;
+  g.text_id = text_id;
+  g.start = start;
+  g.end = end;
+  g.units = units;
+  align_[text_id] = std::move(g);  // idempotent replace by id
+}
+
+std::vector<ComprehensiveTimeline::AlignGroup> ComprehensiveTimeline::SnapshotAlign()
+    const {
+  std::vector<AlignGroup> out;
+  out.reserve(align_.size());
+  for (const auto& kv : align_) out.push_back(kv.second);
+  std::sort(out.begin(), out.end(),
+            [](const AlignGroup& a, const AlignGroup& b) {
+              return a.start < b.start;
+            });
+  return out;
+}
+
 void ComprehensiveTimeline::Clear() {
   speakers_.clear();
   texts_.clear();
   vad_.clear();
   pieces_.clear();
+  align_.clear();
 }
 
 void ComprehensiveTimeline::CleanupOldData(double keep_until_sec) {

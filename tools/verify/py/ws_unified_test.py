@@ -184,6 +184,14 @@ class Reader(threading.Thread):
                 self.events.append(raw)
                 t = raw.get("text", "")
                 print(f"  [stream] asr [{raw.get('start'):.2f}-{raw.get('end'):.2f}] {t}")
+            elif kind == "align":
+                self.events.append(raw)
+                us = raw.get("units", [])
+                preview = " ".join(
+                    f"{u.get('text')}[{u.get('start'):.2f}-{u.get('end'):.2f}]"
+                    for u in us[:8])
+                print(f"  [stream] align [{raw.get('start'):.2f}-{raw.get('end'):.2f}] "
+                      f"({len(us)} units) {preview}")
             elif kind == "timeline":
                 self.timeline = raw
                 self.timeline_event.set()

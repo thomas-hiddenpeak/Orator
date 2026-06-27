@@ -84,6 +84,9 @@ set(ORATOR_CORE_SOURCES
     src/model/asr_audio_tower.cu
     src/model/asr_text_decoder.cu
     src/model/qwen3_asr.cc
+    src/model/forced_align_decode.cc
+    src/model/qwen3_aligner_lm.cu
+    src/model/qwen3_forced_aligner.cc
     src/model/speaker_database.cc
     src/model/builtin_registration.cc
     # pipeline orchestration
@@ -99,6 +102,8 @@ set(ORATOR_CORE_SOURCES
     src/pipeline/pipeline_audio_cache.cc
     src/pipeline/diarization_worker.cc
     src/pipeline/asr_worker.cc
+    src/pipeline/retained_audio_buffer.cc
+    src/pipeline/align_worker.cc
     # networking (libwebsockets-based WebSocket server)
     src/net/http_static_server.cc
     src/net/websocket_server.cc

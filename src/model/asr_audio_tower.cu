@@ -246,8 +246,9 @@ AsrAudioTower::BfBuf AsrAudioTower::LoadBf16(const io::ShardedSafeTensors& w,
   return out;
 }
 
-void AsrAudioTower::LoadWeights(const io::ShardedSafeTensors& w) {
-  const std::string A = "thinker.audio_tower.";
+void AsrAudioTower::LoadWeights(const io::ShardedSafeTensors& w,
+                                const WeightNames& names) {
+  const std::string A = names.prefix;
   conv1_w_ = LoadBf16(w, A + "conv2d1.weight");
   conv1_b_ = Load(w, A + "conv2d1.bias");
   conv2_w_ = LoadBf16(w, A + "conv2d2.weight");
@@ -257,10 +258,10 @@ void AsrAudioTower::LoadWeights(const io::ShardedSafeTensors& w) {
   conv_out_w_ = LoadBf16(w, A + "conv_out.weight");
   ln_post_w_ = Load(w, A + "ln_post.weight");
   ln_post_b_ = Load(w, A + "ln_post.bias");
-  proj1_w_ = LoadBf16(w, A + "proj1.weight");
-  proj1_b_ = Load(w, A + "proj1.bias");
-  proj2_w_ = LoadBf16(w, A + "proj2.weight");
-  proj2_b_ = Load(w, A + "proj2.bias");
+  proj1_w_ = LoadBf16(w, names.proj1 + ".weight");
+  proj1_b_ = Load(w, names.proj1 + ".bias");
+  proj2_w_ = LoadBf16(w, names.proj2 + ".weight");
+  proj2_b_ = Load(w, names.proj2 + ".bias");
 
   layers_.resize(config_.encoder_layers);
   for (int i = 0; i < config_.encoder_layers; ++i) {

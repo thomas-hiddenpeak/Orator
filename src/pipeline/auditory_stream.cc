@@ -71,6 +71,17 @@ void AuditoryStream::Start() {
   diar_desc.consumes = {protocol::TopicPattern{"audio/+"}};
   diar_handle_ = protocol_timeline_->RegisterPipeline(std::move(diar_desc));
 
+  const bool align_on =
+      config_.align_enable && !config_.align_model_dir.empty();
+  if (align_on) {
+    protocol::PipelineDescriptor align_desc;
+    align_desc.name = "align";
+    align_desc.version = "1.0.0";
+    align_desc.produces = {protocol::kAlignUnits};
+    align_desc.consumes = {protocol::TopicPattern{"asr/+"}};
+    align_handle_ = protocol_timeline_->RegisterPipeline(std::move(align_desc));
+  }
+
   vad_sub_id_ = protocol_timeline_->SubscribeInternal(
       protocol::TopicPattern{"vad/+"},
       [this](const protocol::Message& msg) {
@@ -88,6 +99,29 @@ void AuditoryStream::Start() {
         HandleAsrSubscription(comp_, comp_mutex_, msg,
             [this](const std::string& rev_json) { EmitLocked(rev_json); });
       });
+
+  // Forced alignment: enqueue each finalized transcript segment (asr/transcript
+  // only, not the partial topic) for alignment. The aligner is a downstream
+  // consumer of the published transcript -- it never reads ASR internal state.
+  if (align_on) {
+    align_sub_id_ = protocol_timeline_->SubscribeInternal(
+        protocol::TopicPattern(protocol::kAsrTranscript.to_string()),
+        [this](const protocol::Message& msg) {
+          if (!align_worker_) return;
+          const long id = static_cast<long>(JsonParseNum(msg.data, "id"));
+          const double start = JsonParseNum(msg.data, "start");
+          const double end = JsonParseNum(msg.data, "end");
+          const std::string text = JsonParseStr(msg.data, "text");
+          align_worker_->Enqueue(id, start, end, text);
+        });
+    // Output side: incorporate the published per-unit alignment into the
+    // comprehensive timeline's align track (time-base consistent).
+    align_units_sub_id_ = protocol_timeline_->SubscribeInternal(
+        protocol::TopicPattern(protocol::kAlignUnits.to_string()),
+        [this](const protocol::Message& msg) {
+          HandleAlignSubscription(comp_, comp_mutex_, msg);
+        });
+  }
 
   if (!config_.diarizer_weights.empty()) {
     diarizer_ = core::Registry<core::IDiarizer>::Instance().Create("sortformer");
@@ -129,6 +163,12 @@ void AuditoryStream::Start() {
     LOG_INFO("[gpu-sched] priority range [greatest=%d, least=%d]; "
              "asr at index 1 (foreground)\n",
              greatest, least);
+  }
+  if (align_on) {
+    aligner_ =
+        core::Registry<core::IForcedAligner>::Instance().Create(
+            "qwen3_forced_aligner");
+    aligner_->LoadWeights(config_.align_model_dir);
   }
   StartWorkers();
 }
@@ -202,9 +242,10 @@ void AuditoryStream::StartWorkers() {
         [this](const std::string& json) { EmitLocked(json); },
         common_time_base(), asr_stream_, vad_cache_.get());
     asr_worker_->set_text_sink(
-        [this](long id, double start, double end, const std::string& text) {
+        [this](long id, double start, double end, const std::string& text,
+               bool is_final) {
           HandleTextSink(protocol_timeline_.get(), asr_handle_.get(),
-                         id, start, end, text);
+                         id, start, end, text, is_final);
         });
     asr_audio_ = MakeAudioCache();
     asr_thread_ = std::thread([this] {
@@ -221,6 +262,24 @@ void AuditoryStream::StartWorkers() {
       asr_worker_->Finalize();
       progress_cv_.notify_all();
     });
+  }
+  if (aligner_) {
+    align_audio_ = std::make_unique<RetainedAudioBuffer>(
+        config_.sample_rate, config_.align_retain_sec);
+    AlignWorker::Params ap;
+    ap.sample_rate = config_.sample_rate;
+    ap.language = config_.align_language;
+    ap.max_segment_sec = config_.align_max_segment_sec;
+    align_worker_ = std::make_unique<AlignWorker>(
+        aligner_.get(), align_audio_.get(), ap, common_time_base());
+    align_worker_->set_sink(
+        [this](long id, double seg_start, double seg_end,
+               const std::vector<core::AlignUnit>& units) {
+          HandleAlignSink(protocol_timeline_.get(), align_handle_.get(),
+                          [this](const std::string& j) { EmitLocked(j); },
+                          id, seg_start, seg_end, units);
+        });
+    align_worker_->Start();
   }
   if (config_.vad_stream) {
     vad_stream_ = scheduler_.Register("vad", /*priority_index=*/1,
@@ -348,6 +407,10 @@ void AuditoryStream::StopWorkers() {
   if (diar_thread_.joinable()) diar_thread_.join();
   if (asr_thread_.joinable()) asr_thread_.join();
   if (vad_thread_.joinable()) vad_thread_.join();
+  // Stop the aligner last: the ASR thread publishes its final transcript
+  // segments during Finalize(), which the align subscription enqueues, so the
+  // aligner must drain its queue after the ASR thread has joined.
+  if (align_worker_) align_worker_->Stop();
   running_ = false;
 }
 
@@ -423,6 +486,7 @@ void AuditoryStream::PushAudio(const float* samples, int n) {
   if (diar_audio_) diar_audio_->Append(samples, n);
   if (asr_audio_) asr_audio_->Append(samples, n);
   if (vad_audio_) vad_audio_->Append(samples, n);
+  if (align_audio_) align_audio_->Append(samples, n);
   total_samples_.fetch_add(n, std::memory_order_relaxed);
 }
 

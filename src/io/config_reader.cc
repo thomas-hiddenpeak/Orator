@@ -78,6 +78,25 @@ bool ApplyTomlConfig(const std::string& path,
     }
   }
 
+  // ── [align] ───────────────────────────────────────────────────────
+  if (auto* sec = config["align"].as_table()) {
+    if (auto v = sec->get("enable")) {
+      if (auto b = v->value<bool>()) cfg.align_enable = *b;
+    }
+    if (auto v = sec->get("model_dir")) {
+      if (auto s = v->value<std::string>()) cfg.align_model_dir = *s;
+    }
+    if (auto v = sec->get("language")) {
+      if (auto s = v->value<std::string>()) cfg.align_language = *s;
+    }
+    if (auto v = sec->get("max_segment_sec")) {
+      if (auto d = v->value<double>()) cfg.align_max_segment_sec = *d;
+    }
+    if (auto v = sec->get("retain_sec")) {
+      if (auto d = v->value<double>()) cfg.align_retain_sec = *d;
+    }
+  }
+
   // ── [vad] ─────────────────────────────────────────────────────────
   if (auto* sec = config["vad"].as_table()) {
     if (auto v = sec->get("model")) {
