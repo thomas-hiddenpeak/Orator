@@ -160,12 +160,12 @@ spkcache_refresh_rate = 100
 # Use silence profile in speaker cache compression (v2.1 model only).
 # use_silence_profile = false
 
-# Onset/offset double-threshold post-processing (NeMo-style, default 0.45/0.25)
+# Onset/offset double-threshold post-processing (NeMo-style, default 0.45/0.35)
 # onset: probability to START a segment. Higher = fewer, more confident segments.
 # offset: probability to END a segment. Lower than onset creates "sticky" segments.
 #   offset < onset means an active segment persists through probability dips.
 # onset = 0.45
-# offset = 0.25
+# offset = 0.35
 
 # Extra time before/after each segment (seconds). (default 0.0)
 # pad_onset = 0.0
