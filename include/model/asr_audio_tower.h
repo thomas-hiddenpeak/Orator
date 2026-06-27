@@ -25,6 +25,7 @@
 
 #include <cuda_runtime.h>
 
+#include "gpu/device_scratch.h"
 #include "gpu/memory.h"
 #include "io/sharded_safetensor.h"
 
@@ -106,6 +107,11 @@ class AsrAudioTower {
   DevBuf ln_post_w_, ln_post_b_, proj1_b_, proj2_b_;
   std::vector<Layer> layers_;
   std::vector<float> pe_;  // [max_source_positions * d_model] host sinusoidal PE
+  // Per-instance device scratch pool: Forward's working buffers are reused
+  // across calls (grow-on-demand) so the steady-state hot path makes no
+  // cudaMalloc -- a prerequisite for CUDA-graph capture (Spec 002 P2.2). Each
+  // pipeline holds its own tower, so the pool is single-thread per instance.
+  mutable gpu::DeviceScratch scratch_;
 };
 
 }  // namespace model

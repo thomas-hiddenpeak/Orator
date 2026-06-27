@@ -214,10 +214,21 @@ PROJECT_STATE updated.
   no-regression (stream_rt >= 3.6x); diar/VAD unaffected; server stable. Update
   `PROJECT_STATE.md` (Art. VIII).
 
-### P2.2 — Device memory pool (prereq for graph)  [outline]
-- [ ] **T110** Per-context pre-allocated device pool (acquire/release); migrate
-  `AsrAudioTower::Forward`'s per-Forward DeviceBuffers to the pool. No cudaMalloc
-  on the hot path. Oracle gates unchanged-pass.
+### P2.2 — Device memory pool (prereq for graph)  [implemented]
+- [x] **T110** Per-instance grow-on-demand device pool `gpu::DeviceScratch`
+  (`include/gpu/device_scratch.h`): slot-indexed persistent `DeviceBuffer`s,
+  `Get(slot,bytes)` / `GetT<T>(slot,count)` returning stable device pointers,
+  growing only when a call needs more than the steady-state max. Migrated all
+  ~22 per-Forward allocations in `AsrAudioTower::Forward` (d_mel, d_in, conv
+  col/outrows + c1/c2/c3 outputs, d_feat, d_h, d_pe, d_vp, d_hid, d_ss/d_se, the
+  7 transformer working buffers, d_out) to fixed scratch slots; the formerly
+  managed (`UnifiedBuffer`) working buffers are now plain device memory.
+  `AsrAudioTower` holds a `mutable DeviceScratch scratch_` (each pipeline has its
+  own tower, so single-thread per instance). Steady state makes zero `cudaMalloc`
+  on the encoder hot path — the prerequisite for graph capture (cudaMalloc is
+  illegal inside a capture region). Validated: build clean `-Wall -Wextra`;
+  ctest 45/45 (encoder + aligner oracles unchanged-pass); real WS 120s rate=0
+  transcript identical, server stable, stream_rt 2.585x (vs 2.35x pre-pool).
 
 ### P2.3 — Event-based fine-grained scheduling  [outline, high-risk]
 - [ ] **T120** Replace the binary `DeviceLock` mode with per-pipeline stream +

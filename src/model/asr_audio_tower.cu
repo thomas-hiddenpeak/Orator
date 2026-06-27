@@ -372,54 +372,52 @@ std::vector<float> AsrAudioTower::Forward(const float* mel, int n_frames,
   // max_cl] with zero padding (replaces the host fill + memset + HtoD). All
   // device memory; values identical.
   const size_t in_elems = static_cast<size_t>(chunks) * F * max_cl;
-  DeviceBuffer d_mel(sizeof(float) * static_cast<size_t>(F) * n_frames);
-  CheckCudaError(cudaMemcpyAsync(d_mel.data(), mel,
+  float* d_mel = scratch_.GetT<float>(0, static_cast<size_t>(F) * n_frames);
+  CheckCudaError(cudaMemcpyAsync(d_mel, mel,
                                  sizeof(float) * static_cast<size_t>(F) * n_frames,
                                  cudaMemcpyHostToDevice, stream),
                  __FILE__, __LINE__);
-  DeviceBuffer d_in(sizeof(float) * in_elems);
+  float* in_p = scratch_.GetT<float>(1, in_elems);
   BuildConvInputKernel<<<Blocks(static_cast<long>(in_elems)), kThreads, 0, stream>>>(
-      static_cast<const float*>(d_mel.data()), static_cast<float*>(d_in.data()),
-      chunks, F, max_cl, win, n_frames);
+      d_mel, in_p, chunks, F, max_cl, win, n_frames);
   CheckCudaError(cudaGetLastError(), __FILE__, __LINE__);
-  float* in_p = static_cast<float*>(d_in.data());
 
   // ---- Conv2d x3 + GELU via im2col + bf16 tensor-core GEMM ----
   // For each conv: col[B*Ho*Wo, Cin*9] (bf16) = im2col(in); out_rows[rows, Cout]
   // = col @ W[Cout, Cin*9]^T (bf16 GEMM); then rearrange+bias+GELU -> [B,Cout,Ho,Wo].
   auto conv = [&](const float* in, const BfBuf& wt, const DevBuf& bias, int Cin,
-                  int Hh, int Ww, int Cout, int Ho, int Wo) {
+                  int Hh, int Ww, int Cout, int Ho, int Wo, int out_slot) -> float* {
     const long rows = static_cast<long>(chunks) * Ho * Wo;
     const int K = Cin * 9;
-    UnifiedBuffer col(sizeof(uint16_t) * rows * K);
-    UnifiedBuffer outrows(sizeof(float) * rows * Cout);
-    // Spec 002 Phase 7 (T072): conv outputs are DEVICE memory. c1/c2 chain as
-    // GEMM inputs (device); c3 is additionally host-reshaped below via pinned
-    // staging. Device memory never page-faults under concurrent kernels.
-    auto out = std::make_shared<DeviceBuffer>(
-        sizeof(float) * static_cast<size_t>(chunks) * Cout * Ho * Wo);
+    // Conv-internal temporaries reuse shared scratch slots (stream-ordered):
+    // col (im2col, slot 2) and outrows (GEMM output, slot 3). The conv output
+    // uses a caller-supplied distinct slot so chained convs (c1->c2->c3) and the
+    // reshape that follows never alias each other. All device memory: written
+    // and read only by kernels, so the managed page-fault hazard is gone too.
+    uint16_t* col = scratch_.GetT<uint16_t>(2, static_cast<size_t>(rows) * K);
+    float* outrows = scratch_.GetT<float>(3, static_cast<size_t>(rows) * Cout);
+    float* out = scratch_.GetT<float>(
+        out_slot, static_cast<size_t>(chunks) * Cout * Ho * Wo);
     dim3 blk(32, 8);
     dim3 grd((K + 31) / 32, static_cast<unsigned>((rows + 7) / 8));
-            Im2ColKernel<<<grd, blk, 0, stream>>>(in, static_cast<uint16_t*>(col.data()), chunks, Cin,
+            Im2ColKernel<<<grd, blk, 0, stream>>>(in, col, chunks, Cin,
                                Hh, Ww, Ho, Wo);
     CheckCudaError(cudaGetLastError(), __FILE__, __LINE__);
     // bf16 GEMM: rows x K @ (Cout x K)^T -> rows x Cout (no bias/act; fused next).
-    asr_gemm::LinearPre(static_cast<uint16_t*>(col.data()), wt.p, nullptr,
-                        static_cast<float*>(outrows.data()),
+    asr_gemm::LinearPre(col, wt.p, nullptr, outrows,
                       static_cast<int>(rows), K, Cout, 0, stream);
     const long total = static_cast<long>(chunks) * Cout * Ho * Wo;
             ConvOutRearrangeKernel<<<Blocks(total), kThreads, 0, stream>>>(
-        static_cast<float*>(outrows.data()), bias.p,
-        static_cast<float*>(out->data()), chunks, Cout, Ho, Wo);
+        outrows, bias.p, out, chunks, Cout, Ho, Wo);
     CheckCudaError(cudaGetLastError(), __FILE__, __LINE__);
     return out;
   };
   const int dh = config_.downsample_hidden;
-  auto c1 = conv(in_p, conv1_w_, conv1_b_, 1, F, max_cl, dh, Hc1, ConvOut(max_cl));
-  auto c2 = conv(static_cast<float*>(c1->data()), conv2_w_, conv2_b_, dh, Hc1,
-                 ConvOut(max_cl), dh, Hc2, ConvOut(ConvOut(max_cl)));
-  auto c3 = conv(static_cast<float*>(c2->data()), conv3_w_, conv3_b_, dh, Hc2,
-                 ConvOut(ConvOut(max_cl)), dh, Hc3, Wc);
+  float* c1 = conv(in_p, conv1_w_, conv1_b_, 1, F, max_cl, dh, Hc1, ConvOut(max_cl), 4);
+  float* c2 = conv(c1, conv2_w_, conv2_b_, dh, Hc1,
+                   ConvOut(max_cl), dh, Hc2, ConvOut(ConvOut(max_cl)), 5);
+  float* c3 = conv(c2, conv3_w_, conv3_b_, dh, Hc2,
+                   ConvOut(ConvOut(max_cl)), dh, Hc3, Wc, 6);
   const auto pt_conv = pnow();
 
   // ---- Reshape [chunks, dh, Hc3, Wc] -> [chunks*Wc, dh*Hc3] on the GPU ----
@@ -428,17 +426,15 @@ std::vector<float> AsrAudioTower::Forward(const float* mel, int n_frames,
   // sync; values identical). c3 and d_feat are both DEVICE memory.
   const int rows = chunks * Wc;
   const size_t feat_elems = static_cast<size_t>(rows) * CF;
-  DeviceBuffer d_feat(sizeof(float) * feat_elems);
+  float* d_feat = scratch_.GetT<float>(7, feat_elems);
   ReshapeC3Kernel<<<Blocks(static_cast<long>(feat_elems)), kThreads, 0, stream>>>(
-      static_cast<const float*>(c3->data()), static_cast<float*>(d_feat.data()),
-      chunks, dh, Hc3, Wc, CF);
+      c3, d_feat, chunks, dh, Hc3, Wc, CF);
   CheckCudaError(cudaGetLastError(), __FILE__, __LINE__);
 
 
   // ---- conv_out Linear [rows, 7680] -> [rows, 1024] (no bias) ----
-  DeviceBuffer d_h(sizeof(float) * static_cast<size_t>(rows) * D);
-  asr_gemm::Linear(static_cast<float*>(d_feat.data()), conv_out_w_.p, nullptr,
-                     static_cast<float*>(d_h.data()), rows, CF, D, 0, stream);
+  float* d_h = scratch_.GetT<float>(8, static_cast<size_t>(rows) * D);
+  asr_gemm::Linear(d_feat, conv_out_w_.p, nullptr, d_h, rows, CF, D, 0, stream);
   CheckCudaError(cudaGetLastError(), __FILE__, __LINE__);
   // (no sync: PE kernel below is ordered after this GEMM on the same stream)
   const auto pt_convout = pnow();
@@ -446,13 +442,13 @@ std::vector<float> AsrAudioTower::Forward(const float* mel, int n_frames,
   // ---- Add positional embedding (per chunk, PE[0:Wc]) ----
   // Spec 002 Phase 7 (T072): d_pe is DEVICE memory uploaded from the host PE
   // table; the host never touches managed memory here.
-  DeviceBuffer d_pe(sizeof(float) * static_cast<size_t>(Wc) * D);
-  CheckCudaError(cudaMemcpyAsync(d_pe.data(), pe_.data(),
+  float* d_pe = scratch_.GetT<float>(9, static_cast<size_t>(Wc) * D);
+  CheckCudaError(cudaMemcpyAsync(d_pe, pe_.data(),
                                  sizeof(float) * static_cast<size_t>(Wc) * D,
                                  cudaMemcpyHostToDevice, stream),
                  __FILE__, __LINE__);
     AddPeChunkedKernel<<<Blocks(static_cast<long>(rows) * D), kThreads, 0, stream>>>(
-      static_cast<float*>(d_h.data()), static_cast<float*>(d_pe.data()), chunks, Wc, D);
+      d_h, d_pe, chunks, Wc, D);
   CheckCudaError(cudaGetLastError(), __FILE__, __LINE__);
   // (no sync: the drop-pad DtoH below is ordered after this kernel on the stream
   //  and is followed by its own sync before the host reads)
@@ -470,18 +466,16 @@ std::vector<float> AsrAudioTower::Forward(const float* mel, int n_frames,
   // Drop the per-chunk padding on the GPU: upload the cumulative valid_prefix,
   // then gather d_h[(c*Wc+t), :] -> d_hid[r, :] (replaces DtoH -> host gather
   // -> HtoD and its sync). All device memory; values identical.
-  DeviceBuffer d_vp(sizeof(int) * (chunks + 1));
-  CheckCudaError(cudaMemcpyAsync(d_vp.data(), valid_prefix.data(),
+  int* d_vp = scratch_.GetT<int>(10, static_cast<size_t>(chunks) + 1);
+  CheckCudaError(cudaMemcpyAsync(d_vp, valid_prefix.data(),
                                  sizeof(int) * (chunks + 1),
                                  cudaMemcpyHostToDevice, stream),
                  __FILE__, __LINE__);
-  DeviceBuffer d_hid(sizeof(float) * static_cast<size_t>(N) * D);
+  float* hid = scratch_.GetT<float>(11, static_cast<size_t>(N) * D);
   DropPadGatherKernel<<<Blocks(static_cast<long>(N) * D), kThreads, 0, stream>>>(
-      static_cast<const float*>(d_h.data()), static_cast<float*>(d_hid.data()),
-      static_cast<const int*>(d_vp.data()), chunks, Wc, D, N);
+      d_h, hid, d_vp, chunks, Wc, D, N);
   CheckCudaError(cudaGetLastError(), __FILE__, __LINE__);
   // The transformer layers operate in place on the device hidden state.
-  float* hid = static_cast<float*>(d_hid.data());
 
   // ---- Attention windows (cu_seqlens) ----
   const int window_aftercnn = Wc * (config_.n_window_infer / win);  // 13*8=104
@@ -509,54 +503,47 @@ std::vector<float> AsrAudioTower::Forward(const float* mel, int n_frames,
   }
   // Spec 002 Phase 7 (T072): segment bounds are DEVICE memory uploaded from the
   // host vectors; the host never writes managed memory here.
-  DeviceBuffer d_ss(sizeof(int) * N), d_se(sizeof(int) * N);
-  CheckCudaError(cudaMemcpyAsync(d_ss.data(), h_seg_start.data(), sizeof(int) * N,
+  int* d_ss = scratch_.GetT<int>(12, static_cast<size_t>(N));
+  int* d_se = scratch_.GetT<int>(13, static_cast<size_t>(N));
+  CheckCudaError(cudaMemcpyAsync(d_ss, h_seg_start.data(), sizeof(int) * N,
                                  cudaMemcpyHostToDevice, stream),
                  __FILE__, __LINE__);
-  CheckCudaError(cudaMemcpyAsync(d_se.data(), h_seg_end.data(), sizeof(int) * N,
+  CheckCudaError(cudaMemcpyAsync(d_se, h_seg_end.data(), sizeof(int) * N,
                                  cudaMemcpyHostToDevice, stream),
                  __FILE__, __LINE__);
 
   // ---- 24 transformer layers ----
   const auto pt_prep = pnow();
-  UnifiedBuffer d_norm(sizeof(float) * static_cast<size_t>(N) * D);
-  UnifiedBuffer d_q(sizeof(float) * static_cast<size_t>(N) * D);
-  UnifiedBuffer d_k(sizeof(float) * static_cast<size_t>(N) * D);
-  UnifiedBuffer d_v(sizeof(float) * static_cast<size_t>(N) * D);
-  UnifiedBuffer d_attn(sizeof(float) * static_cast<size_t>(N) * D);
-  UnifiedBuffer d_proj(sizeof(float) * static_cast<size_t>(N) * D);
-  UnifiedBuffer d_ff(sizeof(float) * static_cast<size_t>(N) * config_.ffn_dim);
+  float* d_norm = scratch_.GetT<float>(14, static_cast<size_t>(N) * D);
+  float* d_q = scratch_.GetT<float>(15, static_cast<size_t>(N) * D);
+  float* d_k = scratch_.GetT<float>(16, static_cast<size_t>(N) * D);
+  float* d_v = scratch_.GetT<float>(17, static_cast<size_t>(N) * D);
+  float* d_attn = scratch_.GetT<float>(18, static_cast<size_t>(N) * D);
+  float* d_proj = scratch_.GetT<float>(19, static_cast<size_t>(N) * D);
+  float* d_ff = scratch_.GetT<float>(20, static_cast<size_t>(N) * config_.ffn_dim);
   const float scale = 1.0f / std::sqrt(static_cast<float>(Dh));
   const float eps = 1e-5f;
 
   for (int li = 0; li < config_.encoder_layers; ++li) {
     const Layer& L = layers_[li];
       LayerNormKernel<<<N, kThreads, 0, stream>>>(hid, L.ln1_w.p, L.ln1_b.p,
-        static_cast<float*>(d_norm.data()), N, D, eps);
-    asr_gemm::Linear(static_cast<float*>(d_norm.data()), L.q_w.p, L.q_b.p,
-               static_cast<float*>(d_q.data()), N, D, D, 0, stream);
-    asr_gemm::Linear(static_cast<float*>(d_norm.data()), L.k_w.p, L.k_b.p,
-               static_cast<float*>(d_k.data()), N, D, D, 0, stream);
-    asr_gemm::Linear(static_cast<float*>(d_norm.data()), L.v_w.p, L.v_b.p,
-               static_cast<float*>(d_v.data()), N, D, D, 0, stream);
+        d_norm, N, D, eps);
+    asr_gemm::Linear(d_norm, L.q_w.p, L.q_b.p, d_q, N, D, D, 0, stream);
+    asr_gemm::Linear(d_norm, L.k_w.p, L.k_b.p, d_k, N, D, D, 0, stream);
+    asr_gemm::Linear(d_norm, L.v_w.p, L.v_b.p, d_v, N, D, D, 0, stream);
     const int warps = N * H;
       WindowAttnKernel<<<Blocks(warps * kWarp), kThreads, 0, stream>>>(
-        static_cast<float*>(d_q.data()), static_cast<float*>(d_k.data()),
-        static_cast<float*>(d_v.data()), static_cast<float*>(d_attn.data()),
-        static_cast<int*>(d_ss.data()), static_cast<int*>(d_se.data()), N, H, Dh, scale);
-    asr_gemm::Linear(static_cast<float*>(d_attn.data()), L.o_w.p, L.o_b.p,
-               static_cast<float*>(d_proj.data()), N, D, D, 0, stream);
+        d_q, d_k, d_v, d_attn, d_ss, d_se, N, H, Dh, scale);
+    asr_gemm::Linear(d_attn, L.o_w.p, L.o_b.p, d_proj, N, D, D, 0, stream);
       AddResidualKernel<<<Blocks(N * D), kThreads, 0, stream>>>(hid,
-        static_cast<float*>(d_proj.data()), N * D);
+        d_proj, N * D);
     // mlp block
       LayerNormKernel<<<N, kThreads, 0, stream>>>(hid, L.ln2_w.p, L.ln2_b.p,
-        static_cast<float*>(d_norm.data()), N, D, eps);
-    asr_gemm::Linear(static_cast<float*>(d_norm.data()), L.fc1_w.p, L.fc1_b.p,
-               static_cast<float*>(d_ff.data()), N, D, config_.ffn_dim, 1, stream);
-    asr_gemm::Linear(static_cast<float*>(d_ff.data()), L.fc2_w.p, L.fc2_b.p,
-               static_cast<float*>(d_proj.data()), N, config_.ffn_dim, D, 0, stream);
+        d_norm, N, D, eps);
+    asr_gemm::Linear(d_norm, L.fc1_w.p, L.fc1_b.p, d_ff, N, D, config_.ffn_dim, 1, stream);
+    asr_gemm::Linear(d_ff, L.fc2_w.p, L.fc2_b.p, d_proj, N, config_.ffn_dim, D, 0, stream);
       AddResidualKernel<<<Blocks(N * D), kThreads, 0, stream>>>(hid,
-        static_cast<float*>(d_proj.data()), N * D);
+        d_proj, N * D);
     CheckCudaError(cudaGetLastError(), __FILE__, __LINE__);
   }
   // (no sync: ln_post below is ordered after the layer loop on the same stream)
@@ -564,17 +551,15 @@ std::vector<float> AsrAudioTower::Forward(const float* mel, int n_frames,
 
   // ---- ln_post -> proj1 -> GELU -> proj2 ----
       LayerNormKernel<<<N, kThreads, 0, stream>>>(hid, ln_post_w_.p, ln_post_b_.p,
-      static_cast<float*>(d_norm.data()), N, D, eps);
-  asr_gemm::Linear(static_cast<float*>(d_norm.data()), proj1_w_.p, proj1_b_.p,
-               static_cast<float*>(d_proj.data()), N, D, D, 1, stream);
+      d_norm, N, D, eps);
+  asr_gemm::Linear(d_norm, proj1_w_.p, proj1_b_.p, d_proj, N, D, D, 1, stream);
   // Spec 002 Phase 7 (T072): the encoder output is copied to the host below. It
   // MUST be DEVICE memory, not managed: the raw host memcpy from managed memory
   // while the concurrent diarization pipeline runs a kernel faults on Tegra (R1).
   // Device memory does not page-migrate, so the DtoH copy is safe regardless of
   // concurrent kernels. The GPU-only working buffers above stay managed.
-  DeviceBuffer d_out(sizeof(float) * static_cast<size_t>(N) * config_.output_dim);
-  asr_gemm::Linear(static_cast<float*>(d_proj.data()), proj2_w_.p, proj2_b_.p,
-               static_cast<float*>(d_out.data()), N, D, config_.output_dim, 0, stream);
+  float* d_out = scratch_.GetT<float>(21, static_cast<size_t>(N) * config_.output_dim);
+  asr_gemm::Linear(d_proj, proj2_w_.p, proj2_b_.p, d_out, N, D, config_.output_dim, 0, stream);
   CheckCudaError(cudaGetLastError(), __FILE__, __LINE__);
   // (no sync: the output DtoH below is ordered after proj2 on the same stream
   //  and is followed by its own sync before the host reads `out`)
@@ -582,7 +567,7 @@ std::vector<float> AsrAudioTower::Forward(const float* mel, int n_frames,
   std::vector<float> out(static_cast<size_t>(N) * config_.output_dim);
   // DtoH copy from DEVICE memory on the ASR stream (R1-safe). Replaces the raw
   // host memcpy from managed memory.
-  CheckCudaError(cudaMemcpyAsync(out.data(), d_out.data(),
+  CheckCudaError(cudaMemcpyAsync(out.data(), d_out,
                                  sizeof(float) * out.size(),
                                  cudaMemcpyDeviceToHost, stream),
                  __FILE__, __LINE__);
