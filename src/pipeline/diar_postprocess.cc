@@ -95,14 +95,11 @@ std::vector<DiarSegment> OnsetOffsetSegments(const DiarizationFrames& frames,
                                              double min_dur_off) {
   std::vector<DiarSegment> segments;
   const double period = frames.frame_period_sec;
-  // NOTE (audit finding): `offset` is a configured hysteresis exit threshold
-  // that this implementation does NOT yet use -- the exit condition below tests
-  // `prob < onset`, so onset/offset hysteresis is effectively disabled. Wiring
-  // `offset` changes diarization accuracy and must be validated against the
-  // oracle (Constitution Art. II); tracked as a separate change, not silently
-  // altered here.
-  (void)offset;
-
+  // Onset/offset hysteresis (pyannote-style binarization): a speaker segment
+  // STARTS when the probability rises to `onset` and only ENDS when it falls
+  // below the lower `offset` threshold, so a segment is "sticky" across brief
+  // dips (offset < onset). Using `onset` for both edges would chatter and
+  // truncate segments early.
   for (int spk = 0; spk < frames.num_speakers; ++spk) {
     bool active = false;
     int seg_start = 0;
@@ -113,7 +110,7 @@ std::vector<DiarSegment> OnsetOffsetSegments(const DiarizationFrames& frames,
       if (!active && prob >= onset) {
         active = true;
         seg_start = f;
-      } else if (active && prob < onset) {
+      } else if (active && prob < offset) {
         double dur = (f - seg_start) * period;
         if (dur >= min_dur_on) {
           DiarSegment seg;
