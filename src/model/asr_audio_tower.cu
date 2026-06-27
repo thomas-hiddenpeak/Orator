@@ -3,12 +3,14 @@
 #include <cuda_runtime.h>
 #include <cuda_bf16.h>
 
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <stdexcept>
 
+#include "core/log.h"
 #include "model/asr_gemm.h"
 #include "model/gemm.cuh"
 
@@ -129,6 +131,24 @@ __global__ void AddPeChunkedKernel(float* __restrict__ hidden, const float* __re
   const int d = idx % D;
   const int t = (idx / D) % Tc;
   hidden[idx] += pe[static_cast<size_t>(t) * D + d];
+}
+
+// Reshape conv3 output [chunks, dh, Hc3, Wc] (b,co,f,t) -> conv_out input
+// [chunks*Wc, dh*Hc3] (row (b,t), col (co,f)). Pure layout permute (no math),
+// done on the GPU to replace the prior DtoH -> host-permute -> HtoD round-trip.
+// One thread per output element. CF = dh*Hc3.
+__global__ void ReshapeC3Kernel(const float* __restrict__ c3, float* __restrict__ feat,
+                                int chunks, int dh, int Hc3, int Wc, int CF) {
+  const long idx = static_cast<long>(blockIdx.x) * blockDim.x + threadIdx.x;
+  const long total = static_cast<long>(chunks) * Wc * CF;
+  if (idx >= total) return;
+  const int col = static_cast<int>(idx % CF);
+  const long row = idx / CF;
+  const int t = static_cast<int>(row % Wc);
+  const int b = static_cast<int>(row / Wc);
+  const int f = col % Hc3;
+  const int co = col / Hc3;
+  feat[idx] = c3[(((static_cast<long>(b) * dh + co) * Hc3 + f) * Wc) + t];
 }
 
 // Windowed bidirectional attention. q/k/v: [N, H, Dh] (row-major after reshape).
@@ -295,6 +315,10 @@ std::vector<float> AsrAudioTower::Forward(const float* mel, int n_frames,
   const int Dh = config_.head_dim;           // 64
   const int win = config_.n_window * 2;      // 100 mel frames per chunk
 
+  const bool prof = std::getenv("ORATOR_TOWER_PROFILE") != nullptr;
+  auto pnow = [] { return std::chrono::steady_clock::now(); };
+  const auto pt0 = pnow();
+
   // ---- Chunking (matches reference: ceil division, tail = remainder) ----
   const int chunks = (n_frames + win - 1) / win;
   std::vector<int> chunk_len(chunks, win);
@@ -367,34 +391,19 @@ std::vector<float> AsrAudioTower::Forward(const float* mel, int n_frames,
                  ConvOut(max_cl), dh, Hc2, ConvOut(ConvOut(max_cl)));
   auto c3 = conv(static_cast<float*>(c2->data()), conv3_w_, conv3_b_, dh, Hc2,
                  ConvOut(ConvOut(max_cl)), dh, Hc3, Wc);
-    CheckCudaError(cudaStreamSynchronize(stream), __FILE__, __LINE__);
+  const auto pt_conv = pnow();
 
-  // ---- Reshape [chunks, dh, Hc3, Wc] -> [chunks*Wc, dh*Hc3] (permute b,t,c,f) ----
-  // Spec 002 Phase 7 (T072): the permute runs on the HOST. Stage c3 (device) to
-  // PINNED host memory, permute there, then upload to a DEVICE buffer for the
-  // conv_out GEMM. The host only touches pinned memory (R1-safe); the math is
-  // identical to the prior managed-memory permute.
+  // ---- Reshape [chunks, dh, Hc3, Wc] -> [chunks*Wc, dh*Hc3] on the GPU ----
+  // Pure layout permute (b,co,f,t)->((b,t),(co,f)); a device kernel replaces the
+  // prior DtoH -> host-permute -> HtoD round-trip (eliminates two copies and a
+  // sync; values identical). c3 and d_feat are both DEVICE memory.
   const int rows = chunks * Wc;
-  const size_t c3_elems = static_cast<size_t>(chunks) * dh * Hc3 * Wc;
-  PinnedBuffer h_c3(sizeof(float) * c3_elems);
-  CheckCudaError(cudaMemcpyAsync(h_c3.data(), c3->data(), sizeof(float) * c3_elems,
-                                 cudaMemcpyDeviceToHost, stream),
-                 __FILE__, __LINE__);
-  CheckCudaError(cudaStreamSynchronize(stream), __FILE__, __LINE__);
   const size_t feat_elems = static_cast<size_t>(rows) * CF;
-  PinnedBuffer h_feat(sizeof(float) * feat_elems);
-  float* feat = static_cast<float*>(h_feat.data());
-  const float* c3p = static_cast<const float*>(h_c3.data());
-  for (int b = 0; b < chunks; ++b)
-    for (int t = 0; t < Wc; ++t)
-      for (int co = 0; co < dh; ++co)
-        for (int f = 0; f < Hc3; ++f)
-          feat[(static_cast<size_t>(b) * Wc + t) * CF + (co * Hc3 + f)] =
-              c3p[((static_cast<size_t>(b) * dh + co) * Hc3 + f) * Wc + t];
   DeviceBuffer d_feat(sizeof(float) * feat_elems);
-  CheckCudaError(cudaMemcpyAsync(d_feat.data(), feat, sizeof(float) * feat_elems,
-                                 cudaMemcpyHostToDevice, stream),
-                 __FILE__, __LINE__);
+  ReshapeC3Kernel<<<Blocks(static_cast<long>(feat_elems)), kThreads, 0, stream>>>(
+      static_cast<const float*>(c3->data()), static_cast<float*>(d_feat.data()),
+      chunks, dh, Hc3, Wc, CF);
+  CheckCudaError(cudaGetLastError(), __FILE__, __LINE__);
 
 
   // ---- conv_out Linear [rows, 7680] -> [rows, 1024] (no bias) ----
@@ -402,7 +411,8 @@ std::vector<float> AsrAudioTower::Forward(const float* mel, int n_frames,
   asr_gemm::Linear(static_cast<float*>(d_feat.data()), conv_out_w_.p, nullptr,
                      static_cast<float*>(d_h.data()), rows, CF, D, 0, stream);
   CheckCudaError(cudaGetLastError(), __FILE__, __LINE__);
-    CheckCudaError(cudaStreamSynchronize(stream), __FILE__, __LINE__);
+  // (no sync: PE kernel below is ordered after this GEMM on the same stream)
+  const auto pt_convout = pnow();
 
   // ---- Add positional embedding (per chunk, PE[0:Wc]) ----
   // Spec 002 Phase 7 (T072): d_pe is DEVICE memory uploaded from the host PE
@@ -415,7 +425,9 @@ std::vector<float> AsrAudioTower::Forward(const float* mel, int n_frames,
     AddPeChunkedKernel<<<Blocks(static_cast<long>(rows) * D), kThreads, 0, stream>>>(
       static_cast<float*>(d_h.data()), static_cast<float*>(d_pe.data()), chunks, Wc, D);
   CheckCudaError(cudaGetLastError(), __FILE__, __LINE__);
-    CheckCudaError(cudaStreamSynchronize(stream), __FILE__, __LINE__);
+  // (no sync: the drop-pad DtoH below is ordered after this kernel on the stream
+  //  and is followed by its own sync before the host reads)
+  const auto pt_pe = pnow();
 
 // Drop padding: keep valid frames per chunk -> hidden [N, D] ----
   std::vector<int> valid(chunks);
@@ -479,6 +491,7 @@ std::vector<float> AsrAudioTower::Forward(const float* mel, int n_frames,
                  __FILE__, __LINE__);
 
   // ---- 24 transformer layers ----
+  const auto pt_prep = pnow();
   UnifiedBuffer d_norm(sizeof(float) * static_cast<size_t>(N) * D);
   UnifiedBuffer d_q(sizeof(float) * static_cast<size_t>(N) * D);
   UnifiedBuffer d_k(sizeof(float) * static_cast<size_t>(N) * D);
@@ -519,7 +532,8 @@ std::vector<float> AsrAudioTower::Forward(const float* mel, int n_frames,
         static_cast<float*>(d_proj.data()), N * D);
     CheckCudaError(cudaGetLastError(), __FILE__, __LINE__);
   }
-      CheckCudaError(cudaStreamSynchronize(stream), __FILE__, __LINE__);
+  // (no sync: ln_post below is ordered after the layer loop on the same stream)
+  const auto pt_layers = pnow();
 
   // ---- ln_post -> proj1 -> GELU -> proj2 ----
       LayerNormKernel<<<N, kThreads, 0, stream>>>(hid, ln_post_w_.p, ln_post_b_.p,
@@ -535,7 +549,8 @@ std::vector<float> AsrAudioTower::Forward(const float* mel, int n_frames,
   asr_gemm::Linear(static_cast<float*>(d_proj.data()), proj2_w_.p, proj2_b_.p,
                static_cast<float*>(d_out.data()), N, D, config_.output_dim, 0, stream);
   CheckCudaError(cudaGetLastError(), __FILE__, __LINE__);
-      CheckCudaError(cudaStreamSynchronize(stream), __FILE__, __LINE__);
+  // (no sync: the output DtoH below is ordered after proj2 on the same stream
+  //  and is followed by its own sync before the host reads `out`)
 
   std::vector<float> out(static_cast<size_t>(N) * config_.output_dim);
   // DtoH copy from DEVICE memory on the ASR stream (R1-safe). Replaces the raw
@@ -545,6 +560,16 @@ std::vector<float> AsrAudioTower::Forward(const float* mel, int n_frames,
                                  cudaMemcpyDeviceToHost, stream),
                  __FILE__, __LINE__);
   CheckCudaError(cudaStreamSynchronize(stream), __FILE__, __LINE__);
+  if (prof) {
+    auto ms = [](auto a, auto b) {
+      return std::chrono::duration<double, std::milli>(b - a).count();
+    };
+    LOG_INFO("[tower-profile] conv=%.1f reshape=%.1f pe=%.1f prep=%.1f "
+             "layers=%.1f proj=%.1f ms (N=%d chunks=%d)\n",
+             ms(pt0, pt_conv), ms(pt_conv, pt_convout), ms(pt_convout, pt_pe),
+             ms(pt_pe, pt_prep), ms(pt_prep, pt_layers), ms(pt_layers, pnow()),
+             N, chunks);
+  }
   if (out_tokens) *out_tokens = N;
   return out;
 }
