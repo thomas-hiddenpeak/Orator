@@ -16,6 +16,8 @@
 #include <vector>
 #include <cuda_runtime.h>
 
+#include "gpu/device_scratch.h"
+
 namespace orator {
 namespace feature {
 
@@ -59,6 +61,10 @@ class WhisperMel {
   WhisperMelConfig config_;
   std::vector<float> hann_;         // [n_fft] periodic Hann
   std::vector<float> mel_filters_;  // [n_mels * n_freqs] row-major
+  // Per-instance device scratch pool: Compute's working buffers are reused
+  // across calls instead of per-call cudaMalloc. Each pipeline (ASR, aligner)
+  // owns its own WhisperMel, so this is single-thread-of-control per instance.
+  mutable gpu::DeviceScratch scratch_;
 };
 
 }  // namespace feature
