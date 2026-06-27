@@ -129,33 +129,19 @@ std::vector<float> AlignerLm::Forward(const std::vector<int>& input_ids,
   std::vector<int> h_pos(T);
   for (int t = 0; t < T; ++t) h_pos[t] = t;
 
-  // ---- Device scratch (device memory: avoids Tegra managed-migration hazard)
-  // ----
-  auto dbuf = [](size_t bytes) {
-    return std::make_shared<DeviceBuffer>(bytes);
-  };
-  auto d_x = dbuf(sizeof(float) * T * Hh);
-  auto d_pos = dbuf(sizeof(int) * T);
-  auto d_norm = dbuf(sizeof(float) * T * Hh);
-  auto d_q = dbuf(sizeof(float) * T * Qd);
-  auto d_k = dbuf(sizeof(float) * T * KVd);
-  auto d_v = dbuf(sizeof(float) * T * KVd);
-  auto d_attn = dbuf(sizeof(float) * T * Qd);
-  auto d_proj = dbuf(sizeof(float) * T * Hh);
-  auto d_gate = dbuf(sizeof(float) * T * I);
-  auto d_up = dbuf(sizeof(float) * T * I);
-  auto d_logits = dbuf(sizeof(float) * static_cast<size_t>(T) * L_);
-
-  float* x = static_cast<float*>(d_x->data());
-  float* nrm = static_cast<float*>(d_norm->data());
-  float* q = static_cast<float*>(d_q->data());
-  float* k = static_cast<float*>(d_k->data());
-  float* v = static_cast<float*>(d_v->data());
-  float* attn = static_cast<float*>(d_attn->data());
-  float* proj = static_cast<float*>(d_proj->data());
-  float* gate = static_cast<float*>(d_gate->data());
-  float* up = static_cast<float*>(d_up->data());
-  int* pos = static_cast<int*>(d_pos->data());
+  // ---- Device scratch pool (device memory: avoids the Tegra managed-migration
+  // hazard; reused across calls instead of per-call cudaMalloc). ----
+  float* x = scratch_.GetT<float>(0, static_cast<size_t>(T) * Hh);
+  int* pos = scratch_.GetT<int>(1, static_cast<size_t>(T));
+  float* nrm = scratch_.GetT<float>(2, static_cast<size_t>(T) * Hh);
+  float* q = scratch_.GetT<float>(3, static_cast<size_t>(T) * Qd);
+  float* k = scratch_.GetT<float>(4, static_cast<size_t>(T) * KVd);
+  float* v = scratch_.GetT<float>(5, static_cast<size_t>(T) * KVd);
+  float* attn = scratch_.GetT<float>(6, static_cast<size_t>(T) * Qd);
+  float* proj = scratch_.GetT<float>(7, static_cast<size_t>(T) * Hh);
+  float* gate = scratch_.GetT<float>(8, static_cast<size_t>(T) * I);
+  float* up = scratch_.GetT<float>(9, static_cast<size_t>(T) * I);
+  float* logits_dev = scratch_.GetT<float>(10, static_cast<size_t>(T) * L_);
 
   CheckCudaError(cudaMemcpyAsync(x, h_embed.data(), sizeof(float) * T * Hh,
                                  cudaMemcpyHostToDevice, s),
@@ -200,12 +186,11 @@ std::vector<float> AlignerLm::Forward(const std::vector<int>& input_ids,
                         cudaMemcpyDeviceToHost, s),
         __FILE__, __LINE__);
   }
-  asr_gemm::Linear(nrm, score_.p, nullptr,
-                   static_cast<float*>(d_logits->data()), T, Hh, L_, 0, s);
+  asr_gemm::Linear(nrm, score_.p, nullptr, logits_dev, T, Hh, L_, 0, s);
 
   std::vector<float> logits(static_cast<size_t>(T) * L_);
   CheckCudaError(
-      cudaMemcpyAsync(logits.data(), d_logits->data(), sizeof(float) * T * L_,
+      cudaMemcpyAsync(logits.data(), logits_dev, sizeof(float) * T * L_,
                       cudaMemcpyDeviceToHost, s),
       __FILE__, __LINE__);
   CheckCudaError(cudaStreamSynchronize(s), __FILE__, __LINE__);

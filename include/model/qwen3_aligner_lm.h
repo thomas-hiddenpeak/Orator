@@ -19,6 +19,7 @@
 
 #include <cuda_runtime.h>
 
+#include "gpu/device_scratch.h"
 #include "gpu/memory.h"
 #include "io/sharded_safetensor.h"
 
@@ -83,6 +84,9 @@ class AlignerLm {
   F32Buf final_norm_;                 // [hidden]
   BfBuf score_;                       // [num_labels, hidden] bf16
   std::vector<Layer> layers_;
+  // Per-instance device scratch for Forward's working buffers (one aligner
+  // worker -> single-thread-of-control per instance).
+  mutable gpu::DeviceScratch scratch_;
 };
 
 }  // namespace model
