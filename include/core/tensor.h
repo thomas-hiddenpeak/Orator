@@ -3,8 +3,10 @@
 // Minimal device-aware tensor used at model boundaries (weights, activations).
 //
 // A Tensor is either:
-//   * an owning unified-memory buffer (allocated via the GPU unified allocator),
-//   * or a non-owning view into externally managed memory (e.g. mmap'd weights).
+//   * an owning unified-memory buffer (allocated via the GPU unified
+//   allocator),
+//   * or a non-owning view into externally managed memory (e.g. mmap'd
+//   weights).
 //
 // This keeps the zero-copy weight-loading story honest: SafeTensor views point
 // directly into the mapped file, while runtime activations own unified memory

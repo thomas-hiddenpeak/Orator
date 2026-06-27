@@ -11,10 +11,9 @@ static bool Exists(const std::string& p) { return std::ifstream(p).good(); }
 int main() {
   std::printf("Testing multi-shard SafeTensors loader...\n");
 
-  const char* kCandidates[] = {
-      "models/asr/Qwen/Qwen3-ASR-1.7B",
-      "../models/asr/Qwen/Qwen3-ASR-1.7B",
-      "../../models/asr/Qwen/Qwen3-ASR-1.7B"};
+  const char* kCandidates[] = {"models/asr/Qwen/Qwen3-ASR-1.7B",
+                               "../models/asr/Qwen/Qwen3-ASR-1.7B",
+                               "../../models/asr/Qwen/Qwen3-ASR-1.7B"};
   std::string dir;
   for (const auto& c : kCandidates)
     if (Exists(std::string(c) + "/model.safetensors.index.json")) {
@@ -30,7 +29,10 @@ int main() {
   std::printf("  shards=%zu tensors=%zu\n", w.NumShards(), w.NumTensors());
 
   // Qwen3-ASR-1.7B has 708 tensors across 2 shards.
-  if (w.NumShards() != 2) { std::printf("FAIL: expected 2 shards\n"); return 1; }
+  if (w.NumShards() != 2) {
+    std::printf("FAIL: expected 2 shards\n");
+    return 1;
+  }
   if (w.NumTensors() != 708) {
     std::printf("FAIL: expected 708 tensors, got %zu\n", w.NumTensors());
     return 1;
@@ -73,8 +75,9 @@ int main() {
       return 1;
     }
   }
-  std::printf("  spot-checked %zu tensors: shapes + BF16 dtype + non-null views OK\n",
-              sizeof(checks) / sizeof(checks[0]));
+  std::printf(
+      "  spot-checked %zu tensors: shapes + BF16 dtype + non-null views OK\n",
+      sizeof(checks) / sizeof(checks[0]));
 
   std::printf("Multi-shard loader test PASSED\n");
   return 0;

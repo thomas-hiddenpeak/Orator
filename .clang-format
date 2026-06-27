@@ -1,0 +1,14 @@
+# Orator C++/CUDA formatting — machine-enforced realization of the
+# Constitution Article V/VII style: Google C++ Style, 2-space indent,
+# pointer-left, 80 columns. Applied to .cc/.cu/.h/.cuh.
+---
+Language: Cpp
+BasedOnStyle: Google
+IndentWidth: 2
+ColumnLimit: 80
+PointerAlignment: Left
+DerivePointerAlignment: false
+AccessModifierOffset: -1
+IncludeBlocks: Preserve
+SortIncludes: false
+...

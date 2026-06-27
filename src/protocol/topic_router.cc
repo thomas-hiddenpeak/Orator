@@ -5,9 +5,9 @@
 namespace orator {
 namespace protocol {
 
-TopicRouter::SubscriptionId TopicRouter::Subscribe(const TopicPattern& pattern,
-                                                   const std::string& pipeline_name,
-                                                   QoS qos, bool no_local) {
+TopicRouter::SubscriptionId TopicRouter::Subscribe(
+    const TopicPattern& pattern, const std::string& pipeline_name, QoS qos,
+    bool no_local) {
   std::lock_guard<std::mutex> lock(mutex_);
   SubEntry entry;
   entry.id = next_sub_id_++;
@@ -36,7 +36,8 @@ std::vector<Delivery> TopicRouter::Route(const Topic& topic,
 
   for (SubEntry const& entry : subscriptions_) {
     // no_local: skip if subscriber is the same pipeline as the publisher.
-    if (entry.sub.no_local && entry.sub.pipeline_name == publisher_name) continue;
+    if (entry.sub.no_local && entry.sub.pipeline_name == publisher_name)
+      continue;
 
     if (!entry.sub.pattern.Matches(topic)) continue;
 

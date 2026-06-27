@@ -110,7 +110,8 @@ class GpuMemory {
 template <typename AllocatorT>
 class GpuBuffer {
  public:
-  explicit GpuBuffer(size_t bytes, AllocatorT& allocator = get_default_allocator())
+  explicit GpuBuffer(size_t bytes,
+                     AllocatorT& allocator = get_default_allocator())
       : size_(bytes), ptr_(nullptr), allocator_(allocator) {
     if (bytes > 0) {
       ptr_ = allocator_.allocate(bytes);

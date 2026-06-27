@@ -9,7 +9,8 @@
 // + 18 transformer layers -> speaker head -> sigmoid) and verified numerically
 // against the NeMo reference (see tools/verify_forward.cc and
 // tools/verify_streaming.cc). The streaming path is bit-identical to the
-// offline ProcessChunk over the same audio (tools/verify_streaming_incremental).
+// offline ProcessChunk over the same audio
+// (tools/verify_streaming_incremental).
 
 #include <cstdint>
 #include <algorithm>
@@ -92,8 +93,8 @@ struct HostStreamState {
   // pop_out_len frames are drained to spkcache each step. When fifo_len == 0,
   // frames go directly to spkcache (sync path). Both capacities are sized by
   // config_.fifo_len; fifo_count tracks the current occupancy.
-  std::vector<float> fifo_embs;       // [fifo_max_len * fc_d_model]
-  std::vector<float> fifo_preds;      // [fifo_max_len * n_spk]
+  std::vector<float> fifo_embs;   // [fifo_max_len * fc_d_model]
+  std::vector<float> fifo_preds;  // [fifo_max_len * n_spk]
   int fifo_max_len = 0;
   int fifo_count = 0;
   void Clear() {
@@ -156,8 +157,7 @@ class SortformerDiarizer final : public core::IDiarizer {
   // audio. The returned frames' t_start_sec is the absolute stream time.
   // `stream` is the CUDA stream for all GPU work in this call.
   core::DiarizationFrames StreamAudio(const float* samples, int num_samples,
-                                       bool final,
-                                       cudaStream_t stream) override;
+                                      bool final, cudaStream_t stream) override;
 
   int max_speakers() const override { return config_.max_num_speakers; }
   double frame_period_sec() const override { return config_.FramePeriodSec(); }
@@ -173,12 +173,12 @@ class SortformerDiarizer final : public core::IDiarizer {
                                        int t_mel, int valid_mel,
                                        double t_start_sec);
 
-  private:
+ private:
   // Runs xscale -> 17 Conformer layers -> decoder on a host emb sequence
   // [T, fc_d_model] and returns masked per-frame sigmoids [T, n_spk].
   std::vector<float> ForwardEncoderDecoder(const std::vector<float>& emb_seq,
-                                            int T, int valid,
-                                            cudaStream_t stream = nullptr);
+                                           int T, int valid,
+                                           cudaStream_t stream = nullptr);
 
   // One streaming chunk step over a freq-major mel buffer covering absolute
   // frames [buf_base_frame, buf_base_frame+buf_len). Advances the persistent
@@ -209,16 +209,18 @@ class SortformerDiarizer final : public core::IDiarizer {
 
   // --- Incremental real-time streaming state (persists across StreamAudio
   // calls for speaker-identity continuity; reset by Reset()). ---
-  std::vector<float> sig_;       // pre-emphasized signal; sig_[0] = abs sample sig_abs_
-  long sig_abs_ = 0;             // absolute sample index of sig_[0]
+  std::vector<float>
+      sig_;           // pre-emphasized signal; sig_[0] = abs sample sig_abs_
+  long sig_abs_ = 0;  // absolute sample index of sig_[0]
   float last_raw_ = 0.0f;        // last raw sample, for pre-emphasis continuity
   bool stream_started_ = false;  // false until the first sample of the session
-  std::vector<float> mel_seq_;   // freq-major [mel_features, mel_w_]; col0 = frame mel_base_
-  long mel_base_ = 0;            // absolute mel-frame index of mel_seq_ column 0
-  long mel_avail_ = 0;           // absolute count of mel frames computed so far
-  int mel_w_ = 0;                // columns currently held in mel_seq_
-  long stt_feat_ = 0;            // absolute mel-frame index of next chunk to process
-  long emitted_frames_ = 0;      // diar frames emitted so far (output time origin)
+  std::vector<float>
+      mel_seq_;  // freq-major [mel_features, mel_w_]; col0 = frame mel_base_
+  long mel_base_ = 0;   // absolute mel-frame index of mel_seq_ column 0
+  long mel_avail_ = 0;  // absolute count of mel frames computed so far
+  int mel_w_ = 0;       // columns currently held in mel_seq_
+  long stt_feat_ = 0;   // absolute mel-frame index of next chunk to process
+  long emitted_frames_ = 0;  // diar frames emitted so far (output time origin)
 
   // Appends new pre-emphasized samples (cheap; no GPU work).
   void AppendRaw(const float* samples, int num_samples);

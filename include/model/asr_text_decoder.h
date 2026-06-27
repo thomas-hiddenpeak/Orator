@@ -60,9 +60,9 @@ class AsrTextDecoder {
   // Append T input embeddings [T, hidden] (host) to the KV cache STARTING at
   // absolute position `pos0` (instead of resetting to 0). The existing KV at
   // positions [0, pos0) is left intact, so a streaming caller can keep the
-  // already-encoded audio-block KV across steps and prefill only the new tokens.
-  // Leaves logits for the last appended token on the device. `Prefill` is the
-  // special case pos0 == 0 (after ResetCache).
+  // already-encoded audio-block KV across steps and prefill only the new
+  // tokens. Leaves logits for the last appended token on the device. `Prefill`
+  // is the special case pos0 == 0 (after ResetCache).
   void PrefillAt(const float* embeds, int T, int pos0, cudaStream_t stream = 0);
 
   // Set the logical cache length back to `len` (the KV buffers are retained).
@@ -79,8 +79,8 @@ class AsrTextDecoder {
   // Fused GPU decode step: gathers the embedding for the token id held in the
   // device scalar `d_token` (e.g. the previous Argmax result), runs the forward
   // at absolute position `pos`, and leaves logits on the device. No host embed
-  // lookup and no D->H sync of the embedding -> the autoregressive loop stays on
-  // the GPU between Argmax calls.
+  // lookup and no D->H sync of the embedding -> the autoregressive loop stays
+  // on the GPU between Argmax calls.
   void DecodeStepDevice(const int* d_token, int pos, cudaStream_t stream = 0);
 
   // GPU argmax over the current logits, banning up to two ids (-1 = none).
@@ -110,18 +110,25 @@ class AsrTextDecoder {
   std::vector<float> CopyLogits() const;
 
  private:
-  struct F32Buf { std::shared_ptr<gpu::UnifiedBuffer> buf; float* p = nullptr; };
-  struct BfBuf { std::shared_ptr<gpu::UnifiedBuffer> buf; uint16_t* p = nullptr; };
+  struct F32Buf {
+    std::shared_ptr<gpu::UnifiedBuffer> buf;
+    float* p = nullptr;
+  };
+  struct BfBuf {
+    std::shared_ptr<gpu::UnifiedBuffer> buf;
+    uint16_t* p = nullptr;
+  };
   F32Buf LoadF32(const io::ShardedSafeTensors& w, const std::string& name);
   BfBuf LoadBf16(const io::ShardedSafeTensors& w, const std::string& name);
 
   struct Layer {
-    F32Buf in_ln, q_norm, k_norm, post_ln;          // small norm weights (f32)
+    F32Buf in_ln, q_norm, k_norm, post_ln;           // small norm weights (f32)
     BfBuf q_w, k_w, v_w, o_w, gate_w, up_w, down_w;  // matmul weights (bf16)
     // Fused projections (built at load time, parts then released): one GEMV for
-    // q|k|v and one for gate|up cuts per-token kernel launches on the decode hot
-    // path. qkv_w = [Qd+2*KVd, Hh], gateup_w = [2*I, Hh]; outputs are contiguous
-    // so q/k/v and gate/up are read as offset slices. Numerically identical.
+    // q|k|v and one for gate|up cuts per-token kernel launches on the decode
+    // hot path. qkv_w = [Qd+2*KVd, Hh], gateup_w = [2*I, Hh]; outputs are
+    // contiguous so q/k/v and gate/up are read as offset slices. Numerically
+    // identical.
     BfBuf qkv_w, gateup_w;
   };
 
@@ -133,7 +140,7 @@ class AsrTextDecoder {
   float* Work(int which, size_t floats);  // persistent, grow-on-demand
 
   AsrTextConfig config_;
-  BfBuf embed_, lm_head_;        // bf16; lm_head aliases embed_ when tied
+  BfBuf embed_, lm_head_;  // bf16; lm_head aliases embed_ when tied
   F32Buf final_norm_;
   std::vector<Layer> layers_;
   // Plain host copy of embed_ weights (bf16) for the Embed() function. Reading
@@ -155,9 +162,10 @@ class AsrTextDecoder {
   // stays saturated (DVFS boosts) and launch overhead is paid once. Every
   // mutable input lives in a device scalar (token id, position, output index)
   // so a single captured graph serves all steps.
-  void* graph_exec_ = nullptr;     // cudaGraphExec_t (one decode step, no ban)
+  void* graph_exec_ = nullptr;  // cudaGraphExec_t (one decode step, no ban)
   void* graph_exec_banned_ = nullptr;  // cudaGraphExec_t (one step, EOS banned)
-  int graph_ban0_ = -1, graph_ban1_ = -1;  // EOS ids baked into the banned graph
+  int graph_ban0_ = -1,
+      graph_ban1_ = -1;  // EOS ids baked into the banned graph
   bool graph_ready_ = false;
   std::shared_ptr<gpu::UnifiedBuffer> step_x_;  // [hidden] gathered embedding
   // Pinned (page-locked) host memory: device writes, host reads after stream

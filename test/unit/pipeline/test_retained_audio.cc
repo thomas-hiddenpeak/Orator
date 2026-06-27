@@ -19,7 +19,8 @@ static int g_fail = 0;
   } while (0)
 
 static void test_basic_span() {
-  RetainedAudioBuffer buf(/*sample_rate=*/100, /*retain_sec=*/10.0);  // 1000 smp
+  RetainedAudioBuffer buf(/*sample_rate=*/100,
+                          /*retain_sec=*/10.0);  // 1000 smp
   std::vector<float> a(500);
   for (int i = 0; i < 500; ++i) a[i] = static_cast<float>(i);
   buf.Append(a.data(), 500);

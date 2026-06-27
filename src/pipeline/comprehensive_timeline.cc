@@ -16,14 +16,17 @@ double Overlap(double a0, double a1, double b0, double b1) {
 // Used to split text on codepoint (character) boundaries, not bytes (Chinese).
 std::vector<std::size_t> Utf8Offsets(const std::string& s) {
   std::vector<std::size_t> o;
-  o.reserve(s.size() + 1); // Pre-allocate to avoid repeated reallocations
+  o.reserve(s.size() + 1);  // Pre-allocate to avoid repeated reallocations
   for (std::size_t i = 0; i < s.size();) {
     o.push_back(i);
     const unsigned char c = static_cast<unsigned char>(s[i]);
     int adv = 1;
-    if (c >= 0xF0) adv = 4;
-    else if (c >= 0xE0) adv = 3;
-    else if (c >= 0xC0) adv = 2;
+    if (c >= 0xF0)
+      adv = 4;
+    else if (c >= 0xE0)
+      adv = 3;
+    else if (c >= 0xC0)
+      adv = 2;
     i += adv;
   }
   o.push_back(s.size());
@@ -76,27 +79,30 @@ std::string ComprehensiveTimeline::AttributeInterval(double start,
   return best != nullptr ? best->speaker : "unknown";
 }
 
-std::vector<ComprehensiveTimeline::Entry> ComprehensiveTimeline::SplitTextByDiar(
-    const TextSeg& t) const {
-  // The comprehensive VIEW's boundaries come from the DIARIZATION TRACK. Collect
-  // the diarization boundary times that fall strictly inside this text segment,
-  // partition [t.start,t.end) by them, attribute each sub-interval to its
-  // max-overlap speaker, merge consecutive same-speaker sub-intervals, then
+std::vector<ComprehensiveTimeline::Entry>
+ComprehensiveTimeline::SplitTextByDiar(const TextSeg& t) const {
+  // The comprehensive VIEW's boundaries come from the DIARIZATION TRACK.
+  // Collect the diarization boundary times that fall strictly inside this text
+  // segment, partition [t.start,t.end) by them, attribute each sub-interval to
+  // its max-overlap speaker, merge consecutive same-speaker sub-intervals, then
   // allocate the text's characters to each resulting turn proportionally by
   // time (the ASR model emits no per-word timestamps, so a time-proportional
   // split is the faithful approximation).
   std::vector<double> bounds;
-  bounds.reserve(speakers_.size() * 2 + 2); // Pre-allocate to avoid repeated reallocations
+  bounds.reserve(speakers_.size() * 2 +
+                 2);  // Pre-allocate to avoid repeated reallocations
   bounds.push_back(t.start);
   bounds.push_back(t.end);
   for (const auto& s : speakers_) {
-    if (s.start > t.start + 1e-9 && s.start < t.end - 1e-9) bounds.push_back(s.start);
+    if (s.start > t.start + 1e-9 && s.start < t.end - 1e-9)
+      bounds.push_back(s.start);
     if (s.end > t.start + 1e-9 && s.end < t.end - 1e-9) bounds.push_back(s.end);
   }
   std::sort(bounds.begin(), bounds.end());
-  bounds.erase(std::unique(bounds.begin(), bounds.end(),
-                           [](double a, double b) { return std::abs(a - b) < 1e-9; }),
-               bounds.end());
+  bounds.erase(
+      std::unique(bounds.begin(), bounds.end(),
+                  [](double a, double b) { return std::abs(a - b) < 1e-9; }),
+      bounds.end());
 
   struct Turn {
     double start;
@@ -104,7 +110,7 @@ std::vector<ComprehensiveTimeline::Entry> ComprehensiveTimeline::SplitTextByDiar
     std::string speaker;
   };
   std::vector<Turn> turns;
-  turns.reserve(bounds.size()); // Pre-allocate to avoid repeated reallocations
+  turns.reserve(bounds.size());  // Pre-allocate to avoid repeated reallocations
   for (std::size_t i = 0; i + 1 < bounds.size(); ++i) {
     const double s = bounds[i];
     const double e = bounds[i + 1];
@@ -121,7 +127,8 @@ std::vector<ComprehensiveTimeline::Entry> ComprehensiveTimeline::SplitTextByDiar
     return {Entry{t.start, t.end, "unknown", t.text, t.id}};
   }
   if (turns.size() == 1) {
-    return {Entry{turns[0].start, turns[0].end, turns[0].speaker, t.text, t.id}};
+    return {
+        Entry{turns[0].start, turns[0].end, turns[0].speaker, t.text, t.id}};
   }
 
   // Proportional codepoint allocation across turns (cumulative to avoid drift).
@@ -129,7 +136,7 @@ std::vector<ComprehensiveTimeline::Entry> ComprehensiveTimeline::SplitTextByDiar
   const int ncp = static_cast<int>(offs.size()) - 1;
   const double total = t.end - t.start;
   std::vector<Entry> out;
-  out.reserve(turns.size()); // Pre-allocate to avoid repeated reallocations
+  out.reserve(turns.size());  // Pre-allocate to avoid repeated reallocations
   int cp_used = 0;
   for (std::size_t k = 0; k < turns.size(); ++k) {
     int cp_end;
@@ -161,7 +168,6 @@ void ComprehensiveTimeline::ReprojectText(const TextSeg& t,
   if (changed && out) out->push_back({t.start, t.end, std::move(pcs)});
 }
 
-
 void ComprehensiveTimeline::ReprojectRange(double start, double end,
                                            std::vector<Revision>* out) {
   for (const auto& t : texts_) {
@@ -169,8 +175,9 @@ void ComprehensiveTimeline::ReprojectRange(double start, double end,
   }
 }
 
-std::vector<ComprehensiveTimeline::Revision> ComprehensiveTimeline::UpsertSpeaker(
-    double start, double end, const std::string& speaker, float conf) {
+std::vector<ComprehensiveTimeline::Revision>
+ComprehensiveTimeline::UpsertSpeaker(double start, double end,
+                                     const std::string& speaker, float conf) {
   SpeakerSeg s;
   s.start = start;
   s.end = end;
@@ -184,7 +191,7 @@ std::vector<ComprehensiveTimeline::Revision> ComprehensiveTimeline::UpsertSpeake
 
   std::vector<Revision> revs;
   // Pre-allocate to avoid repeated reallocations
-  revs.reserve(1); // Typically 0 or 1 revision
+  revs.reserve(1);  // Typically 0 or 1 revision
   ReprojectRange(start, end, &revs);
   return revs;
 }
@@ -211,18 +218,19 @@ std::vector<ComprehensiveTimeline::Revision> ComprehensiveTimeline::UpsertText(
   }
   std::vector<Revision> revs;
   // Pre-allocate to avoid repeated reallocations
-  revs.reserve(1); // Typically 0 or 1 revision
+  revs.reserve(1);  // Typically 0 or 1 revision
   ReprojectText(*it, &revs);
   return revs;
 }
 
-std::vector<ComprehensiveTimeline::Revision> ComprehensiveTimeline::ReplaceSpeakers(
-    const std::vector<SpeakerInput>& segs) {
+std::vector<ComprehensiveTimeline::Revision>
+ComprehensiveTimeline::ReplaceSpeakers(const std::vector<SpeakerInput>& segs) {
   // Diarization delivers its whole current segment view (global derivation), so
   // replace the speaker set wholesale and re-project ALL text. Emit a revision
   // for every text whose attributed result changed.
   speakers_.clear();
-  speakers_.reserve(segs.size()); // Pre-allocate to avoid repeated reallocations
+  speakers_.reserve(
+      segs.size());  // Pre-allocate to avoid repeated reallocations
   for (const auto& s : segs) {
     SpeakerSeg seg;
     seg.start = s.start;
@@ -236,16 +244,16 @@ std::vector<ComprehensiveTimeline::Revision> ComprehensiveTimeline::ReplaceSpeak
   }
   std::vector<Revision> revs;
   // Pre-allocate to avoid repeated reallocations
-  revs.reserve(texts_.size()); // Maximum possible revisions
+  revs.reserve(texts_.size());  // Maximum possible revisions
   for (const auto& t : texts_) ReprojectText(t, &revs);
   return revs;
 }
 
 void ComprehensiveTimeline::AddVad(double start, double end) {
   VadSeg v{start, end};
-  auto pos = std::lower_bound(
-      vad_.begin(), vad_.end(), start,
-      [](const VadSeg& a, double s) { return a.start < s; });
+  auto pos =
+      std::lower_bound(vad_.begin(), vad_.end(), start,
+                       [](const VadSeg& a, double s) { return a.start < s; });
   vad_.insert(pos, v);
 }
 
@@ -255,7 +263,7 @@ std::vector<ComprehensiveTimeline::Entry> ComprehensiveTimeline::Snapshot()
   // segment, time-ordered, with consecutive same-speaker entries coalesced.
   std::vector<Entry> all;
   // Pre-allocate to avoid repeated reallocations
-  all.reserve(texts_.size() * 2); // Estimate maximum entries
+  all.reserve(texts_.size() * 2);  // Estimate maximum entries
   for (const auto& kv : pieces_) {
     for (const auto& e : kv.second) all.push_back(e);
   }
@@ -274,8 +282,8 @@ std::vector<ComprehensiveTimeline::Entry> ComprehensiveTimeline::Snapshot()
   return out;
 }
 
-std::vector<ComprehensiveTimeline::RawTextSeg> ComprehensiveTimeline::SnapshotRawTexts()
-    const {
+std::vector<ComprehensiveTimeline::RawTextSeg>
+ComprehensiveTimeline::SnapshotRawTexts() const {
   std::vector<RawTextSeg> out;
   out.reserve(texts_.size());
   for (const auto& t : texts_) {
@@ -284,8 +292,9 @@ std::vector<ComprehensiveTimeline::RawTextSeg> ComprehensiveTimeline::SnapshotRa
   return out;
 }
 
-void ComprehensiveTimeline::UpsertAlign(long text_id, double start, double end,
-                                        const std::vector<AlignUnitSeg>& units) {
+void ComprehensiveTimeline::UpsertAlign(
+    long text_id, double start, double end,
+    const std::vector<AlignUnitSeg>& units) {
   AlignGroup g;
   g.text_id = text_id;
   g.start = start;
@@ -294,8 +303,8 @@ void ComprehensiveTimeline::UpsertAlign(long text_id, double start, double end,
   align_[text_id] = std::move(g);  // idempotent replace by id
 }
 
-std::vector<ComprehensiveTimeline::AlignGroup> ComprehensiveTimeline::SnapshotAlign()
-    const {
+std::vector<ComprehensiveTimeline::AlignGroup>
+ComprehensiveTimeline::SnapshotAlign() const {
   std::vector<AlignGroup> out;
   out.reserve(align_.size());
   for (const auto& kv : align_) out.push_back(kv.second);

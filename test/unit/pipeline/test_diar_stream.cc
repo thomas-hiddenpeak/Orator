@@ -48,7 +48,7 @@ int main(int argc, char** argv) {
   std::vector<float> proc, ref;
   int32_t meta[3] = {0, 0, 0};
   try {
-    proc = ReadF32(dir + "/ref_stream_proc.f32");   // [128, t_mel]
+    proc = ReadF32(dir + "/ref_stream_proc.f32");  // [128, t_mel]
     if (!regenerate) ref = ReadF32(dir + "/ref_stream_total.f32");
     std::ifstream mf(dir + "/ref_stream_meta.i32", std::ios::binary);
     if (!mf) throw std::runtime_error("cannot open ref_stream_meta.i32");
@@ -79,14 +79,15 @@ int main(int argc, char** argv) {
   if (regenerate) {
     std::vector<float> new_ref(static_cast<size_t>(out.num_frames) * 4);
     for (int t = 0; t < out.num_frames; ++t)
-      for (int s = 0; s < 4; ++s)
-        new_ref[t * 4 + s] = out.At(t, s);
+      for (int s = 0; s < 4; ++s) new_ref[t * 4 + s] = out.At(t, s);
     WriteF32(dir + "/ref_stream_total.f32", new_ref);
     meta[2] = out.num_frames;
-    std::ofstream mf(dir + "/ref_stream_meta.i32", std::ios::binary | std::ios::trunc);
+    std::ofstream mf(dir + "/ref_stream_meta.i32",
+                     std::ios::binary | std::ios::trunc);
     mf.write(reinterpret_cast<const char*>(meta), sizeof(meta));
-    std::printf("Regenerated reference: %d frames saved to %s/ref_stream_total.f32\n",
-                out.num_frames, dir.c_str());
+    std::printf(
+        "Regenerated reference: %d frames saved to %s/ref_stream_total.f32\n",
+        out.num_frames, dir.c_str());
     return 0;
   }
 
@@ -114,9 +115,10 @@ int main(int argc, char** argv) {
   // 1e-2 (the mel front-end propagates ~5e-3 in the log domain; the same bound
   // used by the historical verify_streaming probe).
   const double kTol = 1e-2;
-  std::printf("diar streaming vs NeMo: frames=%d max_abs=%.6g mean_abs=%.6g "
-              "(tol %.0e)\n",
-              valid, max_abs, mean_abs, kTol);
+  std::printf(
+      "diar streaming vs NeMo: frames=%d max_abs=%.6g mean_abs=%.6g "
+      "(tol %.0e)\n",
+      valid, max_abs, mean_abs, kTol);
   if (max_abs < kTol) {
     std::printf("test_diar_stream PASSED\n");
     return 0;

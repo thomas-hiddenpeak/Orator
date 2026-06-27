@@ -44,8 +44,8 @@ struct Consumer {
 }  // namespace
 
 int main() {
-  constexpr int kTotal = 200000;     // ~12.5 s @ 16 kHz
-  constexpr int kFrame = 1600;       // 100 ms frames
+  constexpr int kTotal = 200000;  // ~12.5 s @ 16 kHz
+  constexpr int kFrame = 1600;    // 100 ms frames
 
   SharedAudioBuffer buf(16000);
   Consumer fast{&buf, buf.AddConsumer(), /*slow=*/false, {}};

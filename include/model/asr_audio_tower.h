@@ -16,7 +16,8 @@
 //     -> ln_post -> proj1 -> GELU -> proj2 -> [N, output_dim=2048]
 //
 // Weights are stored BF16 in the checkpoint and upcast to FP32 at load time.
-// Verified against the FP32 PyTorch oracle (models/reference/asr/audio_features_fp32.f32).
+// Verified against the FP32 PyTorch oracle
+// (models/reference/asr/audio_features_fp32.f32).
 
 #include <cstdint>
 #include <memory>
@@ -37,11 +38,11 @@ struct AsrAudioConfig {
   int d_model = 1024;
   int encoder_layers = 24;
   int encoder_heads = 16;
-  int head_dim = 64;        // d_model / heads
+  int head_dim = 64;  // d_model / heads
   int ffn_dim = 4096;
   int downsample_hidden = 480;
   int output_dim = 2048;
-  int n_window = 50;        // chunk = n_window*2 mel frames
+  int n_window = 50;  // chunk = n_window*2 mel frames
   int n_window_infer = 800;
   int max_source_positions = 1500;
 };
@@ -53,12 +54,13 @@ class AsrAudioTower {
   // Checkpoint tensor names. The Qwen3-ASR encoder and the Qwen3 Forced Aligner
   // encoder are the same architecture but differ in (a) the module prefix and
   // (b) where the output projection lives: ASR keeps proj1/proj2 inside the
-  // tower; the aligner uses a separate multi_modal_projector. The defaults match
-  // ASR; the aligner overrides them.
+  // tower; the aligner uses a separate multi_modal_projector. The defaults
+  // match ASR; the aligner overrides them.
   struct WeightNames {
-    std::string prefix = "thinker.audio_tower.";       // conv/layers/ln_post
-    std::string proj1 = "thinker.audio_tower.proj1";   // D -> output_dim
-    std::string proj2 = "thinker.audio_tower.proj2";   // output_dim -> output_dim
+    std::string prefix = "thinker.audio_tower.";      // conv/layers/ln_post
+    std::string proj1 = "thinker.audio_tower.proj1";  // D -> output_dim
+    std::string proj2 =
+        "thinker.audio_tower.proj2";  // output_dim -> output_dim
   };
 
   // Loads + upcasts all audio_tower weights from the sharded checkpoint.
@@ -70,8 +72,8 @@ class AsrAudioTower {
 
   // mel: row-major [num_mel_bins, n_frames] FP32 (host). Returns row-major
   // [N_out, output_dim] FP32 (host); *out_tokens receives N_out.
-    std::vector<float> Forward(const float* mel, int n_frames, int* out_tokens,
-                               cudaStream_t stream = 0) const;
+  std::vector<float> Forward(const float* mel, int n_frames, int* out_tokens,
+                             cudaStream_t stream = 0) const;
 
   // Output sequence length after the CNN front-end for a given mel length
   // (matches the reference _get_feat_extract_output_lengths).
@@ -88,13 +90,14 @@ class AsrAudioTower {
     std::shared_ptr<gpu::UnifiedBuffer> buf;
     uint16_t* p = nullptr;
   };
-  DevBuf Load(const io::ShardedSafeTensors& w, const std::string& name);     // f32
-  BfBuf LoadBf16(const io::ShardedSafeTensors& w, const std::string& name);  // bf16
+  DevBuf Load(const io::ShardedSafeTensors& w, const std::string& name);  // f32
+  BfBuf LoadBf16(const io::ShardedSafeTensors& w,
+                 const std::string& name);  // bf16
 
   struct Layer {
-    DevBuf ln1_w, ln1_b;          // norms + biases stay f32
+    DevBuf ln1_w, ln1_b;  // norms + biases stay f32
     DevBuf q_b, k_b, v_b, o_b;
-    BfBuf q_w, k_w, v_w, o_w;     // matmul weights bf16 (cuBLAS)
+    BfBuf q_w, k_w, v_w, o_w;  // matmul weights bf16 (cuBLAS)
     DevBuf ln2_w, ln2_b;
     DevBuf fc1_b, fc2_b;
     BfBuf fc1_w, fc2_w;
@@ -106,7 +109,8 @@ class AsrAudioTower {
   BfBuf conv_out_w_, proj1_w_, proj2_w_;  // big matmul weights bf16
   DevBuf ln_post_w_, ln_post_b_, proj1_b_, proj2_b_;
   std::vector<Layer> layers_;
-  std::vector<float> pe_;  // [max_source_positions * d_model] host sinusoidal PE
+  std::vector<float>
+      pe_;  // [max_source_positions * d_model] host sinusoidal PE
   // Per-instance device scratch pool: Forward's working buffers are reused
   // across calls (grow-on-demand) so the steady-state hot path makes no
   // cudaMalloc -- a prerequisite for CUDA-graph capture (Spec 002 P2.2). Each

@@ -25,7 +25,8 @@ class MemoryBackend {
   // Evicts oldest entries if total size would exceed capacity.
   uint64_t Write(const uint8_t* data, uint32_t size);
 
-  // Read data from a logical offset. Returns actual bytes read (0 if not found).
+  // Read data from a logical offset. Returns actual bytes read (0 if not
+  // found).
   uint32_t Read(uint64_t offset, uint32_t size, uint8_t* out) const;
 
   // Get current usage statistics.

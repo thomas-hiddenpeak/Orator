@@ -20,8 +20,8 @@
 
 enum OratorLogLevel {
   ORATOR_LOG_DEBUG = 0,
-  ORATOR_LOG_INFO  = 1,
-  ORATOR_LOG_WARN  = 2,
+  ORATOR_LOG_INFO = 1,
+  ORATOR_LOG_WARN = 2,
   ORATOR_LOG_ERROR = 3,
 };
 
@@ -37,33 +37,37 @@ inline int OratorLogLevel_Runtime() {
     const char* e = std::getenv("ORATOR_LOG_LEVEL");
     if (!e) return ORATOR_LOG_LEVEL;
     int v = std::atoi(e);
-    return (v < ORATOR_LOG_DEBUG) ? static_cast<int>(ORATOR_LOG_DEBUG)
-         : (v > ORATOR_LOG_ERROR) ? static_cast<int>(ORATOR_LOG_ERROR)
-         : v;
+    return (v < ORATOR_LOG_DEBUG)   ? static_cast<int>(ORATOR_LOG_DEBUG)
+           : (v > ORATOR_LOG_ERROR) ? static_cast<int>(ORATOR_LOG_ERROR)
+                                    : v;
   }();
   return level;
 }
 
-#define LOG_DEBUG(...) do {                                             \
-  if (ORATOR_LOG_LEVEL <= ORATOR_LOG_DEBUG &&                           \
-      OratorLogLevel_Runtime() <= ORATOR_LOG_DEBUG)                     \
-    std::fprintf(stderr, "[DEBUG] " __VA_ARGS__);                       \
-} while (0)
+#define LOG_DEBUG(...)                                \
+  do {                                                \
+    if (ORATOR_LOG_LEVEL <= ORATOR_LOG_DEBUG &&       \
+        OratorLogLevel_Runtime() <= ORATOR_LOG_DEBUG) \
+      std::fprintf(stderr, "[DEBUG] " __VA_ARGS__);   \
+  } while (0)
 
-#define LOG_INFO(...) do {                                              \
-  if (ORATOR_LOG_LEVEL <= ORATOR_LOG_INFO &&                            \
-      OratorLogLevel_Runtime() <= ORATOR_LOG_INFO)                      \
-    std::fprintf(stderr, "[INFO] " __VA_ARGS__);                        \
-} while (0)
+#define LOG_INFO(...)                                \
+  do {                                               \
+    if (ORATOR_LOG_LEVEL <= ORATOR_LOG_INFO &&       \
+        OratorLogLevel_Runtime() <= ORATOR_LOG_INFO) \
+      std::fprintf(stderr, "[INFO] " __VA_ARGS__);   \
+  } while (0)
 
-#define LOG_WARN(...) do {                                              \
-  if (ORATOR_LOG_LEVEL <= ORATOR_LOG_WARN &&                            \
-      OratorLogLevel_Runtime() <= ORATOR_LOG_WARN)                      \
-    std::fprintf(stderr, "[WARN] " __VA_ARGS__);                        \
-} while (0)
+#define LOG_WARN(...)                                \
+  do {                                               \
+    if (ORATOR_LOG_LEVEL <= ORATOR_LOG_WARN &&       \
+        OratorLogLevel_Runtime() <= ORATOR_LOG_WARN) \
+      std::fprintf(stderr, "[WARN] " __VA_ARGS__);   \
+  } while (0)
 
-#define LOG_ERROR(...) do {                                             \
-  if (ORATOR_LOG_LEVEL <= ORATOR_LOG_ERROR &&                           \
-      OratorLogLevel_Runtime() <= ORATOR_LOG_ERROR)                     \
-    std::fprintf(stderr, "[ERROR] " __VA_ARGS__);                       \
-} while (0)
+#define LOG_ERROR(...)                                \
+  do {                                                \
+    if (ORATOR_LOG_LEVEL <= ORATOR_LOG_ERROR &&       \
+        OratorLogLevel_Runtime() <= ORATOR_LOG_ERROR) \
+      std::fprintf(stderr, "[ERROR] " __VA_ARGS__);   \
+  } while (0)

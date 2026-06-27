@@ -12,11 +12,12 @@ namespace pipeline {
 
 using namespace worker;
 
-DiarizationWorker::DiarizationWorker(core::IDiarizer* diarizer,
-                                       Params params, core::TimeBase tb,
-                                       cudaStream_t stream)
-    : diarizer_(diarizer), params_(params),
-      tb_(std::move(tb)), stream_(stream) {}
+DiarizationWorker::DiarizationWorker(core::IDiarizer* diarizer, Params params,
+                                     core::TimeBase tb, cudaStream_t stream)
+    : diarizer_(diarizer),
+      params_(params),
+      tb_(std::move(tb)),
+      stream_(stream) {}
 
 void DiarizationWorker::DeliverSpeakers(bool force) {
   if (!speaker_sink_) return;
@@ -31,8 +32,9 @@ void DiarizationWorker::DeliverSpeakers(bool force) {
   // (StreamTimeline was removed — frames live in diar_probs_/diar_speakers_.)
   core::DiarizationFrames frames;
   frames.probs = diar_probs_;
-  frames.num_frames = diar_speakers_ > 0
-      ? static_cast<int>(diar_probs_.size() / diar_speakers_) : 0;
+  frames.num_frames =
+      diar_speakers_ > 0 ? static_cast<int>(diar_probs_.size() / diar_speakers_)
+                         : 0;
   frames.num_speakers = diar_speakers_;
   frames.frame_period_sec = diar_frame_period_sec_;
   if (frames.num_frames <= 0 || frames.num_speakers <= 0) return;
@@ -40,8 +42,8 @@ void DiarizationWorker::DeliverSpeakers(bool force) {
   // sample 0). Set the segment time origin through this pipeline's common base.
   frames.t_start_sec = tb_.SecondsAt(0);
   auto segs = OnsetOffsetSegments(frames, params_.onset, params_.offset,
-                                   params_.pad_onset, params_.pad_offset,
-                                   params_.min_dur_on, params_.min_dur_off);
+                                  params_.pad_onset, params_.pad_offset,
+                                  params_.min_dur_on, params_.min_dur_off);
   speaker_sink_(segs);
 }
 

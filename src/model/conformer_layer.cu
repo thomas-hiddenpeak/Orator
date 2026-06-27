@@ -19,8 +19,8 @@ constexpr int kThreads = 256;
 inline int Blocks(int n) { return (n + kThreads - 1) / kThreads; }
 
 inline void LaunchLinear(const float* in, const float* W, const float* bias,
-                          float* out, int M, int K, int N, int act,
-                          cudaStream_t stream) {
+                         float* out, int M, int K, int N, int act,
+                         cudaStream_t stream) {
   gemm::LaunchSgemm(in, W, bias, out, M, K, N, act, stream);
 }
 
@@ -28,7 +28,8 @@ inline void LaunchLinear(const float* in, const float* W, const float* bias,
 __global__ void LayerNormKernel(const float* __restrict__ in,
                                 const float* __restrict__ gamma,
                                 const float* __restrict__ beta,
-                                float* __restrict__ out, int M, int D, float eps) {
+                                float* __restrict__ out, int M, int D,
+                                float eps) {
   int m = blockIdx.x;
   if (m >= M) return;
   const float* xr = in + static_cast<size_t>(m) * D;
@@ -122,9 +123,9 @@ __global__ void GatherVtHeadMajorKernel(const float* __restrict__ v,
   out[n] = v[(static_cast<size_t>(t) * H + h) * Dk + d];
 }
 
-// scores[h,i,j] = (AC[h,i,j] + rel_shift(BD)[h,i,j]) * scale, masked at j>=valid.
-// rel_shift: idx = T + i*(2T-1) + j; ip = idx/(2T); c2 = idx%(2T);
-// bd = (c2 != 0) ? BD[h, ip, c2-1] : 0.
+// scores[h,i,j] = (AC[h,i,j] + rel_shift(BD)[h,i,j]) * scale, masked at
+// j>=valid. rel_shift: idx = T + i*(2T-1) + j; ip = idx/(2T); c2 = idx%(2T); bd
+// = (c2 != 0) ? BD[h, ip, c2-1] : 0.
 __global__ void RelShiftScoresKernel(const float* __restrict__ ac,
                                      const float* __restrict__ bd,
                                      float* __restrict__ scores, int T, int H,
@@ -153,7 +154,8 @@ __global__ void RelShiftScoresKernel(const float* __restrict__ ac,
 }
 
 // Row softmax over j for each (h,i); writes normalized probabilities in place.
-__global__ void AttnSoftmaxKernel(float* __restrict__ scores, int T, int valid) {
+__global__ void AttnSoftmaxKernel(float* __restrict__ scores, int T,
+                                  int valid) {
   int row = blockIdx.x;  // 0..H*T-1, one (h,i) per block
   float* s = scores + static_cast<size_t>(row) * T;
   __shared__ float red[kThreads];
@@ -213,9 +215,10 @@ __global__ void GluKernel(const float* in, float* out, int T, int C) {
 
 // Depthwise conv1d over time, kernel K, padding (K-1)/2, groups=C. in [T,C].
 __global__ void DepthwiseConvKernel(const float* __restrict__ in,
-                                    const float* __restrict__ w,   // [C,1,K]
+                                    const float* __restrict__ w,  // [C,1,K]
                                     const float* __restrict__ bias,
-                                    float* __restrict__ out, int T, int C, int K) {
+                                    float* __restrict__ out, int T, int C,
+                                    int K) {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx >= T * C) return;
   int c = idx % C, t = idx / C;
@@ -230,9 +233,10 @@ __global__ void DepthwiseConvKernel(const float* __restrict__ in,
 }
 
 // BatchNorm1d eval + SiLU.  in [T,C].
-__global__ void BatchNormSiluKernel(float* x, const float* mean, const float* var,
-                                    const float* gamma, const float* beta, int T,
-                                    int C, float eps) {
+__global__ void BatchNormSiluKernel(float* x, const float* mean,
+                                    const float* var, const float* gamma,
+                                    const float* beta, int T, int C,
+                                    float eps) {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx >= T * C) return;
   int c = idx % C;
@@ -242,7 +246,8 @@ __global__ void BatchNormSiluKernel(float* x, const float* mean, const float* va
 
 }  // namespace
 
-ConformerLayer::ConformerLayer(int d_model, int n_heads, int d_ff, int conv_kernel)
+ConformerLayer::ConformerLayer(int d_model, int n_heads, int d_ff,
+                               int conv_kernel)
     : d_model_(d_model),
       n_heads_(n_heads),
       d_ff_(d_ff),
@@ -257,26 +262,45 @@ const float* ConformerLayer::W(const std::string& name) const {
 
 void ConformerLayer::LoadWeights(const io::SafeTensorReader& reader,
                                  const std::string& prefix) {
-  static const char* names[] = {
-      "norm_feed_forward1.weight", "norm_feed_forward1.bias",
-      "feed_forward1.linear1.weight", "feed_forward1.linear1.bias",
-      "feed_forward1.linear2.weight", "feed_forward1.linear2.bias",
-      "norm_self_att.weight", "norm_self_att.bias",
-      "self_attn.linear_q.weight", "self_attn.linear_q.bias",
-      "self_attn.linear_k.weight", "self_attn.linear_k.bias",
-      "self_attn.linear_v.weight", "self_attn.linear_v.bias",
-      "self_attn.linear_out.weight", "self_attn.linear_out.bias",
-      "self_attn.linear_pos.weight", "self_attn.pos_bias_u",
-      "self_attn.pos_bias_v", "norm_conv.weight", "norm_conv.bias",
-      "conv.pointwise_conv1.weight", "conv.pointwise_conv1.bias",
-      "conv.depthwise_conv.weight", "conv.depthwise_conv.bias",
-      "conv.batch_norm.weight", "conv.batch_norm.bias",
-      "conv.batch_norm.running_mean", "conv.batch_norm.running_var",
-      "conv.pointwise_conv2.weight", "conv.pointwise_conv2.bias",
-      "norm_feed_forward2.weight", "norm_feed_forward2.bias",
-      "feed_forward2.linear1.weight", "feed_forward2.linear1.bias",
-      "feed_forward2.linear2.weight", "feed_forward2.linear2.bias",
-      "norm_out.weight", "norm_out.bias"};
+  static const char* names[] = {"norm_feed_forward1.weight",
+                                "norm_feed_forward1.bias",
+                                "feed_forward1.linear1.weight",
+                                "feed_forward1.linear1.bias",
+                                "feed_forward1.linear2.weight",
+                                "feed_forward1.linear2.bias",
+                                "norm_self_att.weight",
+                                "norm_self_att.bias",
+                                "self_attn.linear_q.weight",
+                                "self_attn.linear_q.bias",
+                                "self_attn.linear_k.weight",
+                                "self_attn.linear_k.bias",
+                                "self_attn.linear_v.weight",
+                                "self_attn.linear_v.bias",
+                                "self_attn.linear_out.weight",
+                                "self_attn.linear_out.bias",
+                                "self_attn.linear_pos.weight",
+                                "self_attn.pos_bias_u",
+                                "self_attn.pos_bias_v",
+                                "norm_conv.weight",
+                                "norm_conv.bias",
+                                "conv.pointwise_conv1.weight",
+                                "conv.pointwise_conv1.bias",
+                                "conv.depthwise_conv.weight",
+                                "conv.depthwise_conv.bias",
+                                "conv.batch_norm.weight",
+                                "conv.batch_norm.bias",
+                                "conv.batch_norm.running_mean",
+                                "conv.batch_norm.running_var",
+                                "conv.pointwise_conv2.weight",
+                                "conv.pointwise_conv2.bias",
+                                "norm_feed_forward2.weight",
+                                "norm_feed_forward2.bias",
+                                "feed_forward2.linear1.weight",
+                                "feed_forward2.linear1.bias",
+                                "feed_forward2.linear2.weight",
+                                "feed_forward2.linear2.bias",
+                                "norm_out.weight",
+                                "norm_out.bias"};
   for (const char* n : names) {
     std::string full = prefix + "." + n;
     const auto& meta = reader.GetMetadata(full);
@@ -293,7 +317,8 @@ std::vector<float> ConformerLayer::BuildPosEmb(int T, int d_model) {
   for (int idx = 0; idx < P; ++idx) {
     float pos = static_cast<float>(T - 1 - idx);
     for (int i = 0; i < d_model; i += 2) {
-      float div = std::exp(-(std::log(10000.0f)) * static_cast<float>(i) / d_model);
+      float div =
+          std::exp(-(std::log(10000.0f)) * static_cast<float>(i) / d_model);
       pe[static_cast<size_t>(idx) * d_model + i] = std::sin(pos * div);
       if (i + 1 < d_model)
         pe[static_cast<size_t>(idx) * d_model + i + 1] = std::cos(pos * div);
@@ -334,8 +359,8 @@ void ConformerLayer::Scratch::Ensure(int T, int D, int Dff, int H) {
   cap_T = T;
 }
 
-void ConformerLayer::Forward(float* x, int T, int valid_len, const float* pos_emb,
-                              cudaStream_t stream) {
+void ConformerLayer::Forward(float* x, int T, int valid_len,
+                             const float* pos_emb, cudaStream_t stream) {
   const int D = d_model_, H = n_heads_, Dk = d_k_, Dff = d_ff_;
   const float eps = 1e-5f;
   size_t TD = static_cast<size_t>(T) * D;
@@ -351,11 +376,9 @@ void ConformerLayer::Forward(float* x, int T, int valid_len, const float* pos_em
   // ---- FFN1 ----
   LN(x, W("norm_feed_forward1.weight"), W("norm_feed_forward1.bias"), lnp);
   LaunchLinear(lnp, W("feed_forward1.linear1.weight"),
-                                               W("feed_forward1.linear1.bias"), ffp,
-                                               T, D, Dff, 1, stream);
+               W("feed_forward1.linear1.bias"), ffp, T, D, Dff, 1, stream);
   LaunchLinear(ffp, W("feed_forward1.linear2.weight"),
-                                             W("feed_forward1.linear2.bias"), tmpp,
-                                             T, Dff, D, 0, stream);
+               W("feed_forward1.linear2.bias"), tmpp, T, Dff, D, 0, stream);
   AddScaledKernel<<<Blocks(T * D), kThreads, 0, stream>>>(x, tmpp, 0.5f, T * D);
 
   // ---- Self-attention ----
@@ -367,13 +390,13 @@ void ConformerLayer::Forward(float* x, int T, int valid_len, const float* pos_em
   float* pp = static_cast<float*>(scr_.pb.data());
   float* cp = static_cast<float*>(scr_.cb.data());
   LaunchLinear(lnp, W("self_attn.linear_q.weight"),
-                                             W("self_attn.linear_q.bias"), qp, T, D, D, 0, stream);
+               W("self_attn.linear_q.bias"), qp, T, D, D, 0, stream);
   LaunchLinear(lnp, W("self_attn.linear_k.weight"),
-                                             W("self_attn.linear_k.bias"), kp, T, D, D, 0, stream);
+               W("self_attn.linear_k.bias"), kp, T, D, D, 0, stream);
   LaunchLinear(lnp, W("self_attn.linear_v.weight"),
-                                             W("self_attn.linear_v.bias"), vp, T, D, D, 0, stream);
-  LaunchLinear(pos_emb, W("self_attn.linear_pos.weight"),
-                                             nullptr, pp, P, D, D, 0, stream);
+               W("self_attn.linear_v.bias"), vp, T, D, D, 0, stream);
+  LaunchLinear(pos_emb, W("self_attn.linear_pos.weight"), nullptr, pp, P, D, D,
+               0, stream);
   float scale = 1.0f / std::sqrt(static_cast<float>(Dk));
 
   // ---- GEMM-decomposed relative-position attention ----
@@ -389,30 +412,36 @@ void ConformerLayer::Forward(float* x, int T, int valid_len, const float* pos_em
   const float* buw = W("self_attn.pos_bias_u");
   const float* bvw = W("self_attn.pos_bias_v");
 
-  GatherAddHeadMajorKernel<<<Blocks(H * T * Dk), kThreads, 0, stream>>>(qp, buw, qbu, T, H, Dk);
-  GatherAddHeadMajorKernel<<<Blocks(H * T * Dk), kThreads, 0, stream>>>(qp, bvw, qbv, T, H, Dk);
-  GatherAddHeadMajorKernel<<<Blocks(H * T * Dk), kThreads, 0, stream>>>(kp, nullptr, kh, T, H, Dk);
-  GatherVtHeadMajorKernel<<<Blocks(H * Dk * T), kThreads, 0, stream>>>(vp, vt, T, H, Dk);
-  GatherPHeadMajorKernel<<<Blocks(H * P * Dk), kThreads, 0, stream>>>(pp, ph, P, H, Dk);
+  GatherAddHeadMajorKernel<<<Blocks(H * T * Dk), kThreads, 0, stream>>>(
+      qp, buw, qbu, T, H, Dk);
+  GatherAddHeadMajorKernel<<<Blocks(H * T * Dk), kThreads, 0, stream>>>(
+      qp, bvw, qbv, T, H, Dk);
+  GatherAddHeadMajorKernel<<<Blocks(H * T * Dk), kThreads, 0, stream>>>(
+      kp, nullptr, kh, T, H, Dk);
+  GatherVtHeadMajorKernel<<<Blocks(H * Dk * T), kThreads, 0, stream>>>(
+      vp, vt, T, H, Dk);
+  GatherPHeadMajorKernel<<<Blocks(H * P * Dk), kThreads, 0, stream>>>(pp, ph, P,
+                                                                      H, Dk);
 
   // AC[h,i,j] = (q_i+bu)·k_j ; BD[h,i,m] = (q_i+bv)·p_m
   gemm::LaunchSgemmBatched(qbu, kh, acm, T, Dk, T, 0, H,
-                            static_cast<long>(T) * Dk, static_cast<long>(T) * Dk,
-                            static_cast<long>(T) * T, stream);
+                           static_cast<long>(T) * Dk, static_cast<long>(T) * Dk,
+                           static_cast<long>(T) * T, stream);
   gemm::LaunchSgemmBatched(qbv, ph, bdm, T, Dk, P, 0, H,
-                            static_cast<long>(T) * Dk, static_cast<long>(P) * Dk,
-                            static_cast<long>(T) * P, stream);
-  RelShiftScoresKernel<<<Blocks(H * T * T), kThreads, 0, stream>>>(acm, bdm, scm, T, H,
-                                                         valid_len, scale);
+                           static_cast<long>(T) * Dk, static_cast<long>(P) * Dk,
+                           static_cast<long>(T) * P, stream);
+  RelShiftScoresKernel<<<Blocks(H * T * T), kThreads, 0, stream>>>(
+      acm, bdm, scm, T, H, valid_len, scale);
   AttnSoftmaxKernel<<<H * T, kThreads, 0, stream>>>(scm, T, valid_len);
   // ctx[h,i,d] = sum_j scores[h,i,j] * v[j,d]  (vt is [H,Dk,T] => W^T form)
-  gemm::LaunchSgemmBatched(scm, vt, acm, T, T, Dk, 0, H, static_cast<long>(T) * T,
-                            static_cast<long>(Dk) * T, static_cast<long>(T) * Dk, stream);
-  ScatterHeadMajorKernel<<<Blocks(H * T * Dk), kThreads, 0, stream>>>(acm, cp, T, H, Dk);
+  gemm::LaunchSgemmBatched(scm, vt, acm, T, T, Dk, 0, H,
+                           static_cast<long>(T) * T, static_cast<long>(Dk) * T,
+                           static_cast<long>(T) * Dk, stream);
+  ScatterHeadMajorKernel<<<Blocks(H * T * Dk), kThreads, 0, stream>>>(acm, cp,
+                                                                      T, H, Dk);
   // linear_out on context [T,D] -> tmp
   LaunchLinear(cp, W("self_attn.linear_out.weight"),
-                                             W("self_attn.linear_out.bias"), tmpp,
-                                             T, D, D, 0, stream);
+               W("self_attn.linear_out.bias"), tmpp, T, D, D, 0, stream);
   AddScaledKernel<<<Blocks(T * D), kThreads, 0, stream>>>(x, tmpp, 1.0f, T * D);
 
   // ---- Conv module ----
@@ -420,32 +449,32 @@ void ConformerLayer::Forward(float* x, int T, int valid_len, const float* pos_em
   float* pw1p = static_cast<float*>(scr_.pw1.data());
   float* glup = static_cast<float*>(scr_.glu.data());
   float* dwp = static_cast<float*>(scr_.dw.data());
-  LaunchLinear(lnp,
-      W("conv.pointwise_conv1.weight"), W("conv.pointwise_conv1.bias"), pw1p, T, D, 2 * D, 0, stream);
+  LaunchLinear(lnp, W("conv.pointwise_conv1.weight"),
+               W("conv.pointwise_conv1.bias"), pw1p, T, D, 2 * D, 0, stream);
   GluKernel<<<Blocks(T * D), kThreads, 0, stream>>>(pw1p, glup, T, D);
   MaskRowsKernel<<<Blocks(T * D), kThreads, 0, stream>>>(glup, T, D, valid_len);
-  DepthwiseConvKernel<<<Blocks(T * D), kThreads, 0, stream>>>(glup,
-      W("conv.depthwise_conv.weight"), W("conv.depthwise_conv.bias"), dwp, T, D, conv_kernel_);
-  BatchNormSiluKernel<<<Blocks(T * D), kThreads, 0, stream>>>(dwp, W("conv.batch_norm.running_mean"),
-      W("conv.batch_norm.running_var"), W("conv.batch_norm.weight"),
-      W("conv.batch_norm.bias"), T, D, eps);
-  LaunchLinear(dwp,
-      W("conv.pointwise_conv2.weight"), W("conv.pointwise_conv2.bias"), tmpp, T, D, D, 0, stream);
+  DepthwiseConvKernel<<<Blocks(T * D), kThreads, 0, stream>>>(
+      glup, W("conv.depthwise_conv.weight"), W("conv.depthwise_conv.bias"), dwp,
+      T, D, conv_kernel_);
+  BatchNormSiluKernel<<<Blocks(T * D), kThreads, 0, stream>>>(
+      dwp, W("conv.batch_norm.running_mean"), W("conv.batch_norm.running_var"),
+      W("conv.batch_norm.weight"), W("conv.batch_norm.bias"), T, D, eps);
+  LaunchLinear(dwp, W("conv.pointwise_conv2.weight"),
+               W("conv.pointwise_conv2.bias"), tmpp, T, D, D, 0, stream);
   AddScaledKernel<<<Blocks(T * D), kThreads, 0, stream>>>(x, tmpp, 1.0f, T * D);
 
   // ---- FFN2 ----
   LN(x, W("norm_feed_forward2.weight"), W("norm_feed_forward2.bias"), lnp);
   LaunchLinear(lnp, W("feed_forward2.linear1.weight"),
-                                               W("feed_forward2.linear1.bias"), ffp,
-                                               T, D, Dff, 1, stream);
+               W("feed_forward2.linear1.bias"), ffp, T, D, Dff, 1, stream);
   LaunchLinear(ffp, W("feed_forward2.linear2.weight"),
-                                             W("feed_forward2.linear2.bias"), tmpp,
-                                             T, Dff, D, 0, stream);
+               W("feed_forward2.linear2.bias"), tmpp, T, Dff, D, 0, stream);
   AddScaledKernel<<<Blocks(T * D), kThreads, 0, stream>>>(x, tmpp, 0.5f, T * D);
 
   // ---- norm_out ----
   LN(x, W("norm_out.weight"), W("norm_out.bias"), lnp);
-  CUDA_CHECK(cudaMemcpyAsync(x, lnp, TD * sizeof(float), cudaMemcpyDeviceToDevice, stream));
+  CUDA_CHECK(cudaMemcpyAsync(x, lnp, TD * sizeof(float),
+                             cudaMemcpyDeviceToDevice, stream));
 }
 
 }  // namespace model

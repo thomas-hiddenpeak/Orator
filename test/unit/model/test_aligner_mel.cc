@@ -14,7 +14,10 @@ using namespace orator;
 
 static std::vector<float> ReadF32(const std::string& p, bool* ok) {
   std::ifstream f(p, std::ios::binary | std::ios::ate);
-  if (!f) { *ok = false; return {}; }
+  if (!f) {
+    *ok = false;
+    return {};
+  }
   std::streamsize n = f.tellg();
   f.seekg(0);
   std::vector<float> v(n / sizeof(float));
@@ -37,7 +40,8 @@ int main() {
 
   feature::WhisperMel mel;
   int n_frames = 0;
-  auto out = mel.Compute(audio.data(), static_cast<int>(audio.size()), &n_frames);
+  auto out =
+      mel.Compute(audio.data(), static_cast<int>(audio.size()), &n_frames);
   std::printf("  ref frames=%d  ours frames=%d\n", ref_frames, n_frames);
 
   const int F = std::min(n_frames, ref_frames);
@@ -52,7 +56,8 @@ int main() {
   std::printf("  mel[:, :%d] max abs=%.3e mean abs=%.3e\n", F, max_abs,
               sum_abs / (n_mels * F));
   if (n_frames != ref_frames || max_abs > 5e-3) {
-    std::printf("FAIL: WhisperMel diverges from the aligner feature extractor\n");
+    std::printf(
+        "FAIL: WhisperMel diverges from the aligner feature extractor\n");
     return 1;
   }
   std::printf("Aligner mel test PASSED\n");

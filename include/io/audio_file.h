@@ -2,9 +2,9 @@
 
 // Audio file ingestion: decode WAV or MP3 into mono float PCM at a target rate.
 //
-// This is an I/O utility for feeding real-world audio into the pipeline. The MP3
-// path uses a vendored public-domain decoder (third_party/minimp3); the core
-// runtime stays dependency-free.
+// This is an I/O utility for feeding real-world audio into the pipeline. The
+// MP3 path uses a vendored public-domain decoder (third_party/minimp3); the
+// core runtime stays dependency-free.
 
 #include <string>
 #include <vector>

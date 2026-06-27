@@ -19,7 +19,7 @@ DiskBackend::DiskBackend(const std::string& path,
   unlink(file_path_.c_str());
 
   fd_ = open(file_path_.c_str(), O_RDWR | O_CREAT,
-              S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+             S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 }
 
 DiskBackend::~DiskBackend() {
@@ -44,8 +44,7 @@ uint64_t DiskBackend::Write(const uint8_t* data, uint32_t size) {
   return static_cast<uint64_t>(offset);
 }
 
-uint32_t DiskBackend::Read(uint64_t offset, uint32_t size,
-                           uint8_t* out) const {
+uint32_t DiskBackend::Read(uint64_t offset, uint32_t size, uint8_t* out) const {
   std::lock_guard<std::mutex> lock(mutex_);
 
   if (lseek(fd_, static_cast<off_t>(offset), SEEK_SET) < 0) return 0;

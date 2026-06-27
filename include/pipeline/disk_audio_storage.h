@@ -8,8 +8,9 @@
 namespace orator {
 namespace pipeline {
 
-// DiskAudioStorage: stores audio samples (float) to SSD based on absolute sample offsets.
-// Data is written in append-only fashion and read by start_sample offset.
+// DiskAudioStorage: stores audio samples (float) to SSD based on absolute
+// sample offsets. Data is written in append-only fashion and read by
+// start_sample offset.
 class DiskAudioStorage {
  public:
   explicit DiskAudioStorage(const std::string& storage_dir);
@@ -34,7 +35,7 @@ class DiskAudioStorage {
   std::string storage_dir_;
   std::string data_file_path_;
   std::string index_file_path_;
-  
+
   mutable std::mutex mutex_;
   long total_disk_samples_written_ = 0;
 };

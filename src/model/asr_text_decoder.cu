@@ -17,16 +17,19 @@ namespace orator {
 namespace model {
 
 using ::orator::gpu::CheckCudaError;
-using ::orator::gpu::UnifiedBuffer;
 using ::orator::gpu::DeviceBuffer;
 using ::orator::gpu::PinnedBuffer;
+using ::orator::gpu::UnifiedBuffer;
 
 namespace {
 
 constexpr int kThreads = 256;
-inline int Blocks(long n) { return static_cast<int>((n + kThreads - 1) / kThreads); }
+inline int Blocks(long n) {
+  return static_cast<int>((n + kThreads - 1) / kThreads);
+}
 
-__global__ void AddResidualKernel(float* __restrict__ a, const float* __restrict__ b, long n) {
+__global__ void AddResidualKernel(float* __restrict__ a,
+                                  const float* __restrict__ b, long n) {
   const long i = static_cast<long>(blockIdx.x) * blockDim.x + threadIdx.x;
   if (i < n) a[i] += b[i];
 }
@@ -45,7 +48,8 @@ __global__ void EmbedGatherKernel(const uint16_t* __restrict__ table,
 // Records the current token id into the output ring and advances the counter.
 // Single thread; runs at the START of each decode step (the recorded token is
 // the one about to be embedded -- i.e. the emitted token for this step).
-__global__ void RecordTokenKernel(int* __restrict__ out, int* __restrict__ count,
+__global__ void RecordTokenKernel(int* __restrict__ out,
+                                  int* __restrict__ count,
                                   const int* __restrict__ tok) {
   out[*count] = *tok;
   *count = *count + 1;
@@ -56,9 +60,11 @@ __global__ void IncPosKernel(int* __restrict__ pos) { *pos = *pos + 1; }
 
 // Write k/v into the cache at [pos0 + t]. cache: [max_seq, Hkv, Dh] BF16.
 // pos0 is read from a device scalar so a captured graph works at any position.
-__global__ void WriteKvCacheKernel(const float* __restrict__ k, const float* __restrict__ v,
-                                  uint16_t* __restrict__ kc, uint16_t* __restrict__ vc,
-                                  int Tq, int Hkv, int Dh, const int* __restrict__ pos0p) {
+__global__ void WriteKvCacheKernel(const float* __restrict__ k,
+                                   const float* __restrict__ v,
+                                   uint16_t* __restrict__ kc,
+                                   uint16_t* __restrict__ vc, int Tq, int Hkv,
+                                   int Dh, const int* __restrict__ pos0p) {
   const long idx = static_cast<long>(blockIdx.x) * blockDim.x + threadIdx.x;
   const long total = static_cast<long>(Tq) * Hkv * Dh;
   if (idx >= total) return;
@@ -76,13 +82,16 @@ __device__ __forceinline__ float Bf16(uint16_t x) {
 }
 
 // Causal GQA against a BF16 KV cache. q: [Tq, Hq, Dh]; kc/vc: [S, Hkv, Dh].
-// Query row t (absolute pos0+t) attends keys [0, pos0+t]. Warp per (token, head).
-// Used for the PREFILL path (Tq>1) where Tq*Hq warps give good occupancy.
+// Query row t (absolute pos0+t) attends keys [0, pos0+t]. Warp per (token,
+// head). Used for the PREFILL path (Tq>1) where Tq*Hq warps give good
+// occupancy.
 constexpr int kWarp = 32;
 __global__ void GqaCacheAttnKernel(const float* __restrict__ q,
-                                  const uint16_t* __restrict__ kc, const uint16_t* __restrict__ vc,
-                                  float* __restrict__ out, int Tq, int Hq, int Hkv,
-                                  int Dh, const int* __restrict__ pos0p, float scale) {
+                                   const uint16_t* __restrict__ kc,
+                                   const uint16_t* __restrict__ vc,
+                                   float* __restrict__ out, int Tq, int Hq,
+                                   int Hkv, int Dh,
+                                   const int* __restrict__ pos0p, float scale) {
   const int pos0 = *pos0p;
   const int lane = threadIdx.x % kWarp;
   const int warp = (blockIdx.x * blockDim.x + threadIdx.x) / kWarp;
@@ -139,19 +148,21 @@ __global__ void GqaCacheAttnKernel(const float* __restrict__ q,
 // Scores live in shared memory (cap kMaxCtx). bf16 KV halves the read.
 constexpr int kMaxCtx = 2048;
 __global__ void GqaDecodeAttnKernel(const float* __restrict__ q,
-                                   const uint16_t* __restrict__ kc, const uint16_t* __restrict__ vc,
-                                   float* __restrict__ out, int Hq, int Hkv, int Dh,
-                                   const int* __restrict__ pos0p, float scale) {
-  const int h = blockIdx.x;        // query head
-  const int d = threadIdx.x;       // 0..Dh-1
+                                    const uint16_t* __restrict__ kc,
+                                    const uint16_t* __restrict__ vc,
+                                    float* __restrict__ out, int Hq, int Hkv,
+                                    int Dh, const int* __restrict__ pos0p,
+                                    float scale) {
+  const int h = blockIdx.x;   // query head
+  const int d = threadIdx.x;  // 0..Dh-1
   const int group = Hq / Hkv;
   const int kvh = h / group;
-  const int S = *pos0p + 1;        // cache length (causal: attend [0, pos0])
+  const int S = *pos0p + 1;  // cache length (causal: attend [0, pos0])
 
   extern __shared__ float sh[];
-  float* qs = sh;                  // [Dh]
-  float* sc = sh + Dh;             // [S] scores
-  float* red = sc + kMaxCtx;       // [blockDim] reduction scratch
+  float* qs = sh;             // [Dh]
+  float* sc = sh + Dh;        // [S] scores
+  float* red = sc + kMaxCtx;  // [blockDim] reduction scratch
 
   qs[d] = q[(static_cast<size_t>(h)) * Dh + d];
   __syncthreads();
@@ -242,8 +253,9 @@ void AsrTextDecoder::LoadWeights(const io::ShardedSafeTensors& w) {
   const std::string M = "thinker.model.";
   embed_ = LoadBf16(w, M + "embed_tokens.weight");
   final_norm_ = LoadF32(w, M + "norm.weight");
-  lm_head_ = w.Has("thinker.lm_head.weight") ? LoadBf16(w, "thinker.lm_head.weight")
-                                             : embed_;  // tied
+  lm_head_ = w.Has("thinker.lm_head.weight")
+                 ? LoadBf16(w, "thinker.lm_head.weight")
+                 : embed_;  // tied
 
   layers_.resize(config_.num_layers);
   // Concatenate bf16 weight tensors along the output (row) dim into one buffer.
@@ -265,7 +277,8 @@ void AsrTextDecoder::LoadWeights(const io::ShardedSafeTensors& w) {
   };
   const size_t Hh = config_.hidden_size;
   const size_t Qd = static_cast<size_t>(config_.num_q_heads) * config_.head_dim;
-  const size_t KVd = static_cast<size_t>(config_.num_kv_heads) * config_.head_dim;
+  const size_t KVd =
+      static_cast<size_t>(config_.num_kv_heads) * config_.head_dim;
   const size_t I = config_.intermediate_size;
   for (int i = 0; i < config_.num_layers; ++i) {
     const std::string p = M + "layers." + std::to_string(i) + ".";
@@ -283,10 +296,11 @@ void AsrTextDecoder::LoadWeights(const io::ShardedSafeTensors& w) {
     L.down_w = LoadBf16(w, p + "mlp.down_proj.weight");
     // Fuse q|k|v and gate|up into single contiguous bf16 weights. The decode
     // path (Tq==1) issues one GEMV whose output row is contiguous, so q/k/v and
-    // gate/up are read as offset slices -- cutting kernel launches on the decode
-    // hot path (75% of ASR). The prefill path (Tq>1) reads the same fused
-    // buffers as row-slices. Numerically identical (same bf16 weights).
-    L.qkv_w = concat_bf16({&L.q_w, &L.k_w, &L.v_w}, {Qd * Hh, KVd * Hh, KVd * Hh});
+    // gate/up are read as offset slices -- cutting kernel launches on the
+    // decode hot path (75% of ASR). The prefill path (Tq>1) reads the same
+    // fused buffers as row-slices. Numerically identical (same bf16 weights).
+    L.qkv_w =
+        concat_bf16({&L.q_w, &L.k_w, &L.v_w}, {Qd * Hh, KVd * Hh, KVd * Hh});
     L.gateup_w = concat_bf16({&L.gate_w, &L.up_w}, {I * Hh, I * Hh});
     // Release the parts: both decode (Tq==1, fused GEMV) and prefill (Tq>1,
     // sliced GEMMs) now read only the fused buffers. No weight duplication.
@@ -295,11 +309,13 @@ void AsrTextDecoder::LoadWeights(const io::ShardedSafeTensors& w) {
 
   k_cache_.resize(config_.num_layers);
   v_cache_.resize(config_.num_layers);
-  const size_t cache_elems =
-      static_cast<size_t>(config_.max_seq_len) * config_.num_kv_heads * config_.head_dim;
+  const size_t cache_elems = static_cast<size_t>(config_.max_seq_len) *
+                             config_.num_kv_heads * config_.head_dim;
   for (int i = 0; i < config_.num_layers; ++i) {
-    k_cache_[i] = std::make_shared<UnifiedBuffer>(sizeof(uint16_t) * cache_elems);
-    v_cache_[i] = std::make_shared<UnifiedBuffer>(sizeof(uint16_t) * cache_elems);
+    k_cache_[i] =
+        std::make_shared<UnifiedBuffer>(sizeof(uint16_t) * cache_elems);
+    v_cache_[i] =
+        std::make_shared<UnifiedBuffer>(sizeof(uint16_t) * cache_elems);
   }
 
   // Slots 0..13 are the prefill (Forward) scratch, grown to the prefill length
@@ -309,7 +325,8 @@ void AsrTextDecoder::LoadWeights(const io::ShardedSafeTensors& w) {
   // (and thus move) them out from under the captured graph.
   work_.resize(27);
   work_cap_.assign(27, 0);
-  d_logits_ = std::make_shared<UnifiedBuffer>(sizeof(float) * config_.vocab_size);
+  d_logits_ =
+      std::make_shared<UnifiedBuffer>(sizeof(float) * config_.vocab_size);
   d_argmax_ = std::make_shared<UnifiedBuffer>(sizeof(int));
 
   // Plain host shadow of the embedding table (bf16) so Embed() can read it
@@ -343,7 +360,8 @@ float* AsrTextDecoder::Work(int which, size_t floats) {
 // at any position. d_x is the residual stream [hidden].
 void AsrTextDecoder::DecodeForwardOnStream(float* d_x, const int* d_pos,
                                            cudaStream_t s) {
-  const int Dh = config_.head_dim, Hq = config_.num_q_heads, Hkv = config_.num_kv_heads;
+  const int Dh = config_.head_dim, Hq = config_.num_q_heads,
+            Hkv = config_.num_kv_heads;
   const int Hh = config_.hidden_size, Qd = Hq * Dh, KVd = Hkv * Dh;
   const int I = config_.intermediate_size;
   const float eps = config_.rms_norm_eps;
@@ -353,7 +371,11 @@ void AsrTextDecoder::DecodeForwardOnStream(float* d_x, const int* d_pos,
   // so only time the eager default-stream (s==0) path.
   const bool prof = (s == 0) && std::getenv("ORATOR_ASR_PROFILE2") != nullptr;
   cudaEvent_t e0, e1;
-  if (prof) { cudaEventCreate(&e0); cudaEventCreate(&e1); cudaEventRecord(e0, s); }
+  if (prof) {
+    cudaEventCreate(&e0);
+    cudaEventCreate(&e1);
+    cudaEventRecord(e0, s);
+  }
 
   float* d_norm = Work(14, Hh);
   // Fused q|k|v output in one contiguous buffer; k/v are offset slices.
@@ -382,23 +404,27 @@ void AsrTextDecoder::DecodeForwardOnStream(float* d_x, const int* d_pos,
 
     asr_ops::RmsNorm(d_x, L.in_ln.p, d_norm, 1, Hh, eps, s);
     asr_gemm::F32ToBf16(d_norm, norm_bf16, Hh, s);
-    asr_gemm::LinearPre(norm_bf16, L.qkv_w.p, nullptr, d_qkv, 1, Hh, Qd + 2 * KVd, 0, s);
+    asr_gemm::LinearPre(norm_bf16, L.qkv_w.p, nullptr, d_qkv, 1, Hh,
+                        Qd + 2 * KVd, 0, s);
     asr_ops::RmsNorm(d_q, L.q_norm.p, d_q, Hq, Dh, eps, s);
     asr_ops::RmsNorm(d_k, L.k_norm.p, d_k, Hkv, Dh, eps, s);
     asr_ops::RopeHalf(d_q, d_pos, 1, Hq, Dh, config_.rope_theta, s);
     asr_ops::RopeHalf(d_k, d_pos, 1, Hkv, Dh, config_.rope_theta, s);
-    WriteKvCacheKernel<<<Blocks(KVd), kThreads, 0, s>>>(d_k, d_v, kc, vc, 1, Hkv, Dh, d_pos);
-    // Decode attention: one block per query head, block-parallel over the cache.
+    WriteKvCacheKernel<<<Blocks(KVd), kThreads, 0, s>>>(d_k, d_v, kc, vc, 1,
+                                                        Hkv, Dh, d_pos);
+    // Decode attention: one block per query head, block-parallel over the
+    // cache.
     const size_t attn_shmem = (Dh + kMaxCtx + Dh) * sizeof(float);
-    GqaDecodeAttnKernel<<<Hq, Dh, attn_shmem, s>>>(
-        d_q, kc, vc, d_attn, Hq, Hkv, Dh, d_pos, scale);
+    GqaDecodeAttnKernel<<<Hq, Dh, attn_shmem, s>>>(d_q, kc, vc, d_attn, Hq, Hkv,
+                                                   Dh, d_pos, scale);
     asr_gemm::F32ToBf16(d_attn, attn_bf16, Qd, s);
     asr_gemm::LinearPre(attn_bf16, L.o_w.p, nullptr, d_proj, 1, Qd, Hh, 0, s);
     AddResidualKernel<<<Blocks(Hh), kThreads, 0, s>>>(d_x, d_proj, Hh);
 
     asr_ops::RmsNorm(d_x, L.post_ln.p, d_norm, 1, Hh, eps, s);
     asr_gemm::F32ToBf16(d_norm, norm_bf16, Hh, s);
-    asr_gemm::LinearPre(norm_bf16, L.gateup_w.p, nullptr, d_gateup, 1, Hh, 2 * I, 0, s);
+    asr_gemm::LinearPre(norm_bf16, L.gateup_w.p, nullptr, d_gateup, 1, Hh,
+                        2 * I, 0, s);
     asr_ops::SwiGLU(d_gate, d_up, d_gate, I, s);
     asr_gemm::F32ToBf16(d_gate, gate_bf16, I, s);
     asr_gemm::LinearPre(gate_bf16, L.down_w.p, nullptr, d_proj, 1, I, Hh, 0, s);
@@ -418,15 +444,19 @@ void AsrTextDecoder::DecodeForwardOnStream(float* d_x, const int* d_pos,
     cudaEventElapsedTime(&gpu_ms, e0, e1);
     static int cnt = 0;
     static float sum = 0;
-    sum += gpu_ms; ++cnt;
+    sum += gpu_ms;
+    ++cnt;
     if (cnt % 16 == 0)
-      std::fprintf(stderr, "[dec2] per-token GPU compute avg = %.3f ms (n=%d)\n",
+      std::fprintf(stderr,
+                   "[dec2] per-token GPU compute avg = %.3f ms (n=%d)\n",
                    sum / cnt, cnt);
-    CUDA_CHECK(cudaEventDestroy(e0)); CUDA_CHECK(cudaEventDestroy(e1));
+    CUDA_CHECK(cudaEventDestroy(e0));
+    CUDA_CHECK(cudaEventDestroy(e1));
   }
 }
 
-void AsrTextDecoder::Forward(float* d_x, int Tq, int pos0, cudaStream_t stream) {
+void AsrTextDecoder::Forward(float* d_x, int Tq, int pos0,
+                             cudaStream_t stream) {
   const int Dh = config_.head_dim;
   const int Hq = config_.num_q_heads;
   const int Hkv = config_.num_kv_heads;
@@ -450,8 +480,8 @@ void AsrTextDecoder::Forward(float* d_x, int Tq, int pos0, cudaStream_t stream) 
   // read by device kernels. Writing them directly into the managed Work(8)
   // buffer faults on Tegra when the concurrent (lock-free) diarization/VAD
   // pipelines run a kernel (R1). Instead, write to a pinned host staging buffer
-  // and upload it to Work(8) with an async copy on the stream; kernels then read
-  // Work(8) on the device as before. Values are identical.
+  // and upload it to Work(8) with an async copy on the stream; kernels then
+  // read Work(8) on the device as before. Values are identical.
   static thread_local std::shared_ptr<PinnedBuffer> pos_stage;
   static thread_local size_t pos_cap = 0;
   const size_t pos_need = static_cast<size_t>(Tq) + 1;
@@ -469,12 +499,15 @@ void AsrTextDecoder::Forward(float* d_x, int Tq, int pos0, cudaStream_t stream) 
 
   // BF16 scratch for the post-norm activation, cast once and shared by the
   // q/k/v projections (and again by gate/up) to cut redundant cast launches.
-  auto* norm_bf16 = reinterpret_cast<uint16_t*>(Work(10, static_cast<size_t>(Tq) * Hh / 2 + 1));
+  auto* norm_bf16 = reinterpret_cast<uint16_t*>(
+      Work(10, static_cast<size_t>(Tq) * Hh / 2 + 1));
 
   const bool prof = (Tq == 1) && std::getenv("ORATOR_ASR_PROFILE2") != nullptr;
   cudaEvent_t e0, e1, e2;
   if (prof) {
-    cudaEventCreate(&e0); cudaEventCreate(&e1); cudaEventCreate(&e2);
+    cudaEventCreate(&e0);
+    cudaEventCreate(&e1);
+    cudaEventCreate(&e2);
     cudaEventRecord(e0);
   }
 
@@ -488,35 +521,39 @@ void AsrTextDecoder::Forward(float* d_x, int Tq, int pos0, cudaStream_t stream) 
     // Prefill (Tq>1) reads the fused qkv_w as three row-slices into separate
     // contiguous q/k/v buffers (a fused output would be row-interleaved). Same
     // weights as the decode path; the parts were released after concatenation.
-    asr_gemm::LinearPre(norm_bf16, L.qkv_w.p, nullptr, d_q, Tq, Hh, Qd, 0, stream);
+    asr_gemm::LinearPre(norm_bf16, L.qkv_w.p, nullptr, d_q, Tq, Hh, Qd, 0,
+                        stream);
     asr_gemm::LinearPre(norm_bf16, L.qkv_w.p + static_cast<size_t>(Qd) * Hh,
                         nullptr, d_k, Tq, Hh, KVd, 0, stream);
-    asr_gemm::LinearPre(norm_bf16, L.qkv_w.p + static_cast<size_t>(Qd + KVd) * Hh,
-                        nullptr, d_v, Tq, Hh, KVd, 0, stream);
+    asr_gemm::LinearPre(norm_bf16,
+                        L.qkv_w.p + static_cast<size_t>(Qd + KVd) * Hh, nullptr,
+                        d_v, Tq, Hh, KVd, 0, stream);
     asr_ops::RmsNorm(d_q, L.q_norm.p, d_q, Tq * Hq, Dh, eps, stream);
     asr_ops::RmsNorm(d_k, L.k_norm.p, d_k, Tq * Hkv, Dh, eps, stream);
     asr_ops::RopeHalf(d_q, d_pos, Tq, Hq, Dh, config_.rope_theta, stream);
     asr_ops::RopeHalf(d_k, d_pos, Tq, Hkv, Dh, config_.rope_theta, stream);
-    WriteKvCacheKernel<<<Blocks(static_cast<long>(Tq) * KVd), kThreads, 0, stream>>>(
-        d_k, d_v, kc, vc, Tq, Hkv, Dh, d_pos0);
+    WriteKvCacheKernel<<<Blocks(static_cast<long>(Tq) * KVd), kThreads, 0,
+                         stream>>>(d_k, d_v, kc, vc, Tq, Hkv, Dh, d_pos0);
     CheckCudaError(cudaGetLastError(), __FILE__, __LINE__);
     const int warps = Tq * Hq;
-    GqaCacheAttnKernel<<<Blocks(static_cast<long>(warps) * kWarp), kThreads, 0, stream>>>(
-        d_q, kc, vc, d_attn, Tq, Hq, Hkv, Dh, d_pos0, scale);
+    GqaCacheAttnKernel<<<Blocks(static_cast<long>(warps) * kWarp), kThreads, 0,
+                         stream>>>(d_q, kc, vc, d_attn, Tq, Hq, Hkv, Dh, d_pos0,
+                                   scale);
     CheckCudaError(cudaGetLastError(), __FILE__, __LINE__);
     asr_gemm::Linear(d_attn, L.o_w.p, nullptr, d_proj, Tq, Qd, Hh, 0, stream);
-    AddResidualKernel<<<Blocks(static_cast<long>(Tq) * Hh), kThreads, 0, stream>>>(
-        d_x, d_proj, static_cast<long>(Tq) * Hh);
+    AddResidualKernel<<<Blocks(static_cast<long>(Tq) * Hh), kThreads, 0,
+                        stream>>>(d_x, d_proj, static_cast<long>(Tq) * Hh);
 
     asr_ops::RmsNorm(d_x, L.post_ln.p, d_norm, Tq, Hh, eps, stream);
     asr_gemm::F32ToBf16(d_norm, norm_bf16, static_cast<long>(Tq) * Hh, stream);
-    asr_gemm::LinearPre(norm_bf16, L.gateup_w.p, nullptr, d_gate, Tq, Hh, I, 0, stream);
+    asr_gemm::LinearPre(norm_bf16, L.gateup_w.p, nullptr, d_gate, Tq, Hh, I, 0,
+                        stream);
     asr_gemm::LinearPre(norm_bf16, L.gateup_w.p + static_cast<size_t>(I) * Hh,
                         nullptr, d_up, Tq, Hh, I, 0, stream);
     asr_ops::SwiGLU(d_gate, d_up, d_gate, Tq * I, stream);
     asr_gemm::Linear(d_gate, L.down_w.p, nullptr, d_proj, Tq, I, Hh, 0, stream);
-    AddResidualKernel<<<Blocks(static_cast<long>(Tq) * Hh), kThreads, 0, stream>>>(
-        d_x, d_proj, static_cast<long>(Tq) * Hh);
+    AddResidualKernel<<<Blocks(static_cast<long>(Tq) * Hh), kThreads, 0,
+                        stream>>>(d_x, d_proj, static_cast<long>(Tq) * Hh);
     CheckCudaError(cudaGetLastError(), __FILE__, __LINE__);
   }
   cache_len_ = pos0 + Tq;
@@ -540,7 +577,9 @@ void AsrTextDecoder::Forward(float* d_x, int Tq, int pos0, cudaStream_t stream) 
     if (once++ < 1)
       std::fprintf(stderr, "[dec2] 28-layer loop=%.2fms lm_head+norm=%.2fms\n",
                    layers_ms, lm_ms);
-    CUDA_CHECK(cudaEventDestroy(e0)); CUDA_CHECK(cudaEventDestroy(e1)); CUDA_CHECK(cudaEventDestroy(e2));
+    CUDA_CHECK(cudaEventDestroy(e0));
+    CUDA_CHECK(cudaEventDestroy(e1));
+    CUDA_CHECK(cudaEventDestroy(e2));
   }
 }
 
@@ -551,11 +590,12 @@ void AsrTextDecoder::Prefill(const float* embeds, int T, cudaStream_t stream) {
 void AsrTextDecoder::PrefillAt(const float* embeds, int T, int pos0,
                                cudaStream_t stream) {
   // Dedicated residual-stream buffer so it doesn't collide with Work(0..9).
-  // Spec 002 Phase 7 (T072): this buffer is DEVICE memory, not managed. The host
-  // `embeds` (plain pageable host memory) is uploaded with cudaMemcpyAsync on
-  // the stream instead of a host std::memcpy into managed memory — a host write
-  // to managed pages while the concurrent (lock-free) diarization/VAD pipelines
-  // run a kernel faults on Tegra (R1; this was the observed crash site).
+  // Spec 002 Phase 7 (T072): this buffer is DEVICE memory, not managed. The
+  // host `embeds` (plain pageable host memory) is uploaded with cudaMemcpyAsync
+  // on the stream instead of a host std::memcpy into managed memory — a host
+  // write to managed pages while the concurrent (lock-free) diarization/VAD
+  // pipelines run a kernel faults on Tegra (R1; this was the observed crash
+  // site).
   static thread_local std::shared_ptr<DeviceBuffer> stream_buf;
   static thread_local size_t stream_cap = 0;
   const size_t need = static_cast<size_t>(T) * config_.hidden_size;
@@ -577,7 +617,8 @@ void AsrTextDecoder::PrefillAt(const float* embeds, int T, int pos0,
   CheckCudaError(cudaStreamSynchronize(stream), __FILE__, __LINE__);
 }
 
-void AsrTextDecoder::DecodeStep(const float* embed, int pos, cudaStream_t stream) {
+void AsrTextDecoder::DecodeStep(const float* embed, int pos,
+                                cudaStream_t stream) {
   const int Hh = config_.hidden_size;
   if (!step_x_) {
     step_x_ = std::make_shared<UnifiedBuffer>(sizeof(float) * Hh);
@@ -594,16 +635,17 @@ void AsrTextDecoder::DecodeStep(const float* embed, int pos, cudaStream_t stream
 }
 
 int AsrTextDecoder::Argmax(int ban0, int ban1, cudaStream_t stream) {
-  asr_ops::ArgmaxBanned(static_cast<float*>(d_logits_->data()), config_.vocab_size,
-                        ban0, ban1, static_cast<int*>(d_argmax_->data()), stream);
+  asr_ops::ArgmaxBanned(static_cast<float*>(d_logits_->data()),
+                        config_.vocab_size, ban0, ban1,
+                        static_cast<int*>(d_argmax_->data()), stream);
   CheckCudaError(cudaStreamSynchronize(stream), __FILE__, __LINE__);
   return *static_cast<int*>(d_argmax_->data());
 }
 
 void AsrTextDecoder::ArgmaxToDevice(int* d_out, int ban0, int ban1,
                                     cudaStream_t stream) {
-  asr_ops::ArgmaxBanned(static_cast<float*>(d_logits_->data()), config_.vocab_size,
-                        ban0, ban1, d_out, stream);
+  asr_ops::ArgmaxBanned(static_cast<float*>(d_logits_->data()),
+                        config_.vocab_size, ban0, ban1, d_out, stream);
 }
 
 int AsrTextDecoder::ReadTokenId(const int* d_token, cudaStream_t stream) const {
@@ -623,7 +665,8 @@ void AsrTextDecoder::DecodeStepDevice(const int* d_token, int pos,
   int* p = static_cast<int*>(step_pos_->data());
   *p = pos;
   cache_len_ = pos + 1;
-  EmbedGatherKernel<<<Blocks(Hh), kThreads, 0, stream>>>(embed_.p, d_token, x, Hh);
+  EmbedGatherKernel<<<Blocks(Hh), kThreads, 0, stream>>>(embed_.p, d_token, x,
+                                                         Hh);
   CheckCudaError(cudaGetLastError(), __FILE__, __LINE__);
   DecodeForwardOnStream(x, p, stream);
 }
@@ -643,8 +686,8 @@ void AsrTextDecoder::DecodeBodyImpl(cudaStream_t s, int ban0, int ban1) {
   RecordTokenKernel<<<1, 1, 0, s>>>(outp, cnt, tok);
   EmbedGatherKernel<<<Blocks(Hh), kThreads, 0, s>>>(embed_.p, tok, x, Hh);
   DecodeForwardOnStream(x, pos, s);
-  asr_ops::ArgmaxBanned(static_cast<float*>(d_logits_->data()), config_.vocab_size,
-                        ban0, ban1, tok, s);
+  asr_ops::ArgmaxBanned(static_cast<float*>(d_logits_->data()),
+                        config_.vocab_size, ban0, ban1, tok, s);
   IncPosKernel<<<1, 1, 0, s>>>(pos);
 }
 
@@ -674,9 +717,11 @@ std::vector<int> AsrTextDecoder::DecodeGreedy(int start_pos, int max_new,
     d_count_ = std::make_shared<PinnedBuffer>(sizeof(int));
   }
   if (!d_out_ || d_out_->size() < sizeof(int) * static_cast<size_t>(max_new)) {
-    d_out_ = std::make_shared<PinnedBuffer>(sizeof(int) * static_cast<size_t>(max_new));
+    d_out_ = std::make_shared<PinnedBuffer>(sizeof(int) *
+                                            static_cast<size_t>(max_new));
     if (graph_exec_) {
-      CUDA_CHECK(cudaGraphExecDestroy(static_cast<cudaGraphExec_t>(graph_exec_)));
+      CUDA_CHECK(
+          cudaGraphExecDestroy(static_cast<cudaGraphExec_t>(graph_exec_)));
       graph_exec_ = nullptr;
     }
     graph_ready_ = false;  // d_out_ moved -> stale graph
@@ -706,7 +751,10 @@ std::vector<int> AsrTextDecoder::DecodeGreedy(int start_pos, int max_new,
       if (out.size() >= 6) {
         bool same = true;
         for (size_t k = out.size() - 6; k + 1 < out.size(); ++k)
-          if (out[k] != out.back()) { same = false; break; }
+          if (out[k] != out.back()) {
+            same = false;
+            break;
+          }
         if (same) return true;
       }
     }
@@ -723,26 +771,31 @@ std::vector<int> AsrTextDecoder::DecodeGreedy(int start_pos, int max_new,
   };
   auto t_seed0 = clk();
   const bool seed_ban = 0 < ban_steps;
-  asr_ops::ArgmaxBanned(static_cast<float*>(d_logits_->data()), config_.vocab_size,
-                        seed_ban ? eos0 : -1, seed_ban ? eos1 : -1, tok, stream);
+  asr_ops::ArgmaxBanned(static_cast<float*>(d_logits_->data()),
+                        config_.vocab_size, seed_ban ? eos0 : -1,
+                        seed_ban ? eos1 : -1, tok, stream);
   CheckCudaError(cudaStreamSynchronize(stream), __FILE__, __LINE__);
   auto t_seed1 = clk();
 
   int emitted = 0;
   // CUDA Graph capture is disabled when (a) explicitly via ORATOR_ASR_NOGRAPH,
-  // or (b) any lock-free GPU concurrency mode is active (Spec 002): capture is a
-  // process/stream-global state machine that the concurrently-issuing
+  // or (b) any lock-free GPU concurrency mode is active (Spec 002): capture is
+  // a process/stream-global state machine that the concurrently-issuing
   // diarization/VAD pipeline corrupts, aborting with "operation failed ...
-  // during capture". In concurrent mode the eager per-batch path is used (it was
-  // measured stable and still faster end-to-end because diarization no longer
-  // waits behind ASR).
+  // during capture". In concurrent mode the eager per-batch path is used (it
+  // was measured stable and still faster end-to-end because diarization no
+  // longer waits behind ASR).
   const bool use_graph = std::getenv("ORATOR_ASR_NOGRAPH") == nullptr &&
                          !gpu::ConcurrentGpuActive();
 
   // If a previously captured banned graph baked different EOS ids, it is stale.
   if (graph_ready_ && (graph_ban0_ != eos0 || graph_ban1_ != eos1)) {
-    if (graph_exec_) CUDA_CHECK(cudaGraphExecDestroy(static_cast<cudaGraphExec_t>(graph_exec_)));
-    if (graph_exec_banned_) CUDA_CHECK(cudaGraphExecDestroy(static_cast<cudaGraphExec_t>(graph_exec_banned_)));
+    if (graph_exec_)
+      CUDA_CHECK(
+          cudaGraphExecDestroy(static_cast<cudaGraphExec_t>(graph_exec_)));
+    if (graph_exec_banned_)
+      CUDA_CHECK(cudaGraphExecDestroy(
+          static_cast<cudaGraphExec_t>(graph_exec_banned_)));
     graph_exec_ = graph_exec_banned_ = nullptr;
     graph_ready_ = false;
   }
@@ -756,29 +809,37 @@ std::vector<int> AsrTextDecoder::DecodeGreedy(int start_pos, int max_new,
   // (~220ms each on this Tegra) from every segment.
   if (use_graph && !graph_ready_) {
     const bool ban0 = (0 + 1) < ban_steps;
-    DecodeBodyImpl(stream, ban0 ? eos0 : -1, ban0 ? eos1 : -1);  // warmup + token 0
+    DecodeBodyImpl(stream, ban0 ? eos0 : -1,
+                   ban0 ? eos1 : -1);  // warmup + token 0
     CheckCudaError(cudaStreamSynchronize(stream), __FILE__, __LINE__);
     ++emitted;
 
     auto capture = [&](int b0, int b1) -> void* {
       CheckCudaError(cudaStreamBeginCapture(capture_stream_,
-                     cudaStreamCaptureModeThreadLocal), __FILE__, __LINE__);
+                                            cudaStreamCaptureModeThreadLocal),
+                     __FILE__, __LINE__);
       DecodeBodyImpl(capture_stream_, b0, b1);
       cudaGraph_t captured;
-      if (cudaStreamEndCapture(capture_stream_, &captured) != cudaSuccess) return nullptr;
+      if (cudaStreamEndCapture(capture_stream_, &captured) != cudaSuccess)
+        return nullptr;
       cudaGraphExec_t exec = nullptr;
-      cudaError_t inst = cudaGraphInstantiate(&exec, captured, nullptr, nullptr, 0);
+      cudaError_t inst =
+          cudaGraphInstantiate(&exec, captured, nullptr, nullptr, 0);
       CUDA_CHECK(cudaGraphDestroy(captured));
       return (inst == cudaSuccess) ? exec : nullptr;
     };
-    graph_ban0_ = eos0; graph_ban1_ = eos1;
+    graph_ban0_ = eos0;
+    graph_ban1_ = eos1;
     graph_exec_banned_ = capture(eos0, eos1);
     graph_exec_ = capture(-1, -1);
     graph_ready_ = true;
     if (std::getenv("ORATOR_ASR_PROFILE"))
       std::fprintf(stderr, "[graph] ready (banned=%p normal=%p)\n",
                    graph_exec_banned_, graph_exec_);
-    if (harvest(emitted)) { cache_len_ = start_pos + emitted; return out; }
+    if (harvest(emitted)) {
+      cache_len_ = start_pos + emitted;
+      return out;
+    }
   }
 
   const bool have_graph =
@@ -808,8 +869,8 @@ std::vector<int> AsrTextDecoder::DecodeGreedy(int start_pos, int max_new,
   int batches = 0;
   while (emitted < max_new) {
     const bool in_ban = (emitted + 1) < ban_steps;
-    cudaGraphExec_t g = static_cast<cudaGraphExec_t>(
-        in_ban ? graph_exec_banned_ : graph_exec_);
+    cudaGraphExec_t g =
+        static_cast<cudaGraphExec_t>(in_ban ? graph_exec_banned_ : graph_exec_);
     const int limit = in_ban ? std::min(ban_steps - 1, max_new) : max_new;
     const int this_batch = std::max(1, std::min(batch, limit - emitted));
     auto s0 = clk();
@@ -822,11 +883,12 @@ std::vector<int> AsrTextDecoder::DecodeGreedy(int start_pos, int max_new,
     if (harvest(emitted)) break;
   }
   if (dprof)
-    std::fprintf(stderr,
-                 "[decprof] seed+drain=%.1fms loop=%.1fms (emitted=%d batches=%d"
-                 " first_batch_sync=%.1fms)\n",
-                 ms(t_seed0, t_seed1), ms(t_loop0, clk()), emitted, batches,
-                 first_sync_ms);
+    std::fprintf(
+        stderr,
+        "[decprof] seed+drain=%.1fms loop=%.1fms (emitted=%d batches=%d"
+        " first_batch_sync=%.1fms)\n",
+        ms(t_seed0, t_seed1), ms(t_loop0, clk()), emitted, batches,
+        first_sync_ms);
   cache_len_ = start_pos + emitted;
   return out;
 }
@@ -836,7 +898,8 @@ std::vector<float> AsrTextDecoder::CopyLogits() const {
   // read. This path is verification-only; the engine uses GPU Argmax instead.
   CheckCudaError(cudaDeviceSynchronize(), __FILE__, __LINE__);
   std::vector<float> out(config_.vocab_size);
-  std::memcpy(out.data(), d_logits_->data(), sizeof(float) * config_.vocab_size);
+  std::memcpy(out.data(), d_logits_->data(),
+              sizeof(float) * config_.vocab_size);
   return out;
 }
 

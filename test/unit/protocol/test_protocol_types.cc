@@ -5,8 +5,8 @@
 #include "protocol/schema.h"
 #include "protocol/topic.h"
 
-using orator::protocol::FieldType;
 using orator::protocol::Field;
+using orator::protocol::FieldType;
 using orator::protocol::Schema;
 using orator::protocol::SchemaRegistry;
 using orator::protocol::Topic;
@@ -15,12 +15,12 @@ using orator::protocol::TopicSchema;
 
 static int g_fail = 0;
 
-#define CHECK(cond, msg)        \
-  do {                          \
-    if (!(cond)) {              \
+#define CHECK(cond, msg)              \
+  do {                                \
+    if (!(cond)) {                    \
       std::printf("FAIL: %s\n", msg); \
-      ++g_fail;                 \
-    }                           \
+      ++g_fail;                       \
+    }                                 \
   } while (0)
 
 // ---------------------------------------------------------------------------
@@ -96,7 +96,8 @@ static void test_pattern_plus_wildcard() {
 static void test_pattern_plus_middle() {
   TopicPattern p{"system/+/online"};
   CHECK(p.Matches(Topic{"system/pipeline/online"}), "+ in middle matches");
-  CHECK(!p.Matches(Topic{"system/pipeline/offline"}), "+ does not change last level");
+  CHECK(!p.Matches(Topic{"system/pipeline/offline"}),
+        "+ does not change last level");
 }
 
 // ---------------------------------------------------------------------------
@@ -133,13 +134,25 @@ static void test_pattern_non_matches() {
 
 static void test_standard_topics() {
   CHECK(orator::protocol::kAudioRaw.to_string() == "audio/raw", "kAudioRaw");
-  CHECK(orator::protocol::kVadSpeechSegment.to_string() == "vad/speech_segment", "kVadSpeechSegment");
-  CHECK(orator::protocol::kAsrTranscript.to_string() == "asr/transcript", "kAsrTranscript");
-  CHECK(orator::protocol::kAsrTranscriptPartial.to_string() == "asr/transcript_partial", "kAsrTranscriptPartial");
-  CHECK(orator::protocol::kDiarSpeakerSegment.to_string() == "diar/speaker_segment", "kDiarSpeakerSegment");
-  CHECK(orator::protocol::kSystemPipelineOnline.to_string() == "system/pipeline/online", "kSystemPipelineOnline");
-  CHECK(orator::protocol::kSystemPipelineOffline.to_string() == "system/pipeline/offline", "kSystemPipelineOffline");
-  CHECK(orator::protocol::kSystemGpuTelemetry.to_string() == "system/gpu_telemetry", "kSystemGpuTelemetry");
+  CHECK(orator::protocol::kVadSpeechSegment.to_string() == "vad/speech_segment",
+        "kVadSpeechSegment");
+  CHECK(orator::protocol::kAsrTranscript.to_string() == "asr/transcript",
+        "kAsrTranscript");
+  CHECK(orator::protocol::kAsrTranscriptPartial.to_string() ==
+            "asr/transcript_partial",
+        "kAsrTranscriptPartial");
+  CHECK(orator::protocol::kDiarSpeakerSegment.to_string() ==
+            "diar/speaker_segment",
+        "kDiarSpeakerSegment");
+  CHECK(orator::protocol::kSystemPipelineOnline.to_string() ==
+            "system/pipeline/online",
+        "kSystemPipelineOnline");
+  CHECK(orator::protocol::kSystemPipelineOffline.to_string() ==
+            "system/pipeline/offline",
+        "kSystemPipelineOffline");
+  CHECK(orator::protocol::kSystemGpuTelemetry.to_string() ==
+            "system/gpu_telemetry",
+        "kSystemGpuTelemetry");
 }
 
 // ---------------------------------------------------------------------------

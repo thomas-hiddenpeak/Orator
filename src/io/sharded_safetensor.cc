@@ -35,16 +35,26 @@ std::map<std::string, std::string> ShardedSafeTensors::ParseIndex(
 
   std::map<std::string, std::string> map;
   size_t wm = json.find("\"weight_map\"");
-  if (wm == std::string::npos) throw std::runtime_error("index missing weight_map");
+  if (wm == std::string::npos)
+    throw std::runtime_error("index missing weight_map");
   size_t brace = json.find('{', wm);
-  if (brace == std::string::npos) throw std::runtime_error("malformed weight_map");
+  if (brace == std::string::npos)
+    throw std::runtime_error("malformed weight_map");
 
   // Walk "key": "value" pairs until the matching close brace.
   int depth = 1;
   size_t pos = brace + 1;
   while (pos < json.size() && depth > 0) {
-    if (json[pos] == '{') { depth++; pos++; continue; }
-    if (json[pos] == '}') { depth--; pos++; continue; }
+    if (json[pos] == '{') {
+      depth++;
+      pos++;
+      continue;
+    }
+    if (json[pos] == '}') {
+      depth--;
+      pos++;
+      continue;
+    }
     size_t k0 = json.find('"', pos);
     if (k0 == std::string::npos || k0 > json.find('}', pos)) break;
     size_t k1 = json.find('"', k0 + 1);

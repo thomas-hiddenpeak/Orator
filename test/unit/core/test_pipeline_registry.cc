@@ -11,14 +11,14 @@ using orator::protocol::PipelineHandle;
 using orator::protocol::PipelineRegistry;
 
 static int g_fail = 0;
-#define CHECK(cond, msg)                                 \
-  do {                                                   \
-    if (!(cond)) {                                       \
-      std::printf("FAIL: %s\n", msg);                    \
-      ++g_fail;                                          \
-    } else {                                             \
-      std::printf("PASS: %s\n", msg);                    \
-    }                                                    \
+#define CHECK(cond, msg)              \
+  do {                                \
+    if (!(cond)) {                    \
+      std::printf("FAIL: %s\n", msg); \
+      ++g_fail;                       \
+    } else {                          \
+      std::printf("PASS: %s\n", msg); \
+    }                                 \
   } while (0)
 
 int main() {
@@ -137,7 +137,8 @@ int main() {
     CHECK(registry.Describe().empty(), "pipeline gone after handle scope exit");
   }
 
-  // ---- 7. Disabled pipeline (enabled=false) registers but is marked disabled ----
+  // ---- 7. Disabled pipeline (enabled=false) registers but is marked disabled
+  // ----
   {
     PipelineRegistry registry;
     PipelineDescriptor desc;
@@ -168,17 +169,18 @@ int main() {
     CHECK(handle2.name() == "movable", "moved handle preserves name");
 
     // Verify the pipeline is still registered.
-    CHECK(registry.Describe().size() == 1, "pipeline still registered after move");
+    CHECK(registry.Describe().size() == 1,
+          "pipeline still registered after move");
   }
 
   // ---- 9. System event callback fires on register/unregister ----
   {
     PipelineRegistry registry;
     std::vector<std::string> events;
-    registry.OnSystemEvent([&events](const std::string& topic,
-                                     const std::string& data) {
-      events.push_back(topic + "=" + data);
-    });
+    registry.OnSystemEvent(
+        [&events](const std::string& topic, const std::string& data) {
+          events.push_back(topic + "=" + data);
+        });
 
     PipelineDescriptor desc;
     desc.name = "event_test";

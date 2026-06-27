@@ -30,8 +30,9 @@ int main() {
   int device_count = 0;
   cudaError_t ce = cudaGetDeviceCount(&device_count);
   if (ce != cudaSuccess || device_count < 1) {
-    std::printf("SKIP: no CUDA-capable GPU found (cudaGetDeviceCount=%d, count=%d)\n",
-                static_cast<int>(ce), device_count);
+    std::printf(
+        "SKIP: no CUDA-capable GPU found (cudaGetDeviceCount=%d, count=%d)\n",
+        static_cast<int>(ce), device_count);
     return 0;
   }
   std::printf("Testing gpu::GpuScheduler...\n");
@@ -60,7 +61,8 @@ int main() {
     GpuScheduler sched;
     cudaStream_t s = sched.Register("diarization", 0, /*background=*/false,
                                     /*create_stream=*/true);
-    CHECK(s != nullptr, "Register(priority=0, create=true) returns non-null stream");
+    CHECK(s != nullptr,
+          "Register(priority=0, create=true) returns non-null stream");
     std::printf("  PASS\n");
   }
 
@@ -113,8 +115,8 @@ int main() {
     int p_neg = sched.PriorityForIndex(-5);
     CHECK(p_neg == greatest, "PriorityForIndex(-5) == greatest (clamped to 0)");
 
-    std::printf("    greatest=%d, least=%d, p0=%d, p999=%d, p-5=%d\n",
-                greatest, least, p0, p_big, p_neg);
+    std::printf("    greatest=%d, least=%d, p0=%d, p999=%d, p-5=%d\n", greatest,
+                least, p0, p_big, p_neg);
     std::printf("  PASS\n");
   }
 

@@ -26,7 +26,7 @@ class BpeTokenizer {
   // Loads vocab.json + merges.txt + tokenizer_config.json from model_dir.
   bool Load(const std::string& model_dir);
 
-  std::vector<int> Encode(const std::string& text) const;        // ordinary text
+  std::vector<int> Encode(const std::string& text) const;  // ordinary text
   std::string Decode(const std::vector<int>& ids,
                      bool skip_special = true) const;
 

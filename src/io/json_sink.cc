@@ -57,8 +57,8 @@ std::string TimelineToJson(const core::Timeline& timeline, bool pretty) {
     oss << nl << ind2 << "{";
     oss << "\"start\":" << sp << FormatTime(seg.start_sec) << "," << sp;
     oss << "\"end\":" << sp << FormatTime(seg.end_sec) << "," << sp;
-    oss << "\"speaker_id\":" << sp << "\"" << EscapeJson(seg.speaker_id) << "\","
-        << sp;
+    oss << "\"speaker_id\":" << sp << "\"" << EscapeJson(seg.speaker_id)
+        << "\"," << sp;
     oss << "\"text\":" << sp << "\"" << EscapeJson(seg.text) << "\"}";
     if (i + 1 < timeline.segments.size()) oss << ",";
   }

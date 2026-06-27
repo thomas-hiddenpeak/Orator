@@ -26,8 +26,8 @@ namespace {
 // Per-window detector dimensions (identical to the CPU AsrSileroVad).
 constexpr int kContext = 64;
 constexpr int kWindow = 512;
-constexpr int kInput = 576;     // context + window
-constexpr int kPadded = 640;    // reflect-padded input (pad 64 on the right)
+constexpr int kInput = 576;   // context + window
+constexpr int kPadded = 640;  // reflect-padded input (pad 64 on the right)
 constexpr int kNfft = 256;
 constexpr int kHop = 128;
 constexpr int kStftBins = 129;
@@ -83,10 +83,10 @@ __global__ void StftMagKernel(const float* padded, const float* basis,
 
 // Batched 1D convolution (optionally followed by ReLU). Channel-major layout:
 // input[n][ci*Lin + pos], weight[co*Cin*K + ci*K + k], output[n][co*Lout + t].
-__global__ void Conv1dReluKernel(const float* in, const float* w, const float* b,
-                                 float* out, int n_win, int Cin, int Lin,
-                                 int Cout, int K, int stride, int pad, int Lout,
-                                 int do_relu) {
+__global__ void Conv1dReluKernel(const float* in, const float* w,
+                                 const float* b, float* out, int n_win, int Cin,
+                                 int Lin, int Cout, int K, int stride, int pad,
+                                 int Lout, int do_relu) {
   const int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx >= n_win * Cout * Lout) return;
   const int t = idx % Lout;
@@ -190,8 +190,7 @@ float* DeviceUpload(const std::vector<float>& host) {
 
 }  // namespace
 
-GpuVad::GpuVad(const Params& params)
-    : params_(params), stream_(params.stream) {
+GpuVad::GpuVad(const Params& params) : params_(params), stream_(params.stream) {
   InitModel();
   UploadWeights();
   buf_.assign(kContext, 0.0f);
@@ -199,31 +198,47 @@ GpuVad::GpuVad(const Params& params)
   next_window_abs_ = 0;
 }
 
-GpuVad::~GpuVad() {
-  FreeDeviceMemory();
-}
+GpuVad::~GpuVad() { FreeDeviceMemory(); }
 
 void GpuVad::FreeDeviceMemory() {
-  CUDA_CHECK(cudaFree(d_stft_basis_)); d_stft_basis_ = nullptr;
+  CUDA_CHECK(cudaFree(d_stft_basis_));
+  d_stft_basis_ = nullptr;
   for (int i = 0; i < 4; ++i) {
-    CUDA_CHECK(cudaFree(d_enc_w_[i])); d_enc_w_[i] = nullptr;
-    CUDA_CHECK(cudaFree(d_enc_b_[i])); d_enc_b_[i] = nullptr;
+    CUDA_CHECK(cudaFree(d_enc_w_[i]));
+    d_enc_w_[i] = nullptr;
+    CUDA_CHECK(cudaFree(d_enc_b_[i]));
+    d_enc_b_[i] = nullptr;
   }
-  CUDA_CHECK(cudaFree(d_lstm_wih_)); d_lstm_wih_ = nullptr;
-  CUDA_CHECK(cudaFree(d_lstm_whh_)); d_lstm_whh_ = nullptr;
-  CUDA_CHECK(cudaFree(d_lstm_bih_)); d_lstm_bih_ = nullptr;
-  CUDA_CHECK(cudaFree(d_lstm_bhh_)); d_lstm_bhh_ = nullptr;
-  CUDA_CHECK(cudaFree(d_dec_w_)); d_dec_w_ = nullptr;
-  CUDA_CHECK(cudaFree(d_ext_)); d_ext_ = nullptr;
-  CUDA_CHECK(cudaFree(d_padded_)); d_padded_ = nullptr;
-  CUDA_CHECK(cudaFree(d_mag_)); d_mag_ = nullptr;
-  CUDA_CHECK(cudaFree(d_enc0_)); d_enc0_ = nullptr;
-  CUDA_CHECK(cudaFree(d_enc1_)); d_enc1_ = nullptr;
-  CUDA_CHECK(cudaFree(d_enc2_)); d_enc2_ = nullptr;
-  CUDA_CHECK(cudaFree(d_enc3_)); d_enc3_ = nullptr;
-  CUDA_CHECK(cudaFree(d_prob_)); d_prob_ = nullptr;
-  CUDA_CHECK(cudaFree(d_h_)); d_h_ = nullptr;
-  CUDA_CHECK(cudaFree(d_c_)); d_c_ = nullptr;
+  CUDA_CHECK(cudaFree(d_lstm_wih_));
+  d_lstm_wih_ = nullptr;
+  CUDA_CHECK(cudaFree(d_lstm_whh_));
+  d_lstm_whh_ = nullptr;
+  CUDA_CHECK(cudaFree(d_lstm_bih_));
+  d_lstm_bih_ = nullptr;
+  CUDA_CHECK(cudaFree(d_lstm_bhh_));
+  d_lstm_bhh_ = nullptr;
+  CUDA_CHECK(cudaFree(d_dec_w_));
+  d_dec_w_ = nullptr;
+  CUDA_CHECK(cudaFree(d_ext_));
+  d_ext_ = nullptr;
+  CUDA_CHECK(cudaFree(d_padded_));
+  d_padded_ = nullptr;
+  CUDA_CHECK(cudaFree(d_mag_));
+  d_mag_ = nullptr;
+  CUDA_CHECK(cudaFree(d_enc0_));
+  d_enc0_ = nullptr;
+  CUDA_CHECK(cudaFree(d_enc1_));
+  d_enc1_ = nullptr;
+  CUDA_CHECK(cudaFree(d_enc2_));
+  d_enc2_ = nullptr;
+  CUDA_CHECK(cudaFree(d_enc3_));
+  d_enc3_ = nullptr;
+  CUDA_CHECK(cudaFree(d_prob_));
+  d_prob_ = nullptr;
+  CUDA_CHECK(cudaFree(d_h_));
+  d_h_ = nullptr;
+  CUDA_CHECK(cudaFree(d_c_));
+  d_c_ = nullptr;
 }
 
 void GpuVad::Initialize(const core::VadConfig& config) {
@@ -282,9 +297,11 @@ void GpuVad::UploadWeights() {
   d_lstm_bhh_ = DeviceUpload(lstm_bhh_);
   d_dec_w_ = DeviceUpload(dec_w_);
 
-  CUDA_CHECK(cudaMalloc(&d_ext_, (kContext + kMaxBatch * kWindow) * sizeof(float)));
+  CUDA_CHECK(
+      cudaMalloc(&d_ext_, (kContext + kMaxBatch * kWindow) * sizeof(float)));
   CUDA_CHECK(cudaMalloc(&d_padded_, kMaxBatch * kPadded * sizeof(float)));
-  CUDA_CHECK(cudaMalloc(&d_mag_, kMaxBatch * kStftBins * kStftFrames * sizeof(float)));
+  CUDA_CHECK(
+      cudaMalloc(&d_mag_, kMaxBatch * kStftBins * kStftFrames * sizeof(float)));
   CUDA_CHECK(cudaMalloc(&d_enc0_, kMaxBatch * 128 * 4 * sizeof(float)));
   CUDA_CHECK(cudaMalloc(&d_enc1_, kMaxBatch * 64 * 2 * sizeof(float)));
   CUDA_CHECK(cudaMalloc(&d_enc2_, kMaxBatch * 64 * 1 * sizeof(float)));
@@ -301,7 +318,8 @@ void GpuVad::Push(const float* samples, int n) {
   buf_.insert(buf_.end(), samples, samples + n);
 }
 
-void GpuVad::RunBatch(const float* ext, int n_windows, std::vector<float>* probs) {
+void GpuVad::RunBatch(const float* ext, int n_windows,
+                      std::vector<float>* probs) {
   probs->resize(n_windows);
   const auto t0 = std::chrono::steady_clock::now();
   // Spec 002: VAD runs on its own dedicated CUDA stream (lock-free).
@@ -314,36 +332,42 @@ void GpuVad::RunBatch(const float* ext, int n_windows, std::vector<float>* probs
                                (kContext + nb * kWindow) * sizeof(float),
                                cudaMemcpyHostToDevice, stream_));
 
-    BuildPaddedKernel<<<CeilDiv(nb * kPadded, kThreads), kThreads, 0, stream_>>>(
-        d_ext_, d_padded_, nb);
-    StftMagKernel<<<CeilDiv(nb * kStftBins * kStftFrames, kThreads), kThreads, 0, stream_>>>(
-        d_padded_, d_stft_basis_, d_mag_, nb);
+    BuildPaddedKernel<<<CeilDiv(nb * kPadded, kThreads), kThreads, 0,
+                        stream_>>>(d_ext_, d_padded_, nb);
+    StftMagKernel<<<CeilDiv(nb * kStftBins * kStftFrames, kThreads), kThreads,
+                    0, stream_>>>(d_padded_, d_stft_basis_, d_mag_, nb);
     // enc0: Cin=129 Lin=4 -> Cout=128 Lout=4, K3 s1 p1, relu
     Conv1dReluKernel<<<CeilDiv(nb * 128 * 4, kThreads), kThreads, 0, stream_>>>(
-        d_mag_, d_enc_w_[0], d_enc_b_[0], d_enc0_, nb, 129, 4, 128, 3, 1, 1, 4, 1);
+        d_mag_, d_enc_w_[0], d_enc_b_[0], d_enc0_, nb, 129, 4, 128, 3, 1, 1, 4,
+        1);
     // enc1: Cin=128 Lin=4 -> Cout=64 Lout=2, K3 s2 p1, relu
     Conv1dReluKernel<<<CeilDiv(nb * 64 * 2, kThreads), kThreads, 0, stream_>>>(
-        d_enc0_, d_enc_w_[1], d_enc_b_[1], d_enc1_, nb, 128, 4, 64, 3, 2, 1, 2, 1);
+        d_enc0_, d_enc_w_[1], d_enc_b_[1], d_enc1_, nb, 128, 4, 64, 3, 2, 1, 2,
+        1);
     // enc2: Cin=64 Lin=2 -> Cout=64 Lout=1, K3 s2 p1, relu
     Conv1dReluKernel<<<CeilDiv(nb * 64 * 1, kThreads), kThreads, 0, stream_>>>(
-        d_enc1_, d_enc_w_[2], d_enc_b_[2], d_enc2_, nb, 64, 2, 64, 3, 2, 1, 1, 1);
+        d_enc1_, d_enc_w_[2], d_enc_b_[2], d_enc2_, nb, 64, 2, 64, 3, 2, 1, 1,
+        1);
     // enc3: Cin=64 Lin=1 -> Cout=128 Lout=1, K3 s1 p1, relu
     Conv1dReluKernel<<<CeilDiv(nb * 128 * 1, kThreads), kThreads, 0, stream_>>>(
-        d_enc2_, d_enc_w_[3], d_enc_b_[3], d_enc3_, nb, 64, 1, 128, 3, 1, 1, 1, 1);
+        d_enc2_, d_enc_w_[3], d_enc_b_[3], d_enc3_, nb, 64, 1, 128, 3, 1, 1, 1,
+        1);
     // LSTM scan + decoder (one block, carried state).
-    LstmDecoderKernel<<<1, kHidden, 0, stream_>>>(d_enc3_, d_lstm_wih_, d_lstm_whh_,
-                                                  d_lstm_bih_, d_lstm_bhh_, d_dec_w_, dec_b_,
-                                                  d_h_, d_c_, d_prob_, nb);
+    LstmDecoderKernel<<<1, kHidden, 0, stream_>>>(
+        d_enc3_, d_lstm_wih_, d_lstm_whh_, d_lstm_bih_, d_lstm_bhh_, d_dec_w_,
+        dec_b_, d_h_, d_c_, d_prob_, nb);
     CUDA_CHECK(cudaGetLastError());
-    CUDA_CHECK(cudaMemcpyAsync(probs->data() + done, d_prob_, nb * sizeof(float),
-                               cudaMemcpyDeviceToHost, stream_));
+    CUDA_CHECK(cudaMemcpyAsync(probs->data() + done, d_prob_,
+                               nb * sizeof(float), cudaMemcpyDeviceToHost,
+                               stream_));
     // Wait for this sub-batch's probs to be ready before the host reads them
     // in the endpoint state machine (DrainSegments).
     CUDA_CHECK(cudaStreamSynchronize(stream_));
     done += nb;
   }
   compute_sec_ +=
-      std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+      std::chrono::duration<double>(std::chrono::steady_clock::now() - t0)
+          .count();
 }
 
 void GpuVad::DrainSegments(bool finalize,

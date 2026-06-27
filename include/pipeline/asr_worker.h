@@ -25,11 +25,14 @@ class AsrWorker {
  public:
   struct Params {
     int sample_rate = 16000;
-    double segment_sec = 24.0;  // commit + reset cadence (cap, unused with VAD gate)
-    int max_audio_tokens = 1500;       // KV-cache safety cap (prevents crash above ~1768 tokens)
-    bool asr_vad_gate = true;           // enable VAD-gated processing
-    int asr_vad_lead_ms = 200;          // lead buffer (ms) before VAD speech onset
-    double asr_vad_trail_sec = 1.5;     // trailing window (sec) after VAD silence before commit
+    double segment_sec =
+        24.0;  // commit + reset cadence (cap, unused with VAD gate)
+    int max_audio_tokens =
+        1500;  // KV-cache safety cap (prevents crash above ~1768 tokens)
+    bool asr_vad_gate = true;   // enable VAD-gated processing
+    int asr_vad_lead_ms = 200;  // lead buffer (ms) before VAD speech onset
+    double asr_vad_trail_sec =
+        1.5;  // trailing window (sec) after VAD silence before commit
   };
 
   using Emit = std::function<void(const std::string&)>;
@@ -54,9 +57,9 @@ class AsrWorker {
     }
     // The absolute time (common clock, sec) up to which VAD has processed and
     // confirmed its speech/silence decision. ASR treats a silence sub-span as
-    // skippable only when its end is within this horizon, so at real-time pacing
-    // (VAD ~= ASR at the leading edge) ASR can still skip confirmed silence
-    // instead of spending GPU on it. Published by the VAD pipeline via
+    // skippable only when its end is within this horizon, so at real-time
+    // pacing (VAD ~= ASR at the leading edge) ASR can still skip confirmed
+    // silence instead of spending GPU on it. Published by the VAD pipeline via
     // `vad/progress` and consumed here -- ASR never blocks on VAD.
     void set_horizon(double sec) {
       std::lock_guard<std::mutex> lk(mutex_);
@@ -66,15 +69,15 @@ class AsrWorker {
       std::lock_guard<std::mutex> lk(mutex_);
       return horizon_;
     }
+
    private:
     mutable std::mutex mutex_;
     std::vector<std::pair<double, double>> segments_;
     double horizon_ = -1e9;
   };
 
-  AsrWorker(core::IAsr* asr, const Params& params,
-            Emit emit, core::TimeBase tb, cudaStream_t stream = 0,
-            VadCache* vad_cache = nullptr);
+  AsrWorker(core::IAsr* asr, const Params& params, Emit emit, core::TimeBase tb,
+            cudaStream_t stream = 0, VadCache* vad_cache = nullptr);
 
   void set_text_sink(TextSegmentSink sink) { text_sink_ = std::move(sink); }
 
@@ -90,14 +93,15 @@ class AsrWorker {
   void EmitIncrementalChunk(const float* samples, int n, bool finalize);
 
   // Event-driven VAD gate. ProcessSpan cuts the incoming audio span at the VAD
-  // segment boundaries that fall inside it (VadCutSamples) so each sub-span lies
-  // wholly within one VAD region, then ProcessGateSubSpan acts on it: process
-  // speech and UNCONFIRMED audio (never drop speech), skip only CONFIRMED
-  // silence (the GPU saving), committing the open utterance after its trailing
-  // window. Cut points are VAD audio times, so coverage does not depend on how
-  // large the span is (chunk-invariant): a flooded multi-minute span is no
-  // longer skipped wholesale because its end happens to land in a silence gap.
-  // This never blocks on VAD -- it only consults what VAD has already published.
+  // segment boundaries that fall inside it (VadCutSamples) so each sub-span
+  // lies wholly within one VAD region, then ProcessGateSubSpan acts on it:
+  // process speech and UNCONFIRMED audio (never drop speech), skip only
+  // CONFIRMED silence (the GPU saving), committing the open utterance after its
+  // trailing window. Cut points are VAD audio times, so coverage does not
+  // depend on how large the span is (chunk-invariant): a flooded multi-minute
+  // span is no longer skipped wholesale because its end happens to land in a
+  // silence gap. This never blocks on VAD -- it only consults what VAD has
+  // already published.
   void ProcessGateSubSpan(const float* sub, int sub_n);
   std::vector<long> VadCutSamples(long span_start, long span_end) const;
 

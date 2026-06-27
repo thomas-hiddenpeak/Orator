@@ -6,11 +6,11 @@ namespace orator {
 namespace pipeline {
 
 struct TestComprehensiveTimeline : public ComprehensiveTimeline {
-  using ComprehensiveTimeline::UpsertSpeaker;
-  using ComprehensiveTimeline::ReplaceSpeakers;
-  using ComprehensiveTimeline::UpsertText;
   using ComprehensiveTimeline::AddVad;
+  using ComprehensiveTimeline::ReplaceSpeakers;
   using ComprehensiveTimeline::SpeakerInput;
+  using ComprehensiveTimeline::UpsertSpeaker;
+  using ComprehensiveTimeline::UpsertText;
 };
 
 }  // namespace pipeline

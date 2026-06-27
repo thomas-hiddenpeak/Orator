@@ -34,8 +34,9 @@ std::string ShellQuote(const std::string& s) {
 bool WriteF32(const std::filesystem::path& p, const float* in, int n) {
   std::ofstream os(p, std::ios::binary);
   if (!os.good()) return false;
-  os.write(reinterpret_cast<const char*>(in), static_cast<std::streamsize>(n) *
-                                               static_cast<std::streamsize>(sizeof(float)));
+  os.write(reinterpret_cast<const char*>(in),
+           static_cast<std::streamsize>(n) *
+               static_cast<std::streamsize>(sizeof(float)));
   return os.good();
 }
 
@@ -48,7 +49,8 @@ bool ReadF32(const std::filesystem::path& p, std::vector<float>* out) {
     return false;
   }
   is.seekg(0, std::ios::beg);
-  out->resize(static_cast<size_t>(bytes / static_cast<std::streamsize>(sizeof(float))));
+  out->resize(
+      static_cast<size_t>(bytes / static_cast<std::streamsize>(sizeof(float))));
   if (!out->empty()) {
     is.read(reinterpret_cast<char*>(out->data()), bytes);
   }
@@ -91,7 +93,8 @@ std::filesystem::path MakeTempPath(const char* suffix) {
 AsrPreprocessor::AsrPreprocessor(const Params& params)
     : params_(params), mode_(ParseMode(params.mode)) {}
 
-AsrPreprocessor::Mode AsrPreprocessor::ParseMode(const std::string& mode) const {
+AsrPreprocessor::Mode AsrPreprocessor::ParseMode(
+    const std::string& mode) const {
   std::string m = mode;
   std::transform(m.begin(), m.end(), m.begin(), [](unsigned char c) {
     return static_cast<char>(std::tolower(c));
@@ -118,14 +121,16 @@ void AsrPreprocessor::Process(const float* samples, int n,
       return;
     case Mode::kFrcrn:
       if (RunFrcrnModelScope(samples, n, out)) return;
-      WarnOnce("[asr_preproc] FRCRN backend unavailable, fallback to classical.\n");
+      WarnOnce(
+          "[asr_preproc] FRCRN backend unavailable, fallback to classical.\n");
       ClassicalEnhance(samples, n, out);
       return;
     case Mode::kTfGridNet:
       // Model inference backend will use converted safetensors in a follow-up
       // implementation. Keep the processing active today via the deterministic
       // classical path to preserve the VAD->preproc->ASR wiring.
-      WarnOnce("[asr_preproc] TF-GridNet backend not wired yet, using classical.\n");
+      WarnOnce(
+          "[asr_preproc] TF-GridNet backend not wired yet, using classical.\n");
       ClassicalEnhance(samples, n, out);
       return;
   }
@@ -144,17 +149,19 @@ bool AsrPreprocessor::RunFrcrnModelScope(const float* in, int n,
 
   if (!WriteF32(in_f32, in, n)) return false;
 
-  const std::string model = params_.frcrn_model_path.empty() ||
-                                    params_.frcrn_model_path.find(".safetensors") != std::string::npos
-                                ? "damo/speech_frcrn_ans_cirm_16k"
-                                : params_.frcrn_model_path;
+  const std::string model =
+      params_.frcrn_model_path.empty() ||
+              params_.frcrn_model_path.find(".safetensors") != std::string::npos
+          ? "damo/speech_frcrn_ans_cirm_16k"
+          : params_.frcrn_model_path;
   std::ostringstream cmd;
   cmd << "bash -lc "
       << ShellQuote(std::string("source ") + torchenv_sh.string() +
-                    " && python3 " + infer_py.string() + " --mode frcrn --in-f32 " +
-                    in_f32.string() + " --out-f32 " + out_f32.string() + " --sample-rate " +
-                    std::to_string(params_.sample_rate) + " --frcrn-model " + model + " 2>" +
-                    err_log.string());
+                    " && python3 " + infer_py.string() +
+                    " --mode frcrn --in-f32 " + in_f32.string() +
+                    " --out-f32 " + out_f32.string() + " --sample-rate " +
+                    std::to_string(params_.sample_rate) + " --frcrn-model " +
+                    model + " 2>" + err_log.string());
 
   const int rc = std::system(cmd.str().c_str());
   std::vector<float> enhanced;

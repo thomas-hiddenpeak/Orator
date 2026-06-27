@@ -25,16 +25,18 @@ namespace io {
 struct SafeTensorMetadata {
   std::string name;
   std::vector<int64_t> shape;
-  std::string dtype;       // "F32", "F16", "I32", ...
-  int64_t data_offset;     // absolute byte offset within the file
-  int64_t data_size;       // bytes
+  std::string dtype;    // "F32", "F16", "I32", ...
+  int64_t data_offset;  // absolute byte offset within the file
+  int64_t data_size;    // bytes
 };
 
 class SafeTensorReader {
  public:
   explicit SafeTensorReader(const std::string& filepath);
 
-  const std::vector<std::string>& GetWeightNames() const { return weight_names_; }
+  const std::vector<std::string>& GetWeightNames() const {
+    return weight_names_;
+  }
   bool Has(const std::string& name) const;
   const SafeTensorMetadata& GetMetadata(const std::string& name) const;
 
@@ -64,9 +66,9 @@ class SafeTensorWriter {
  public:
   struct Entry {
     std::string name;
-    std::string dtype;            // "F32", etc.
+    std::string dtype;  // "F32", etc.
     std::vector<int64_t> shape;
-    const void* data;             // contiguous source bytes
+    const void* data;  // contiguous source bytes
     size_t nbytes;
   };
 

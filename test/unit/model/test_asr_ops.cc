@@ -130,7 +130,8 @@ int main() {
       all = false;
     } else {
       const int n = static_cast<int>(hg.size());
-      UnifiedBuffer g(sizeof(float) * n), u(sizeof(float) * n), o(sizeof(float) * n);
+      UnifiedBuffer g(sizeof(float) * n), u(sizeof(float) * n),
+          o(sizeof(float) * n);
       Up(g, hg);
       Up(u, hu);
       ops::SwiGLU(F(g), F(u), F(o), n);
@@ -177,8 +178,9 @@ int main() {
   {
     const int T = 256, Hq = 16, Hkv = 8, Dh = 128;
     const float scale = 1.0f / std::sqrt(static_cast<float>(Dh));
-    UnifiedBuffer q(sizeof(float) * T * Hq * Dh), k(sizeof(float) * T * Hkv * Dh),
-        v(sizeof(float) * T * Hkv * Dh), out(sizeof(float) * T * Hq * Dh);
+    UnifiedBuffer q(sizeof(float) * T * Hq * Dh),
+        k(sizeof(float) * T * Hkv * Dh), v(sizeof(float) * T * Hkv * Dh),
+        out(sizeof(float) * T * Hq * Dh);
     for (int i = 0; i < T * Hq * Dh; ++i) F(q)[i] = 0.1f;
     for (int i = 0; i < T * Hkv * Dh; ++i) {
       F(k)[i] = 0.1f;

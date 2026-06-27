@@ -17,8 +17,9 @@
 namespace orator {
 namespace core {
 
-// Configuration handed to a diarizer at initialization. Fields are intentionally
-// model-agnostic; model-specific knobs live inside each implementation.
+// Configuration handed to a diarizer at initialization. Fields are
+// intentionally model-agnostic; model-specific knobs live inside each
+// implementation.
 struct DiarizationConfig {
   int sample_rate = 16000;
   int max_speakers = 4;
@@ -26,7 +27,8 @@ struct DiarizationConfig {
 };
 
 // Streaming speaker diarization model.
-// Generalizes Streaming Sortformer; any frame-level diarizer fits this contract.
+// Generalizes Streaming Sortformer; any frame-level diarizer fits this
+// contract.
 class IDiarizer {
  public:
   virtual ~IDiarizer() = default;
@@ -42,9 +44,8 @@ class IDiarizer {
   // ── Streaming incremental diarization ────────────────────────────
   // Feed mono-16k samples and return frame-level speaker probabilities.
   // `final` flushes any residual frames. `stream` is the CUDA stream.
-  virtual DiarizationFrames StreamAudio(const float* samples,
-                                        int num_samples, bool final,
-                                        cudaStream_t stream) = 0;
+  virtual DiarizationFrames StreamAudio(const float* samples, int num_samples,
+                                        bool final, cudaStream_t stream) = 0;
 
   virtual int max_speakers() const = 0;
   virtual double frame_period_sec() const = 0;
@@ -70,7 +71,8 @@ class ISpeakerEmbedder {
 class ISpeakerRegistry {
  public:
   virtual ~ISpeakerRegistry() = default;
-  virtual bool Enroll(const std::string& speaker_id, const float* embedding) = 0;
+  virtual bool Enroll(const std::string& speaker_id,
+                      const float* embedding) = 0;
   // Returns matched index or -1; writes the score when out_score != nullptr.
   virtual int Match(const float* embedding, float threshold,
                     float* out_score) const = 0;
@@ -193,8 +195,9 @@ class IForcedAligner {
   virtual ~IForcedAligner() = default;
   // Load weights from a model directory.
   virtual void LoadWeights(const std::string& path) = 0;
-  // Align `transcript` to `pcm` (mono 16 kHz, `n` samples). `language` is a full
-  // name (e.g. "Chinese") or empty. Times are seconds relative to pcm start.
+  // Align `transcript` to `pcm` (mono 16 kHz, `n` samples). `language` is a
+  // full name (e.g. "Chinese") or empty. Times are seconds relative to pcm
+  // start.
   virtual std::vector<AlignUnit> Align(const float* pcm, int n,
                                        const std::string& transcript,
                                        const std::string& language) const = 0;

@@ -63,7 +63,8 @@ bool HttpStaticServer::Start() {
   addr.sin_family = AF_INET;
   addr.sin_addr.s_addr = htonl(INADDR_ANY);
   addr.sin_port = htons(static_cast<uint16_t>(port_));
-  if (::bind(listen_fd_, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) < 0) {
+  if (::bind(listen_fd_, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) <
+      0) {
     ::close(listen_fd_);
     listen_fd_ = -1;
     return false;
@@ -96,8 +97,8 @@ void HttpStaticServer::Serve() {
   while (running_) {
     sockaddr_in caddr{};
     socklen_t clen = sizeof(caddr);
-    const int cfd = ::accept(listen_fd_, reinterpret_cast<sockaddr*>(&caddr),
-                             &clen);
+    const int cfd =
+        ::accept(listen_fd_, reinterpret_cast<sockaddr*>(&caddr), &clen);
     if (cfd < 0) {
       if (errno == EINTR) continue;
       if (!running_) break;
@@ -129,9 +130,11 @@ bool HttpStaticServer::HandleClient(int fd) {
 
   const std::string line = req.substr(0, line_end);
   const size_t m1 = line.find(' ');
-  const size_t m2 = m1 == std::string::npos ? std::string::npos : line.find(' ', m1 + 1);
+  const size_t m2 =
+      m1 == std::string::npos ? std::string::npos : line.find(' ', m1 + 1);
   if (m1 == std::string::npos || m2 == std::string::npos) {
-    return SendResponse(fd, 400, "Bad Request", "text/plain", "Bad request line\n");
+    return SendResponse(fd, 400, "Bad Request", "text/plain",
+                        "Bad request line\n");
   }
 
   const std::string method = line.substr(0, m1);

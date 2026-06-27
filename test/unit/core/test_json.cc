@@ -10,14 +10,14 @@ using namespace orator;
 
 static int fails = 0;
 
-#define CHECK(cond, msg)                                                \
-  do {                                                                  \
-    if (!(cond)) {                                                      \
+#define CHECK(cond, msg)                                                    \
+  do {                                                                      \
+    if (!(cond)) {                                                          \
       std::fprintf(stderr, "  FAIL [%s:%d] %s\n", __FILE__, __LINE__, msg); \
-      ++fails;                                                          \
-    } else {                                                            \
-      std::printf("  OK %s\n", msg);                                    \
-    }                                                                   \
+      ++fails;                                                              \
+    } else {                                                                \
+      std::printf("  OK %s\n", msg);                                        \
+    }                                                                       \
   } while (0)
 
 // Helper: check that a string contains a substring.
@@ -37,7 +37,8 @@ int main() {
     std::printf("  got: %s\n", json.c_str());
 
     std::string pretty = io::TimelineToJson(tl, true);
-    CHECK(Contains(pretty, "\"segments\""), "empty timeline (pretty) has segments key");
+    CHECK(Contains(pretty, "\"segments\""),
+          "empty timeline (pretty) has segments key");
     CHECK(Contains(pretty, "["), "empty timeline (pretty) has opening bracket");
     CHECK(Contains(pretty, "]"), "empty timeline (pretty) has closing bracket");
     std::printf("  pretty: %s\n", pretty.c_str());
@@ -52,7 +53,8 @@ int main() {
     std::string json = io::TimelineToJson(tl, false);
     CHECK(Contains(json, "\"start\":0.000"), "single segment start");
     CHECK(Contains(json, "\"end\":2.500"), "single segment end");
-    CHECK(Contains(json, "\"speaker_id\":\"alice\""), "single segment speaker_id");
+    CHECK(Contains(json, "\"speaker_id\":\"alice\""),
+          "single segment speaker_id");
     CHECK(Contains(json, "\"text\":\"Hello world.\""), "single segment text");
     std::printf("  compact: %s\n", json.c_str());
   }
@@ -65,12 +67,17 @@ int main() {
     tl.segments.push_back({1.5, 3.0, "speaker_1", "Second utterance."});
 
     std::string json = io::TimelineToJson(tl, false);
-    CHECK(Contains(json, "\"speaker_id\":\"speaker_0\""), "multi segment speaker_0");
-    CHECK(Contains(json, "\"speaker_id\":\"speaker_1\""), "multi segment speaker_1");
-    CHECK(Contains(json, "\"text\":\"First utterance.\""), "multi segment text 0");
-    CHECK(Contains(json, "\"text\":\"Second utterance.\""), "multi segment text 1");
+    CHECK(Contains(json, "\"speaker_id\":\"speaker_0\""),
+          "multi segment speaker_0");
+    CHECK(Contains(json, "\"speaker_id\":\"speaker_1\""),
+          "multi segment speaker_1");
+    CHECK(Contains(json, "\"text\":\"First utterance.\""),
+          "multi segment text 0");
+    CHECK(Contains(json, "\"text\":\"Second utterance.\""),
+          "multi segment text 1");
     // Verify it's valid JSON-ish: starts with {, ends with }
-    CHECK(json.front() == '{' && json.back() == '}', "multi segment JSON wrapper");
+    CHECK(json.front() == '{' && json.back() == '}',
+          "multi segment JSON wrapper");
     std::printf("  compact: %s\n", json.c_str());
   }
 
@@ -78,7 +85,8 @@ int main() {
   std::printf("\n-- Special characters --\n");
   {
     core::Timeline tl;
-    tl.segments.push_back({0.0, 1.0, "test", "Line1\nLine2\tTabbed\"Quoted\"\\End"});
+    tl.segments.push_back(
+        {0.0, 1.0, "test", "Line1\nLine2\tTabbed\"Quoted\"\\End"});
 
     std::string json = io::TimelineToJson(tl, false);
     CHECK(Contains(json, "\\n"), "special char newline escaped");
@@ -116,10 +124,13 @@ int main() {
     sink.Consume(tl);
 
     std::string output = oss.str();
-    CHECK(Contains(output, "\"speaker_id\":\"bob\""), "JsonSink output has speaker_id");
-    CHECK(Contains(output, "\"text\":\"Test message.\""), "JsonSink output has text");
+    CHECK(Contains(output, "\"speaker_id\":\"bob\""),
+          "JsonSink output has speaker_id");
+    CHECK(Contains(output, "\"text\":\"Test message.\""),
+          "JsonSink output has text");
     // Consume appends a newline
-    CHECK(!output.empty() && output.back() == '\n', "JsonSink output ends with newline");
+    CHECK(!output.empty() && output.back() == '\n',
+          "JsonSink output ends with newline");
     std::printf("  output: %s", output.c_str());
   }
 

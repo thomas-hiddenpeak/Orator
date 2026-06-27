@@ -12,14 +12,14 @@ using namespace orator::core;
 
 static int fails = 0;
 
-#define CHECK(cond, msg)                                                \
-  do {                                                                  \
-    if (!(cond)) {                                                      \
+#define CHECK(cond, msg)                                                    \
+  do {                                                                      \
+    if (!(cond)) {                                                          \
       std::fprintf(stderr, "  FAIL [%s:%d] %s\n", __FILE__, __LINE__, msg); \
-      ++fails;                                                          \
-    } else {                                                            \
-      std::printf("  OK %s\n", msg);                                    \
-    }                                                                   \
+      ++fails;                                                              \
+    } else {                                                                \
+      std::printf("  OK %s\n", msg);                                        \
+    }                                                                       \
   } while (0)
 
 int main() {
@@ -35,12 +35,15 @@ int main() {
   CHECK(DTypeSize(DType::U8) == 1, "DTypeSize(U8) == 1");
   CHECK(DTypeSize(DType::Unknown) == 0, "DTypeSize(Unknown) == 0");
 
-  CHECK(std::strcmp(DTypeName(DType::F32), "F32") == 0, "DTypeName(F32) == F32");
-  CHECK(std::strcmp(DTypeName(DType::Unknown), "UNKNOWN") == 0, "DTypeName(Unknown) == UNKNOWN");
+  CHECK(std::strcmp(DTypeName(DType::F32), "F32") == 0,
+        "DTypeName(F32) == F32");
+  CHECK(std::strcmp(DTypeName(DType::Unknown), "UNKNOWN") == 0,
+        "DTypeName(Unknown) == UNKNOWN");
 
   CHECK(DTypeFromString("F32") == DType::F32, "DTypeFromString(F32)");
   CHECK(DTypeFromString("I64") == DType::I64, "DTypeFromString(I64)");
-  CHECK(DTypeFromString("bogus") == DType::Unknown, "DTypeFromString(bogus) == Unknown");
+  CHECK(DTypeFromString("bogus") == DType::Unknown,
+        "DTypeFromString(bogus) == Unknown");
 
   // ── Default tensor ──────────────────────────────────────────────────
   std::printf("\n-- Default tensor --\n");
@@ -121,7 +124,8 @@ int main() {
     CHECK(b.defined(), "move-constructed tensor is defined");
     CHECK(b.numel() == 4, "move-constructed tensor numel == 4");
     CHECK(b.data_as<float>()[0] == 1.0f, "move-constructed tensor data intact");
-    // a should be in a valid but unspecified state (shape_ moved, data_ still points)
+    // a should be in a valid but unspecified state (shape_ moved, data_ still
+    // points)
     CHECK(a.shape().empty(), "moved-from tensor has empty shape");
 
     // Move assignment
@@ -170,7 +174,8 @@ int main() {
       CHECK(t.numel() == 32, "Unified tensor numel == 32");
       CHECK(t.nbytes() == 32 * 4, "Unified tensor nbytes == 128");
       CHECK(t.dtype() == DType::F32, "Unified tensor dtype == F32");
-      CHECK(t.device() == Device::GpuUnified, "Unified tensor device == GpuUnified");
+      CHECK(t.device() == Device::GpuUnified,
+            "Unified tensor device == GpuUnified");
       CHECK(t.data() != nullptr, "Unified tensor data non-null");
 
       // Write and read back via unified memory

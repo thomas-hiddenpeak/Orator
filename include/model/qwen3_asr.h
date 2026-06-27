@@ -1,8 +1,10 @@
 #pragma once
 
-// Qwen3-ASR engine: the full native ASR pipeline behind the core::IAsr contract.
+// Qwen3-ASR engine: the full native ASR pipeline behind the core::IAsr
+// contract.
 //
-//   PCM -> WhisperMel -> AsrAudioTower (encoder) -> build prompt (audio_pad x N)
+//   PCM -> WhisperMel -> AsrAudioTower (encoder) -> build prompt (audio_pad x
+//   N)
 //        -> embed + inject encoder output -> AsrTextDecoder prefill
 //        -> greedy autoregressive decode -> BPE decode -> Transcript
 //
@@ -41,8 +43,8 @@ class Qwen3Asr final : public core::IAsr {
   // Transcribe raw mono-16k samples into text (no AudioChunk wrapper). This is
   // the single-segment path: the caller guarantees a bounded (<=~30s) span so
   // the decoder context stays short.
-    std::string TranscribeText(const float* samples, int num_samples,
-                               cudaStream_t stream = 0);
+  std::string TranscribeText(const float* samples, int num_samples,
+                             cudaStream_t stream = 0);
 
   // Transcribe `samples` with an optional committed text prefix. The prefix is
   // appended to the prompt after the <asr_text> tag so the model continues from
@@ -65,7 +67,8 @@ class Qwen3Asr final : public core::IAsr {
   // bound the cache length over a long stream.
   //
   // Number of mel frames per 8 s encoder window and the audio tokens it yields.
-  static constexpr int kStreamWindowMel = 100;   // 1 s at hop 160 (n_window_infer)
+  static constexpr int kStreamWindowMel =
+      100;  // 1 s at hop 160 (n_window_infer)
 
   // Begin a new segment. `base_sample` is the absolute sample index of the
   // first sample fed after this call (for timeline anchoring by the caller).
@@ -82,18 +85,21 @@ class Qwen3Asr final : public core::IAsr {
   // the final transcript for the segment. Ends the session.
   std::string StreamFinalize(cudaStream_t stream = 0) override;
 
-  // Streaming knobs (mirror the official unfixed_chunk_num / unfixed_token_num).
+  // Streaming knobs (mirror the official unfixed_chunk_num /
+  // unfixed_token_num).
   void set_stream_unfixed_chunks(int n) { stream_unfixed_chunks_ = n; }
   void set_stream_unfixed_tokens(int n) { stream_unfixed_tokens_ = n; }
   int stream_audio_tokens() const override { return stream_audio_tokens_; }
   int stream_chunk_id() const { return stream_chunk_id_; }
 
-
   // Energy-VAD speech segmentation. Splits [0,num_samples) into bounded speech
   // spans (sample offsets) separated by silence, capping each at
   // max_segment_sec and bridging gaps below min_silence_sec. Independent of
   // diarization -- this is how the ASR pipeline segments itself.
-  struct Span { int begin; int end; };  // sample offsets [begin, end)
+  struct Span {
+    int begin;
+    int end;
+  };  // sample offsets [begin, end)
   std::vector<Span> SegmentSpeech(const float* samples, int num_samples,
                                   int sample_rate) const;
 
@@ -120,11 +126,12 @@ class Qwen3Asr final : public core::IAsr {
 
   // VAD / segmentation knobs (energy-based, dependency-free).
   bool vad_enabled_ = true;
-  double max_segment_sec_ = 28.0;   // cap context length per ASR call
-  double min_silence_sec_ = 3.50;   // only long dead-air splits (few large segments)
-  double min_speech_sec_ = 0.20;    // drop spans shorter than this
-  double speech_pad_sec_ = 0.16;    // pad each span so words aren't clipped
-  float vad_rel_threshold_ = 0.08f; // speech if frame RMS > thr * peak RMS
+  double max_segment_sec_ = 28.0;  // cap context length per ASR call
+  double min_silence_sec_ =
+      3.50;  // only long dead-air splits (few large segments)
+  double min_speech_sec_ = 0.20;     // drop spans shorter than this
+  double speech_pad_sec_ = 0.16;     // pad each span so words aren't clipped
+  float vad_rel_threshold_ = 0.08f;  // speech if frame RMS > thr * peak RMS
 
   std::unique_ptr<io::ShardedSafeTensors> weights_;
   std::unique_ptr<feature::WhisperMel> mel_;
@@ -133,19 +140,21 @@ class Qwen3Asr final : public core::IAsr {
   io::BpeTokenizer tokenizer_;
 
   // --- incremental streaming session state (Spec 003) ---
-  std::vector<float> seg_pcm_;        // retained segment PCM tail (mono 16k)
-  long seg_base_sample_ = 0;          // absolute index of seg_pcm_[0]
-  int seg_encoded_frames_ = 0;        // mel frames already turned into audio tokens
-  int seg_pcm_frame_offset_ = 0;      // segment-absolute frame index of seg_pcm_[0] after trimming
-  float seg_logmel_max_ = -1e30f;     // running Whisper log-mel max across the segment (norm consistency)
-  int stream_cache_ckpt_ = 0;         // cache length after [system][audio block]
-  int stream_audio_tokens_ = 0;       // N audio tokens encoded so far
-  int stream_chunk_id_ = 0;           // completed-window counter
-  std::string stream_raw_decoded_;    // running raw decoded text (official _raw_decoded)
-  int stream_unfixed_chunks_ = 2;     // first N windows use empty prefix
-  int stream_unfixed_tokens_ = 5;     // roll back last K tokens each step
+  std::vector<float> seg_pcm_;  // retained segment PCM tail (mono 16k)
+  long seg_base_sample_ = 0;    // absolute index of seg_pcm_[0]
+  int seg_encoded_frames_ = 0;  // mel frames already turned into audio tokens
+  int seg_pcm_frame_offset_ =
+      0;  // segment-absolute frame index of seg_pcm_[0] after trimming
+  float seg_logmel_max_ = -1e30f;  // running Whisper log-mel max across the
+                                   // segment (norm consistency)
+  int stream_cache_ckpt_ = 0;      // cache length after [system][audio block]
+  int stream_audio_tokens_ = 0;    // N audio tokens encoded so far
+  int stream_chunk_id_ = 0;        // completed-window counter
+  std::string
+      stream_raw_decoded_;  // running raw decoded text (official _raw_decoded)
+  int stream_unfixed_chunks_ = 2;  // first N windows use empty prefix
+  int stream_unfixed_tokens_ = 5;  // roll back last K tokens each step
   bool stream_active_ = false;
-
 
   // Special token ids (Qwen3-ASR).
   static constexpr int kImStart = 151644;

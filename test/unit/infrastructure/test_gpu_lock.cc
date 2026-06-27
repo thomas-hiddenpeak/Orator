@@ -1,4 +1,5 @@
-// Unit tests for gpu/gpu_lock.h — DeviceGuard, DeviceLock, ConcurrentGpuEnabled/Active.
+// Unit tests for gpu/gpu_lock.h — DeviceGuard, DeviceLock,
+// ConcurrentGpuEnabled/Active.
 //
 // These tests exercise the GPU access serialization logic. The mode is resolved
 // once at first access via a static local; we set ORATOR_GPU_SERIAL=1 at the
@@ -60,7 +61,8 @@ int main() {
   // 2. ConcurrentGpuEnabled() is false in serialized mode.
   // ------------------------------------------------------------------
   {
-    std::printf("  Test 2: ConcurrentGpuEnabled() == false under ORATOR_GPU_SERIAL\n");
+    std::printf(
+        "  Test 2: ConcurrentGpuEnabled() == false under ORATOR_GPU_SERIAL\n");
     CHECK(!ConcurrentGpuEnabled(), "ConcurrentGpuEnabled false in serial mode");
     std::printf("  PASS\n");
   }
@@ -69,7 +71,8 @@ int main() {
   // 3. ConcurrentGpuActive() is false in serialized mode.
   // ------------------------------------------------------------------
   {
-    std::printf("  Test 3: ConcurrentGpuActive() == false under ORATOR_GPU_SERIAL\n");
+    std::printf(
+        "  Test 3: ConcurrentGpuActive() == false under ORATOR_GPU_SERIAL\n");
     CHECK(!ConcurrentGpuActive(), "ConcurrentGpuActive false in serial mode");
     std::printf("  PASS\n");
   }
@@ -116,10 +119,12 @@ int main() {
         DeviceLock().unlock();
       });
       std::this_thread::sleep_for(std::chrono::milliseconds(50));
-      CHECK(!thread_entered, "thread blocked while DeviceGuard(true) holds lock");
+      CHECK(!thread_entered,
+            "thread blocked while DeviceGuard(true) holds lock");
     }
     t.join();
-    CHECK(thread_entered, "thread acquired lock after DeviceGuard(true) destruction");
+    CHECK(thread_entered,
+          "thread acquired lock after DeviceGuard(true) destruction");
     std::printf("  PASS\n");
   }
 

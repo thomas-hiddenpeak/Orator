@@ -1,29 +1,31 @@
 #pragma once
 
-// ComprehensiveTimeline (Spec 004): the native, stateful container that holds the
-// three independent pipelines' tracks on one common time base (seconds; origin =
-// absolute sample 0). It is a PURE CONTAINER + ALIGNMENT layer: it only RECEIVES
-// each pipeline's data + meta + time codes and never modifies, infers, or
-// back-fills another pipeline's content.
+// ComprehensiveTimeline (Spec 004): the native, stateful container that holds
+// the three independent pipelines' tracks on one common time base (seconds;
+// origin = absolute sample 0). It is a PURE CONTAINER + ALIGNMENT layer: it
+// only RECEIVES each pipeline's data + meta + time codes and never modifies,
+// infers, or back-fills another pipeline's content.
 //
 //   - diarization -> ReplaceSpeakers(segs)        (who / when)   [diar track]
 //   - ASR         -> UpsertText(id,start,end,text) (what / when)  [asr track]
 //   - VAD         -> AddVad(start,end)             (speech segs)  [vad track]
 //
 // The COMPREHENSIVE VIEW is a DERIVED PRODUCT of this container, for human
-// browsing -- it is not a fourth pipeline. The view answers "who said what when"
-// and its boundaries come from the DIARIZATION TRACK: each ASR text segment is
-// placed onto the diarization speaker turns it overlaps, and when a text segment
-// crosses a diarization boundary its text is split at that boundary (proportional
-// to time, since the ASR model emits no per-word timestamps). The view never
-// re-segments by ASR's own coarse segmentation. Where diarization has not covered
-// a span the speaker is honestly "unknown" (never borrowed from a neighbour). The
-// view is a faithful interactive form of the container and carries the same
-// characteristics (common time base, no invented content).
+// browsing -- it is not a fourth pipeline. The view answers "who said what
+// when" and its boundaries come from the DIARIZATION TRACK: each ASR text
+// segment is placed onto the diarization speaker turns it overlaps, and when a
+// text segment crosses a diarization boundary its text is split at that
+// boundary (proportional to time, since the ASR model emits no per-word
+// timestamps). The view never re-segments by ASR's own coarse segmentation.
+// Where diarization has not covered a span the speaker is honestly "unknown"
+// (never borrowed from a neighbour). The view is a faithful interactive form of
+// the container and carries the same characteristics (common time base, no
+// invented content).
 //
 // Because the container is stateful and revisable, a text placed against
-// incomplete diarization is re-projected when diarization later covers the span;
-// each change is returned as a Revision the controller pushes to the WS consumer.
+// incomplete diarization is re-projected when diarization later covers the
+// span; each change is returned as a Revision the controller pushes to the WS
+// consumer.
 //
 #include <functional>
 #include <map>
@@ -45,19 +47,19 @@ namespace pipeline {
 class ComprehensiveTimeline {
  public:
   // One view entry: a time span attributed to a speaker with their (possibly
-  // diarization-split) text slice. Multiple entries may share a text_id when one
-  // ASR segment is split across several diarization turns.
+  // diarization-split) text slice. Multiple entries may share a text_id when
+  // one ASR segment is split across several diarization turns.
   struct Entry {
     double start = 0.0;
     double end = 0.0;
     std::string speaker;  // "speaker_<n>" or resolved id, "unknown" if none yet
     std::string text;
-    long text_id = -1;    // source text-segment id (for revision tracking)
+    long text_id = -1;  // source text-segment id (for revision tracking)
   };
 
   // A revision: the consumer should replace its comprehensive entries whose
-  // text_id matches with these entries (or insert if new). dirty_start/end bound
-  // the affected time range for convenience.
+  // text_id matches with these entries (or insert if new). dirty_start/end
+  // bound the affected time range for convenience.
   struct Revision {
     double dirty_start = 0.0;
     double dirty_end = 0.0;
@@ -123,19 +125,15 @@ class ComprehensiveTimeline {
   // ---------------------------------------------------------------------------
 
   // Friend the three protocol subscription bridge functions.
-  friend void HandleVadSubscription(ComprehensiveTimeline&,
-                                    std::mutex&,
+  friend void HandleVadSubscription(ComprehensiveTimeline&, std::mutex&,
                                     const orator::protocol::Message&);
-  friend void HandleDiarSubscription(ComprehensiveTimeline&,
-                                     std::mutex&,
+  friend void HandleDiarSubscription(ComprehensiveTimeline&, std::mutex&,
                                      const orator::protocol::Message&,
                                      std::function<void(const std::string&)>);
-  friend void HandleAsrSubscription(ComprehensiveTimeline&,
-                                    std::mutex&,
+  friend void HandleAsrSubscription(ComprehensiveTimeline&, std::mutex&,
                                     const orator::protocol::Message&,
                                     std::function<void(const std::string&)>);
-  friend void HandleAlignSubscription(ComprehensiveTimeline&,
-                                      std::mutex&,
+  friend void HandleAlignSubscription(ComprehensiveTimeline&, std::mutex&,
                                       const orator::protocol::Message&);
   // Deposit a speaker segment (who/when). Returns revisions caused by
   // attribution changes in overlapping text segments.
@@ -186,11 +184,11 @@ class ComprehensiveTimeline {
   // it. Used per sub-interval when splitting a text by diarization boundaries.
   std::string AttributeInterval(double start, double end) const;
   // Split one text segment at the diarization-track boundaries it crosses,
-  // allocating the text to each speaker turn proportionally by time. Returns the
-  // resulting view entries (>=1) for this text id.
+  // allocating the text to each speaker turn proportionally by time. Returns
+  // the resulting view entries (>=1) for this text id.
   std::vector<Entry> SplitTextByDiar(const TextSeg& t) const;
-  // Re-project text segments overlapping [start,end); update pieces_ and collect
-  // those whose projection changed into `out`.
+  // Re-project text segments overlapping [start,end); update pieces_ and
+  // collect those whose projection changed into `out`.
   void ReprojectRange(double start, double end, std::vector<Revision>* out);
   // Re-project a single text segment by id; update its pieces_; if new or
   // changed, append a revision to `out`.

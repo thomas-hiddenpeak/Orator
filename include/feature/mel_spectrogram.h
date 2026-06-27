@@ -19,15 +19,15 @@ namespace feature {
 struct MelConfig {
   int sample_rate = 16000;
   int n_fft = 512;
-  int win_length = 400;   // 25 ms @ 16 kHz
-  int hop_length = 160;   // 10 ms @ 16 kHz
+  int win_length = 400;  // 25 ms @ 16 kHz
+  int hop_length = 160;  // 10 ms @ 16 kHz
   int n_mels = 128;
   float fmin = 0.0f;
-  float fmax = 8000.0f;   // Nyquist
+  float fmax = 8000.0f;  // Nyquist
   float log_eps = 1e-5f;
   // NeMo AudioToMelSpectrogramPreprocessor parity:
-  float preemph = 0.97f;          // pre-emphasis coefficient (0 to disable)
-  bool center = true;             // torch.stft center=True (constant pad n_fft/2)
+  float preemph = 0.97f;  // pre-emphasis coefficient (0 to disable)
+  bool center = true;     // torch.stft center=True (constant pad n_fft/2)
   float log_zero_guard = 5.9604644775390625e-08f;  // 2^-24, log(x + guard)
 };
 
@@ -55,9 +55,8 @@ class MelSpectrogram {
   // frame-major [num_frames * n_mels], bit-identical to Compute over the same
   // underlying samples. Pre-emphasis continuity is the caller's responsibility.
   std::vector<float> ComputeStreamFrames(const float* sig, int num_samples,
-                                          int input_offset,
-                                          int num_frames,
-                                          cudaStream_t stream = nullptr) const;
+                                         int input_offset, int num_frames,
+                                         cudaStream_t stream = nullptr) const;
 
   int n_mels() const { return config_.n_mels; }
   int n_freqs() const { return config_.n_fft / 2 + 1; }
@@ -75,8 +74,8 @@ class MelSpectrogram {
 
  private:
   MelConfig config_;
-  std::vector<float> hann_;          // [win_length]
-  std::vector<float> mel_filters_;   // [n_mels * n_freqs]
+  std::vector<float> hann_;         // [win_length]
+  std::vector<float> mel_filters_;  // [n_mels * n_freqs]
 
   void BuildHannWindow();
   void BuildMelFilterbank();

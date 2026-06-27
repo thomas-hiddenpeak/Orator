@@ -27,7 +27,8 @@ void Bf16ToF32(const uint16_t* in, float* out, long n, cudaStream_t stream = 0);
 // out[M,N] = in[M,K] @ W[N,K]^T (+ bias). W_bf16 points to native BF16 weights.
 // bias may be null. act: 0=none, 1=GELU(exact), 2=ReLU.
 void Linear(const float* in_f32, const uint16_t* W_bf16, const float* bias_f32,
-            float* out_f32, int M, int K, int N, int act, cudaStream_t stream = 0);
+            float* out_f32, int M, int K, int N, int act,
+            cudaStream_t stream = 0);
 
 // Same as Linear but `in` is already BF16 (no internal cast) -- use when one
 // activation feeds several projections (e.g. q/k/v share the post-norm input),

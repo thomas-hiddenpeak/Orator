@@ -7,16 +7,18 @@
 using orator::pipeline::TestComprehensiveTimeline;
 
 static int g_fail = 0;
-#define CHECK(cond, msg)                                  \
-  do {                                                    \
-    if (!(cond)) {                                        \
-      std::printf("FAIL: %s\n", msg);                     \
-      ++g_fail;                                           \
-    }                                                     \
+#define CHECK(cond, msg)              \
+  do {                                \
+    if (!(cond)) {                    \
+      std::printf("FAIL: %s\n", msg); \
+      ++g_fail;                       \
+    }                                 \
   } while (0)
 
 int main() {
-  std::printf("Testing ComprehensiveTimeline (Spec 004 Phase 5: diar-driven view)...\n");
+  std::printf(
+      "Testing ComprehensiveTimeline (Spec 004 Phase 5: diar-driven "
+      "view)...\n");
 
   // ---- 1. Out-of-order upserts: text arrives before its speaker ----
   {
@@ -27,7 +29,8 @@ int main() {
     CHECK(r0[0].entries.size() == 1 && r0[0].entries[0].speaker == "unknown",
           "text with no speaker attributed unknown");
 
-    // Speaker covering [0,5) arrives -> attribution flips to speaker_0, revision.
+    // Speaker covering [0,5) arrives -> attribution flips to speaker_0,
+    // revision.
     auto r1 = tl.UpsertSpeaker(0.0, 5.0, "speaker_0", 0.9f);
     CHECK(r1.size() == 1, "speaker upsert flips attribution -> one revision");
     CHECK(r1[0].entries[0].speaker == "speaker_0", "flip to speaker_0");
@@ -44,13 +47,16 @@ int main() {
     // Speaker_0 [0,3), Speaker_1 [3,10).
     tl.UpsertSpeaker(0.0, 3.0, "speaker_0", 0.9f);
     tl.UpsertSpeaker(3.0, 10.0, "speaker_1", 0.9f);
-    // Text [2,9) crosses the boundary at 3.0 -> two pieces: [2,3) spk0, [3,9) spk1.
+    // Text [2,9) crosses the boundary at 3.0 -> two pieces: [2,3) spk0, [3,9)
+    // spk1.
     auto r = tl.UpsertText(0, 2.0, 9.0, "spanning text");
     CHECK(r.size() == 1, "text yields one revision");
-    CHECK(r[0].entries.size() == 2, "text crossing a diar boundary splits in two");
+    CHECK(r[0].entries.size() == 2,
+          "text crossing a diar boundary splits in two");
     if (r[0].entries.size() == 2) {
       CHECK(r[0].entries[0].speaker == "speaker_0", "first piece -> speaker_0");
-      CHECK(r[0].entries[1].speaker == "speaker_1", "second piece -> speaker_1");
+      CHECK(r[0].entries[1].speaker == "speaker_1",
+            "second piece -> speaker_1");
       CHECK(r[0].entries[0].end == 3.0 && r[0].entries[1].start == 3.0,
             "pieces split exactly at the diarization boundary");
       CHECK(r[0].entries[0].text + r[0].entries[1].text == "spanning text",
@@ -75,7 +81,8 @@ int main() {
     }
   }
 
-  // ---- 4. Incrementality: a speaker update far from a text does not revise ----
+  // ---- 4. Incrementality: a speaker update far from a text does not revise
+  // ----
   {
     TestComprehensiveTimeline tl;
     tl.UpsertSpeaker(0.0, 5.0, "speaker_0", 0.9f);
@@ -117,7 +124,8 @@ int main() {
     CHECK(snap[0].start == 0.0 && snap[0].end == 15.0, "coalesced span");
   }
 
-  // ---- 6. ReplaceSpeakers: diarization's whole-view delivery re-projects text ----
+  // ---- 6. ReplaceSpeakers: diarization's whole-view delivery re-projects text
+  // ----
   {
     TestComprehensiveTimeline tl;
     tl.UpsertText(0, 0.0, 5.0, "x");
@@ -134,50 +142,52 @@ int main() {
             "text 1 re-attributed to speaker_1 after diar refinement");
   }
 
-      // ---- 7. Interleaved convergence: ASR self-revisions and diar updates in
-      // different arrival orders must converge to the SAME final view. ----
-      {
+  // ---- 7. Interleaved convergence: ASR self-revisions and diar updates in
+  // different arrival orders must converge to the SAME final view. ----
+  {
     TestComprehensiveTimeline a;
     TestComprehensiveTimeline b;
 
-        // Order A: diar baseline -> text -> text revision -> diar refinement.
-        a.ReplaceSpeakers({{0.0, 4.0, "speaker_0", 0.8f},
-               {4.0, 8.0, "speaker_1", 0.8f}});
-        a.UpsertText(7, 2.0, 6.0, "abcd");
-        a.UpsertText(7, 2.0, 7.0, "abcdef");
-        a.ReplaceSpeakers({{0.0, 3.0, "speaker_0", 0.9f},
-               {3.0, 8.0, "speaker_1", 0.9f}});
+    // Order A: diar baseline -> text -> text revision -> diar refinement.
+    a.ReplaceSpeakers(
+        {{0.0, 4.0, "speaker_0", 0.8f}, {4.0, 8.0, "speaker_1", 0.8f}});
+    a.UpsertText(7, 2.0, 6.0, "abcd");
+    a.UpsertText(7, 2.0, 7.0, "abcdef");
+    a.ReplaceSpeakers(
+        {{0.0, 3.0, "speaker_0", 0.9f}, {3.0, 8.0, "speaker_1", 0.9f}});
 
-        // Order B: text and revision arrive first, diar view arrives later.
-        b.UpsertText(7, 2.0, 6.0, "abcd");
-        b.UpsertText(7, 2.0, 7.0, "abcdef");
-        b.ReplaceSpeakers({{0.0, 4.0, "speaker_0", 0.8f},
-               {4.0, 8.0, "speaker_1", 0.8f}});
-        b.ReplaceSpeakers({{0.0, 3.0, "speaker_0", 0.9f},
-               {3.0, 8.0, "speaker_1", 0.9f}});
+    // Order B: text and revision arrive first, diar view arrives later.
+    b.UpsertText(7, 2.0, 6.0, "abcd");
+    b.UpsertText(7, 2.0, 7.0, "abcdef");
+    b.ReplaceSpeakers(
+        {{0.0, 4.0, "speaker_0", 0.8f}, {4.0, 8.0, "speaker_1", 0.8f}});
+    b.ReplaceSpeakers(
+        {{0.0, 3.0, "speaker_0", 0.9f}, {3.0, 8.0, "speaker_1", 0.9f}});
 
-        const auto sa = a.Snapshot();
-        const auto sb = b.Snapshot();
-        CHECK(sa.size() == 2, "final view has two diar-driven turns");
-        CHECK(sb.size() == 2, "final view has two diar-driven turns (order B)");
-        if (sa.size() == 2) {
-      CHECK(sa[0].speaker == "speaker_0" && sa[0].start == 2.0 && sa[0].end == 3.0,
-        "order A first turn is speaker_0 [2,3)");
-      CHECK(sa[1].speaker == "speaker_1" && sa[1].start == 3.0 && sa[1].end == 7.0,
-        "order A second turn is speaker_1 [3,7)");
+    const auto sa = a.Snapshot();
+    const auto sb = b.Snapshot();
+    CHECK(sa.size() == 2, "final view has two diar-driven turns");
+    CHECK(sb.size() == 2, "final view has two diar-driven turns (order B)");
+    if (sa.size() == 2) {
+      CHECK(sa[0].speaker == "speaker_0" && sa[0].start == 2.0 &&
+                sa[0].end == 3.0,
+            "order A first turn is speaker_0 [2,3)");
+      CHECK(sa[1].speaker == "speaker_1" && sa[1].start == 3.0 &&
+                sa[1].end == 7.0,
+            "order A second turn is speaker_1 [3,7)");
       CHECK(sa[0].text + sa[1].text == "abcdef",
-        "order A split preserves full revised text");
-        }
-        if (sa.size() == sb.size() && sa.size() == 2) {
+            "order A split preserves full revised text");
+    }
+    if (sa.size() == sb.size() && sa.size() == 2) {
       CHECK(sa[0].speaker == sb[0].speaker && sa[1].speaker == sb[1].speaker,
-        "arrival order does not change final speaker attribution");
+            "arrival order does not change final speaker attribution");
       CHECK(sa[0].text == sb[0].text && sa[1].text == sb[1].text,
-        "arrival order does not change final text split");
+            "arrival order does not change final text split");
       CHECK(sa[0].start == sb[0].start && sa[0].end == sb[0].end &&
-        sa[1].start == sb[1].start && sa[1].end == sb[1].end,
-        "arrival order does not change final time spans");
-        }
-      }
+                sa[1].start == sb[1].start && sa[1].end == sb[1].end,
+            "arrival order does not change final time spans");
+    }
+  }
 
   if (g_fail == 0) {
     std::printf("ComprehensiveTimeline test PASSED\n");

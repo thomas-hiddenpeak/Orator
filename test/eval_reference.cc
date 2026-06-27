@@ -47,8 +47,8 @@ int main(int argc, char** argv) {
   std::cout << "Speakers (" << speakers.size() << "):";
   for (const auto& s : speakers) std::cout << " " << s;
   std::cout << "\n";
-  std::cout << "Last timestamp: " << total_dur << " s ("
-            << (total_dur / 60.0) << " min)\n\n";
+  std::cout << "Last timestamp: " << total_dur << " s (" << (total_dur / 60.0)
+            << " min)\n\n";
 
   // Ground-truth diarization + ASR-style transcript (no speaker labels).
   auto diar = ref.ToDiarSegments(5.0);
@@ -79,8 +79,9 @@ int main(int argc, char** argv) {
   std::vector<pipeline::ComprehensiveTimeline::Entry> entries =
       timeline.Snapshot();
 
-  // Attribution accuracy: each text entry's attributed speaker (by time overlap)
-  // vs the reference speaker. Entries are keyed by text_id = utterance index.
+  // Attribution accuracy: each text entry's attributed speaker (by time
+  // overlap) vs the reference speaker. Entries are keyed by text_id = utterance
+  // index.
   int correct = 0;
   std::unordered_map<std::string, int> per_speaker_total, per_speaker_correct;
   std::unordered_map<long, std::string> attributed;

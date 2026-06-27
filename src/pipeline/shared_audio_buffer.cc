@@ -39,7 +39,8 @@ void SharedAudioBuffer::Close() {
 }
 
 bool SharedAudioBuffer::WaitAndRead(int cursor, std::vector<float>* out,
-                                    long* span_start_abs, long max_batch_samples) {
+                                    long* span_start_abs,
+                                    long max_batch_samples) {
   std::unique_lock<std::mutex> lock(mutex_);
   cv_.wait(lock, [&] { return cursors_[cursor] < total_samples_ || closed_; });
 
@@ -54,7 +55,8 @@ bool SharedAudioBuffer::WaitAndRead(int cursor, std::vector<float>* out,
   long count = total_samples_ - requested_start;
   // Cap the batch so a consumer pulls a flooded backlog in fixed-size pieces at
   // its own max speed (rate-independent per-batch behaviour). 0 = no cap.
-  if (max_batch_samples > 0 && count > max_batch_samples) count = max_batch_samples;
+  if (max_batch_samples > 0 && count > max_batch_samples)
+    count = max_batch_samples;
 
   // Copy under the lock: Append (insert -> possible reallocation) and other
   // consumers' RemovePassedPrefix (erase) mutate memory_buffer_, so reading its
@@ -65,7 +67,8 @@ bool SharedAudioBuffer::WaitAndRead(int cursor, std::vector<float>* out,
   out->assign(memory_buffer_.begin() + from_in_buffer,
               memory_buffer_.begin() + from_in_buffer + count);
 
-  cursors_[cursor] = requested_start + count;  // advance only by what we returned
+  cursors_[cursor] =
+      requested_start + count;  // advance only by what we returned
   RemovePassedPrefix();
   return true;
 }
@@ -73,15 +76,21 @@ bool SharedAudioBuffer::WaitAndRead(int cursor, std::vector<float>* out,
 void SharedAudioBuffer::RemovePassedPrefix() {
   if (cursors_.empty()) return;
   const long min_cursor = *std::min_element(cursors_.begin(), cursors_.end());
-  
+
   // Update base_sample to min_cursor
   base_sample_ = min_cursor;
-  
-  // If min_cursor has advanced past memory_start_sample_, clean up memory buffer
+
+  // If min_cursor has advanced past memory_start_sample_, clean up memory
+  // buffer
   if (min_cursor >= memory_start_sample_) {
-    long samples_to_remove_from_memory = std::min(static_cast<long>(memory_buffer_.size()), min_cursor - memory_start_sample_);
+    long samples_to_remove_from_memory =
+        std::min(static_cast<long>(memory_buffer_.size()),
+                 min_cursor - memory_start_sample_);
     if (samples_to_remove_from_memory > 0) {
-      memory_buffer_.erase(memory_buffer_.begin(), memory_buffer_.begin() + static_cast<size_t>(samples_to_remove_from_memory));
+      memory_buffer_.erase(
+          memory_buffer_.begin(),
+          memory_buffer_.begin() +
+              static_cast<size_t>(samples_to_remove_from_memory));
       memory_start_sample_ += samples_to_remove_from_memory;
     }
   }

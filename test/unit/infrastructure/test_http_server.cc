@@ -24,12 +24,12 @@ using namespace orator;
 using namespace orator::net;
 
 static int g_fail = 0;
-#define CHECK(cond, msg)                \
-  do {                                  \
-    if (!(cond)) {                      \
-      std::printf("FAIL: %s\n", msg);   \
-      ++g_fail;                         \
-    }                                   \
+#define CHECK(cond, msg)              \
+  do {                                \
+    if (!(cond)) {                    \
+      std::printf("FAIL: %s\n", msg); \
+      ++g_fail;                       \
+    }                                 \
   } while (0)
 
 // ---------------------------------------------------------------------------
@@ -136,10 +136,10 @@ static void test_serve_index_html() {
   // Give the server a moment to start accepting.
   ::usleep(100000);
 
-  std::string resp = SendRequest(port, "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n");
+  std::string resp =
+      SendRequest(port, "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n");
 
-  CHECK(resp.find("200 OK") != std::string::npos,
-        "response contains 200 OK");
+  CHECK(resp.find("200 OK") != std::string::npos, "response contains 200 OK");
   CHECK(resp.find("Content-Type: text/html") != std::string::npos,
         "Content-Type is text/html");
   CHECK(resp.find("Hello World") != std::string::npos,
@@ -162,8 +162,8 @@ static void test_404_not_found() {
   std::thread srv([&]() { server.Serve(); });
   ::usleep(100000);
 
-  std::string resp =
-      SendRequest(port, "GET /nonexistent.html HTTP/1.1\r\nHost: localhost\r\n\r\n");
+  std::string resp = SendRequest(
+      port, "GET /nonexistent.html HTTP/1.1\r\nHost: localhost\r\n\r\n");
 
   CHECK(resp.find("404 Not Found") != std::string::npos,
         "response contains 404 Not Found");

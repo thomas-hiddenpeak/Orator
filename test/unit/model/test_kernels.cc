@@ -58,21 +58,27 @@ static float CpuCosineSimilarity(const float* a, const float* b, int n) {
 static int g_failures = 0;
 static int g_tests = 0;
 
-#define TEST(name) do { ++g_tests; printf("  RUN  %s\n", name); } while (0)
-#define ASSERT_NEAR(a, b, tol) do {                                           \
-  float va_ = (a), vb_ = (b);                                                 \
-  if (std::abs(va_ - vb_) > tol) {                                           \
-    printf("  FAIL %s:%d: expected %.6f ≈ %.6f (tol=%.2e)\n",                \
-           __FILE__, __LINE__, double(va_), double(vb_), double(tol));        \
-    ++g_failures;                                                             \
-  }                                                                           \
-} while (0)
-#define ASSERT_TRUE(cond) do {                                                \
-  if (!(cond)) {                                                              \
-    printf("  FAIL %s:%d: expected true\n", __FILE__, __LINE__);              \
-    ++g_failures;                                                             \
-  }                                                                           \
-} while (0)
+#define TEST(name)               \
+  do {                           \
+    ++g_tests;                   \
+    printf("  RUN  %s\n", name); \
+  } while (0)
+#define ASSERT_NEAR(a, b, tol)                                            \
+  do {                                                                    \
+    float va_ = (a), vb_ = (b);                                           \
+    if (std::abs(va_ - vb_) > tol) {                                      \
+      printf("  FAIL %s:%d: expected %.6f ≈ %.6f (tol=%.2e)\n", __FILE__, \
+             __LINE__, double(va_), double(vb_), double(tol));            \
+      ++g_failures;                                                       \
+    }                                                                     \
+  } while (0)
+#define ASSERT_TRUE(cond)                                          \
+  do {                                                             \
+    if (!(cond)) {                                                 \
+      printf("  FAIL %s:%d: expected true\n", __FILE__, __LINE__); \
+      ++g_failures;                                                \
+    }                                                              \
+  } while (0)
 
 // ---------------------------------------------------------------------------
 // GPU memory RAII helper
@@ -84,11 +90,19 @@ struct GpuBuf {
   explicit GpuBuf(size_t count) : n(count) {
     cudaMalloc(&ptr, n * sizeof(float));
   }
-  ~GpuBuf() { if (ptr) cudaFree(ptr); }
-  GpuBuf(GpuBuf&& o) noexcept : ptr(o.ptr), n(o.n) { o.ptr = nullptr; o.n = 0; }
+  ~GpuBuf() {
+    if (ptr) cudaFree(ptr);
+  }
+  GpuBuf(GpuBuf&& o) noexcept : ptr(o.ptr), n(o.n) {
+    o.ptr = nullptr;
+    o.n = 0;
+  }
   GpuBuf& operator=(GpuBuf&& o) noexcept {
     if (ptr) cudaFree(ptr);
-    ptr = o.ptr; n = o.n; o.ptr = nullptr; o.n = 0;
+    ptr = o.ptr;
+    n = o.n;
+    o.ptr = nullptr;
+    o.n = 0;
     return *this;
   }
   void Upload(const float* src) {
@@ -112,7 +126,10 @@ static void TestAdd() {
   TEST("TestAdd: element-wise vector addition");
   const int N = 1024;
   std::vector<float> a(N), b(N), cpu(N), gpu(N);
-  for (int i = 0; i < N; ++i) { a[i] = float(i); b[i] = float(N - i); }
+  for (int i = 0; i < N; ++i) {
+    a[i] = float(i);
+    b[i] = float(N - i);
+  }
   CpuAdd(a.data(), b.data(), N, cpu.data());
 
   GpuBuf d_a(N), d_b(N), d_out(N);
@@ -121,8 +138,7 @@ static void TestAdd() {
   orator::gpu::Kernels::Add(d_a.ptr, d_b.ptr, N, d_out.ptr);
   d_out.Download(gpu.data());
 
-  for (int i = 0; i < N; ++i)
-    ASSERT_NEAR(gpu[i], cpu[i], 1e-5f);
+  for (int i = 0; i < N; ++i) ASSERT_NEAR(gpu[i], cpu[i], 1e-5f);
 }
 
 static void TestAddEmpty() {
@@ -144,8 +160,7 @@ static void TestMultiply() {
   orator::gpu::Kernels::Multiply(d_a.ptr, s, N, d_out.ptr);
   d_out.Download(gpu.data());
 
-  for (int i = 0; i < N; ++i)
-    ASSERT_NEAR(gpu[i], cpu[i], 1e-5f);
+  for (int i = 0; i < N; ++i) ASSERT_NEAR(gpu[i], cpu[i], 1e-5f);
 }
 
 static void TestMultiplyZeroScalar() {
@@ -160,8 +175,7 @@ static void TestMultiplyZeroScalar() {
   orator::gpu::Kernels::Multiply(d_a.ptr, 0.0f, N, d_out.ptr);
   d_out.Download(gpu.data());
 
-  for (int i = 0; i < N; ++i)
-    ASSERT_NEAR(gpu[i], cpu[i], 1e-5f);
+  for (int i = 0; i < N; ++i) ASSERT_NEAR(gpu[i], cpu[i], 1e-5f);
 }
 
 static void TestNormalize() {
@@ -176,8 +190,7 @@ static void TestNormalize() {
   orator::gpu::Kernels::NormalizeVector(d_a.ptr, N, d_out.ptr, nullptr);
   d_out.Download(gpu.data());
 
-  for (int i = 0; i < N; ++i)
-    ASSERT_NEAR(gpu[i], cpu[i], 1e-5f);
+  for (int i = 0; i < N; ++i) ASSERT_NEAR(gpu[i], cpu[i], 1e-5f);
 }
 
 static void TestNormalizeZero() {
@@ -190,8 +203,7 @@ static void TestNormalizeZero() {
   orator::gpu::Kernels::NormalizeVector(d_a.ptr, N, d_out.ptr, nullptr);
   d_out.Download(gpu.data());
 
-  for (int i = 0; i < N; ++i)
-    ASSERT_NEAR(gpu[i], cpu[i], 1e-5f);
+  for (int i = 0; i < N; ++i) ASSERT_NEAR(gpu[i], cpu[i], 1e-5f);
 }
 
 static void TestNormalizeUnit() {
@@ -207,8 +219,7 @@ static void TestNormalizeUnit() {
   orator::gpu::Kernels::NormalizeVector(d_a.ptr, N, d_out.ptr, nullptr);
   d_out.Download(gpu.data());
 
-  for (int i = 0; i < N; ++i)
-    ASSERT_NEAR(gpu[i], cpu[i], 1e-5f);
+  for (int i = 0; i < N; ++i) ASSERT_NEAR(gpu[i], cpu[i], 1e-5f);
 
   // verify output is still unit-length (norm ≈ 1)
   float gpu_norm = CpuNorm(gpu.data(), N);
@@ -225,7 +236,8 @@ static void TestCosineSimilarity() {
   GpuBuf d_a(N), d_b(N);
   d_a.Upload(a.data());
   d_b.Upload(b.data());
-  float got = orator::gpu::Kernels::CosineSimilarity(d_a.ptr, d_b.ptr, N, nullptr);
+  float got =
+      orator::gpu::Kernels::CosineSimilarity(d_a.ptr, d_b.ptr, N, nullptr);
   ASSERT_NEAR(got, expected, 1e-5f);
 }
 
@@ -238,7 +250,8 @@ static void TestCosineSimilarityOrthogonal() {
   GpuBuf d_a(N), d_b(N);
   d_a.Upload(a.data());
   d_b.Upload(b.data());
-  float got = orator::gpu::Kernels::CosineSimilarity(d_a.ptr, d_b.ptr, N, nullptr);
+  float got =
+      orator::gpu::Kernels::CosineSimilarity(d_a.ptr, d_b.ptr, N, nullptr);
   ASSERT_NEAR(got, 0.0f, 1e-6f);
 }
 
@@ -246,13 +259,17 @@ static void TestCosineSimilarityOpposite() {
   TEST("TestCosineSimilarity: opposite vectors → -1.0");
   const int N = 8;
   std::vector<float> a(N), b(N);
-  for (int i = 0; i < N; ++i) { a[i] = float(i + 1); b[i] = -float(i + 1); }
+  for (int i = 0; i < N; ++i) {
+    a[i] = float(i + 1);
+    b[i] = -float(i + 1);
+  }
   float expected = CpuCosineSimilarity(a.data(), b.data(), N);
 
   GpuBuf d_a(N), d_b(N);
   d_a.Upload(a.data());
   d_b.Upload(b.data());
-  float got = orator::gpu::Kernels::CosineSimilarity(d_a.ptr, d_b.ptr, N, nullptr);
+  float got =
+      orator::gpu::Kernels::CosineSimilarity(d_a.ptr, d_b.ptr, N, nullptr);
   ASSERT_NEAR(got, expected, 1e-5f);
 }
 
@@ -264,7 +281,8 @@ static void TestCosineSimilarityZero() {
   GpuBuf d_a(N), d_b(N);
   d_a.Upload(a.data());
   d_b.Upload(b.data());
-  float got = orator::gpu::Kernels::CosineSimilarity(d_a.ptr, d_b.ptr, N, nullptr);
+  float got =
+      orator::gpu::Kernels::CosineSimilarity(d_a.ptr, d_b.ptr, N, nullptr);
   ASSERT_NEAR(got, 0.0f, 1e-6f);
 }
 
@@ -284,12 +302,11 @@ static void TestBatchCosineSimilarity() {
   GpuBuf d_query(N), d_keys(K * N), d_out(K);
   d_query.Upload(query.data());
   d_keys.Upload(keys.data());
-  orator::gpu::Kernels::BatchCosineSimilarity(d_query.ptr, d_keys.ptr,
-                                               K, N, d_out.ptr, nullptr);
+  orator::gpu::Kernels::BatchCosineSimilarity(d_query.ptr, d_keys.ptr, K, N,
+                                              d_out.ptr, nullptr);
   d_out.Download(gpu.data());
 
-  for (int k = 0; k < K; ++k)
-    ASSERT_NEAR(gpu[k], cpu[k], 1e-5f);
+  for (int k = 0; k < K; ++k) ASSERT_NEAR(gpu[k], cpu[k], 1e-5f);
 }
 
 static void TestLargeVector() {
@@ -315,7 +332,8 @@ static void TestLargeVector() {
 
   // Verify norm of difference is small
   double diff = 0.0;
-  for (int i = 0; i < N; ++i) diff += double(gpu[i] - cpu[i]) * double(gpu[i] - cpu[i]);
+  for (int i = 0; i < N; ++i)
+    diff += double(gpu[i] - cpu[i]) * double(gpu[i] - cpu[i]);
   ASSERT_NEAR(float(std::sqrt(diff / N)), 0.0f, 1e-5f);
 }
 

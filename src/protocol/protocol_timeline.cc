@@ -25,8 +25,8 @@ ProtocolTimeline::ProtocolTimeline(size_t mem_capacity,
 
 ProtocolTimeline::~ProtocolTimeline() = default;
 
-std::unique_ptr<PipelineHandle>
-ProtocolTimeline::RegisterPipeline(PipelineDescriptor desc) {
+std::unique_ptr<PipelineHandle> ProtocolTimeline::RegisterPipeline(
+    PipelineDescriptor desc) {
   std::vector<std::pair<std::string, std::string>> system_events;
   std::unique_ptr<PipelineHandle> handle;
   {
@@ -85,8 +85,8 @@ bool ProtocolTimeline::Publish(PipelineHandle& handle, const Topic& topic,
 
     StorageRef ref = storage_->Write(topic_str, msg);
 
-    bool ooo = time_index_->Append(topic_str, msg.timestamp_sec, ref,
-                                     msg.msg_id);
+    bool ooo =
+        time_index_->Append(topic_str, msg.timestamp_sec, ref, msg.msg_id);
 
     if (ooo) {
       std::ostringstream oss;
@@ -130,8 +130,8 @@ std::string ProtocolTimeline::Describe() const {
   auto pipelines = registry_->Describe();
   out << "  \"pipelines\": [\n";
   for (size_t i = 0; i < pipelines.size(); ++i) {
-    out << "    {\"name\": \"" << pipelines[i].name
-        << "\", \"version\": \"" << pipelines[i].version
+    out << "    {\"name\": \"" << pipelines[i].name << "\", \"version\": \""
+        << pipelines[i].version
         << "\", \"enabled\": " << (pipelines[i].enabled ? "true" : "false")
         << "}";
     if (i + 1 < pipelines.size()) out << ",";
@@ -154,7 +154,7 @@ std::string ProtocolTimeline::Describe() const {
 }
 
 std::vector<Message> ProtocolTimeline::Replay(const std::string& topic,
-                                               double from_sec) const {
+                                              double from_sec) const {
   std::lock_guard<std::mutex> lock(mutex_);
 
   auto indexed = time_index_->Replay(topic, from_sec);
@@ -177,7 +177,7 @@ Message const* ProtocolTimeline::LastRetained(const std::string& topic) const {
 }
 
 void ProtocolTimeline::SetTopicRetention(const std::string& topic,
-                                          const TopicRetention& config) {
+                                         const TopicRetention& config) {
   std::lock_guard<std::mutex> lock(mutex_);
   storage_->SetTopicBackend(topic, config);
 }
@@ -189,19 +189,19 @@ void ProtocolTimeline::CleanupOldData(double keep_until_sec) {
   time_index_->CleanupOldEntries(keep_until_sec);
 
   // Cleanup memory backend by evicting old entries
-  // The MemoryBackend automatically evicts oldest entries when capacity is exceeded
-  // We can trigger eviction by writing a small marker message
+  // The MemoryBackend automatically evicts oldest entries when capacity is
+  // exceeded We can trigger eviction by writing a small marker message
   uint8_t marker[1] = {0};
   storage_->GetMemoryBackend()->Write(marker, 1);
 }
 
 long ProtocolTimeline::SubscribeInternal(const TopicPattern& pattern,
-                                          MessageHandler handler) {
+                                         MessageHandler handler) {
   std::lock_guard<std::mutex> lock(mutex_);
 
   long sub_id = next_internal_sub_id_++;
-  long router_id = router_->Subscribe(pattern, "__internal__",
-                                       QoS::AT_MOST_ONCE, false);
+  long router_id =
+      router_->Subscribe(pattern, "__internal__", QoS::AT_MOST_ONCE, false);
 
   InternalSub isub;
   isub.internal_id = sub_id;
@@ -226,7 +226,7 @@ void ProtocolTimeline::UnsubscribeInternal(long sub_id) {
 }
 
 void ProtocolTimeline::FireSystemEvent(const std::string& topic,
-                                         const std::string& data) {
+                                       const std::string& data) {
   std::vector<std::pair<std::string, std::string>> events;
   {
     std::lock_guard<std::mutex> lock(mutex_);

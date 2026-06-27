@@ -34,9 +34,9 @@ class Qwen3ForcedAligner : public core::IForcedAligner {
   // Align `transcript` to `pcm` (mono 16 kHz, `n` samples, up to ~5 min).
   // `language` is a full name (e.g. "Chinese", "English") or empty. Returns the
   // per-word units with start/end seconds relative to the start of `pcm`.
-  std::vector<core::AlignUnit> Align(const float* pcm, int n,
-                                     const std::string& transcript,
-                                     const std::string& language = "") const override;
+  std::vector<core::AlignUnit> Align(
+      const float* pcm, int n, const std::string& transcript,
+      const std::string& language = "") const override;
 
   std::string name() const override { return "qwen3_forced_aligner"; }
 

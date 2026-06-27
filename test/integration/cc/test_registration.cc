@@ -3,7 +3,8 @@
 //
 // No GPU required — these tests exercise the registration mechanism only.
 // For builtin registrations we check Contains() and Keys() but do NOT call
-// Create() (the factories construct real model objects that need GPU + weights).
+// Create() (the factories construct real model objects that need GPU +
+// weights).
 
 #include <cstdio>
 #include <memory>
@@ -15,8 +16,8 @@
 #include "core/stages.h"
 #include "model/builtin_registration.h"
 
-using orator::core::Registry;
 using orator::core::Registrar;
+using orator::core::Registry;
 
 static int g_fail = 0;
 #define CHECK(cond, msg)              \
@@ -47,7 +48,8 @@ struct TestB : ITest {
 // Main
 // ---------------------------------------------------------------------------
 int main() {
-  std::printf("Testing core::Registry and model::EnsureBuiltinsRegistered...\n");
+  std::printf(
+      "Testing core::Registry and model::EnsureBuiltinsRegistered...\n");
 
   // ------------------------------------------------------------------
   // 1. Registry: Register, Contains, Create, Keys with a custom interface.
@@ -111,9 +113,8 @@ int main() {
   {
     std::printf("  Test 3: Registrar helper\n");
     // Register via Registrar (simulates static-init pattern).
-    Registrar<ITest> r("registrar_test", [] {
-      return std::make_unique<TestA>();
-    });
+    Registrar<ITest> r("registrar_test",
+                       [] { return std::make_unique<TestA>(); });
     auto& reg = Registry<ITest>::Instance();
     CHECK(reg.Contains("registrar_test"),
           "Contains('registrar_test') after Registrar");
@@ -139,8 +140,7 @@ int main() {
 
     // Check IAsr registry.
     auto& asr_reg = Registry<orator::core::IAsr>::Instance();
-    CHECK(asr_reg.Contains("qwen3_asr"),
-          "IAsr registry contains 'qwen3_asr'");
+    CHECK(asr_reg.Contains("qwen3_asr"), "IAsr registry contains 'qwen3_asr'");
     CHECK(!asr_reg.Contains("nonexistent_asr"),
           "IAsr registry does not contain unknown key");
 
@@ -184,10 +184,13 @@ int main() {
   // Summary
   // ------------------------------------------------------------------
   if (g_fail == 0) {
-    std::printf("core::Registry and model::EnsureBuiltinsRegistered test PASSED\n");
+    std::printf(
+        "core::Registry and model::EnsureBuiltinsRegistered test PASSED\n");
     return 0;
   }
-  std::printf("core::Registry and model::EnsureBuiltinsRegistered test FAILED (%d checks)\n",
-              g_fail);
+  std::printf(
+      "core::Registry and model::EnsureBuiltinsRegistered test FAILED (%d "
+      "checks)\n",
+      g_fail);
   return 1;
 }

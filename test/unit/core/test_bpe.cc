@@ -16,7 +16,10 @@ int main() {
   }
 
   io::BpeTokenizer tk;
-  if (!tk.Load(model)) { std::printf("FAIL: load\n"); return 1; }
+  if (!tk.Load(model)) {
+    std::printf("FAIL: load\n");
+    return 1;
+  }
   std::printf("  vocab=%d\n", tk.VocabSize());
 
   int fails = 0;
@@ -33,7 +36,8 @@ int main() {
   check_encode("language English", {11528, 6364});
 
   // Decode the dumped generation ids; must equal transcript.txt.
-  std::ifstream gf("models/reference/asr/gen_ids.i32", std::ios::binary | std::ios::ate);
+  std::ifstream gf("models/reference/asr/gen_ids.i32",
+                   std::ios::binary | std::ios::ate);
   if (gf) {
     std::streamsize n = gf.tellg();
     gf.seekg(0);
@@ -41,13 +45,20 @@ int main() {
     gf.read(reinterpret_cast<char*>(ids.data()), n);
     std::string text = tk.Decode(ids, true);
     std::ifstream tf("models/reference/asr/transcript.txt");
-    std::string ref((std::istreambuf_iterator<char>(tf)), std::istreambuf_iterator<char>());
+    std::string ref((std::istreambuf_iterator<char>(tf)),
+                    std::istreambuf_iterator<char>());
     std::printf("  decode(gen_ids) = \"%s\"\n", text.c_str());
     std::printf("  reference       = \"%s\"\n", ref.c_str());
-    if (text != ref) { std::printf("  decode MISMATCH\n"); ++fails; }
+    if (text != ref) {
+      std::printf("  decode MISMATCH\n");
+      ++fails;
+    }
   }
 
-  if (fails) { std::printf("FAIL: %d mismatches\n", fails); return 1; }
+  if (fails) {
+    std::printf("FAIL: %d mismatches\n", fails);
+    return 1;
+  }
   std::printf("BPE tokenizer test PASSED\n");
   return 0;
 }

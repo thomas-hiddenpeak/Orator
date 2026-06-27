@@ -1,22 +1,23 @@
 #pragma once
 
-// GpuVad: the Silero speech-endpoint detector with its per-window compute on the
-// GPU, driven in batches (Spec 004 Phase 5, FR6).
+// GpuVad: the Silero speech-endpoint detector with its per-window compute on
+// the GPU, driven in batches (Spec 004 Phase 5, FR6).
 //
 // The legacy detector (AsrSileroVad) runs the per-window STFT, convolutional
 // encoder, and LSTM on the CPU, one window at a time, synchronously on the
 // streaming thread. When the endpoint pipeline falls behind and a large span of
-// audio is drained at once, that path spends a long stretch on a single CPU core
-// with the GPU idle. GpuVad removes that hazard: each buffered read is processed
-// as ONE batched GPU pass over all ready 512-sample windows.
+// audio is drained at once, that path spends a long stretch on a single CPU
+// core with the GPU idle. GpuVad removes that hazard: each buffered read is
+// processed as ONE batched GPU pass over all ready 512-sample windows.
 //
 // Batching is sound because a window's STFT input is
-// [64 prior audio samples | 512 window samples] -- the "context" is prior AUDIO,
-// not recurrent compute state -- so the STFT and the convolutional encoder are
-// independent per window and run as one batch. Only the LSTM hidden/cell
-// recurrence is sequential; it is a single scan over the batch carried in shared
-// memory. The endpoint state machine (speech/silence accumulation) then runs on
-// the host over the per-window probabilities (no compute, just counters).
+// [64 prior audio samples | 512 window samples] -- the "context" is prior
+// AUDIO, not recurrent compute state -- so the STFT and the convolutional
+// encoder are independent per window and run as one batch. Only the LSTM
+// hidden/cell recurrence is sequential; it is a single scan over the batch
+// carried in shared memory. The endpoint state machine (speech/silence
+// accumulation) then runs on the host over the per-window probabilities (no
+// compute, just counters).
 //
 // Numerics: GpuVad reproduces AsrSileroVad's fp32 computation with the same
 // weights; test_vad gates the per-window probability against the CPU reference
@@ -44,7 +45,8 @@ class GpuVad : public core::IVad {
     int silero_min_speech_ms = 250;
     int silero_min_silence_ms = 120;
     int silero_speech_pad_ms = 60;  // accepted for parity; unused for endpoints
-    cudaStream_t stream = nullptr;  // Spec 002: dedicated CUDA stream (lock-free)
+    cudaStream_t stream =
+        nullptr;  // Spec 002: dedicated CUDA stream (lock-free)
   };
 
   explicit GpuVad(const Params& params);
@@ -66,8 +68,8 @@ class GpuVad : public core::IVad {
   // Process every ready full window on the GPU in one batch and append each
   // completed SPEECH SEGMENT as an absolute-sample [start,end) pair to *segs
   // (the VAD pipeline's data: voice-activity regions on the common time base).
-  // `finalize` flushes a still-open speech segment at end of stream. Runs on its
-  // own dedicated CUDA stream (Spec 002); no GPU lock is acquired.
+  // `finalize` flushes a still-open speech segment at end of stream. Runs on
+  // its own dedicated CUDA stream (Spec 002); no GPU lock is acquired.
   void DrainSegments(bool finalize,
                      std::vector<core::VadSegmentResult>* segs) override;
 
@@ -100,14 +102,14 @@ class GpuVad : public core::IVad {
   cudaStream_t stream_;
 
   // Host weights (loaded from safetensors, then uploaded to device).
-  std::vector<float> stft_basis_;     // [258*256]
+  std::vector<float> stft_basis_;  // [258*256]
   std::vector<float> enc_w_[4];
   std::vector<float> enc_b_[4];
-  std::vector<float> lstm_wih_;       // [512*128]
-  std::vector<float> lstm_whh_;       // [512*128]
-  std::vector<float> lstm_bih_;       // [512]
-  std::vector<float> lstm_bhh_;       // [512]
-  std::vector<float> dec_w_;          // [128]
+  std::vector<float> lstm_wih_;  // [512*128]
+  std::vector<float> lstm_whh_;  // [512*128]
+  std::vector<float> lstm_bih_;  // [512]
+  std::vector<float> lstm_bhh_;  // [512]
+  std::vector<float> dec_w_;     // [128]
   float dec_b_ = 0.0f;
 
   // Device weights.
@@ -144,7 +146,8 @@ class GpuVad : public core::IVad {
   bool in_speech_ = false;
   int speech_samples_ = 0;
   int silence_samples_ = 0;
-  long seg_start_abs_ = 0;       // absolute sample where the open speech segment began
+  long seg_start_abs_ =
+      0;  // absolute sample where the open speech segment began
   double compute_sec_ = 0.0;
 };
 

@@ -10,12 +10,12 @@ using orator::protocol::TopicPattern;
 using orator::protocol::TopicRouter;
 
 static int g_fail = 0;
-#define CHECK(cond, msg)                \
-  do {                                  \
-    if (!(cond)) {                      \
-      std::printf("FAIL: %s\n", msg);   \
-      ++g_fail;                         \
-    }                                   \
+#define CHECK(cond, msg)              \
+  do {                                \
+    if (!(cond)) {                    \
+      std::printf("FAIL: %s\n", msg); \
+      ++g_fail;                       \
+    }                                 \
   } while (0)
 
 int main() {
@@ -39,8 +39,8 @@ int main() {
   {
     TopicRouter router;
     router.Subscribe(TopicPattern{"audio/raw"}, "pipeline_a");
-    auto deliveries = router.Route(Topic{"audio/raw"}, "publisher_x",
-                                   QoS::AT_MOST_ONCE);
+    auto deliveries =
+        router.Route(Topic{"audio/raw"}, "publisher_x", QoS::AT_MOST_ONCE);
     CHECK(deliveries.size() == 1, "exact match produces one delivery");
     CHECK(deliveries[0].pipeline_name == "pipeline_a",
           "delivery targets correct pipeline");
@@ -62,13 +62,13 @@ int main() {
     router.Subscribe(TopicPattern{"system/#"}, "monitor");
 
     // Two-level topic: system/pipeline/online
-    auto d1 = router.Route(Topic{"system/pipeline/online"}, "sys",
-                            QoS::AT_MOST_ONCE);
+    auto d1 =
+        router.Route(Topic{"system/pipeline/online"}, "sys", QoS::AT_MOST_ONCE);
     CHECK(d1.size() == 1, "'#' matches system/pipeline/online");
 
     // Another two-level topic: system/pipeline/offline
     auto d2 = router.Route(Topic{"system/pipeline/offline"}, "sys",
-                            QoS::AT_MOST_ONCE);
+                           QoS::AT_MOST_ONCE);
     CHECK(d2.size() == 1, "'#' matches system/pipeline/offline");
 
     // Single-level topic: system (zero remaining levels)
@@ -80,8 +80,8 @@ int main() {
   {
     TopicRouter router;
     router.Subscribe(TopicPattern{"audio/raw"}, "pipeline_a");
-    auto deliveries = router.Route(Topic{"vad/speech_segment"}, "vad",
-                                   QoS::AT_MOST_ONCE);
+    auto deliveries =
+        router.Route(Topic{"vad/speech_segment"}, "vad", QoS::AT_MOST_ONCE);
     CHECK(deliveries.empty(), "non-matching topic produces no delivery");
   }
 
@@ -90,8 +90,8 @@ int main() {
     TopicRouter router;
     router.Subscribe(TopicPattern{"audio/#"}, "pipeline_a", QoS::AT_MOST_ONCE,
                      /*no_local=*/true);
-    auto deliveries = router.Route(Topic{"audio/raw"}, "pipeline_a",
-                                   QoS::AT_MOST_ONCE);
+    auto deliveries =
+        router.Route(Topic{"audio/raw"}, "pipeline_a", QoS::AT_MOST_ONCE);
     CHECK(deliveries.empty(), "no_local=true blocks self-delivery");
   }
 
@@ -100,8 +100,8 @@ int main() {
     TopicRouter router;
     router.Subscribe(TopicPattern{"audio/#"}, "pipeline_a", QoS::AT_MOST_ONCE,
                      /*no_local=*/false);
-    auto deliveries = router.Route(Topic{"audio/raw"}, "pipeline_a",
-                                   QoS::AT_MOST_ONCE);
+    auto deliveries =
+        router.Route(Topic{"audio/raw"}, "pipeline_a", QoS::AT_MOST_ONCE);
     CHECK(deliveries.size() == 1, "no_local=false allows self-delivery");
   }
 
@@ -111,8 +111,8 @@ int main() {
     router.Subscribe(TopicPattern{"audio/raw"}, "pipeline_a");
     router.Subscribe(TopicPattern{"audio/raw"}, "pipeline_b");
     router.Subscribe(TopicPattern{"audio/+"}, "pipeline_c");
-    auto deliveries = router.Route(Topic{"audio/raw"}, "publisher",
-                                   QoS::AT_MOST_ONCE);
+    auto deliveries =
+        router.Route(Topic{"audio/raw"}, "publisher", QoS::AT_MOST_ONCE);
     CHECK(deliveries.size() == 3, "fan-out delivers to all three subscribers");
   }
 
@@ -120,8 +120,9 @@ int main() {
   {
     TopicRouter router;
     long id = router.Subscribe(TopicPattern{"audio/raw"}, "pipeline_a");
-    CHECK(router.Route(Topic{"audio/raw"}, "pub", QoS::AT_MOST_ONCE).size() == 1,
-          "delivers before unsubscribe");
+    CHECK(
+        router.Route(Topic{"audio/raw"}, "pub", QoS::AT_MOST_ONCE).size() == 1,
+        "delivers before unsubscribe");
 
     router.Unsubscribe(id);
     CHECK(router.Route(Topic{"audio/raw"}, "pub", QoS::AT_MOST_ONCE).empty(),
@@ -135,7 +136,8 @@ int main() {
     router.Subscribe(TopicPattern{"vad/+"}, "pipeline_a");
     router.Subscribe(TopicPattern{"audio/raw"}, "pipeline_b");
 
-    CHECK(router.GetAllSubscriptions().size() == 3, "three subscriptions exist");
+    CHECK(router.GetAllSubscriptions().size() == 3,
+          "three subscriptions exist");
 
     router.RemovePipeline("pipeline_a");
     CHECK(router.GetAllSubscriptions().size() == 1,
@@ -186,14 +188,14 @@ int main() {
           "audio/raw -> audio_consumer only");
 
     // vad/speech_segment matches vad/+ only
-    auto d2 = router.Route(Topic{"vad/speech_segment"}, "pub",
-                            QoS::AT_MOST_ONCE);
+    auto d2 =
+        router.Route(Topic{"vad/speech_segment"}, "pub", QoS::AT_MOST_ONCE);
     CHECK(d2.size() == 1 && d2[0].pipeline_name == "vad_consumer",
           "vad/speech_segment -> vad_consumer only");
 
     // system/pipeline/online matches system/# only
-    auto d3 = router.Route(Topic{"system/pipeline/online"}, "pub",
-                            QoS::AT_MOST_ONCE);
+    auto d3 =
+        router.Route(Topic{"system/pipeline/online"}, "pub", QoS::AT_MOST_ONCE);
     CHECK(d3.size() == 1 && d3[0].pipeline_name == "monitor",
           "system/pipeline/online -> monitor only");
   }

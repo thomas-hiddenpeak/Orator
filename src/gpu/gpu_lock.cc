@@ -20,8 +20,8 @@ bool EnvTrue(const char* name) {
 //              after stream routing is complete.
 //   kAsrOnly — ONLY the ASR own-stream pipeline is lock-free; diarization + VAD
 //              still hold the lock. Intermediate/legacy option.
-// Resolution: ORATOR_GPU_SERIAL=1 forces kSerial; ORATOR_GPU_CONCURRENT=1 selects
-// kFull; otherwise kFull (default).
+// Resolution: ORATOR_GPU_SERIAL=1 forces kSerial; ORATOR_GPU_CONCURRENT=1
+// selects kFull; otherwise kFull (default).
 enum class GpuMode { kSerial, kAsrOnly, kFull };
 
 GpuMode ResolveMode() {
@@ -47,8 +47,8 @@ bool ConcurrentGpuEnabled() {
 }
 
 bool ConcurrentGpuActive() {
-  // True if ANY lock-free concurrency mode is active (ASR-only default or full).
-  // The ASR decoder uses this to disable CUDA Graph capture, which a
+  // True if ANY lock-free concurrency mode is active (ASR-only default or
+  // full). The ASR decoder uses this to disable CUDA Graph capture, which a
   // concurrently-issuing pipeline corrupts ("operation failed ... during
   // capture" abort).
   return Mode() != GpuMode::kSerial;
@@ -58,21 +58,27 @@ DeviceGuard::DeviceGuard(bool own_stream) : locked_(false) {
   // Spec 002 concurrency (validated 2026-06-17). This Orin reports
   // concurrentManagedAccess == 0, so the host must not touch managed memory
   // while any kernel runs. The ASR engine's streaming host-touch sites were
-  // de-coupled to device + pinned memory, and CUDA Graph capture is auto-disabled
-  // under concurrency, so the ASR own-stream pipeline is safe to run lock-free.
-  // The diarizer's streaming compute state is pure host memory (HostStreamState)
-  // and GpuVad is all-device, so the full mode is also safe; it is simply no
-  // faster than ASR-only (diar/VAD share the default stream).
+  // de-coupled to device + pinned memory, and CUDA Graph capture is
+  // auto-disabled under concurrency, so the ASR own-stream pipeline is safe to
+  // run lock-free. The diarizer's streaming compute state is pure host memory
+  // (HostStreamState) and GpuVad is all-device, so the full mode is also safe;
+  // it is simply no faster than ASR-only (diar/VAD share the default stream).
   //
   //   kSerial : everyone locks.
-  //   kAsrOnly: ASR (own_stream) is lock-free; diar/VAD lock. PRODUCTION DEFAULT.
-  //   kFull   : everyone is lock-free.
+  //   kAsrOnly: ASR (own_stream) is lock-free; diar/VAD lock. PRODUCTION
+  //   DEFAULT. kFull   : everyone is lock-free.
   const GpuMode mode = Mode();
   bool skip = false;
   switch (mode) {
-    case GpuMode::kSerial: skip = false; break;
-    case GpuMode::kAsrOnly: skip = own_stream; break;
-    case GpuMode::kFull: skip = true; break;
+    case GpuMode::kSerial:
+      skip = false;
+      break;
+    case GpuMode::kAsrOnly:
+      skip = own_stream;
+      break;
+    case GpuMode::kFull:
+      skip = true;
+      break;
   }
   if (!skip) {
     DeviceLock().lock();

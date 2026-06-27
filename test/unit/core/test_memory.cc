@@ -28,13 +28,13 @@ int main() {
     host_data[i] = static_cast<float>(i);
   }
 
-  void* device_data = GpuMemory::device_allocator().allocate(size * sizeof(float));
+  void* device_data =
+      GpuMemory::device_allocator().allocate(size * sizeof(float));
   GpuMemory::CopyHostToDevice(device_data, host_data, size * sizeof(float));
   std::cout << "✓ Copied host data to device" << std::endl;
 
   float* host_result = new float[size];
-  GpuMemory::CopyDeviceToHost(host_result, device_data,
-                              size * sizeof(float));
+  GpuMemory::CopyDeviceToHost(host_result, device_data, size * sizeof(float));
   std::cout << "✓ Copied device data back to host" << std::endl;
 
   // Verify data integrity

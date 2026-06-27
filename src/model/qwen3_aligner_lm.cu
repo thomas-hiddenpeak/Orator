@@ -11,13 +11,15 @@
 namespace orator {
 namespace model {
 
+using gpu::CheckCudaError;
 using gpu::DeviceBuffer;
 using gpu::UnifiedBuffer;
-using gpu::CheckCudaError;
 
 namespace {
 constexpr int kThreads = 256;
-inline int Blocks(long n) { return static_cast<int>((n + kThreads - 1) / kThreads); }
+inline int Blocks(long n) {
+  return static_cast<int>((n + kThreads - 1) / kThreads);
+}
 
 __global__ void AddInPlaceKernel(float* x, const float* y, long n) {
   const long i = static_cast<long>(blockIdx.x) * blockDim.x + threadIdx.x;
@@ -107,7 +109,8 @@ std::vector<float> AlignerLm::Forward(const std::vector<int>& input_ids,
   const float scale = 1.0f / std::sqrt(static_cast<float>(Dh));
   cudaStream_t s = 0;  // asr_ops::GqaAttention runs on the default stream
 
-  // ---- Build input embeddings on host: embed table lookup, audio injected ----
+  // ---- Build input embeddings on host: embed table lookup, audio injected
+  // ----
   std::vector<float> h_embed(static_cast<size_t>(T) * Hh);
   int audio_idx = 0;
   for (int t = 0; t < T; ++t) {
@@ -126,8 +129,11 @@ std::vector<float> AlignerLm::Forward(const std::vector<int>& input_ids,
   std::vector<int> h_pos(T);
   for (int t = 0; t < T; ++t) h_pos[t] = t;
 
-  // ---- Device scratch (device memory: avoids Tegra managed-migration hazard) ----
-  auto dbuf = [](size_t bytes) { return std::make_shared<DeviceBuffer>(bytes); };
+  // ---- Device scratch (device memory: avoids Tegra managed-migration hazard)
+  // ----
+  auto dbuf = [](size_t bytes) {
+    return std::make_shared<DeviceBuffer>(bytes);
+  };
   auto d_x = dbuf(sizeof(float) * T * Hh);
   auto d_pos = dbuf(sizeof(int) * T);
   auto d_norm = dbuf(sizeof(float) * T * Hh);
@@ -169,7 +175,8 @@ std::vector<float> AlignerLm::Forward(const std::vector<int>& input_ids,
     asr_ops::RmsNorm(k, L.k_norm.p, k, T * Hkv, Dh, eps, s);
     asr_ops::RopeHalf(q, pos, T, Hq, Dh, config_.rope_theta, s);
     asr_ops::RopeHalf(k, pos, T, Hkv, Dh, config_.rope_theta, s);
-    asr_ops::GqaAttention(q, k, v, attn, T, Hq, Hkv, Dh, scale, /*causal=*/true);
+    asr_ops::GqaAttention(q, k, v, attn, T, Hq, Hkv, Dh, scale,
+                          /*causal=*/true);
     asr_gemm::Linear(attn, L.o_w.p, nullptr, proj, T, Qd, Hh, 0, s);
     AddInPlaceKernel<<<Blocks(static_cast<long>(T) * Hh), kThreads, 0, s>>>(
         x, proj, static_cast<long>(T) * Hh);
@@ -188,19 +195,19 @@ std::vector<float> AlignerLm::Forward(const std::vector<int>& input_ids,
   asr_ops::RmsNorm(x, final_norm_.p, nrm, T, Hh, eps, s);
   if (hidden_out) {
     hidden_out->resize(static_cast<size_t>(T) * Hh);
-    CheckCudaError(cudaMemcpyAsync(hidden_out->data(), nrm,
-                                   sizeof(float) * T * Hh, cudaMemcpyDeviceToHost,
-                                   s),
-                   __FILE__, __LINE__);
+    CheckCudaError(
+        cudaMemcpyAsync(hidden_out->data(), nrm, sizeof(float) * T * Hh,
+                        cudaMemcpyDeviceToHost, s),
+        __FILE__, __LINE__);
   }
-  asr_gemm::Linear(nrm, score_.p, nullptr, static_cast<float*>(d_logits->data()),
-                   T, Hh, L_, 0, s);
+  asr_gemm::Linear(nrm, score_.p, nullptr,
+                   static_cast<float*>(d_logits->data()), T, Hh, L_, 0, s);
 
   std::vector<float> logits(static_cast<size_t>(T) * L_);
-  CheckCudaError(cudaMemcpyAsync(logits.data(), d_logits->data(),
-                                 sizeof(float) * T * L_, cudaMemcpyDeviceToHost,
-                                 s),
-                 __FILE__, __LINE__);
+  CheckCudaError(
+      cudaMemcpyAsync(logits.data(), d_logits->data(), sizeof(float) * T * L_,
+                      cudaMemcpyDeviceToHost, s),
+      __FILE__, __LINE__);
   CheckCudaError(cudaStreamSynchronize(s), __FILE__, __LINE__);
   return logits;
 }

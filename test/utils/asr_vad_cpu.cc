@@ -14,7 +14,8 @@ namespace pipeline {
 namespace {
 
 template <typename T>
-void LoadVec(const io::SafeTensorReader& r, const char* name, std::vector<T>* dst) {
+void LoadVec(const io::SafeTensorReader& r, const char* name,
+             std::vector<T>* dst) {
   const auto meta = r.GetMetadata(name);
   const size_t n = static_cast<size_t>(meta.data_size) / sizeof(T);
   dst->resize(n);
@@ -96,8 +97,8 @@ AsrSileroVad::StepResult AsrSileroVad::ProcessWindow(const float* pcm,
 
   constexpr int kStftOut = 258;
   float stft_out[kStftOut * kStftFrames];
-  Conv1d(padded, 1, kPaddedLen, stft_basis_.data(), nullptr,
-         kStftOut, kNfft, kHopLength, 0, stft_out, kStftFrames);
+  Conv1d(padded, 1, kPaddedLen, stft_basis_.data(), nullptr, kStftOut, kNfft,
+         kHopLength, 0, stft_out, kStftFrames);
 
   float magnitude[kStftBins * kStftFrames];
   for (int f = 0; f < kStftBins; ++f) {
@@ -109,36 +110,31 @@ AsrSileroVad::StepResult AsrSileroVad::ProcessWindow(const float* pcm,
   }
 
   float enc0[kEnc0Out * kEnc0Frames];
-  Conv1d(magnitude, kStftBins, kStftFrames,
-         enc_w_[0].data(), enc_b_[0].data(),
+  Conv1d(magnitude, kStftBins, kStftFrames, enc_w_[0].data(), enc_b_[0].data(),
          kEnc0Out, 3, 1, 1, enc0, kEnc0Frames);
   ReluInplace(enc0, kEnc0Out * kEnc0Frames);
 
   float enc1[kEnc1Out * kEnc1Frames];
-  Conv1d(enc0, kEnc0Out, kEnc0Frames,
-         enc_w_[1].data(), enc_b_[1].data(),
+  Conv1d(enc0, kEnc0Out, kEnc0Frames, enc_w_[1].data(), enc_b_[1].data(),
          kEnc1Out, 3, 2, 1, enc1, kEnc1Frames);
   ReluInplace(enc1, kEnc1Out * kEnc1Frames);
 
   float enc2[kEnc2Out * kEnc2Frames];
-  Conv1d(enc1, kEnc1Out, kEnc1Frames,
-         enc_w_[2].data(), enc_b_[2].data(),
+  Conv1d(enc1, kEnc1Out, kEnc1Frames, enc_w_[2].data(), enc_b_[2].data(),
          kEnc2Out, 3, 2, 1, enc2, kEnc2Frames);
   ReluInplace(enc2, kEnc2Out * kEnc2Frames);
 
   float enc3[kEnc3Out * kEnc3Frames];
-  Conv1d(enc2, kEnc2Out, kEnc2Frames,
-         enc_w_[3].data(), enc_b_[3].data(),
+  Conv1d(enc2, kEnc2Out, kEnc2Frames, enc_w_[3].data(), enc_b_[3].data(),
          kEnc3Out, 3, 1, 1, enc3, kEnc3Frames);
   ReluInplace(enc3, kEnc3Out * kEnc3Frames);
 
   float lstm_in[kLstmHidden];
   for (int i = 0; i < kLstmHidden; ++i) lstm_in[i] = enc3[i];
 
-  LstmCellStep(lstm_in, kLstmHidden,
-               lstm_wih_.data(), lstm_whh_.data(),
-               lstm_bih_.data(), lstm_bhh_.data(),
-               h_state_.data(), c_state_.data(), kLstmHidden);
+  LstmCellStep(lstm_in, kLstmHidden, lstm_wih_.data(), lstm_whh_.data(),
+               lstm_bih_.data(), lstm_bhh_.data(), h_state_.data(),
+               c_state_.data(), kLstmHidden);
 
   float dot = dec_b_;
   for (int i = 0; i < kLstmHidden; ++i) {
@@ -156,7 +152,8 @@ AsrSileroVad::StepResult AsrSileroVad::ProcessWindow(const float* pcm,
   if (out.is_speech) {
     silence_samples_ = 0;
     speech_samples_ += n_samples;
-    const int min_speech = params_.silero_min_speech_ms * params_.sample_rate / 1000;
+    const int min_speech =
+        params_.silero_min_speech_ms * params_.sample_rate / 1000;
     if (!in_speech_ && speech_samples_ >= min_speech) {
       in_speech_ = true;
       out.segment_start = true;
@@ -164,7 +161,8 @@ AsrSileroVad::StepResult AsrSileroVad::ProcessWindow(const float* pcm,
   } else {
     if (in_speech_) {
       silence_samples_ += n_samples;
-      const int min_silence = params_.silero_min_silence_ms * params_.sample_rate / 1000;
+      const int min_silence =
+          params_.silero_min_silence_ms * params_.sample_rate / 1000;
       if (silence_samples_ >= min_silence) {
         in_speech_ = false;
         out.segment_end = true;
@@ -200,10 +198,12 @@ bool AsrSileroVad::NextSpan(bool finalize, int* begin, int* end, int* consume) {
 
     if (segment_open_) {
       if (st.is_speech) last_voiced_end_ = win_end;
-      const bool hit_cap = max_len > 0 && (last_voiced_end_ - segment_start_) >= max_len;
+      const bool hit_cap =
+          max_len > 0 && (last_voiced_end_ - segment_start_) >= max_len;
       if (st.segment_end || hit_cap) {
         const int out_begin = std::max(0, segment_start_ - pad);
-        const int out_end = std::min(static_cast<int>(pcm_.size()), last_voiced_end_ + pad);
+        const int out_end =
+            std::min(static_cast<int>(pcm_.size()), last_voiced_end_ + pad);
         const int out_consume = std::max(out_end, cursor_);
         segment_open_ = false;
         if (out_end - out_begin >= min_len) {
@@ -222,7 +222,8 @@ bool AsrSileroVad::NextSpan(bool finalize, int* begin, int* end, int* consume) {
 
   if (finalize && segment_open_) {
     const int out_begin = std::max(0, segment_start_ - pad);
-    const int out_end = std::min(static_cast<int>(pcm_.size()), last_voiced_end_ + pad);
+    const int out_end =
+        std::min(static_cast<int>(pcm_.size()), last_voiced_end_ + pad);
     segment_open_ = false;
     if (out_end - out_begin >= min_len) {
       *begin = out_begin;
@@ -296,15 +297,16 @@ std::vector<float> AsrSileroVad::DebugWindowProbs(const float* pcm, int n) {
   return probs;
 }
 
-void AsrSileroVad::ReflectPadRight(const float* in, int len, int pad, float* out) {
+void AsrSileroVad::ReflectPadRight(const float* in, int len, int pad,
+                                   float* out) {
   std::memcpy(out, in, len * sizeof(float));
   for (int i = 0; i < pad; ++i) out[len + i] = in[len - 2 - i];
 }
 
 void AsrSileroVad::Conv1d(const float* input, int C_in, int L_in,
-                          const float* weight, const float* bias,
-                          int C_out, int K, int stride, int pad,
-                          float* output, int L_out) {
+                          const float* weight, const float* bias, int C_out,
+                          int K, int stride, int pad, float* output,
+                          int L_out) {
   for (int co = 0; co < C_out; ++co) {
     const float b = bias ? bias[co] : 0.0f;
     for (int t = 0; t < L_out; ++t) {
@@ -331,8 +333,8 @@ void AsrSileroVad::ReluInplace(float* data, int n) {
 
 void AsrSileroVad::LstmCellStep(const float* x, int input_size,
                                 const float* Wih, const float* Whh,
-                                const float* bih, const float* bhh,
-                                float* h, float* c, int hidden) {
+                                const float* bih, const float* bhh, float* h,
+                                float* c, int hidden) {
   const int H4 = 4 * hidden;
   float gates[512];
   assert(H4 <= 512);

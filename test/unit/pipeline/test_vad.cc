@@ -1,10 +1,10 @@
 // test_vad: numeric gate for the GPU endpoint detector (Spec 004 Phase 5, FR8).
 //
-// The CPU AsrSileroVad is the reference of record for the endpoint detector. The
-// GPU GpuVad must reproduce its per-window speech probability with the SAME
-// weights. This test feeds an identical deterministic signal to both and asserts
-// the per-window probabilities match within a recorded tolerance. Run from the
-// repo root so models/vad/silero_vad.safetensors resolves.
+// The CPU AsrSileroVad is the reference of record for the endpoint detector.
+// The GPU GpuVad must reproduce its per-window speech probability with the SAME
+// weights. This test feeds an identical deterministic signal to both and
+// asserts the per-window probabilities match within a recorded tolerance. Run
+// from the repo root so models/vad/silero_vad.safetensors resolves.
 
 #include <cmath>
 #include <cstdio>
@@ -26,7 +26,8 @@ int main() {
   std::vector<float> pcm(n);
   for (int i = 0; i < n; ++i) {
     const double t = static_cast<double>(i) / sr;
-    const double env = 0.5 * (1.0 + std::sin(2.0 * M_PI * 0.7 * t));  // 0..1 slow
+    const double env =
+        0.5 * (1.0 + std::sin(2.0 * M_PI * 0.7 * t));  // 0..1 slow
     const double s = std::sin(2.0 * M_PI * 220.0 * t) +
                      0.5 * std::sin(2.0 * M_PI * 740.0 * t) +
                      0.3 * std::sin(2.0 * M_PI * 1600.0 * t);
@@ -64,10 +65,12 @@ int main() {
   }
 
   const double tol = 2e-3;  // fp32 with differing reduction order
-  std::printf("windows=%zu  max |prob_gpu - prob_cpu|=%.2e (window %d)  tol=%.0e\n",
-              cpu_probs.size(), max_abs, worst, tol);
+  std::printf(
+      "windows=%zu  max |prob_gpu - prob_cpu|=%.2e (window %d)  tol=%.0e\n",
+      cpu_probs.size(), max_abs, worst, tol);
   if (worst >= 0) {
-    std::printf("  worst: cpu=%.6f gpu=%.6f\n", cpu_probs[worst], gpu_probs[worst]);
+    std::printf("  worst: cpu=%.6f gpu=%.6f\n", cpu_probs[worst],
+                gpu_probs[worst]);
   }
 
   if (max_abs > tol) {

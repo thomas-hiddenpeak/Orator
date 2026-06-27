@@ -17,7 +17,9 @@ using ::orator::gpu::CheckCudaError;
 namespace {
 
 constexpr int kThreads = 256;
-inline int Blocks(long n) { return static_cast<int>((n + kThreads - 1) / kThreads); }
+inline int Blocks(long n) {
+  return static_cast<int>((n + kThreads - 1) / kThreads);
+}
 
 // Per-THREAD bf16 cast scratch for the `in` operand. asr_gemm::Linear is called
 // concurrently from independent pipeline threads (the ASR worker on asr_stream
@@ -25,15 +27,17 @@ inline int Blocks(long n) { return static_cast<int>((n + kThreads - 1) / kThread
 // production lock-free concurrency mode, are NOT mutually excluded. A single
 // shared scratch would race: Scratch()'s grow path (cudaFree + cudaMalloc)
 // could free the buffer out from under another thread's queued GEMM
-// (use-after-free on device memory). thread_local gives each pipeline thread its
-// own scratch. (Per-thread buffers are reclaimed at process exit.)
-thread_local uint16_t* g_scratch = nullptr;   // bf16 cast scratch for the `in` operand
+// (use-after-free on device memory). thread_local gives each pipeline thread
+// its own scratch. (Per-thread buffers are reclaimed at process exit.)
+thread_local uint16_t* g_scratch =
+    nullptr;  // bf16 cast scratch for the `in` operand
 thread_local long g_scratch_cap = 0;
 
 uint16_t* Scratch(long n) {
   if (n > g_scratch_cap) {
     if (g_scratch) CUDA_CHECK(cudaFree(g_scratch));
-    CheckCudaError(cudaMalloc(&g_scratch, sizeof(uint16_t) * n), __FILE__, __LINE__);
+    CheckCudaError(cudaMalloc(&g_scratch, sizeof(uint16_t) * n), __FILE__,
+                   __LINE__);
     g_scratch_cap = n;
   }
   return g_scratch;
@@ -73,7 +77,8 @@ __global__ void GemvBf16Kernel(const __nv_bfloat16* __restrict__ in,
   const int row = blockIdx.x * kGemvWarps + warp;
   if (row >= N) return;
 
-  const __nv_bfloat162* w2 = reinterpret_cast<const __nv_bfloat162*>(W + static_cast<size_t>(row) * K);
+  const __nv_bfloat162* w2 =
+      reinterpret_cast<const __nv_bfloat162*>(W + static_cast<size_t>(row) * K);
   const __nv_bfloat162* x2 = reinterpret_cast<const __nv_bfloat162*>(sx);
   const int K2 = K >> 1;
   float acc = 0.0f;
@@ -86,16 +91,18 @@ __global__ void GemvBf16Kernel(const __nv_bfloat16* __restrict__ in,
   for (int m = 16; m > 0; m >>= 1) acc += __shfl_xor_sync(0xffffffffu, acc, m);
   if (lane == 0) {
     if (bias) acc += bias[row];
-    if (act == 1) acc = 0.5f * acc * (1.0f + erff(acc * 0.70710678118654752440f));
-    else if (act == 2) acc = fmaxf(acc, 0.0f);
+    if (act == 1)
+      acc = 0.5f * acc * (1.0f + erff(acc * 0.70710678118654752440f));
+    else if (act == 2)
+      acc = fmaxf(acc, 0.0f);
     out[row] = acc;
   }
 }
 
 // 128-bit (float4 = 8 bf16) vectorized variant of GemvBf16Kernel. Each lane
 // issues a single 16-byte load per step, so the 32-lane warp reads a 512-byte
-// coalesced transaction -- higher memory-level parallelism (more bytes in flight
-// per instruction, 4x fewer loop iterations) than the half2 path on the
+// coalesced transaction -- higher memory-level parallelism (more bytes in
+// flight per instruction, 4x fewer loop iterations) than the half2 path on the
 // bandwidth-bound M=1 decode. Requires K % 8 == 0 (true for every Qwen3
 // projection: 1024/2048/6144); the row offset row*K is then a multiple of 8, so
 // each row's float4 stream is 16-byte aligned. x is staged in shared (16-byte
@@ -103,7 +110,8 @@ __global__ void GemvBf16Kernel(const __nv_bfloat16* __restrict__ in,
 __global__ void GemvBf16Vec4Kernel(const __nv_bfloat16* __restrict__ in,
                                    const __nv_bfloat16* __restrict__ W,
                                    const float* __restrict__ bias,
-                                   float* __restrict__ out, int K, int N, int act) {
+                                   float* __restrict__ out, int K, int N,
+                                   int act) {
   extern __shared__ __nv_bfloat16 sx[];  // [K]
   const int tid = threadIdx.x;
   const int lane = tid & 31;
@@ -114,10 +122,14 @@ __global__ void GemvBf16Vec4Kernel(const __nv_bfloat16* __restrict__ in,
   const int row = blockIdx.x * kGemvWarps + warp;
   if (row >= N) return;
 
-  const float4* w4 = reinterpret_cast<const float4*>(W + static_cast<size_t>(row) * K);
+  const float4* w4 =
+      reinterpret_cast<const float4*>(W + static_cast<size_t>(row) * K);
   const float4* x4 = reinterpret_cast<const float4*>(sx);
   const int K8 = K >> 3;  // float4 (8 bf16) chunks
-  union Pack { float4 v; __nv_bfloat162 h[4]; };
+  union Pack {
+    float4 v;
+    __nv_bfloat162 h[4];
+  };
   float acc = 0.0f;
   for (int k = lane; k < K8; k += 32) {
     Pack wp, xp;
@@ -134,8 +146,10 @@ __global__ void GemvBf16Vec4Kernel(const __nv_bfloat16* __restrict__ in,
   for (int m = 16; m > 0; m >>= 1) acc += __shfl_xor_sync(0xffffffffu, acc, m);
   if (lane == 0) {
     if (bias) acc += bias[row];
-    if (act == 1) acc = 0.5f * acc * (1.0f + erff(acc * 0.70710678118654752440f));
-    else if (act == 2) acc = fmaxf(acc, 0.0f);
+    if (act == 1)
+      acc = 0.5f * acc * (1.0f + erff(acc * 0.70710678118654752440f));
+    else if (act == 2)
+      acc = fmaxf(acc, 0.0f);
     out[row] = acc;
   }
 }
@@ -172,22 +186,26 @@ void LinearPre(const uint16_t* in_bf16, const uint16_t* W_bf16,
                int act, cudaStream_t stream) {
   if (M <= 0 || K <= 0 || N <= 0) return;
 
-  // M==1 (autoregressive decode): memory-bound GEMV with coalesced weight reads.
-  // K is even for every Qwen3 projection (1024/2048/6144) so the half2 path is safe;
-  // K % 8 == 0 holds for all of them too, so the 128-bit float4 path is preferred.
+  // M==1 (autoregressive decode): memory-bound GEMV with coalesced weight
+  // reads. K is even for every Qwen3 projection (1024/2048/6144) so the half2
+  // path is safe; K % 8 == 0 holds for all of them too, so the 128-bit float4
+  // path is preferred.
   if (M == 1 && (K & 1) == 0) {
     const int grid = (N + kGemvWarps - 1) / kGemvWarps;
     const size_t shmem = static_cast<size_t>(K) * sizeof(__nv_bfloat16);
-    // ORATOR_GEMV_HALF2=1 forces the legacy half2 kernel (A/B + safety fallback).
+    // ORATOR_GEMV_HALF2=1 forces the legacy half2 kernel (A/B + safety
+    // fallback).
     static const bool force_half2 = std::getenv("ORATOR_GEMV_HALF2") != nullptr;
     if ((K & 7) == 0 && !force_half2) {
       GemvBf16Vec4Kernel<<<grid, kGemvWarps * 32, shmem, stream>>>(
           reinterpret_cast<const __nv_bfloat16*>(in_bf16),
-          reinterpret_cast<const __nv_bfloat16*>(W_bf16), bias_f32, out_f32, K, N, act);
+          reinterpret_cast<const __nv_bfloat16*>(W_bf16), bias_f32, out_f32, K,
+          N, act);
     } else {
       GemvBf16Kernel<<<grid, kGemvWarps * 32, shmem, stream>>>(
           reinterpret_cast<const __nv_bfloat16*>(in_bf16),
-          reinterpret_cast<const __nv_bfloat16*>(W_bf16), bias_f32, out_f32, K, N, act);
+          reinterpret_cast<const __nv_bfloat16*>(W_bf16), bias_f32, out_f32, K,
+          N, act);
     }
     CheckCudaError(cudaGetLastError(), __FILE__, __LINE__);
     return;
@@ -196,11 +214,16 @@ void LinearPre(const uint16_t* in_bf16, const uint16_t* W_bf16,
   // M>1 (and the rare M==1 odd-K): in-project tiled bf16 GEMM with the bias +
   // activation epilogue fused. Replaces cuBLAS (Spec 002 P2.1, Constitution
   // Art. I): allocation-free, stream-explicit, no global handle -> capturable.
-  gemm::LaunchBf16Gemm(in_bf16, W_bf16, bias_f32, out_f32, M, K, N, act, stream);
+  gemm::LaunchBf16Gemm(in_bf16, W_bf16, bias_f32, out_f32, M, K, N, act,
+                       stream);
 }
 
 void Shutdown() {
-  if (g_scratch) { CUDA_CHECK(cudaFree(g_scratch)); g_scratch = nullptr; g_scratch_cap = 0; }
+  if (g_scratch) {
+    CUDA_CHECK(cudaFree(g_scratch));
+    g_scratch = nullptr;
+    g_scratch_cap = 0;
+  }
 }
 
 }  // namespace asr_gemm

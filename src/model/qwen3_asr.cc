@@ -72,18 +72,19 @@ std::string Qwen3Asr::BuildAndRun(const std::vector<float>& encoder_out,
   // Default: a short Chinese ASR guidance string proven to stabilise output.
   const char* sys_env = std::getenv("ORATOR_ASR_SYSTEM_PROMPT");
   const std::string sys_prompt = (sys_env != nullptr && sys_env[0] != '\0')
-      ? std::string(sys_env)
-      : "你是一个专业的中文普通话语音识别系统，请准确识别并转录所有语音内容。";
+                                     ? std::string(sys_env)
+                                     : "你是一个专业的中文普通话语音识别系统，"
+                                       "请准确识别并转录所有语音内容。";
 
   std::vector<int> prompt;
   prompt.insert(prompt.end(), {kImStart, kSystem, kNewline});
   for (int t : tokenizer_.Encode(sys_prompt)) prompt.push_back(t);
-  prompt.insert(prompt.end(), {kImEnd, kNewline,
-                               kImStart, kUser, kNewline, kAudioStart});
+  prompt.insert(prompt.end(),
+                {kImEnd, kNewline, kImStart, kUser, kNewline, kAudioStart});
   const int audio_pad_start = static_cast<int>(prompt.size());
   for (int i = 0; i < n_tokens; ++i) prompt.push_back(kAudioPad);
-  prompt.insert(prompt.end(), {kAudioEnd, kImEnd, kNewline, kImStart,
-                               kAssistant, kNewline});
+  prompt.insert(prompt.end(),
+                {kAudioEnd, kImEnd, kNewline, kImStart, kAssistant, kNewline});
   if (!language_.empty()) {
     for (int t : tokenizer_.Encode("language " + language_))
       prompt.push_back(t);
@@ -96,9 +97,11 @@ std::string Qwen3Asr::BuildAndRun(const std::vector<float>& encoder_out,
 
   const int T = static_cast<int>(prompt.size());
 
-  // ---- input embeddings: lookup, then overwrite audio_pad with encoder out ----
+  // ---- input embeddings: lookup, then overwrite audio_pad with encoder out
+  // ----
   std::vector<float> embeds(static_cast<size_t>(T) * H);
-  for (int i = 0; i < T; ++i) decoder_->Embed(prompt[i], embeds.data() + static_cast<size_t>(i) * H);
+  for (int i = 0; i < T; ++i)
+    decoder_->Embed(prompt[i], embeds.data() + static_cast<size_t>(i) * H);
   for (int i = 0; i < n_tokens; ++i) {
     std::copy(encoder_out.begin() + static_cast<size_t>(i) * H,
               encoder_out.begin() + static_cast<size_t>(i + 1) * H,
@@ -113,27 +116,28 @@ std::string Qwen3Asr::BuildAndRun(const std::vector<float>& encoder_out,
   decoder_->Prefill(embeds.data(), T, stream);
   auto p1 = now();
 
-  // ---- greedy autoregressive decode, driven entirely on the GPU. The per-token
-  // body (embed-gather -> 28-layer forward -> argmax) is captured as a CUDA graph
-  // and replayed in small batches with a host sync per batch. The stop condition
-  // (EOS / repetition) is checked only at batch boundaries, so the batch size
-  // bounds how many tokens are computed past EOS. batch=4 stops within a few
-  // tokens of EOS (short utterances dominate streaming) while keeping the
-  // per-token sync overhead amortized. ORATOR_ASR_BATCH overrides it. ----
+  // ---- greedy autoregressive decode, driven entirely on the GPU. The
+  // per-token body (embed-gather -> 28-layer forward -> argmax) is captured as
+  // a CUDA graph and replayed in small batches with a host sync per batch. The
+  // stop condition (EOS / repetition) is checked only at batch boundaries, so
+  // the batch size bounds how many tokens are computed past EOS. batch=4 stops
+  // within a few tokens of EOS (short utterances dominate streaming) while
+  // keeping the per-token sync overhead amortized. ORATOR_ASR_BATCH overrides
+  // it. ----
   const int ban_steps = EnvIntOr("ORATOR_ASR_BAN_STEPS", 3);
   const int decode_batch = EnvIntOr("ORATOR_ASR_DECODE_BATCH", 4);
-  std::vector<int> out_tokens =
-      decoder_->DecodeGreedy(T, max_new_tokens_, kImEnd, kEndOfText,
-                             ban_steps, decode_batch, stream);
+  std::vector<int> out_tokens = decoder_->DecodeGreedy(
+      T, max_new_tokens_, kImEnd, kEndOfText, ban_steps, decode_batch, stream);
   if (prof) {
     auto p2 = now();
     auto ms = [](auto a, auto b) {
       return std::chrono::duration<double, std::milli>(b - a).count();
     };
-    LOG_INFO("[asr-profile]   prefill(T=%d)=%.1fms  decode(%zu tok)=%.1fms"
-             " (%.1fms/tok)\n",
-             T, ms(p0, p1), out_tokens.size(), ms(p1, p2),
-             out_tokens.empty() ? 0.0 : ms(p1, p2) / out_tokens.size());
+    LOG_INFO(
+        "[asr-profile]   prefill(T=%d)=%.1fms  decode(%zu tok)=%.1fms"
+        " (%.1fms/tok)\n",
+        T, ms(p0, p1), out_tokens.size(), ms(p1, p2),
+        out_tokens.empty() ? 0.0 : ms(p1, p2) / out_tokens.size());
   }
 
   std::string text = tokenizer_.Decode(out_tokens, /*skip_special=*/true);
@@ -157,12 +161,14 @@ std::string Qwen3Asr::TranscribeText(const float* samples, int num_samples,
   auto t0 = now();
 
   int n_frames = 0;
-  std::vector<float> mel = mel_->Compute(samples, num_samples, &n_frames, stream);
+  std::vector<float> mel =
+      mel_->Compute(samples, num_samples, &n_frames, stream);
   if (n_frames <= 0) return "";
   auto t_mel = now();
 
   int n_tokens = 0;
-  std::vector<float> enc = encoder_->Forward(mel.data(), n_frames, &n_tokens, stream);
+  std::vector<float> enc =
+      encoder_->Forward(mel.data(), n_frames, &n_tokens, stream);
   if (n_tokens <= 0) return "";
   auto t_enc = now();
 
@@ -173,8 +179,9 @@ std::string Qwen3Asr::TranscribeText(const float* samples, int num_samples,
     auto ms = [](auto a, auto b) {
       return std::chrono::duration<double, std::milli>(b - a).count();
     };
-    LOG_INFO("[asr-profile] mel=%.1fms encoder=%.1fms decode=%.1fms (tokens=%d)\n",
-             ms(t0, t_mel), ms(t_mel, t_enc), ms(t_enc, t_dec), n_tokens);
+    LOG_INFO(
+        "[asr-profile] mel=%.1fms encoder=%.1fms decode=%.1fms (tokens=%d)\n",
+        ms(t0, t_mel), ms(t_mel, t_enc), ms(t_enc, t_dec), n_tokens);
   }
   return text;
 }
@@ -186,11 +193,13 @@ std::string Qwen3Asr::TranscribeWindow(const float* samples, int num_samples,
   if (samples == nullptr || num_samples <= 0) return "";
 
   int n_frames = 0;
-  std::vector<float> mel = mel_->Compute(samples, num_samples, &n_frames, stream);
+  std::vector<float> mel =
+      mel_->Compute(samples, num_samples, &n_frames, stream);
   if (n_frames <= 0) return "";
 
   int n_tokens = 0;
-  std::vector<float> enc = encoder_->Forward(mel.data(), n_frames, &n_tokens, stream);
+  std::vector<float> enc =
+      encoder_->Forward(mel.data(), n_frames, &n_tokens, stream);
   if (n_tokens <= 0) return "";
 
   // Returns only the newly generated continuation; the caller holds the prefix.
@@ -219,8 +228,9 @@ void Qwen3Asr::StreamReset(long base_sample) {
   // Fixed system prefix up to and including <audio_start>. Matches BuildAndRun.
   const char* sys_env = std::getenv("ORATOR_ASR_SYSTEM_PROMPT");
   const std::string sys_prompt = (sys_env != nullptr && sys_env[0] != '\0')
-      ? std::string(sys_env)
-      : "你是一个专业的中文普通话语音识别系统，请准确识别并转录所有语音内容。";
+                                     ? std::string(sys_env)
+                                     : "你是一个专业的中文普通话语音识别系统，"
+                                       "请准确识别并转录所有语音内容。";
   std::vector<int> prefix;
   prefix.insert(prefix.end(), {kImStart, kSystem, kNewline});
   for (int t : tokenizer_.Encode(sys_prompt)) prefix.push_back(t);
@@ -237,11 +247,11 @@ void Qwen3Asr::StreamReset(long base_sample) {
   stream_active_ = true;
 }
 
-std::string Qwen3Asr::StreamChunk(const float* pcm, int n, cudaStream_t stream) {
+std::string Qwen3Asr::StreamChunk(const float* pcm, int n,
+                                  cudaStream_t stream) {
   if (!loaded_) throw std::runtime_error("Qwen3Asr: weights not loaded");
   if (!stream_active_) StreamReset(0);
-  if (pcm != nullptr && n > 0)
-    seg_pcm_.insert(seg_pcm_.end(), pcm, pcm + n);
+  if (pcm != nullptr && n > 0) seg_pcm_.insert(seg_pcm_.end(), pcm, pcm + n);
 
   const bool prof = std::getenv("ORATOR_ASR_PROFILE") != nullptr;
   auto pnow = [] { return std::chrono::steady_clock::now(); };
@@ -299,7 +309,8 @@ std::string Qwen3Asr::StreamChunk(const float* pcm, int n, cudaStream_t stream) 
     // output IS the embedding at those positions.
     decoder_->PrefillAt(enc.data(), toks, stream_cache_ckpt_, stream);
     if (prof)
-      encode_ms += std::chrono::duration<double, std::milli>(pnow() - e0).count();
+      encode_ms +=
+          std::chrono::duration<double, std::milli>(pnow() - e0).count();
     stream_cache_ckpt_ += toks;
     stream_audio_tokens_ += toks;
     seg_encoded_frames_ += kStreamWindowMel;
@@ -346,7 +357,10 @@ std::string Qwen3Asr::StreamDecodeStep(cudaStream_t stream) {
     int k = stream_unfixed_tokens_;
     while (true) {
       int end = std::max(0, static_cast<int>(cur.size()) - k);
-      if (end <= 0) { prefix_str.clear(); break; }
+      if (end <= 0) {
+        prefix_str.clear();
+        break;
+      }
       std::vector<int> sub(cur.begin(), cur.begin() + end);
       prefix_str = tokenizer_.Decode(sub, /*skip_special=*/true);
       // Guard against cutting a multi-byte UTF-8 character (U+FFFD = EF BF BD).
@@ -357,8 +371,8 @@ std::string Qwen3Asr::StreamDecodeStep(cudaStream_t stream) {
 
   // Suffix after the audio block: audio_end, assistant header, language tag,
   // <asr_text>, then the committed prefix text.
-  std::vector<int> suffix = {kAudioEnd, kImEnd, kNewline,
-                             kImStart, kAssistant, kNewline};
+  std::vector<int> suffix = {kAudioEnd, kImEnd,     kNewline,
+                             kImStart,  kAssistant, kNewline};
   if (!language_.empty())
     for (int t : tokenizer_.Encode("language " + language_))
       suffix.push_back(t);
@@ -413,7 +427,8 @@ std::string Qwen3Asr::StreamFinalize(cudaStream_t stream) {
           sub[static_cast<size_t>(f) * rem + t] =
               mel[static_cast<size_t>(f) * n_frames + (local_start + t)];
       int toks = 0;
-      std::vector<float> enc = encoder_->Forward(sub.data(), rem, &toks, stream);
+      std::vector<float> enc =
+          encoder_->Forward(sub.data(), rem, &toks, stream);
       if (toks > 0) {
         decoder_->PrefillAt(enc.data(), toks, stream_cache_ckpt_, stream);
         stream_cache_ckpt_ += toks;
@@ -447,7 +462,6 @@ std::string Qwen3Asr::CurrentLiveText() const {
   return text;
 }
 
-
 // segment starts only on a long silence (>= min_silence_sec) or the length cap.
 // Few large segments amortise the fixed per-call mel+encoder cost and let the
 // decoder's CUDA-graph fast path dominate. Trims leading/trailing silence.
@@ -469,7 +483,8 @@ std::vector<Qwen3Asr::Span> Qwen3Asr::SegmentSpeech(const float* x, int n,
   if (peak <= 0.0f) return spans;
   const float thr = vad_rel_threshold_ * peak;
   const int max_frames = static_cast<int>(max_segment_sec_ * 100);
-  const int split_gap = static_cast<int>(min_silence_sec_ * 100);  // silence that splits
+  const int split_gap =
+      static_cast<int>(min_silence_sec_ * 100);  // silence that splits
   const int min_frames = static_cast<int>(min_speech_sec_ * 100);
   const int pad = static_cast<int>(speech_pad_sec_ * 100);
 
@@ -493,7 +508,8 @@ std::vector<Qwen3Asr::Span> Qwen3Asr::SegmentSpeech(const float* x, int n,
   auto emit = [&](int seg_b, int seg_e) {
     int b = std::max(0, seg_b - pad);
     int e = std::min(nf, seg_e + pad);
-    if (e - b >= min_frames) spans.push_back({b * frame, std::min(n, e * frame)});
+    if (e - b >= min_frames)
+      spans.push_back({b * frame, std::min(n, e * frame)});
   };
   int seg_b = runs[0].first, seg_e = runs[0].second;
   for (size_t i = 1; i < runs.size(); ++i) {
@@ -517,8 +533,7 @@ core::Transcript Qwen3Asr::Transcribe(const core::AudioChunk& audio) {
   const int sr = audio.sample_rate > 0 ? audio.sample_rate : cfg_.sample_rate;
 
   std::vector<Span> spans;
-  if (vad_enabled_)
-    spans = SegmentSpeech(audio.samples, audio.num_samples, sr);
+  if (vad_enabled_) spans = SegmentSpeech(audio.samples, audio.num_samples, sr);
   if (spans.empty())  // VAD off or all-speech: one bounded span
     spans.push_back({0, audio.num_samples});
 

@@ -18,8 +18,9 @@ namespace protocol {
 
 class TimeIndex {
  public:
-  // Append a message to the index for a topic. Messages are sorted by timestamp.
-  // Returns true if the message was out-of-order (timestamp < last stored).
+  // Append a message to the index for a topic. Messages are sorted by
+  // timestamp. Returns true if the message was out-of-order (timestamp < last
+  // stored).
   bool Append(const std::string& topic, double timestamp_sec,
               const StorageRef& ref, uint64_t msg_id);
 

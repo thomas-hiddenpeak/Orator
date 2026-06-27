@@ -16,21 +16,27 @@ using orator::pipeline::AsrPreprocessor;
 static int g_failures = 0;
 static int g_tests = 0;
 
-#define TEST(name) do { ++g_tests; printf("  RUN  %s\n", name); } while (0)
-#define ASSERT_NEAR(a, b, tol) do {                                           \
-  float va_ = (a), vb_ = (b);                                                 \
-  if (std::abs(va_ - vb_) > tol) {                                           \
-    printf("  FAIL %s:%d: expected %.6f ≈ %.6f (tol=%.2e)\n",                \
-           __FILE__, __LINE__, double(va_), double(vb_), double(tol));        \
-    ++g_failures;                                                             \
-  }                                                                           \
-} while (0)
-#define ASSERT_TRUE(cond) do {                                                \
-  if (!(cond)) {                                                              \
-    printf("  FAIL %s:%d: expected true\n", __FILE__, __LINE__);              \
-    ++g_failures;                                                             \
-  }                                                                           \
-} while (0)
+#define TEST(name)               \
+  do {                           \
+    ++g_tests;                   \
+    printf("  RUN  %s\n", name); \
+  } while (0)
+#define ASSERT_NEAR(a, b, tol)                                            \
+  do {                                                                    \
+    float va_ = (a), vb_ = (b);                                           \
+    if (std::abs(va_ - vb_) > tol) {                                      \
+      printf("  FAIL %s:%d: expected %.6f ≈ %.6f (tol=%.2e)\n", __FILE__, \
+             __LINE__, double(va_), double(vb_), double(tol));            \
+      ++g_failures;                                                       \
+    }                                                                     \
+  } while (0)
+#define ASSERT_TRUE(cond)                                          \
+  do {                                                             \
+    if (!(cond)) {                                                 \
+      printf("  FAIL %s:%d: expected true\n", __FILE__, __LINE__); \
+      ++g_failures;                                                \
+    }                                                              \
+  } while (0)
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -43,14 +49,14 @@ static void TestModeNonePassthrough() {
   const int N = 160;  // 10 ms @ 16 kHz
   std::vector<float> in(N);
   for (int i = 0; i < N; ++i)
-    in[i] = std::sin(2.0f * 3.14159f * 440.0f * static_cast<float>(i) / 16000.0f);
+    in[i] =
+        std::sin(2.0f * 3.14159f * 440.0f * static_cast<float>(i) / 16000.0f);
 
   std::vector<float> out;
   preproc.Process(in.data(), N, &out);
 
   ASSERT_TRUE(static_cast<int>(out.size()) == N);
-  for (int i = 0; i < N; ++i)
-    ASSERT_NEAR(out[i], in[i], 1e-6f);
+  for (int i = 0; i < N; ++i) ASSERT_NEAR(out[i], in[i], 1e-6f);
 }
 
 static void TestModeNoneEmptyInput() {
@@ -86,7 +92,8 @@ static void TestClassicalOutputShape() {
   const int N = 1600;  // 100 ms @ 16 kHz
   std::vector<float> in(N);
   for (int i = 0; i < N; ++i)
-    in[i] = std::sin(2.0f * 3.14159f * 440.0f * static_cast<float>(i) / 16000.0f);
+    in[i] =
+        std::sin(2.0f * 3.14159f * 440.0f * static_cast<float>(i) / 16000.0f);
 
   std::vector<float> out;
   preproc.Process(in.data(), N, &out);
@@ -114,8 +121,7 @@ static void TestClassicalSilence() {
   preproc.Process(in.data(), N, &out);
 
   ASSERT_TRUE(static_cast<int>(out.size()) == N);
-  for (int i = 0; i < N; ++i)
-    ASSERT_NEAR(out[i], 0.0f, 1e-6f);
+  for (int i = 0; i < N; ++i) ASSERT_NEAR(out[i], 0.0f, 1e-6f);
 }
 
 static void TestClassicalSingleSample() {
@@ -132,14 +138,17 @@ static void TestClassicalSingleSample() {
 }
 
 static void TestClassicalPeakPreservation() {
-  TEST("TestClassicalPeakPreservation: output peak does not exceed 2x input peak");
+  TEST(
+      "TestClassicalPeakPreservation: output peak does not exceed 2x input "
+      "peak");
   AsrPreprocessor preproc({.mode = "classical"});
 
   const int N = 1600;
   std::vector<float> in(N);
   float in_peak = 0.0f;
   for (int i = 0; i < N; ++i) {
-    in[i] = std::sin(2.0f * 3.14159f * 440.0f * static_cast<float>(i) / 16000.0f);
+    in[i] =
+        std::sin(2.0f * 3.14159f * 440.0f * static_cast<float>(i) / 16000.0f);
     in_peak = std::max(in_peak, std::abs(in[i]));
   }
 
@@ -147,8 +156,7 @@ static void TestClassicalPeakPreservation() {
   preproc.Process(in.data(), N, &out);
 
   float out_peak = 0.0f;
-  for (int i = 0; i < N; ++i)
-    out_peak = std::max(out_peak, std::abs(out[i]));
+  for (int i = 0; i < N; ++i) out_peak = std::max(out_peak, std::abs(out[i]));
 
   // Peak preservation caps gain at 2x
   ASSERT_TRUE(out_peak <= 2.0f * in_peak + 1e-4f);
@@ -166,8 +174,7 @@ static void TestUnknownMode() {
   preproc.Process(in.data(), N, &out);
 
   ASSERT_TRUE(static_cast<int>(out.size()) == N);
-  for (int i = 0; i < N; ++i)
-    ASSERT_NEAR(out[i], in[i], 1e-6f);
+  for (int i = 0; i < N; ++i) ASSERT_NEAR(out[i], in[i], 1e-6f);
 }
 
 // ---------------------------------------------------------------------------

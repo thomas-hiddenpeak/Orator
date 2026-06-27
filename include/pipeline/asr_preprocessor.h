@@ -17,7 +17,8 @@ class AsrPreprocessor {
     int sample_rate = 16000;
     std::string mode = "none";  // none|classical|frcrn|tfgridnet
     std::string frcrn_model_path = "models/asr_preproc/frcrn.safetensors";
-    std::string tfgridnet_model_path = "models/asr_preproc/tfgridnet.safetensors";
+    std::string tfgridnet_model_path =
+        "models/asr_preproc/tfgridnet.safetensors";
   };
 
   explicit AsrPreprocessor(const Params& params);
@@ -38,7 +39,8 @@ class AsrPreprocessor {
   // Classical DSP pipeline: spectral subtraction + DC removal + gain.
   void ClassicalEnhance(const float* in, int n, std::vector<float>* out) const;
   // FRCRN neural enhancement (not yet wired — returns false).
-  bool RunFrcrnModelScope(const float* in, int n, std::vector<float>* out) const;
+  bool RunFrcrnModelScope(const float* in, int n,
+                          std::vector<float>* out) const;
   // Issue a warning at most once per instance lifetime.
   void WarnOnce(const char* msg) const;
 

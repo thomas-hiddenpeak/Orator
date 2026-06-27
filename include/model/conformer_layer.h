@@ -5,11 +5,12 @@
 //
 // Mirrors NeMo's ConformerLayer.forward (eval, no dropout):
 //   r = x;                r += 0.5*FF1(LN(r))
-//   r += SelfAttn(LN(r), pos_emb, mask)          [RelPositionMultiHeadAttention]
-//   r += Conv(LN(r), pad_mask)                   [pw1->GLU->dw(k9)->BN->SiLU->pw2]
+//   r += SelfAttn(LN(r), pos_emb, mask) [RelPositionMultiHeadAttention] r +=
+//   Conv(LN(r), pad_mask)                   [pw1->GLU->dw(k9)->BN->SiLU->pw2]
 //   r += 0.5*FF2(LN(r))
 //   out = LN_out(r)
-// Manual (non-SDPA) attention: scores = (matrix_ac + rel_shift(matrix_bd))/sqrt(d_k).
+// Manual (non-SDPA) attention: scores = (matrix_ac +
+// rel_shift(matrix_bd))/sqrt(d_k).
 //
 // Weights are copied from a SafeTensorReader into unified memory. The same
 // instance type is reused for all 17 layers (different prefixes).
@@ -32,7 +33,8 @@ class ConformerLayer {
   ConformerLayer(int d_model = 512, int n_heads = 8, int d_ff = 2048,
                  int conv_kernel = 9);
 
-  void LoadWeights(const io::SafeTensorReader& reader, const std::string& prefix);
+  void LoadWeights(const io::SafeTensorReader& reader,
+                   const std::string& prefix);
 
   // x: [T, d_model] device/unified, modified in place to the layer output.
   // pos_emb: [2T-1, d_model] relative positional encoding (device/unified).

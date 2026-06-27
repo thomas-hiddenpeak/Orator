@@ -43,7 +43,8 @@ int main() {
     }
   }
 
-  // Convert the peak mel bin back to an approximate Hz via the same mel mapping.
+  // Convert the peak mel bin back to an approximate Hz via the same mel
+  // mapping.
   auto hz_to_mel = [](float hz) {
     return 2595.0f * std::log10(1.0f + hz / 700.0f);
   };
@@ -52,8 +53,8 @@ int main() {
   };
   const float mel_min = hz_to_mel(cfg.fmin);
   const float mel_max = hz_to_mel(cfg.fmax);
-  const float peak_mel = mel_min + (mel_max - mel_min) * (argmax + 1) /
-                                       (cfg.n_mels + 1);
+  const float peak_mel =
+      mel_min + (mel_max - mel_min) * (argmax + 1) / (cfg.n_mels + 1);
   const float peak_hz = mel_to_hz(peak_mel);
   std::cout << "Peak mel bin=" << argmax << " ~= " << peak_hz << " Hz"
             << std::endl;

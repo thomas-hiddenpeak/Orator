@@ -8,8 +8,8 @@
 // path has no KV cache and no generation loop -- one prefill, all positions.
 //
 // It reuses the verified Qwen3 building blocks (asr_ops RmsNorm / RopeHalf /
-// GqaAttention / SwiGLU, asr_gemm Linear) but keeps its own orchestration so the
-// autoregressive ASR decoder is untouched. Weights load from the aligner
+// GqaAttention / SwiGLU, asr_gemm Linear) but keeps its own orchestration so
+// the autoregressive ASR decoder is untouched. Weights load from the aligner
 // checkpoint under model.language_model.* and score.weight.
 
 #include <cstdint>
@@ -61,8 +61,14 @@ class AlignerLm {
   const AlignerLmConfig& config() const { return config_; }
 
  private:
-  struct F32Buf { std::shared_ptr<gpu::UnifiedBuffer> buf; float* p = nullptr; };
-  struct BfBuf { std::shared_ptr<gpu::UnifiedBuffer> buf; uint16_t* p = nullptr; };
+  struct F32Buf {
+    std::shared_ptr<gpu::UnifiedBuffer> buf;
+    float* p = nullptr;
+  };
+  struct BfBuf {
+    std::shared_ptr<gpu::UnifiedBuffer> buf;
+    uint16_t* p = nullptr;
+  };
   F32Buf LoadF32(const io::ShardedSafeTensors& w, const std::string& name);
   BfBuf LoadBf16(const io::ShardedSafeTensors& w, const std::string& name);
 
@@ -72,10 +78,10 @@ class AlignerLm {
   };
 
   AlignerLmConfig config_;
-  BfBuf embed_;            // [vocab, hidden] bf16
+  BfBuf embed_;                       // [vocab, hidden] bf16
   std::vector<uint16_t> embed_host_;  // host shadow for embedding lookup
-  F32Buf final_norm_;     // [hidden]
-  BfBuf score_;           // [num_labels, hidden] bf16
+  F32Buf final_norm_;                 // [hidden]
+  BfBuf score_;                       // [num_labels, hidden] bf16
   std::vector<Layer> layers_;
 };
 

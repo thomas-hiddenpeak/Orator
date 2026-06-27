@@ -82,7 +82,8 @@ bool SessionStore::Save(const std::string& session_id,
   {
     std::ofstream ofs(tmp_path, std::ios::binary);
     if (!ofs.is_open()) {
-      LOG_ERROR("SessionStore: failed to open %s for writing\n", tmp_path.c_str());
+      LOG_ERROR("SessionStore: failed to open %s for writing\n",
+                tmp_path.c_str());
       return false;
     }
     ofs.write(timeline_json.data(),
@@ -102,8 +103,8 @@ bool SessionStore::Save(const std::string& session_id,
     return false;
   }
 
-  LOG_INFO("SessionStore: saved session %s (%zu bytes)\n",
-           session_id.c_str(), timeline_json.size());
+  LOG_INFO("SessionStore: saved session %s (%zu bytes)\n", session_id.c_str(),
+           timeline_json.size());
   return true;
 }
 

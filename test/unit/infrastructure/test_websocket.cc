@@ -44,9 +44,9 @@ static std::string Recv(int fd, size_t n) {
 
 int main() {
   // 1) Handshake accept vector from RFC6455 section 1.3.
-  std::string accept =
-      detail::Sha1Base64("dGhlIHNhbXBsZSBub25jZQ=="
-                         "258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
+  std::string accept = detail::Sha1Base64(
+      "dGhlIHNhbXBsZSBub25jZQ=="
+      "258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
   assert(accept == "s3pPLMBiTxaQ9kYGzzhZRbK+xOo=");
 
   // 2) base64 known answers.
@@ -97,8 +97,8 @@ int main() {
   const char* msg = "hi";
   uint8_t mask[4] = {0x12, 0x34, 0x56, 0x78};
   std::vector<uint8_t> frame;
-  frame.push_back(0x81);              // FIN + text
-  frame.push_back(0x80 | 2);          // masked, len 2
+  frame.push_back(0x81);      // FIN + text
+  frame.push_back(0x80 | 2);  // masked, len 2
   frame.insert(frame.end(), mask, mask + 4);
   for (int i = 0; i < 2; ++i) frame.push_back(uint8_t(msg[i]) ^ mask[i & 3]);
   ::send(fd, frame.data(), frame.size(), 0);

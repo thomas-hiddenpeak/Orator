@@ -31,7 +31,8 @@ DiskAudioStorage::DiskAudioStorage(const std::string& storage_dir)
     // Get current file size to determine total samples written
     struct stat st;
     if (fstat(fd, &st) == 0) {
-      total_disk_samples_written_ = static_cast<long>(st.st_size) / sizeof(float);
+      total_disk_samples_written_ =
+          static_cast<long>(st.st_size) / sizeof(float);
     }
     close(fd);
   }
@@ -41,7 +42,8 @@ DiskAudioStorage::~DiskAudioStorage() {
   // No active file descriptors held open continuously
 }
 
-size_t DiskAudioStorage::Write(long start_sample_offset, const float* samples, int n) {
+size_t DiskAudioStorage::Write(long start_sample_offset, const float* samples,
+                               int n) {
   if (samples == nullptr || n <= 0) return 0;
 
   std::lock_guard<std::mutex> lock(mutex_);
@@ -62,14 +64,15 @@ size_t DiskAudioStorage::Write(long start_sample_offset, const float* samples, i
   close(fd);
 
   if (written > 0) {
-    total_disk_samples_written_ = std::max(total_disk_samples_written_, 
-                                            start_sample_offset + n);
+    total_disk_samples_written_ =
+        std::max(total_disk_samples_written_, start_sample_offset + n);
     return static_cast<size_t>(written);
   }
   return 0;
 }
 
-int DiskAudioStorage::Read(long start_sample_offset, int n, std::vector<float>* out) const {
+int DiskAudioStorage::Read(long start_sample_offset, int n,
+                           std::vector<float>* out) const {
   if (n <= 0 || out == nullptr) return 0;
 
   std::lock_guard<std::mutex> lock(mutex_);
@@ -93,8 +96,9 @@ int DiskAudioStorage::Read(long start_sample_offset, int n, std::vector<float>* 
   long available_samples = static_cast<long>(st.st_size) / sizeof(float);
   long start_idx = start_sample_offset;
   if (start_idx < 0) start_idx = 0;
-  
-  long count_to_read = std::min(static_cast<long>(n), available_samples - start_idx);
+
+  long count_to_read =
+      std::min(static_cast<long>(n), available_samples - start_idx);
   if (count_to_read <= 0) {
     close(fd);
     return 0;

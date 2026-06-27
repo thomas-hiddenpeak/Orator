@@ -21,7 +21,8 @@ struct AudioChunk {
   double t_start_sec = 0.0;  // absolute start time within the stream
 
   double DurationSec() const {
-    return sample_rate > 0 ? static_cast<double>(num_samples) / sample_rate : 0.0;
+    return sample_rate > 0 ? static_cast<double>(num_samples) / sample_rate
+                           : 0.0;
   }
 };
 
@@ -43,9 +44,9 @@ struct DiarizationFrames {
 struct DiarSegment {
   double start_sec = 0.0;
   double end_sec = 0.0;
-  int local_speaker = -1;       // diarizer-local speaker slot index
-  std::string speaker_id;       // resolved registry id (may be empty)
-  float confidence = 0.0f;      // mean activity probability over the span
+  int local_speaker = -1;   // diarizer-local speaker slot index
+  std::string speaker_id;   // resolved registry id (may be empty)
+  float confidence = 0.0f;  // mean activity probability over the span
 };
 
 // A single ASR token/word with timing (the upstream ASR result).

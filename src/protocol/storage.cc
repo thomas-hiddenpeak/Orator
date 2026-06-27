@@ -23,8 +23,7 @@ void WriteLE32(uint8_t* buf, uint32_t val) {
 }
 
 uint32_t ReadLE32(const uint8_t* buf) {
-  return static_cast<uint32_t>(buf[0]) |
-         (static_cast<uint32_t>(buf[1]) << 8) |
+  return static_cast<uint32_t>(buf[0]) | (static_cast<uint32_t>(buf[1]) << 8) |
          (static_cast<uint32_t>(buf[2]) << 16) |
          (static_cast<uint32_t>(buf[3]) << 24);
 }
@@ -62,11 +61,9 @@ std::string StorageManager::Serialize(const Message& msg) {
 
   // Reserve approximate space to avoid reallocations.
   size_t est = sizeof(uint64_t) + sizeof(double) * 2 + sizeof(uint8_t) +
-               sizeof(uint32_t) +
-               4 + msg.topic.size() +
-               4 + msg.pipeline.size() +
-               4 + msg.pipeline_version.size() +
-               4 + msg.data.size();
+               sizeof(uint32_t) + 4 + msg.topic.size() + 4 +
+               msg.pipeline.size() + 4 + msg.pipeline_version.size() + 4 +
+               msg.data.size();
   out.reserve(est);
 
   // msg_id (uint64_t)
@@ -109,16 +106,19 @@ Message StorageManager::Deserialize(const std::string& bytes) {
   // pipeline_version
   msg.pipeline_version = ReadString(bytes, pos);
   // timestamp_sec (double)
-  std::memcpy(&msg.timestamp_sec, bytes.data() + pos, sizeof(msg.timestamp_sec));
+  std::memcpy(&msg.timestamp_sec, bytes.data() + pos,
+              sizeof(msg.timestamp_sec));
   pos += sizeof(msg.timestamp_sec);
   // wall_clock_sec (double)
-  std::memcpy(&msg.wall_clock_sec, bytes.data() + pos, sizeof(msg.wall_clock_sec));
+  std::memcpy(&msg.wall_clock_sec, bytes.data() + pos,
+              sizeof(msg.wall_clock_sec));
   pos += sizeof(msg.wall_clock_sec);
   // qos (uint8_t)
   std::memcpy(&msg.qos, bytes.data() + pos, sizeof(msg.qos));
   pos += sizeof(msg.qos);
   // schema_version (uint32_t)
-  std::memcpy(&msg.schema_version, bytes.data() + pos, sizeof(msg.schema_version));
+  std::memcpy(&msg.schema_version, bytes.data() + pos,
+              sizeof(msg.schema_version));
   pos += sizeof(msg.schema_version);
   // data (string)
   msg.data = ReadString(bytes, pos);
@@ -187,7 +187,8 @@ void StorageManager::SetTopicBackend(const std::string& topic,
   topic_config_[topic] = config;
 }
 
-TopicRetention StorageManager::GetTopicRetention(const std::string& topic) const {
+TopicRetention StorageManager::GetTopicRetention(
+    const std::string& topic) const {
   std::lock_guard<std::mutex> lock(mutex_);
   auto it = topic_config_.find(topic);
   if (it != topic_config_.end()) {

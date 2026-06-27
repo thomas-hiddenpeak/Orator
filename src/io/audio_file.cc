@@ -65,9 +65,8 @@ AudioData LoadMp3(const std::string& path, int target_rate) {
     throw std::runtime_error("Failed to decode MP3: " + path);
   }
 
-  std::vector<float> mono =
-      DownmixToMono(info.buffer, static_cast<size_t>(info.samples),
-                    info.channels);
+  std::vector<float> mono = DownmixToMono(
+      info.buffer, static_cast<size_t>(info.samples), info.channels);
   free(info.buffer);
 
   AudioData out;

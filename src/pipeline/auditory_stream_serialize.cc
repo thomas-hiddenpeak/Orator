@@ -1,8 +1,8 @@
 // Serialization functions for AuditoryStream.
 //
-// Extracted from auditory_stream.cc to keep the controller focused on lifecycle.
-// All three functions are AuditoryStream member functions declared in
-// include/pipeline/auditory_stream.h.
+// Extracted from auditory_stream.cc to keep the controller focused on
+// lifecycle. All three functions are AuditoryStream member functions declared
+// in include/pipeline/auditory_stream.h.
 
 #include "pipeline/auditory_stream.h"
 
@@ -21,8 +21,8 @@ namespace orator {
 namespace pipeline {
 
 // Shared revision serializer defined in src/pipeline/json_util.cc.
-std::string SerializeRevisionToJson(
-    const ComprehensiveTimeline::Revision& r, const char* source);
+std::string SerializeRevisionToJson(const ComprehensiveTimeline::Revision& r,
+                                    const char* source);
 
 // ---------------------------------------------------------------------------
 // Serialize one revision (Spec 004) to a {"type":"revision",...} message.
@@ -61,8 +61,8 @@ std::string AuditoryStream::SerializeGpuTelemetry() const {
                   "\"compute_sec\":%.3f,\"real_time_factor\":%.3f}",
                   e.name.c_str(), e.priority_index,
                   e.background ? "background" : "foreground",
-                  e.stream_active ? "true" : "false", e.cuda_priority,
-                  compute, rtf);
+                  e.stream_active ? "true" : "false", e.cuda_priority, compute,
+                  rtf);
     out += buf;
     if (i + 1 < entries.size()) out += ",";
   }
@@ -74,8 +74,8 @@ std::string AuditoryStream::SerializeGpuTelemetry() const {
 // Serialize the comprehensive timeline JSON document.
 // ---------------------------------------------------------------------------
 std::string AuditoryStream::Serialize() {
-  // Read both result sets from the timeline store under its lock, then build the
-  // timeline document. The document has a shared time axis and three parts:
+  // Read both result sets from the timeline store under its lock, then build
+  // the timeline document. The document has a shared time axis and three parts:
   //   - "tracks": one independent track per pipeline (diarization, asr), each a
   //     list of that pipeline's time-ordered entries.
   //   - "comprehensive": a derived view that attributes each ASR utterance to
@@ -85,11 +85,12 @@ std::string AuditoryStream::Serialize() {
   //     utterance granularity (the ASR engine does not emit per-word times).
   // A consumer reads whichever part it needs. Adding a future pipeline adds a
   // track and, optionally, a contribution to the comprehensive view.
-  // StreamTimeline removed — ASR track data now comes from comp_.SnapshotRawTexts().
-  // Spec 004 Step 2: the diarization worker is the sole producer of the speaker
-  // view (it delivers live via ReplaceSpeakers + keeps last_segments_ fresh);
-  // the ASR worker delivers text live via UpsertText. So Serialize is a pure
-  // reader: snapshot everything under comp_mutex_. No derivation, no upserts here.
+  // StreamTimeline removed — ASR track data now comes from
+  // comp_.SnapshotRawTexts(). Spec 004 Step 2: the diarization worker is the
+  // sole producer of the speaker view (it delivers live via ReplaceSpeakers +
+  // keeps last_segments_ fresh); the ASR worker delivers text live via
+  // UpsertText. So Serialize is a pure reader: snapshot everything under
+  // comp_mutex_. No derivation, no upserts here.
   std::vector<core::DiarSegment> diar_view;
   std::vector<ComprehensiveTimeline::Entry> comp_view;
   std::vector<ComprehensiveTimeline::VadSeg> vad_view;
@@ -151,15 +152,17 @@ std::string AuditoryStream::Serialize() {
 
   // Track: automatic speech recognition (present only when ASR is enabled).
   if (asr_) {
-    std::snprintf(buf, sizeof(buf),
-                  ",{\"kind\":\"asr\",\"source\":\"qwen3_asr\","
-                  "\"compute_sec\":%.3f,\"real_time_factor\":%.3f,\"entries\":[",
-                  asr_c, asr_c > 0 ? audio / asr_c : 0.0);
+    std::snprintf(
+        buf, sizeof(buf),
+        ",{\"kind\":\"asr\",\"source\":\"qwen3_asr\","
+        "\"compute_sec\":%.3f,\"real_time_factor\":%.3f,\"entries\":[",
+        asr_c, asr_c > 0 ? audio / asr_c : 0.0);
     out += buf;
     for (size_t i = 0; i < last_transcript_.tokens.size(); ++i) {
       const auto& t = last_transcript_.tokens[i];
-      std::snprintf(buf, sizeof(buf), "{\"start\":%.3f,\"end\":%.3f,\"text\":\"",
-                    t.start_sec, t.end_sec);
+      std::snprintf(buf, sizeof(buf),
+                    "{\"start\":%.3f,\"end\":%.3f,\"text\":\"", t.start_sec,
+                    t.end_sec);
       out += std::string(buf) + JsonEscape(t.text) + "\"}";
       if (i + 1 < last_transcript_.tokens.size()) out += ",";
     }
@@ -169,10 +172,11 @@ std::string AuditoryStream::Serialize() {
   // Track: voice activity (VAD). Present only when the VAD pipeline is enabled.
   if (config_.vad_stream) {
     const double vad_c = vad_detector_ ? vad_detector_->compute_sec() : 0.0;
-    std::snprintf(buf, sizeof(buf),
-                  ",{\"kind\":\"vad\",\"source\":\"silero_gpu\","
-                  "\"compute_sec\":%.3f,\"real_time_factor\":%.3f,\"entries\":[",
-                  vad_c, vad_c > 0 ? audio / vad_c : 0.0);
+    std::snprintf(
+        buf, sizeof(buf),
+        ",{\"kind\":\"vad\",\"source\":\"silero_gpu\","
+        "\"compute_sec\":%.3f,\"real_time_factor\":%.3f,\"entries\":[",
+        vad_c, vad_c > 0 ? audio / vad_c : 0.0);
     out += buf;
     for (size_t i = 0; i < vad_view.size(); ++i) {
       std::snprintf(buf, sizeof(buf), "{\"start\":%.3f,\"end\":%.3f}",
@@ -188,10 +192,11 @@ std::string AuditoryStream::Serialize() {
   // by the source text_id so consumers can tie units back to the asr track.
   if (aligner_) {
     const double align_c = align_worker_ ? align_worker_->compute_sec() : 0.0;
-    std::snprintf(buf, sizeof(buf),
-                  ",{\"kind\":\"align\",\"source\":\"qwen3_forced_aligner\","
-                  "\"compute_sec\":%.3f,\"real_time_factor\":%.3f,\"entries\":[",
-                  align_c, align_c > 0 ? audio / align_c : 0.0);
+    std::snprintf(
+        buf, sizeof(buf),
+        ",{\"kind\":\"align\",\"source\":\"qwen3_forced_aligner\","
+        "\"compute_sec\":%.3f,\"real_time_factor\":%.3f,\"entries\":[",
+        align_c, align_c > 0 ? audio / align_c : 0.0);
     out += buf;
     for (size_t i = 0; i < align_view.size(); ++i) {
       const auto& g = align_view[i];
@@ -201,8 +206,9 @@ std::string AuditoryStream::Serialize() {
       out += buf;
       for (size_t j = 0; j < g.units.size(); ++j) {
         const auto& u = g.units[j];
-        std::snprintf(buf, sizeof(buf), "{\"start\":%.3f,\"end\":%.3f,\"text\":\"",
-                      u.start, u.end);
+        std::snprintf(buf, sizeof(buf),
+                      "{\"start\":%.3f,\"end\":%.3f,\"text\":\"", u.start,
+                      u.end);
         out += std::string(buf) + JsonEscape(u.text) + "\"}";
         if (j + 1 < g.units.size()) out += ",";
       }
@@ -221,9 +227,13 @@ std::string AuditoryStream::Serialize() {
       // Extract numeric speaker index from "speaker_N" format.
       int spk_idx = -1;
       if (e.speaker.size() > 8 && e.speaker.substr(0, 8) == "speaker_") {
-      try { spk_idx = std::stoi(e.speaker.substr(8)); }
-      catch (const std::invalid_argument&) { spk_idx = -1; }
-      catch (const std::out_of_range&) { spk_idx = -1; }
+        try {
+          spk_idx = std::stoi(e.speaker.substr(8));
+        } catch (const std::invalid_argument&) {
+          spk_idx = -1;
+        } catch (const std::out_of_range&) {
+          spk_idx = -1;
+        }
       }
       std::snprintf(buf, sizeof(buf),
                     "{\"start\":%.3f,\"end\":%.3f,\"text_id\":%ld,"

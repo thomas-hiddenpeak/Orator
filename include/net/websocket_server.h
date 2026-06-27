@@ -25,10 +25,11 @@ struct per_session_data;
 // Per-connection handle the handler uses to push messages back to the client.
 // ---------------------------------------------------------------------------
 class WebSocketConnection {
-  friend int ws_callback(struct lws *, enum lws_callback_reasons,
-                         void *, void *, size_t);
+  friend int ws_callback(struct lws*, enum lws_callback_reasons, void*, void*,
+                         size_t);
+
  public:
-  WebSocketConnection(struct lws *wsi, struct lws_context *ctx)
+  WebSocketConnection(struct lws* wsi, struct lws_context* ctx)
       : wsi_(wsi), context_(ctx) {}
 
   bool SendText(const std::string& text);
@@ -37,13 +38,13 @@ class WebSocketConnection {
 
   bool closed() const { return closed_; }
 
-  private:
-   struct lws *wsi_;
-   struct lws_context *context_;
-   bool closed_ = false;
-   bool wakeup_pending_ = false;
-   std::vector<std::string> pending_text_;
-   std::shared_ptr<std::mutex> mu_ = std::make_shared<std::mutex>();
+ private:
+  struct lws* wsi_;
+  struct lws_context* context_;
+  bool closed_ = false;
+  bool wakeup_pending_ = false;
+  std::vector<std::string> pending_text_;
+  std::shared_ptr<std::mutex> mu_ = std::make_shared<std::mutex>();
 };
 
 // Application callback surface. Override the events of interest.
@@ -68,8 +69,9 @@ std::string Base64Encode(const uint8_t* data, size_t len);
 }  // namespace detail
 
 class WebSocketServer {
-  friend int ws_callback(struct lws *, enum lws_callback_reasons,
-                         void *, void *, size_t);
+  friend int ws_callback(struct lws*, enum lws_callback_reasons, void*, void*,
+                         size_t);
+
  public:
   explicit WebSocketServer(int port);
   ~WebSocketServer();
@@ -90,7 +92,7 @@ class WebSocketServer {
 
  private:
   int port_;
-  struct lws_context *context_ = nullptr;
+  struct lws_context* context_ = nullptr;
   bool running_ = false;
 
   // Per-instance serve-once state (replaces file-scope statics).
@@ -101,7 +103,7 @@ class WebSocketServer {
   std::function<std::unique_ptr<WebSocketHandler>()> serve_factory_;
 
   // Linked-list head for all active per_session_data nodes.
-  struct per_session_data *pss_list_head_ = nullptr;
+  struct per_session_data* pss_list_head_ = nullptr;
 };
 
 }  // namespace net

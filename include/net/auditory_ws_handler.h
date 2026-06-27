@@ -2,13 +2,14 @@
 
 // WebSocket handler that runs the AuditoryStream (independent diarization + ASR
 // pipelines) over a real-time PCM stream. It is a thin transport adapter: it
-// decodes incoming PCM frames and forwards them to AuditoryStream, and wires the
-// stream's JSON result callback to the client connection.
+// decodes incoming PCM frames and forwards them to AuditoryStream, and wires
+// the stream's JSON result callback to the client connection.
 //
 // Architecture: the AuditoryStream (and its loaded GPU models) is created ONCE
-// and shared across all connections via a shared_ptr. Each new client connection
-// calls Reset() on the stream and re-routes the emit callback to the new socket.
-// This avoids the GPU OOM crash caused by loading the ASR model once per client.
+// and shared across all connections via a shared_ptr. Each new client
+// connection calls Reset() on the stream and re-routes the emit callback to the
+// new socket. This avoids the GPU OOM crash caused by loading the ASR model
+// once per client.
 //
 // Wire protocol (client -> server):
 //   * Binary frames: raw mono PCM at the configured sample rate. int16
@@ -21,7 +22,8 @@
 //
 // Server -> client (text JSON):
 //   {"type":"ready",...}                                    on open
-//   {"type":"asr","start":..,"end":..,"text":..}            per completed utterance
+//   {"type":"asr","start":..,"end":..,"text":..}            per completed
+//   utterance
 //   {"type":"timeline",...}                                  on flush/end
 
 #include <memory>
@@ -34,14 +36,16 @@
 namespace orator {
 namespace net {
 
-// Thread-safe emit target shared between the AuditoryStream and all connections.
-// The active connection registers itself; previous connection clears on close.
+// Thread-safe emit target shared between the AuditoryStream and all
+// connections. The active connection registers itself; previous connection
+// clears on close.
 struct SessionEmit {
   std::mutex mu;
   WebSocketConnection* conn = nullptr;  // guarded by mu
   int64_t msg_id = 0;                   // auto-increment, guarded by mu
 
-  // Transform legacy messages to the new topic-based envelope format, then send.
+  // Transform legacy messages to the new topic-based envelope format, then
+  // send.
   void Send(const std::string& json);
 };
 
@@ -52,7 +56,8 @@ class AuditoryWsHandler final : public WebSocketHandler {
                     std::shared_ptr<SessionEmit> emit_target);
 
   void OnOpen(WebSocketConnection& conn) override;
-  void OnBinary(WebSocketConnection& conn, const uint8_t* data, size_t n) override;
+  void OnBinary(WebSocketConnection& conn, const uint8_t* data,
+                size_t n) override;
   void OnText(WebSocketConnection& conn, const std::string& text) override;
   void OnClose() override;
 

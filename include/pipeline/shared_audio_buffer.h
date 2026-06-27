@@ -42,11 +42,13 @@ namespace pipeline {
 class SharedAudioBuffer {
  public:
   struct Config {
-    size_t max_memory_samples;  // Fixed size of in-memory ring buffer (0 = no limit, defaults to 60s @ 16kHz = 960000)
+    size_t max_memory_samples;  // Fixed size of in-memory ring buffer (0 = no
+                                // limit, defaults to 60s @ 16kHz = 960000)
     size_t shrink_threshold;    // 10M samples ~ 40MB
-    
+
     Config() : max_memory_samples(960000), shrink_threshold(10000000) {}
-    Config(size_t max_mem, size_t shrink_t) : max_memory_samples(max_mem), shrink_threshold(shrink_t) {}
+    Config(size_t max_mem, size_t shrink_t)
+        : max_memory_samples(max_mem), shrink_threshold(shrink_t) {}
   };
 
   explicit SharedAudioBuffer(int sample_rate = 16000);
@@ -78,13 +80,13 @@ class SharedAudioBuffer {
   // i.e. the cursor's position before this read -- so a consumer can anchor its
   // local time codes onto the common time base.
   //
-  // `max_batch_samples` caps how many samples a single read returns (0 = no cap,
-  // return everything available). This lets a consumer pull the backlog in
+  // `max_batch_samples` caps how many samples a single read returns (0 = no
+  // cap, return everything available). This lets a consumer pull the backlog in
   // fixed-size batches at its own (device-determined) maximum speed, so its
   // per-batch behaviour does not depend on how fast the producer floods the
-  // buffer -- the consumer sees the same batch sequence whether audio arrives in
-  // real time or all at once. The cursor advances only by what is returned, so
-  // the next call continues from where this one stopped.
+  // buffer -- the consumer sees the same batch sequence whether audio arrives
+  // in real time or all at once. The cursor advances only by what is returned,
+  // so the next call continues from where this one stopped.
   bool WaitAndRead(int cursor, std::vector<float>* out,
                    long* span_start_abs = nullptr, long max_batch_samples = 0);
 
@@ -112,8 +114,8 @@ class SharedAudioBuffer {
   struct CursorProgress {
     long total_samples;
     long base_sample;
-    std::vector<std::pair<int, long>> cursors; // (cursor_id, position)
-    size_t buffer_size; // current buffer size in samples
+    std::vector<std::pair<int, long>> cursors;  // (cursor_id, position)
+    size_t buffer_size;  // current buffer size in samples
   };
   CursorProgress GetCursorProgress() const;
 
@@ -127,16 +129,18 @@ class SharedAudioBuffer {
 
   const int sample_rate_;
   Config config_;
-  
+
   // Append-only sample store. The consumed prefix is erased once every cursor
   // has passed it (RemovePassedPrefix), so retained memory tracks the in-flight
-  // window -- which stays small because every consumer runs faster than realtime.
+  // window -- which stays small because every consumer runs faster than
+  // realtime.
   std::vector<float> memory_buffer_;
-  long memory_start_sample_ = 0; // absolute sample index of memory_buffer_.front()
+  long memory_start_sample_ =
+      0;  // absolute sample index of memory_buffer_.front()
 
-  long base_sample_ = 0;        // absolute index of the oldest retained sample
-  long total_samples_ = 0;      // absolute count appended this session
-  std::vector<long> cursors_;   // absolute read position per consumer
+  long base_sample_ = 0;       // absolute index of the oldest retained sample
+  long total_samples_ = 0;     // absolute count appended this session
+  std::vector<long> cursors_;  // absolute read position per consumer
   bool closed_ = false;
 };
 

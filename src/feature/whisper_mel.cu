@@ -29,12 +29,13 @@ __host__ __device__ inline int Reflect(int i, int n) {
 }
 
 // Power spectrum via direct DFT over a reflect-padded, Hann-windowed frame.
-// One block per frame; threads cover frequency bins. power: [num_frames, n_freqs].
+// One block per frame; threads cover frequency bins. power: [num_frames,
+// n_freqs].
 __global__ void PowerSpectrumKernel(const float* __restrict__ signal,
-                                    int num_samples, const float* __restrict__ window,
-                                    int n_fft, int hop_length, int n_freqs,
-                                    int num_frames, int pad,
-                                    float* __restrict__ power) {
+                                    int num_samples,
+                                    const float* __restrict__ window, int n_fft,
+                                    int hop_length, int n_freqs, int num_frames,
+                                    int pad, float* __restrict__ power) {
   const int frame = blockIdx.x;
   if (frame >= num_frames) return;
   for (int k = threadIdx.x; k < n_freqs; k += blockDim.x) {
@@ -85,7 +86,8 @@ double HzToMelSlaney(double hz) {
   const double min_log_hz = 1000.0;
   const double min_log_mel = min_log_hz / f_sp;  // 15
   const double logstep = std::log(6.4) / 27.0;
-  if (hz >= min_log_hz) return min_log_mel + std::log(hz / min_log_hz) / logstep;
+  if (hz >= min_log_hz)
+    return min_log_mel + std::log(hz / min_log_hz) / logstep;
   return hz / f_sp;
 }
 double MelToHzSlaney(double mel) {
@@ -93,7 +95,8 @@ double MelToHzSlaney(double mel) {
   const double min_log_hz = 1000.0;
   const double min_log_mel = min_log_hz / f_sp;  // 15
   const double logstep = std::log(6.4) / 27.0;
-  if (mel >= min_log_mel) return min_log_hz * std::exp(logstep * (mel - min_log_mel));
+  if (mel >= min_log_mel)
+    return min_log_hz * std::exp(logstep * (mel - min_log_mel));
   return f_sp * mel;
 }
 
@@ -122,7 +125,8 @@ void WhisperMel::BuildMelFilterbank() {
   // FFT bin center frequencies: linspace(0, sr/2, n_freqs).
   std::vector<double> fft_freqs(nfreq);
   for (int k = 0; k < nfreq; ++k)
-    fft_freqs[k] = static_cast<double>(config_.sample_rate) / 2.0 * k / (nfreq - 1);
+    fft_freqs[k] =
+        static_cast<double>(config_.sample_rate) / 2.0 * k / (nfreq - 1);
 
   // n_mels+2 mel points, evenly spaced in mel, mapped back to Hz.
   const double mel_min = HzToMelSlaney(config_.fmin);
@@ -151,8 +155,7 @@ void WhisperMel::BuildMelFilterbank() {
 }
 
 std::vector<float> WhisperMel::Compute(const float* samples, int num_samples,
-                                       int* out_num_frames,
-                                       cudaStream_t stream,
+                                       int* out_num_frames, cudaStream_t stream,
                                        float* running_max,
                                        int max_valid_from) const {
   const int n_fft = config_.n_fft;
@@ -170,25 +173,26 @@ std::vector<float> WhisperMel::Compute(const float* samples, int num_samples,
     return {};
   }
 
-    gpu::DeviceBuffer d_sig(sizeof(float) * num_samples);
-    gpu::DeviceBuffer d_win(sizeof(float) * n_fft);
-    gpu::DeviceBuffer d_filt(sizeof(float) * mel_filters_.size());
-    gpu::DeviceBuffer d_power(sizeof(float) * static_cast<size_t>(num_frames) * nfreq);
-    gpu::DeviceBuffer d_out(sizeof(float) * static_cast<size_t>(n_mels) * num_frames);
+  gpu::DeviceBuffer d_sig(sizeof(float) * num_samples);
+  gpu::DeviceBuffer d_win(sizeof(float) * n_fft);
+  gpu::DeviceBuffer d_filt(sizeof(float) * mel_filters_.size());
+  gpu::DeviceBuffer d_power(sizeof(float) * static_cast<size_t>(num_frames) *
+                            nfreq);
+  gpu::DeviceBuffer d_out(sizeof(float) * static_cast<size_t>(n_mels) *
+                          num_frames);
 
-    CheckCudaError(
+  CheckCudaError(
       cudaMemcpyAsync(d_sig.data(), samples, sizeof(float) * num_samples,
-              cudaMemcpyHostToDevice, stream),
+                      cudaMemcpyHostToDevice, stream),
       __FILE__, __LINE__);
-    CheckCudaError(
+  CheckCudaError(
       cudaMemcpyAsync(d_win.data(), hann_.data(), sizeof(float) * n_fft,
-              cudaMemcpyHostToDevice, stream),
+                      cudaMemcpyHostToDevice, stream),
       __FILE__, __LINE__);
-    CheckCudaError(
-      cudaMemcpyAsync(d_filt.data(), mel_filters_.data(),
-              sizeof(float) * mel_filters_.size(), cudaMemcpyHostToDevice,
-              stream),
-      __FILE__, __LINE__);
+  CheckCudaError(cudaMemcpyAsync(d_filt.data(), mel_filters_.data(),
+                                 sizeof(float) * mel_filters_.size(),
+                                 cudaMemcpyHostToDevice, stream),
+                 __FILE__, __LINE__);
 
   PowerSpectrumKernel<<<num_frames, 128, 0, stream>>>(
       static_cast<float*>(d_sig.data()), num_samples,
@@ -202,14 +206,14 @@ std::vector<float> WhisperMel::Compute(const float* samples, int num_samples,
       static_cast<float*>(d_filt.data()), n_mels, num_frames,
       static_cast<float*>(d_out.data()));
   CheckCudaError(cudaGetLastError(), __FILE__, __LINE__);
-      CheckCudaError(cudaStreamSynchronize(stream), __FILE__, __LINE__);
+  CheckCudaError(cudaStreamSynchronize(stream), __FILE__, __LINE__);
 
   // Global max over the (kept) log-mel for the Whisper floor/normalization.
   std::vector<float> logmel(static_cast<size_t>(total));
-  CheckCudaError(
-      cudaMemcpyAsync(logmel.data(), d_out.data(), sizeof(float) * logmel.size(),
-                      cudaMemcpyDeviceToHost, stream),
-      __FILE__, __LINE__);
+  CheckCudaError(cudaMemcpyAsync(logmel.data(), d_out.data(),
+                                 sizeof(float) * logmel.size(),
+                                 cudaMemcpyDeviceToHost, stream),
+                 __FILE__, __LINE__);
   CheckCudaError(cudaStreamSynchronize(stream), __FILE__, __LINE__);
 
   // Local maximum over the valid frame range [max_valid_from, num_frames) for

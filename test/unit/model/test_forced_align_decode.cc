@@ -39,10 +39,11 @@ static void test_split_words() {
   CHECK(WordsEq(SplitWordsForAlignment("你好，世界123 abc。", "Chinese"),
                 {"你", "好", "世", "界", "123", "abc"}),
         "split zh mixed");
-  CHECK(WordsEq(SplitWordsForAlignment(
-                    "Mr. Quilter's the apostle of the middle classes.", "English"),
-                {"Mr", "Quilter's", "the", "apostle", "of", "the", "middle",
-                 "classes"}),
+  CHECK(WordsEq(
+            SplitWordsForAlignment(
+                "Mr. Quilter's the apostle of the middle classes.", "English"),
+            {"Mr", "Quilter's", "the", "apostle", "of", "the", "middle",
+             "classes"}),
         "split en punctuation+apostrophe");
   CHECK(WordsEq(SplitWordsForAlignment("我觉得十五是差不多的。", "Chinese"),
                 {"我", "觉", "得", "十", "五", "是", "差", "不", "多", "的"}),
@@ -67,9 +68,9 @@ static void test_fix_timestamps() {
   CHECK(LongEq(FixTimestamps({100, 90, 80, 200, 210, 50, 300}),
                {100, 100, 200, 200, 210, 210, 300}),
         "fix multiple anomalies");
-  CHECK(LongEq(FixTimestamps({0, 0, 80, 80, 160, 160}),
-               {0, 0, 80, 80, 160, 160}),
-        "fix non-decreasing repeats");
+  CHECK(
+      LongEq(FixTimestamps({0, 0, 80, 80, 160, 160}), {0, 0, 80, 80, 160, 160}),
+      "fix non-decreasing repeats");
 }
 
 static void test_pair() {
@@ -96,19 +97,19 @@ static void test_audio_token_length() {
 static void test_build_input_ids() {
   // Ground truth from tools/reference/aligner_oracle.py (6 s of test.mp3,
   // transcript "比较理想化的一个人吧其实是这样的", 16 single-token CJK words,
-  // N_audio=78, seq=128). We assert the assembly against the oracle's structural
-  // facts rather than a 128-int literal.
+  // N_audio=78, seq=128). We assert the assembly against the oracle's
+  // structural facts rather than a 128-int literal.
   const int kAudioStart = 151669, kAudioPad = 151676, kAudioEnd = 151670,
             kTs = 151705;
   const int kN = 78;
-  const std::vector<int> wt = {56006, 99260, 21887, 99172, 32108,  9370,
+  const std::vector<int> wt = {56006, 99260, 21887, 99172,  32108, 9370,
                                14777, 18947, 17340, 100003, 41146, 39973,
                                20412, 43288, 90885, 9370};
   std::vector<std::vector<int>> words;
   for (int t : wt) words.push_back({t});
 
-  auto ids = BuildAlignerInputIds(words, kN, kAudioStart, kAudioPad, kAudioEnd,
-                                  kTs);
+  auto ids =
+      BuildAlignerInputIds(words, kN, kAudioStart, kAudioPad, kAudioEnd, kTs);
   CHECK(ids.size() == 128, "input_ids length 128 (oracle)");
   CHECK(!ids.empty() && ids.front() == kAudioStart, "first = audio_start");
   int pads = 0;

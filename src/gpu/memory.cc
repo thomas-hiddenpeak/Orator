@@ -47,9 +47,7 @@ void UnifiedAllocator::deallocate(void* ptr) {
 }
 
 // HostAllocator implementation
-void* HostAllocator::allocate(size_t bytes) {
-  return std::malloc(bytes);
-}
+void* HostAllocator::allocate(size_t bytes) { return std::malloc(bytes); }
 
 void HostAllocator::deallocate(void* ptr) {
   if (ptr) {
@@ -79,7 +77,8 @@ MmapAllocator::MmapAllocator(const std::string& filepath)
     : fd_(-1), mapped_ptr_(nullptr), mapped_size_(0) {
   fd_ = open(filepath.c_str(), O_RDONLY);
   if (fd_ < 0) {
-    throw GpuMemoryException(std::string("Cannot open file: " + filepath).c_str());
+    throw GpuMemoryException(
+        std::string("Cannot open file: " + filepath).c_str());
   }
 
   // Reject anything that is not a regular file (e.g. a directory): mmap'ing it
@@ -147,17 +146,11 @@ void GpuMemory::SetDevice(int device_id) {
   CUDA_CHECK(cudaSetDevice(device_id));
 }
 
-DeviceAllocator& GpuMemory::device_allocator() {
-  return g_device_allocator;
-}
+DeviceAllocator& GpuMemory::device_allocator() { return g_device_allocator; }
 
-UnifiedAllocator& GpuMemory::unified_allocator() {
-  return g_unified_allocator;
-}
+UnifiedAllocator& GpuMemory::unified_allocator() { return g_unified_allocator; }
 
-HostAllocator& GpuMemory::host_allocator() {
-  return g_host_allocator;
-}
+HostAllocator& GpuMemory::host_allocator() { return g_host_allocator; }
 
 void GpuMemory::CopyDeviceToDevice(void* dst, const void* src, size_t bytes) {
   CUDA_CHECK(cudaMemcpy(dst, src, bytes, cudaMemcpyDeviceToDevice));
@@ -201,4 +194,3 @@ PinnedAllocator& GpuBuffer<PinnedAllocator>::get_default_allocator() {
 
 }  // namespace gpu
 }  // namespace orator
-

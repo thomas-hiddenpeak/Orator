@@ -65,9 +65,9 @@ __global__ void CosineSimilarityKernel(const float* a, const float* b, int n,
   }
 }
 
-__global__ void BatchCosineSimilarityKernel(
-    const float* query, const float* keys, int num_keys, int vec_dim,
-    float* output) {
+__global__ void BatchCosineSimilarityKernel(const float* query,
+                                            const float* keys, int num_keys,
+                                            int vec_dim, float* output) {
   int key_idx = blockIdx.x;
   if (key_idx >= num_keys) return;
 
@@ -149,8 +149,8 @@ float Kernels::CosineSimilarity(const float* a, const float* b, int n,
 }
 
 void Kernels::BatchCosineSimilarity(const float* query, const float* keys,
-                                    int num_keys, int vec_dim,
-                                    float* output, cudaStream_t stream) {
+                                    int num_keys, int vec_dim, float* output,
+                                    cudaStream_t stream) {
   if (num_keys <= 0 || vec_dim <= 0) return;
   // One block per key, threads for vector dimension
   int block_size = std::min(vec_dim, 256);

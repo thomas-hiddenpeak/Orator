@@ -49,7 +49,8 @@ void GetLogPredScores(const std::vector<float>& preds, int n, int n_spk,
   }
   for (int f = 0; f < n; ++f) {
     float sum1p = 0.0f;
-    for (int s = 0; s < n_spk; ++s) sum1p += log_1p[static_cast<size_t>(f) * n_spk + s];
+    for (int s = 0; s < n_spk; ++s)
+      sum1p += log_1p[static_cast<size_t>(f) * n_spk + s];
     for (int s = 0; s < n_spk; ++s) {
       size_t i = static_cast<size_t>(f) * n_spk + s;
       scores[i] = log_p[i] - log_1p[i] + sum1p - std::log(0.5f);
@@ -57,8 +58,8 @@ void GetLogPredScores(const std::vector<float>& preds, int n, int n_spk,
   }
 }
 
-// _disable_low_scores: non-speech -> -inf; non-positive -> -inf if a speaker has
-// at least min_pos positive-scored frames.
+// _disable_low_scores: non-speech -> -inf; non-positive -> -inf if a speaker
+// has at least min_pos positive-scored frames.
 void DisableLowScores(const std::vector<float>& preds, int n, int n_spk,
                       int min_pos, std::vector<float>& scores) {
   for (int f = 0; f < n; ++f)
@@ -75,7 +76,8 @@ void DisableLowScores(const std::vector<float>& preds, int n, int n_spk,
       size_t i = static_cast<size_t>(f) * n_spk + s;
       bool is_speech = preds[i] > 0.5f;
       bool is_pos = scores[i] > 0.0f;
-      if ((!is_pos) && is_speech && pos_count[s] >= min_pos) scores[i] = kNegInf;
+      if ((!is_pos) && is_speech && pos_count[s] >= min_pos)
+        scores[i] = kNegInf;
     }
 }
 
@@ -88,14 +90,13 @@ void BoostTopkScores(int n, int n_spk, int n_boost, float scale,
   for (int s = 0; s < n_spk; ++s) {
     std::vector<int> idx(n);
     std::iota(idx.begin(), idx.end(), 0);
-    std::partial_sort(
-        idx.begin(), idx.begin() + std::min(n_boost, n), idx.end(),
-        [&](int a, int b) {
-          float va = scores[static_cast<size_t>(a) * n_spk + s];
-          float vb = scores[static_cast<size_t>(b) * n_spk + s];
-          if (va != vb) return va > vb;
-          return a < b;
-        });
+    std::partial_sort(idx.begin(), idx.begin() + std::min(n_boost, n),
+                      idx.end(), [&](int a, int b) {
+                        float va = scores[static_cast<size_t>(a) * n_spk + s];
+                        float vb = scores[static_cast<size_t>(b) * n_spk + s];
+                        if (va != vb) return va > vb;
+                        return a < b;
+                      });
     int lim = std::min(n_boost, n);
     for (int k = 0; k < lim; ++k) {
       size_t i = static_cast<size_t>(idx[k]) * n_spk + s;
@@ -113,7 +114,8 @@ void UpdateSilenceProfile(const std::vector<float>& embs,
   long sil_count = 0;
   for (int f = 0; f < n; ++f) {
     float sump = 0.0f;
-    for (int s = 0; s < n_spk; ++s) sump += preds[static_cast<size_t>(f) * n_spk + s];
+    for (int s = 0; s < n_spk; ++s)
+      sump += preds[static_cast<size_t>(f) * n_spk + s];
     if (sump < kSilThreshold) {
       is_sil[f] = 1;
       ++sil_count;
@@ -139,13 +141,15 @@ void CompressSpkcache(const std::vector<float>& emb_seq,
                       const std::vector<float>& preds, int n, int n_spk,
                       int emb_dim, int spkcache_len,
                       const std::vector<float>& mean_sil_emb,
-                      bool use_silence_profile,
-                      std::vector<float>& out_emb,
+                      bool use_silence_profile, std::vector<float>& out_emb,
                       std::vector<float>& out_preds) {
   const int spkcache_len_per_spk = spkcache_len / n_spk - kSilFramesPerSpk;
-  const int strong = static_cast<int>(std::floor(spkcache_len_per_spk * kStrongBoostRate));
-  const int weak = static_cast<int>(std::floor(spkcache_len_per_spk * kWeakBoostRate));
-  const int min_pos = static_cast<int>(std::floor(spkcache_len_per_spk * kMinPosScoresRate));
+  const int strong =
+      static_cast<int>(std::floor(spkcache_len_per_spk * kStrongBoostRate));
+  const int weak =
+      static_cast<int>(std::floor(spkcache_len_per_spk * kWeakBoostRate));
+  const int min_pos =
+      static_cast<int>(std::floor(spkcache_len_per_spk * kMinPosScoresRate));
 
   std::vector<float> scores;
   GetLogPredScores(preds, n, n_spk, scores);
@@ -153,8 +157,8 @@ void CompressSpkcache(const std::vector<float>& emb_seq,
   // similarity between each frame embedding and mean_sil_emb. Frames close to
   // silence (cos_sim > 0.3) get their scores reduced, keeping the spkcache
   // focused on active speech frames.
-  if (use_silence_profile &&
-      !mean_sil_emb.empty() && static_cast<int>(mean_sil_emb.size()) == emb_dim) {
+  if (use_silence_profile && !mean_sil_emb.empty() &&
+      static_cast<int>(mean_sil_emb.size()) == emb_dim) {
     float sil_norm2 = 0.0f;
     for (int d = 0; d < emb_dim; ++d)
       sil_norm2 += mean_sil_emb[d] * mean_sil_emb[d];
@@ -228,7 +232,7 @@ void CompressSpkcache(const std::vector<float>& emb_seq,
       continue;
     }
     int f = static_cast<int>(v % n_pad);  // remainder by padded n_frames
-    if (f >= n) {                          // silence-pad row
+    if (f >= n) {                         // silence-pad row
       disabled[k] = 1;
       f = 0;
     }
@@ -270,11 +274,11 @@ bool SortformerConfig::Validate() const {
 }
 
 SortformerState::SortformerState(const SortformerConfig& cfg)
-    : spkcache(static_cast<size_t>(cfg.spkcache_len) * cfg.transformer_hidden_size *
-               sizeof(float)),
+    : spkcache(static_cast<size_t>(cfg.spkcache_len) *
+               cfg.transformer_hidden_size * sizeof(float)),
       spkcache_lengths(sizeof(int32_t)),
-      spkcache_preds(static_cast<size_t>(cfg.spkcache_len) * cfg.max_num_speakers *
-                     sizeof(float)),
+      spkcache_preds(static_cast<size_t>(cfg.spkcache_len) *
+                     cfg.max_num_speakers * sizeof(float)),
       fifo(static_cast<size_t>(std::max(cfg.fifo_len, 1)) *
            cfg.transformer_hidden_size * sizeof(float)),
       fifo_lengths(sizeof(int32_t)),
@@ -283,7 +287,8 @@ SortformerState::SortformerState(const SortformerConfig& cfg)
       spk_perm(static_cast<size_t>(cfg.max_num_speakers) * sizeof(int32_t)),
       mean_sil_emb(static_cast<size_t>(cfg.max_num_speakers) *
                    cfg.transformer_hidden_size * sizeof(float)),
-      n_sil_frames(static_cast<size_t>(cfg.max_num_speakers) * sizeof(int32_t)) {
+      n_sil_frames(static_cast<size_t>(cfg.max_num_speakers) *
+                   sizeof(int32_t)) {
   Clear();
 }
 
@@ -306,13 +311,21 @@ SortformerDiarizer::SortformerDiarizer(const SortformerConfig& cfg)
 
 void SortformerDiarizer::ApplyStreamingTuning(const SortformerTuning& tuning) {
   if (tuning.spkcache_len > 0) config_.spkcache_len = tuning.spkcache_len;
-  if (tuning.chunk_len > 0) { config_.chunk_len = tuning.chunk_len; }
-  if (tuning.spkcache_update_period > 0) config_.spkcache_update_period = tuning.spkcache_update_period;
-  if (tuning.chunk_left_context >= 0) config_.chunk_left_context = tuning.chunk_left_context;
-  if (tuning.chunk_right_context >= 0) config_.chunk_right_context = tuning.chunk_right_context;
-  if (tuning.spkcache_sil_frames >= 0) config_.spkcache_sil_frames_per_spk = tuning.spkcache_sil_frames;
-  if (tuning.spkcache_refresh_rate >= 0) config_.spkcache_refresh_rate = tuning.spkcache_refresh_rate;
-  if (tuning.use_silence_profile >= 0) config_.use_silence_profile = (tuning.use_silence_profile != 0);
+  if (tuning.chunk_len > 0) {
+    config_.chunk_len = tuning.chunk_len;
+  }
+  if (tuning.spkcache_update_period > 0)
+    config_.spkcache_update_period = tuning.spkcache_update_period;
+  if (tuning.chunk_left_context >= 0)
+    config_.chunk_left_context = tuning.chunk_left_context;
+  if (tuning.chunk_right_context >= 0)
+    config_.chunk_right_context = tuning.chunk_right_context;
+  if (tuning.spkcache_sil_frames >= 0)
+    config_.spkcache_sil_frames_per_spk = tuning.spkcache_sil_frames;
+  if (tuning.spkcache_refresh_rate >= 0)
+    config_.spkcache_refresh_rate = tuning.spkcache_refresh_rate;
+  if (tuning.use_silence_profile >= 0)
+    config_.use_silence_profile = (tuning.use_silence_profile != 0);
   if (tuning.fifo_len >= 0) config_.fifo_len = tuning.fifo_len;
 }
 
@@ -348,7 +361,8 @@ void SortformerDiarizer::LoadWeights(const std::string& path) {
                       wmeta.data_size);
   const auto& fbmeta = reader_->GetMetadata("preprocessor.featurizer.fb");
   std::vector<float> fb(fbmeta.data_size / sizeof(float));  // [1,128,257]->flat
-  reader_->ReadWeight("preprocessor.featurizer.fb", fb.data(), fbmeta.data_size);
+  reader_->ReadWeight("preprocessor.featurizer.fb", fb.data(),
+                      fbmeta.data_size);
   mcfg.win_length = static_cast<int>(window.size());
   mel_ = std::make_unique<feature::MelSpectrogram>(mcfg, window, fb);
 
@@ -390,25 +404,23 @@ void SortformerDiarizer::Reset() {
 }
 
 std::vector<float> SortformerDiarizer::ForwardEncoderDecoder(
-    const std::vector<float>& emb_seq, int T, int valid,
-    cudaStream_t stream) {
+    const std::vector<float>& emb_seq, int T, int valid, cudaStream_t stream) {
   const int D = config_.encoder_d_model;
   const float xscale = std::sqrt(static_cast<float>(D));
   std::vector<float> xin(emb_seq.size());
   for (size_t i = 0; i < emb_seq.size(); ++i) xin[i] = emb_seq[i] * xscale;
 
   gpu::DeviceBuffer dx(xin.size() * sizeof(float));
-  CUDA_CHECK(cudaMemcpyAsync(dx.data(), xin.data(),
-                              xin.size() * sizeof(float), cudaMemcpyHostToDevice,
-                              stream));
+  CUDA_CHECK(cudaMemcpyAsync(dx.data(), xin.data(), xin.size() * sizeof(float),
+                             cudaMemcpyHostToDevice, stream));
   std::vector<float> posemb = ConformerLayer::BuildPosEmb(T, D);
   gpu::DeviceBuffer dpe(posemb.size() * sizeof(float));
   CUDA_CHECK(cudaMemcpyAsync(dpe.data(), posemb.data(),
-                              posemb.size() * sizeof(float), cudaMemcpyHostToDevice,
-                              stream));
+                             posemb.size() * sizeof(float),
+                             cudaMemcpyHostToDevice, stream));
   for (auto& layer : conformer_layers_) {
     layer->Forward(static_cast<float*>(dx.data()), T, valid,
-                    static_cast<const float*>(dpe.data()), stream);
+                   static_cast<const float*>(dpe.data()), stream);
   }
   std::vector<float> preds =
       decoder_->Forward(static_cast<float*>(dx.data()), T, valid, stream);
@@ -439,8 +451,7 @@ core::DiarizationFrames SortformerDiarizer::RunStreaming(const float* mel_fm,
   while (stt < t_mel) {
     if (std::getenv("ORATOR_STREAM_PROGRESS")) {
       std::fprintf(stderr, "\r  streaming chunk %d/%d (t=%.0fs)   ",
-                   chunk_idx + 1, num_chunks,
-                   stt * config_.hop_size_sec);
+                   chunk_idx + 1, num_chunks, stt * config_.hop_size_sec);
       std::fflush(stderr);
     }
     // Offline path: the whole mel buffer is available, base frame = 0,
@@ -472,20 +483,19 @@ core::DiarizationFrames SortformerDiarizer::RunStreaming(const float* mel_fm,
 // RunStreaming loop and the incremental StreamAudio path, so the two are
 // bit-identical for identical mel content.
 void SortformerDiarizer::StreamMelChunk(const float* mel_buf, int n_mels,
-                                         int buf_len, long buf_base_frame,
-                                         long stt_abs, long valid_abs,
-                                         long avail_abs,
-                                         std::vector<float>& out_preds,
-                                         int& out_frames,
-                                         cudaStream_t stream) {
+                                        int buf_len, long buf_base_frame,
+                                        long stt_abs, long valid_abs,
+                                        long avail_abs,
+                                        std::vector<float>& out_preds,
+                                        int& out_frames, cudaStream_t stream) {
   const int D = config_.encoder_d_model;
   const int n_spk = config_.max_num_speakers;
   const int sub = config_.encoder_subsampling_factor;
   const int chunk_mel = config_.chunk_len * sub;
   const int spkcache_len = config_.spkcache_len;
 
-  const int lc =
-      static_cast<int>(std::min<long>(config_.chunk_left_context * sub, stt_abs));
+  const int lc = static_cast<int>(
+      std::min<long>(config_.chunk_left_context * sub, stt_abs));
   const long end_abs = std::min<long>(stt_abs + chunk_mel, avail_abs);
   const int rc = static_cast<int>(
       std::min<long>(config_.chunk_right_context * sub, avail_abs - end_abs));
@@ -510,7 +520,8 @@ void SortformerDiarizer::StreamMelChunk(const float* mel_buf, int n_mels,
   std::vector<float> chunk_embs = pre_encode_->Forward(
       slice.data(), n_mels, mlen, feat_len, &chunk_T, &chunk_valid, stream);
 
-  const int lc_sub = static_cast<int>(std::lround(static_cast<double>(lc) / sub));
+  const int lc_sub =
+      static_cast<int>(std::lround(static_cast<double>(lc) / sub));
   const int rc_sub = static_cast<int>(std::ceil(static_cast<double>(rc) / sub));
   const int chunk_center_len = chunk_T - lc_sub - rc_sub;
 
@@ -518,16 +529,16 @@ void SortformerDiarizer::StreamMelChunk(const float* mel_buf, int n_mels,
   const int spk_len = stream_state_.spk_len;
   const int Tcat = spk_len + chunk_T;
   std::vector<float> enc_in(static_cast<size_t>(Tcat) * D);
-  std::copy(
-      stream_state_.spkcache.begin(),
-      stream_state_.spkcache.begin() + static_cast<size_t>(spk_len) * D,
-      enc_in.begin());
+  std::copy(stream_state_.spkcache.begin(),
+            stream_state_.spkcache.begin() + static_cast<size_t>(spk_len) * D,
+            enc_in.begin());
   std::copy(chunk_embs.begin(), chunk_embs.end(),
             enc_in.begin() + static_cast<size_t>(spk_len) * D);
   const int valid_cat = spk_len + chunk_valid;
 
   // encoder + decoder -> preds [Tcat, n_spk].
-  std::vector<float> preds = ForwardEncoderDecoder(enc_in, Tcat, valid_cat, stream);
+  std::vector<float> preds =
+      ForwardEncoderDecoder(enc_in, Tcat, valid_cat, stream);
 
   // chunk_preds = preds[spk_len + lc_sub : spk_len + lc_sub + chunk_center_len]
   const int cp_start = spk_len + lc_sub;
@@ -558,19 +569,21 @@ void SortformerDiarizer::StreamMelChunk(const float* mel_buf, int n_mels,
     int keep_new = chunk_center_len;
     int keep_old = 0;
     if (keep_new > cap) {
-      keep_new = cap;          // keep only the last `cap` chunk frames
-      keep_old = 0;            // discard all existing FIFO content
+      keep_new = cap;  // keep only the last `cap` chunk frames
+      keep_old = 0;    // discard all existing FIFO content
     } else {
       int total = stream_state_.fifo_count + keep_new;
       if (total > cap) {
         keep_old = std::max(0, stream_state_.fifo_count - (total - cap));
         if (keep_old > 0 && keep_old < stream_state_.fifo_count) {
           int drop = stream_state_.fifo_count - keep_old;
-          std::memmove(stream_state_.fifo_embs.data(),
-                       stream_state_.fifo_embs.data() + static_cast<size_t>(drop) * D,
-                       static_cast<size_t>(keep_old) * D * sizeof(float));
+          std::memmove(
+              stream_state_.fifo_embs.data(),
+              stream_state_.fifo_embs.data() + static_cast<size_t>(drop) * D,
+              static_cast<size_t>(keep_old) * D * sizeof(float));
           std::memmove(stream_state_.fifo_preds.data(),
-                       stream_state_.fifo_preds.data() + static_cast<size_t>(drop) * n_spk,
+                       stream_state_.fifo_preds.data() +
+                           static_cast<size_t>(drop) * n_spk,
                        static_cast<size_t>(keep_old) * n_spk * sizeof(float));
         } else {
           keep_old = stream_state_.fifo_count;  // no drop needed
@@ -614,11 +627,13 @@ void SortformerDiarizer::StreamMelChunk(const float* mel_buf, int n_mels,
     // Shift remaining content left.
     int remain = stream_state_.fifo_count - pop_out_len;
     if (remain > 0) {
-      std::memmove(stream_state_.fifo_embs.data(),
-                   stream_state_.fifo_embs.data() + static_cast<size_t>(pop_out_len) * D,
-                   static_cast<size_t>(remain) * D * sizeof(float));
+      std::memmove(
+          stream_state_.fifo_embs.data(),
+          stream_state_.fifo_embs.data() + static_cast<size_t>(pop_out_len) * D,
+          static_cast<size_t>(remain) * D * sizeof(float));
       std::memmove(stream_state_.fifo_preds.data(),
-                   stream_state_.fifo_preds.data() + static_cast<size_t>(pop_out_len) * n_spk,
+                   stream_state_.fifo_preds.data() +
+                       static_cast<size_t>(pop_out_len) * n_spk,
                    static_cast<size_t>(remain) * n_spk * sizeof(float));
     }
     stream_state_.fifo_count = remain;
@@ -641,7 +656,8 @@ void SortformerDiarizer::StreamMelChunk(const float* mel_buf, int n_mels,
 
   if (pop_out_len > 0) {
     UpdateSilenceProfile(pop_embs, pop_preds, pop_out_len, n_spk, D,
-                         stream_state_.mean_sil_emb, stream_state_.n_sil_frames);
+                         stream_state_.mean_sil_emb,
+                         stream_state_.n_sil_frames);
 
     const int new_len = spk_len + pop_out_len;
     stream_state_.spkcache.insert(stream_state_.spkcache.end(),
@@ -654,8 +670,8 @@ void SortformerDiarizer::StreamMelChunk(const float* mel_buf, int n_mels,
 
     if (new_len > spkcache_len) {
       if (!stream_state_.spkcache_preds_valid) {
-        stream_state_.spkcache_preds.assign(static_cast<size_t>(new_len) * n_spk,
-                                            0.0f);
+        stream_state_.spkcache_preds.assign(
+            static_cast<size_t>(new_len) * n_spk, 0.0f);
         for (int f = 0; f < spk_len; ++f)
           for (int s = 0; s < n_spk; ++s)
             stream_state_.spkcache_preds[static_cast<size_t>(f) * n_spk + s] =
@@ -668,8 +684,8 @@ void SortformerDiarizer::StreamMelChunk(const float* mel_buf, int n_mels,
       std::vector<float> comp_emb, comp_preds;
       CompressSpkcache(stream_state_.spkcache, stream_state_.spkcache_preds,
                        new_len, n_spk, D, spkcache_len,
-                       stream_state_.mean_sil_emb,
-                       config_.use_silence_profile, comp_emb, comp_preds);
+                       stream_state_.mean_sil_emb, config_.use_silence_profile,
+                       comp_emb, comp_preds);
       stream_state_.spkcache.swap(comp_emb);
       stream_state_.spkcache_preds.swap(comp_preds);
       stream_state_.spk_len = spkcache_len;
@@ -702,9 +718,10 @@ core::DiarizationFrames SortformerDiarizer::ProcessChunk(
       mel_fm[static_cast<size_t>(m) * t_mel + t] =
           mel[static_cast<size_t>(t) * n_mels + m];
 
-  // NeMo center-pads the STFT by n_fft/2; valid (non-pad) frames = floor(L/hop).
-  const int hop = static_cast<int>(std::lround(config_.hop_size_sec *
-                                                config_.sample_rate));
+  // NeMo center-pads the STFT by n_fft/2; valid (non-pad) frames =
+  // floor(L/hop).
+  const int hop =
+      static_cast<int>(std::lround(config_.hop_size_sec * config_.sample_rate));
   int valid_mel = std::min(t_mel, chunk.num_samples / hop);
 
   // 2) Streaming chunked forward over the full mel.
@@ -808,9 +825,9 @@ void SortformerDiarizer::TrimStreamingBuffers() {
 }
 
 core::DiarizationFrames SortformerDiarizer::StreamAudio(const float* samples,
-                                                         int num_samples,
-                                                         bool final,
-                                                         cudaStream_t stream) {
+                                                        int num_samples,
+                                                        bool final,
+                                                        cudaStream_t stream) {
   if (!initialized_)
     throw std::runtime_error("SortformerDiarizer not initialized");
   if (!weights_loaded_)
@@ -863,8 +880,8 @@ core::DiarizationFrames SortformerDiarizer::StreamAudio(const float* samples,
       if (!full || end_abs + rc_max > mel_avail_) break;
     }
     StreamMelChunk(mel_seq_.data(), n_mels, mel_w_, mel_base_, stt_feat_,
-                    /*valid_abs=*/mel_avail_, /*avail_abs=*/mel_avail_, out_preds,
-                    out_frames, stream);
+                   /*valid_abs=*/mel_avail_, /*avail_abs=*/mel_avail_,
+                   out_preds, out_frames, stream);
     stt_feat_ = end_abs;
     TrimStreamingBuffers();
   }

@@ -21,12 +21,12 @@ using orator::protocol::TimeIndex;
 using orator::protocol::TopicRetention;
 
 static int g_fail = 0;
-#define CHECK(cond, msg)                \
-  do {                                  \
-    if (!(cond)) {                      \
-      std::printf("FAIL: %s\n", msg);   \
-      ++g_fail;                         \
-    }                                   \
+#define CHECK(cond, msg)              \
+  do {                                \
+    if (!(cond)) {                    \
+      std::printf("FAIL: %s\n", msg); \
+      ++g_fail;                       \
+    }                                 \
   } while (0)
 
 // ---------------------------------------------------------------------------
@@ -198,7 +198,8 @@ static void test_message_serialization() {
   msg.data = "{\"text\":\"hello world\"}";
 
   auto mem = std::make_unique<MemoryBackend>();
-  auto disk = std::make_unique<DiskBackend>("/tmp/orator_test_storage", "test4");
+  auto disk =
+      std::make_unique<DiskBackend>("/tmp/orator_test_storage", "test4");
   StorageManager manager(std::move(mem), std::move(disk));
 
   StorageRef ref = manager.Write("audio/raw", msg);
@@ -209,7 +210,8 @@ static void test_message_serialization() {
   CHECK(read.msg_id == msg.msg_id, "msg_id matches");
   CHECK(read.topic == msg.topic, "topic matches");
   CHECK(read.pipeline == msg.pipeline, "pipeline matches");
-  CHECK(read.pipeline_version == msg.pipeline_version, "pipeline_version matches");
+  CHECK(read.pipeline_version == msg.pipeline_version,
+        "pipeline_version matches");
   CHECK(read.timestamp_sec == msg.timestamp_sec, "timestamp_sec matches");
   CHECK(read.wall_clock_sec == msg.wall_clock_sec, "wall_clock_sec matches");
   CHECK(read.qos == msg.qos, "qos matches");
@@ -227,7 +229,8 @@ static void test_storage_manager_default_memory() {
   std::printf("  StorageManager: default MEMORY routing... ");
 
   auto mem = std::make_unique<MemoryBackend>();
-  auto disk = std::make_unique<DiskBackend>("/tmp/orator_test_storage", "test5");
+  auto disk =
+      std::make_unique<DiskBackend>("/tmp/orator_test_storage", "test5");
   StorageManager manager(std::move(mem), std::move(disk));
 
   Message msg;
@@ -248,7 +251,8 @@ static void test_storage_manager_disk_routing() {
   std::printf("  StorageManager: DISK routing when configured... ");
 
   auto mem = std::make_unique<MemoryBackend>();
-  auto disk = std::make_unique<DiskBackend>("/tmp/orator_test_storage", "test6");
+  auto disk =
+      std::make_unique<DiskBackend>("/tmp/orator_test_storage", "test6");
   StorageManager manager(std::move(mem), std::move(disk));
 
   // Configure topic for DISK backend.
@@ -280,7 +284,8 @@ static void test_storage_manager_read_back_roundtrip() {
   std::printf("  StorageManager: full read-back roundtrip... ");
 
   auto mem = std::make_unique<MemoryBackend>();
-  auto disk = std::make_unique<DiskBackend>("/tmp/orator_test_storage", "test7");
+  auto disk =
+      std::make_unique<DiskBackend>("/tmp/orator_test_storage", "test7");
   StorageManager manager(std::move(mem), std::move(disk));
 
   // Write to MEMORY.
@@ -367,7 +372,8 @@ static void test_time_index_replay() {
 
   for (int i = 0; i < 5; ++i) {
     StorageRef ref{Backend::MEMORY, static_cast<uint64_t>(i) * 10, 10};
-    idx.Append("audio/raw", static_cast<double>(i) * 0.5, ref, static_cast<uint64_t>(i));
+    idx.Append("audio/raw", static_cast<double>(i) * 0.5, ref,
+               static_cast<uint64_t>(i));
   }
 
   // Replay from 1.0s (should get timestamps 1.0, 1.5, 2.0 = indices 2,3,4).
@@ -409,7 +415,8 @@ static void test_time_index_retain() {
 
   for (int i = 0; i < 10; ++i) {
     StorageRef ref{Backend::MEMORY, static_cast<uint64_t>(i) * 10, 10};
-    idx.Append("audio/raw", static_cast<double>(i), ref, static_cast<uint64_t>(i));
+    idx.Append("audio/raw", static_cast<double>(i), ref,
+               static_cast<uint64_t>(i));
   }
 
   CHECK(idx.GetAll("audio/raw").size() == 10, "10 entries before retain");
@@ -418,7 +425,8 @@ static void test_time_index_retain() {
   idx.Retain("audio/raw", 5.0);
 
   auto remaining = idx.GetAll("audio/raw");
-  CHECK(remaining.size() == 5, "5 entries after retain (5.0, 6.0, 7.0, 8.0, 9.0)");
+  CHECK(remaining.size() == 5,
+        "5 entries after retain (5.0, 6.0, 7.0, 8.0, 9.0)");
   CHECK(remaining[0].timestamp_sec == 5.0, "oldest retained is 5.0");
   CHECK(remaining[4].timestamp_sec == 9.0, "newest retained is 9.0");
 

@@ -11,8 +11,8 @@
 #include <string>
 #include <vector>
 
-using orator::model::Qwen3Asr;
 using orator::core::AsrConfig;
+using orator::model::Qwen3Asr;
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -20,37 +20,51 @@ using orator::core::AsrConfig;
 static int g_failures = 0;
 static int g_tests = 0;
 
-#define TEST(name) do { ++g_tests; printf("  RUN  %s\n", name); } while (0)
-#define ASSERT_TRUE(cond) do {                                                \
-  if (!(cond)) {                                                              \
-    printf("  FAIL %s:%d: expected true\n", __FILE__, __LINE__);              \
-    ++g_failures;                                                             \
-  }                                                                           \
-} while (0)
-#define ASSERT_EQ(a, b) do {                                                  \
-  std::string va_ = (a);                                                      \
-  std::string vb_ = (b);                                                      \
-  if (va_ != vb_) {                                                           \
-    printf("  FAIL %s:%d: expected '%s' == '%s'\n",                          \
-           __FILE__, __LINE__, va_.c_str(), vb_.c_str());                     \
-    ++g_failures;                                                             \
-  }                                                                           \
-} while (0)
-#define ASSERT_THROWS(expr) do {                                              \
-  bool caught_ = false;                                                       \
-  try { expr; } catch (const std::exception&) { caught_ = true; }            \
-  if (!caught_) {                                                             \
-    printf("  FAIL %s:%d: expected exception\n", __FILE__, __LINE__);         \
-    ++g_failures;                                                             \
-  }                                                                           \
-} while (0)
-#define ASSERT_NO_THROW(expr) do {                                            \
-  try { expr; } catch (const std::exception& e) {                            \
-    printf("  FAIL %s:%d: unexpected exception: %s\n",                       \
-           __FILE__, __LINE__, e.what());                                     \
-    ++g_failures;                                                             \
-  }                                                                           \
-} while (0)
+#define TEST(name)               \
+  do {                           \
+    ++g_tests;                   \
+    printf("  RUN  %s\n", name); \
+  } while (0)
+#define ASSERT_TRUE(cond)                                          \
+  do {                                                             \
+    if (!(cond)) {                                                 \
+      printf("  FAIL %s:%d: expected true\n", __FILE__, __LINE__); \
+      ++g_failures;                                                \
+    }                                                              \
+  } while (0)
+#define ASSERT_EQ(a, b)                                                   \
+  do {                                                                    \
+    std::string va_ = (a);                                                \
+    std::string vb_ = (b);                                                \
+    if (va_ != vb_) {                                                     \
+      printf("  FAIL %s:%d: expected '%s' == '%s'\n", __FILE__, __LINE__, \
+             va_.c_str(), vb_.c_str());                                   \
+      ++g_failures;                                                       \
+    }                                                                     \
+  } while (0)
+#define ASSERT_THROWS(expr)                                             \
+  do {                                                                  \
+    bool caught_ = false;                                               \
+    try {                                                               \
+      expr;                                                             \
+    } catch (const std::exception&) {                                   \
+      caught_ = true;                                                   \
+    }                                                                   \
+    if (!caught_) {                                                     \
+      printf("  FAIL %s:%d: expected exception\n", __FILE__, __LINE__); \
+      ++g_failures;                                                     \
+    }                                                                   \
+  } while (0)
+#define ASSERT_NO_THROW(expr)                                                \
+  do {                                                                       \
+    try {                                                                    \
+      expr;                                                                  \
+    } catch (const std::exception& e) {                                      \
+      printf("  FAIL %s:%d: unexpected exception: %s\n", __FILE__, __LINE__, \
+             e.what());                                                      \
+      ++g_failures;                                                          \
+    }                                                                        \
+  } while (0)
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -128,13 +142,16 @@ static void TestSegmentSpeechSilence() {
 }
 
 static void TestSegmentSpeechContinuous() {
-  TEST("TestSegmentSpeechContinuous: SegmentSpeech with continuous speech returns one span");
+  TEST(
+      "TestSegmentSpeechContinuous: SegmentSpeech with continuous speech "
+      "returns one span");
   Qwen3Asr asr;
   const int sr = 16000;
   const int N = sr * 2;  // 2 seconds
   std::vector<float> speech(N);
   for (int i = 0; i < N; ++i)
-    speech[i] = 0.5f * std::sin(2.0f * 3.14159f * 440.0f * static_cast<float>(i) / sr);
+    speech[i] =
+        0.5f * std::sin(2.0f * 3.14159f * 440.0f * static_cast<float>(i) / sr);
 
   auto spans = asr.SegmentSpeech(speech.data(), N, sr);
   ASSERT_TRUE(!spans.empty());

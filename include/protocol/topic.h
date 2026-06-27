@@ -30,7 +30,8 @@ class Topic {
 
   bool operator<(Topic const& other) const {
     return std::lexicographical_compare(levels_.begin(), levels_.end(),
-                                        other.levels_.begin(), other.levels_.end());
+                                        other.levels_.begin(),
+                                        other.levels_.end());
   }
 
   std::string to_string() const;
@@ -108,7 +109,8 @@ inline TopicPattern::TopicPattern(std::string s) : pattern_{std::move(s)} {
       levels_.push_back(pattern_.substr(start));
       break;
     }
-    if (slash != start) levels_.push_back(pattern_.substr(start, slash - start));
+    if (slash != start)
+      levels_.push_back(pattern_.substr(start, slash - start));
     start = slash + 1;
   }
 }

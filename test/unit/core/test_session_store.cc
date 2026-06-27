@@ -17,12 +17,12 @@ using namespace orator;
 using namespace orator::protocol;
 
 static int g_fail = 0;
-#define CHECK(cond, msg)                \
-  do {                                  \
-    if (!(cond)) {                      \
-      std::printf("FAIL: %s\n", msg);   \
-      ++g_fail;                         \
-    }                                   \
+#define CHECK(cond, msg)              \
+  do {                                \
+    if (!(cond)) {                    \
+      std::printf("FAIL: %s\n", msg); \
+      ++g_fail;                       \
+    }                                 \
   } while (0)
 
 // ---------------------------------------------------------------------------
@@ -111,12 +111,10 @@ static void test_list_sessions() {
   CHECK(list.size() == 2, "List returns 2 sessions");
 
   // Sorted by wall_clock_sec descending (newest first).
-  CHECK(list[0].session_id == "session_a",
-        "first entry is session_a (newer)");
+  CHECK(list[0].session_id == "session_a", "first entry is session_a (newer)");
   CHECK(list[0].file_size > 0, "file_size > 0 for session_a");
 
-  CHECK(list[1].session_id == "session_b",
-        "second entry is session_b (older)");
+  CHECK(list[1].session_id == "session_b", "second entry is session_b (older)");
   CHECK(list[1].file_size > 0, "file_size > 0 for session_b");
 
   // NOTE: wall_clock_sec and audio_sec parsing via ExtractDouble has a

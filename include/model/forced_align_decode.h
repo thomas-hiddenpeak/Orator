@@ -33,12 +33,12 @@ using core::AlignUnit;
 // Word-level tokens for forced alignment. `language` is the full name (e.g.
 // "Chinese", "English") or empty; only ja/ko would use external morphology in
 // the reference, which falls back to the default tokenizer here.
-std::vector<std::string> SplitWordsForAlignment(const std::string& text,
-                                                const std::string& language = "");
+std::vector<std::string> SplitWordsForAlignment(
+    const std::string& text, const std::string& language = "");
 
 // Number of audio placeholder tokens for `mel_frames` log-mel frames, mirroring
-// the reference `_get_audio_token_length` (CNN downsampling + 13 tokens per full
-// n_window*2 chunk). Uses Python floor division semantics.
+// the reference `_get_audio_token_length` (CNN downsampling + 13 tokens per
+// full n_window*2 chunk). Uses Python floor division semantics.
 int AudioTokenLength(int mel_frames, int n_window = 50);
 
 // Assemble the forced-aligner input id sequence:
@@ -55,7 +55,8 @@ std::vector<int> BuildAlignerInputIds(
 // truncated-to-integer milliseconds.
 std::vector<long> FixTimestamps(const std::vector<double>& raw_ms);
 
-// Pair repaired timestamps (2 per word: start,end) with words; times in seconds.
+// Pair repaired timestamps (2 per word: start,end) with words; times in
+// seconds.
 std::vector<AlignUnit> PairWordTimestamps(const std::vector<std::string>& words,
                                           const std::vector<long>& fixed_ms);
 

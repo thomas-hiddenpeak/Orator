@@ -3,10 +3,10 @@
 // Multi-shard SafeTensors loader.
 //
 // Large checkpoints (e.g. Qwen3-ASR-1.7B) are split across several
-// `model-0000k-of-0000n.safetensors` files with a `model.safetensors.index.json`
-// mapping each tensor name to its shard. This wraps one SafeTensorReader per
-// shard and resolves tensor lookups across them, preserving the same zero-copy
-// mmap view semantics as the single-file reader.
+// `model-0000k-of-0000n.safetensors` files with a
+// `model.safetensors.index.json` mapping each tensor name to its shard. This
+// wraps one SafeTensorReader per shard and resolves tensor lookups across them,
+// preserving the same zero-copy mmap view semantics as the single-file reader.
 
 #include <map>
 #include <memory>

@@ -69,7 +69,8 @@ void ReadEnvString(const char* name, std::string* out) {
 bool ReadEnvFlag(const char* name, bool dflt) {
   const char* v = std::getenv(name);
   if (v == nullptr || v[0] == '\0') return dflt;
-  return v[0] == '1' || v[0] == 't' || v[0] == 'T' || v[0] == 'y' || v[0] == 'Y';
+  return v[0] == '1' || v[0] == 't' || v[0] == 'T' || v[0] == 'y' ||
+         v[0] == 'Y';
 }
 
 }  // namespace
@@ -122,8 +123,7 @@ int main(int argc, char** argv) {
   ReadEnvString("ORATOR_ASR_MODEL_DIR", &cfg.asr_model_dir);
   {
     const char* asr_disable = std::getenv("ORATOR_ASR_DISABLE");
-    if (asr_disable && asr_disable[0] == '1')
-      cfg.asr_model_dir.clear();
+    if (asr_disable && asr_disable[0] == '1') cfg.asr_model_dir.clear();
   }
   ReadEnvInt("ORATOR_PORT", &cfg.port);
   ReadEnvInt("ORATOR_UI_PORT", &cfg.ui_port);
@@ -136,9 +136,11 @@ int main(int argc, char** argv) {
   ReadEnvDouble("ORATOR_GPU_TELEMETRY_SEC", &cfg.gpu_telemetry_interval_sec);
   ReadEnvSizeT("ORATOR_BUFFER_MAX_SAMPLES", &cfg.buffer_max_samples);
   ReadEnvSizeT("ORATOR_BUFFER_SHRINK_THRESHOLD", &cfg.buffer_shrink_threshold);
-  ReadEnvDouble("ORATOR_CURSOR_TELEMETRY_SEC", &cfg.cursor_telemetry_interval_sec);
+  ReadEnvDouble("ORATOR_CURSOR_TELEMETRY_SEC",
+                &cfg.cursor_telemetry_interval_sec);
   ReadEnvSizeT("ORATOR_CURSOR_LAG_WARN_SAMPLES", &cfg.cursor_lag_warn_samples);
-  ReadEnvSizeT("ORATOR_CURSOR_LAG_CRITICAL_SAMPLES", &cfg.cursor_lag_critical_samples);
+  ReadEnvSizeT("ORATOR_CURSOR_LAG_CRITICAL_SAMPLES",
+               &cfg.cursor_lag_critical_samples);
   ReadEnvString("ORATOR_STORAGE_DISK_PATH", &cfg.storage_disk_path);
   ReadEnvString("ORATOR_SESSION_DIR", &cfg.session_dir);
   ReadEnvInt("ORATOR_LOG_LEVEL", &cfg.log_level);
@@ -146,7 +148,8 @@ int main(int argc, char** argv) {
   cfg.asr_profile = ReadEnvFlag("ORATOR_ASR_PROFILE", cfg.asr_profile);
   ReadEnvInt("ORATOR_ASR_BAN_STEPS", &cfg.asr_ban_steps);
   ReadEnvInt("ORATOR_ASR_DECODE_BATCH", &cfg.asr_decode_batch);
-  cfg.stream_progress = ReadEnvFlag("ORATOR_STREAM_PROGRESS", cfg.stream_progress);
+  cfg.stream_progress =
+      ReadEnvFlag("ORATOR_STREAM_PROGRESS", cfg.stream_progress);
   ReadEnvString("ORATOR_ASR_SYSTEM_PROMPT", &cfg.asr_system_prompt);
   ReadEnvDouble("ORATOR_DIAR_ONSET", &cfg.diar_onset);
   ReadEnvDouble("ORATOR_DIAR_OFFSET", &cfg.diar_offset);
@@ -154,7 +157,8 @@ int main(int argc, char** argv) {
   ReadEnvDouble("ORATOR_DIAR_PAD_OFFSET", &cfg.diar_pad_offset);
   ReadEnvDouble("ORATOR_DIAR_MIN_DUR_ON", &cfg.diar_min_dur_on);
   ReadEnvDouble("ORATOR_DIAR_MIN_DUR_OFF", &cfg.diar_min_dur_off);
-  // gpu_scheduling_mode: env ORATOR_GPU_SERIAL=1 → mode 1, ORATOR_GPU_CONCURRENT=1 → mode 2
+  // gpu_scheduling_mode: env ORATOR_GPU_SERIAL=1 → mode 1,
+  // ORATOR_GPU_CONCURRENT=1 → mode 2
   int gpu_mode = 0;
   if (ReadEnvInt("ORATOR_GPU_SERIAL", &gpu_mode) && gpu_mode == 1) {
     cfg.gpu_scheduling_mode = 1;
@@ -202,14 +206,15 @@ int main(int argc, char** argv) {
             << "  vad:      " << cfg.vad_model << "\n"
             << "  asr_cfg:  max_new=" << cfg.asr_max_new_tokens
             << " segment=" << cfg.asr_segment_sec
-            << "s lang=" << cfg.asr_language
-            << std::endl;
+            << "s lang=" << cfg.asr_language << std::endl;
   std::cout << "  send binary PCM (int16le mono 16k); text {\"flush\"} or "
-               "{\"end\"} to get the timeline." << std::endl;
+               "{\"end\"} to get the timeline."
+            << std::endl;
 
-  server.Serve([stream, emit_target]() -> std::unique_ptr<net::WebSocketHandler> {
-    return std::make_unique<net::AuditoryWsHandler>(stream, emit_target);
-  });
+  server.Serve(
+      [stream, emit_target]() -> std::unique_ptr<net::WebSocketHandler> {
+        return std::make_unique<net::AuditoryWsHandler>(stream, emit_target);
+      });
 
   ui.Stop();
   if (ui_thread.joinable()) ui_thread.join();

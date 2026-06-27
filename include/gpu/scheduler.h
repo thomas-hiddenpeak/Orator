@@ -41,10 +41,10 @@ class GpuScheduler {
   // One pipeline's scheduling state.
   struct Entry {
     std::string name;
-    int priority_index = 0;     // 0 = most latency-critical; larger = lower
-    bool background = false;    // background pipelines yield to foreground
-    bool stream_active = false; // a dedicated prioritized stream was created
-    int cuda_priority = 0;      // concrete CUDA stream priority assigned
+    int priority_index = 0;      // 0 = most latency-critical; larger = lower
+    bool background = false;     // background pipelines yield to foreground
+    bool stream_active = false;  // a dedicated prioritized stream was created
+    int cuda_priority = 0;       // concrete CUDA stream priority assigned
     cudaStream_t stream = nullptr;  // owned by the scheduler when stream_active
   };
 
@@ -55,10 +55,10 @@ class GpuScheduler {
   GpuScheduler& operator=(const GpuScheduler&) = delete;
 
   // Register a pipeline with its declared priority index and background flag.
-  // When create_stream is true, a CUDA stream at the derived priority is created
-  // and returned (owned by the scheduler); otherwise the default stream (0) is
-  // returned and only the class metadata is recorded (its engine is not yet
-  // stream-routed). Re-registering a name returns its existing stream.
+  // When create_stream is true, a CUDA stream at the derived priority is
+  // created and returned (owned by the scheduler); otherwise the default stream
+  // (0) is returned and only the class metadata is recorded (its engine is not
+  // yet stream-routed). Re-registering a name returns its existing stream.
   cudaStream_t Register(const std::string& name, int priority_index,
                         bool background, bool create_stream);
 
@@ -73,13 +73,14 @@ class GpuScheduler {
   }
 
   // Bounded-yield consultation for a future lock-free background path: record a
-  // foreground submission; a background pipeline should yield while a foreground
-  // submission occurred within the recent window.
+  // foreground submission; a background pipeline should yield while a
+  // foreground submission occurred within the recent window.
   void NoteForegroundSubmit();
   bool ShouldBackgroundYield(double window_sec = 0.05) const;
 
   // Map a declared priority index to a concrete CUDA stream priority within the
-  // device's supported range. Exposed for telemetry of not-yet-streamed classes.
+  // device's supported range. Exposed for telemetry of not-yet-streamed
+  // classes.
   int PriorityForIndex(int priority_index) const;
 
  private:

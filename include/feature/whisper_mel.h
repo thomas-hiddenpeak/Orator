@@ -21,7 +21,7 @@ namespace feature {
 
 struct WhisperMelConfig {
   int sample_rate = 16000;
-  int n_fft = 400;       // = win_length = frame_length
+  int n_fft = 400;  // = win_length = frame_length
   int hop_length = 160;
   int n_mels = 128;
   float fmin = 0.0f;
@@ -45,9 +45,9 @@ class WhisperMel {
   // reflect-padded boundary frames of a trimmed tail). running_max == nullptr
   // reproduces the legacy per-call local-max behavior.
   std::vector<float> Compute(const float* samples, int num_samples,
-                               int* out_num_frames, cudaStream_t stream = 0,
-                               float* running_max = nullptr,
-                               int max_valid_from = 0) const;
+                             int* out_num_frames, cudaStream_t stream = 0,
+                             float* running_max = nullptr,
+                             int max_valid_from = 0) const;
 
   int n_mels() const { return config_.n_mels; }
   int n_freqs() const { return config_.n_fft / 2 + 1; }

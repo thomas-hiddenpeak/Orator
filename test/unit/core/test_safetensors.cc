@@ -48,7 +48,8 @@ int main() {
   std::string sortformer_path = root + "/models/sortformer_4spk_v2.safetensors";
 
   io::SafeTensorReader reader(sortformer_path);
-  std::cout << "Loaded sortformer (" << reader.GetWeightNames().size() << " weights)" << std::endl;
+  std::cout << "Loaded sortformer (" << reader.GetWeightNames().size()
+            << " weights)" << std::endl;
   assert(reader.GetWeightNames().size() > 0);
 
   const std::string& name = reader.GetWeightNames()[0];

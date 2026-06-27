@@ -87,15 +87,13 @@ void AlignWorker::Process(const Job& job) {
     return;
   }
   const auto t1 = std::chrono::steady_clock::now();
-  compute_sec_.fetch_add(
-      std::chrono::duration<double>(t1 - t0).count());
+  compute_sec_.fetch_add(std::chrono::duration<double>(t1 - t0).count());
 
   // A unit's timestamp cannot lie outside its segment's audio. On mismatched or
   // hallucinated transcript text the aligner may emit labels beyond the span
   // length; clamp each unit to [0, span_dur] before mapping onto the common
   // clock so reported times always lie within the segment bounds.
-  const double span_dur =
-      static_cast<double>(pcm.size()) / params_.sample_rate;
+  const double span_dur = static_cast<double>(pcm.size()) / params_.sample_rate;
   for (auto& u : units) {
     if (u.start_sec < 0.0) u.start_sec = 0.0;
     if (u.start_sec > span_dur) u.start_sec = span_dur;

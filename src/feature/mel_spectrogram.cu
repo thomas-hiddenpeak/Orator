@@ -43,8 +43,8 @@ __global__ void PowerSpectrumKernel(const float* signal, int num_samples,
   float im = 0.0f;
   const float two_pi_k = -2.0f * 3.14159265358979323846f * k / n_fft;
   for (int w = 0; w < win_length; ++w) {
-    const int j = win_off + w;            // position within the n_fft frame
-    const int s = base + j - pad_left;    // index into the real signal
+    const int j = win_off + w;                // position within the n_fft frame
+    const int s = base + j - pad_left;        // index into the real signal
     if (s < 0 || s >= num_samples) continue;  // constant (zero) padding
     const float x = signal[s] * window[w];
     const float angle = two_pi_k * j;
@@ -146,7 +146,8 @@ void MelSpectrogram::BuildMelFilterbank() {
   }
 }
 
-std::vector<float> MelSpectrogram::Compute(const float* samples, int num_samples,
+std::vector<float> MelSpectrogram::Compute(const float* samples,
+                                           int num_samples,
                                            int* out_num_frames) const {
   const int num_frames = NumFrames(num_samples);
   if (out_num_frames) *out_num_frames = num_frames;
@@ -172,18 +173,15 @@ std::vector<float> MelSpectrogram::Compute(const float* samples, int num_samples
 // starts at `input_offset` samples into `sig`. Out-of-range samples (start or
 // final-tail) read as zero, matching torch.stft(center=True, pad="constant").
 // Returns frame-major [num_frames * n_mels], bit-identical to the offline path.
-std::vector<float> MelSpectrogram::ComputeStreamFrames(const float* sig,
-                                                        int num_samples,
-                                                        int input_offset,
-                                                        int num_frames,
-                                                        cudaStream_t stream) const {
+std::vector<float> MelSpectrogram::ComputeStreamFrames(
+    const float* sig, int num_samples, int input_offset, int num_frames,
+    cudaStream_t stream) const {
   if (num_frames <= 0) return {};
   return RunStftMel(sig, num_samples, input_offset, num_frames, stream);
 }
 
 std::vector<float> MelSpectrogram::RunStftMel(const float* sig, int num_samples,
-                                              int input_offset,
-                                              int num_frames,
+                                              int input_offset, int num_frames,
                                               cudaStream_t stream) const {
   const int n_freqs = this->n_freqs();
   const int n_mels = config_.n_mels;
@@ -191,19 +189,20 @@ std::vector<float> MelSpectrogram::RunStftMel(const float* sig, int num_samples,
   const int win_off = (config_.n_fft - config_.win_length) / 2;
 
   gpu::DeviceBuffer d_samples(static_cast<size_t>(num_samples) * sizeof(float));
-  gpu::DeviceBuffer d_win(static_cast<size_t>(config_.win_length) * sizeof(float));
+  gpu::DeviceBuffer d_win(static_cast<size_t>(config_.win_length) *
+                          sizeof(float));
   gpu::DeviceBuffer d_filters(mel_filters_.size() * sizeof(float));
   gpu::DeviceBuffer d_power(static_cast<size_t>(num_frames) * n_freqs *
                             sizeof(float));
   gpu::DeviceBuffer d_mel(static_cast<size_t>(num_frames) * n_mels *
                           sizeof(float));
 
-  gpu::GpuMemory::CopyHostToDevice(d_samples.data(), sig,
-                                    static_cast<size_t>(num_samples) * sizeof(float));
+  gpu::GpuMemory::CopyHostToDevice(
+      d_samples.data(), sig, static_cast<size_t>(num_samples) * sizeof(float));
   gpu::GpuMemory::CopyHostToDevice(d_win.data(), hann_.data(),
-                                    hann_.size() * sizeof(float));
+                                   hann_.size() * sizeof(float));
   gpu::GpuMemory::CopyHostToDevice(d_filters.data(), mel_filters_.data(),
-                                    mel_filters_.size() * sizeof(float));
+                                   mel_filters_.size() * sizeof(float));
 
   const int block = 256;
   const long power_total = static_cast<long>(num_frames) * n_freqs;
@@ -226,8 +225,8 @@ std::vector<float> MelSpectrogram::RunStftMel(const float* sig, int num_samples,
 
   std::vector<float> mel(static_cast<size_t>(num_frames) * n_mels);
   CUDA_CHECK(cudaMemcpyAsync(mel.data(), d_mel.data(),
-                              mel.size() * sizeof(float), cudaMemcpyDeviceToHost,
-                              stream));
+                             mel.size() * sizeof(float), cudaMemcpyDeviceToHost,
+                             stream));
   CUDA_CHECK(cudaStreamSynchronize(stream));
   return mel;
 }

@@ -42,8 +42,8 @@ class AsrSileroVad {
   bool NextEndpoint(bool finalize, long* endpoint_abs_sample);
 
   // Numeric-gate probe (Spec 004 Phase 5, FR8): from a fresh state, return the
-  // per-window speech probability for every full window in [pcm, pcm+n). This is
-  // the reference of record the GPU detector (GpuVad) is gated against.
+  // per-window speech probability for every full window in [pcm, pcm+n). This
+  // is the reference of record the GPU detector (GpuVad) is gated against.
   std::vector<float> DebugWindowProbs(const float* pcm, int n);
 
   const float* data() const { return pcm_.data(); }
@@ -64,13 +64,11 @@ class AsrSileroVad {
 
   static void ReflectPadRight(const float* in, int len, int pad, float* out);
   static void Conv1d(const float* input, int C_in, int L_in,
-                     const float* weight, const float* bias,
-                     int C_out, int K, int stride, int pad,
-                     float* output, int L_out);
+                     const float* weight, const float* bias, int C_out, int K,
+                     int stride, int pad, float* output, int L_out);
   static void ReluInplace(float* data, int n);
-  static void LstmCellStep(const float* x, int input_size,
-                           const float* Wih, const float* Whh,
-                           const float* bih, const float* bhh,
+  static void LstmCellStep(const float* x, int input_size, const float* Wih,
+                           const float* Whh, const float* bih, const float* bhh,
                            float* h, float* c, int hidden);
 
   static constexpr int kContextSize = 64;

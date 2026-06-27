@@ -15,16 +15,16 @@ namespace pipeline {
 
 using namespace worker;
 
-AsrWorker::AsrWorker(core::IAsr* asr,
-                       const Params& params, Emit emit, core::TimeBase tb,
-                       cudaStream_t stream,
-                       VadCache* vad_cache)
-    : asr_(asr), params_(params), emit_(std::move(emit)),
+AsrWorker::AsrWorker(core::IAsr* asr, const Params& params, Emit emit,
+                     core::TimeBase tb, cudaStream_t stream,
+                     VadCache* vad_cache)
+    : asr_(asr),
+      params_(params),
+      emit_(std::move(emit)),
       tb_(std::move(tb)),
       vad_cache_(vad_cache),
       stream_(stream),
-      ring_buffer_(kRingBufferSamples) {
-}
+      ring_buffer_(kRingBufferSamples) {}
 
 void AsrWorker::ProcessSpan(const float* samples, int n) {
   if (samples == nullptr || n <= 0) return;
@@ -37,11 +37,12 @@ void AsrWorker::ProcessSpan(const float* samples, int n) {
 
   // Event-driven, non-blocking VAD gate. The incoming span may be a few
   // milliseconds (real-time pacing) or several minutes (flooded ingest, when
-  // WaitAndRead returns the whole backlog). Cut it at the VAD segment boundaries
-  // that fall inside it so each sub-span lies entirely within one VAD region,
-  // then act per sub-span in ProcessGateSubSpan. Because the cut points are VAD
-  // audio times, coverage no longer depends on the span size: previously a large
-  // flooded span whose END landed in a silence gap was dropped in full
+  // WaitAndRead returns the whole backlog). Cut it at the VAD segment
+  // boundaries that fall inside it so each sub-span lies entirely within one
+  // VAD region, then act per sub-span in ProcessGateSubSpan. Because the cut
+  // points are VAD audio times, coverage no longer depends on the span size:
+  // previously a large flooded span whose END landed in a silence gap was
+  // dropped in full
   // (`inc_abs_pos_ += n; return`), discarding all the speech inside it -- the
   // measured flood coverage collapse. inc_abs_pos_ advances by exactly the
   // consumed audio per sub-span, so it stays equal to the absolute clock head
@@ -65,7 +66,8 @@ void AsrWorker::ProcessSpan(const float* samples, int n) {
 // and end) that fall strictly inside (span_start, span_end), sorted unique.
 // These are the only points where the speech/silence classification can change,
 // so cutting the span here makes each sub-span homogeneous.
-std::vector<long> AsrWorker::VadCutSamples(long span_start, long span_end) const {
+std::vector<long> AsrWorker::VadCutSamples(long span_start,
+                                           long span_end) const {
   std::vector<long> cuts;
   if (!vad_cache_) return cuts;
   const auto segs = vad_cache_->GetAll();
@@ -107,7 +109,10 @@ void AsrWorker::ProcessGateSubSpan(const float* sub, int sub_n) {
 
   bool is_speech = false;
   for (const auto& [s, e] : vad_segs) {
-    if (mid_sec >= s && mid_sec < e) { is_speech = true; break; }
+    if (mid_sec >= s && mid_sec < e) {
+      is_speech = true;
+      break;
+    }
   }
 
   if (is_speech) {
@@ -151,8 +156,6 @@ void AsrWorker::ProcessGateSubSpan(const float* sub, int sub_n) {
   vad_state_ = VadState::PROCESSING;
 }
 
-
-
 void AsrWorker::Finalize() {
   vad_state_ = VadState::IDLE;
   ProcessIncremental(nullptr, 0, /*finalize=*/true);
@@ -179,7 +182,8 @@ void AsrWorker::ProcessIncremental(const float* samples, int n, bool finalize) {
   if (finalize) EmitIncrementalChunk(nullptr, 0, /*finalize=*/true);
 }
 
-void AsrWorker::EmitIncrementalChunk(const float* samples, int n, bool finalize) {
+void AsrWorker::EmitIncrementalChunk(const float* samples, int n,
+                                     bool finalize) {
   const auto t0 = Clock::now();
   {
     gpu::DeviceGuard gpu(/*own_stream=*/true);
@@ -202,14 +206,15 @@ void AsrWorker::EmitIncrementalChunk(const float* samples, int n, bool finalize)
     }
     // KV-cache safety cap: force-finalize before GPU memory crash.
     // Root cause: GqaDecodeAttnKernel at layer 0 has an illegal memory access
-    // when the KV-cache position exceeds ~1800 (verified empirically: crashes at
-    // audio_tokens=1768 during the 18th encoding window; max_audio_tokens=1664
-    // passes but 1792 crashes). The crash is NOT a buffer overflow (all positions
-    // within max_seq_len=2048, shared memory within kMaxCtx=2048). A known safe
-    // upper bound of ~1700 total cache positions limits single-segment audio
-    // tokens to 1664 (1700-31 system-5 suffix margin). With max_audio_tokens=1500
-    // the margin increases and the per-segment cap is ~115s of audio. VAD
-    // trailing window normally closes segments before the cap is reached.
+    // when the KV-cache position exceeds ~1800 (verified empirically: crashes
+    // at audio_tokens=1768 during the 18th encoding window;
+    // max_audio_tokens=1664 passes but 1792 crashes). The crash is NOT a buffer
+    // overflow (all positions within max_seq_len=2048, shared memory within
+    // kMaxCtx=2048). A known safe upper bound of ~1700 total cache positions
+    // limits single-segment audio tokens to 1664 (1700-31 system-5 suffix
+    // margin). With max_audio_tokens=1500 the margin increases and the
+    // per-segment cap is ~115s of audio. VAD trailing window normally closes
+    // segments before the cap is reached.
     if (inc_in_segment_ && params_.max_audio_tokens > 0 &&
         asr_->stream_audio_tokens() >= params_.max_audio_tokens) {
       inc_live_text_ = asr_->StreamFinalize(stream_);
@@ -225,9 +230,11 @@ void AsrWorker::EmitIncrementalChunk(const float* samples, int n, bool finalize)
     tok.end_sec = tb_.SecondsAt(inc_seg_end_sample_);
     tok.text = inc_live_text_;
     // Text segment goes through ProtocolTimeline → comp_ via text_sink_.
-    // StreamTimeline was removed; raw text is read from comp_.SnapshotRawTexts().
-    if (text_sink_) text_sink_(inc_text_id_, tok.start_sec, tok.end_sec, tok.text,
-                               /*is_final=*/true);
+    // StreamTimeline was removed; raw text is read from
+    // comp_.SnapshotRawTexts().
+    if (text_sink_)
+      text_sink_(inc_text_id_, tok.start_sec, tok.end_sec, tok.text,
+                 /*is_final=*/true);
     ++inc_text_id_;
     inc_delivered_text_.clear();
     if (emit_) {
@@ -252,8 +259,7 @@ void AsrWorker::EmitIncrementalChunk(const float* samples, int n, bool finalize)
                     "{\"type\":\"asr_partial\",\"source\":\"qwen3_asr\","
                     "\"text_id\":%ld,\"start\":%.3f,\"end\":%.3f,"
                     "\"text\":\"",
-                    inc_text_id_,
-                    tb_.SecondsAt(inc_seg_start_sample_),
+                    inc_text_id_, tb_.SecondsAt(inc_seg_start_sample_),
                     tb_.SecondsAt(inc_seg_end_sample_));
       emit_(std::string(buf) + JsonEscape(inc_live_text_) + "\"}");
     }
@@ -301,7 +307,8 @@ void AsrWorker::RingPop(int n, std::vector<float>* out) {
   if (ring_count_ == kRingBufferSamples) {
     read_pos = ring_write_pos_;
   } else {
-    read_pos = (ring_write_pos_ - ring_count_ + kRingBufferSamples) % kRingBufferSamples;
+    read_pos = (ring_write_pos_ - ring_count_ + kRingBufferSamples) %
+               kRingBufferSamples;
   }
 
   for (int i = 0; i < pop; ++i) {

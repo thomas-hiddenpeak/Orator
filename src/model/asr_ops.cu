@@ -78,8 +78,8 @@ __global__ void RopeKernel(float* __restrict__ x, const int* __restrict__ pos,
 // SwiGLU: out = SiLU(gate) * up. Precise expf for fidelity.
 // ---------------------------------------------------------------------------
 __global__ void SwiGLUKernel(const float* __restrict__ g,
-                             const float* __restrict__ u,
-                             float* __restrict__ o, int n) {
+                             const float* __restrict__ u, float* __restrict__ o,
+                             int n) {
   const int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i >= n) return;
   const float gv = g[i];
@@ -89,8 +89,9 @@ __global__ void SwiGLUKernel(const float* __restrict__ g,
 // ---------------------------------------------------------------------------
 // rotate_half RoPE: one block per (token, head); threads cover half pairs.
 // ---------------------------------------------------------------------------
-__global__ void RopeHalfKernel(float* __restrict__ x, const int* __restrict__ pos,
-                               int T, int H, int Dh, float base) {
+__global__ void RopeHalfKernel(float* __restrict__ x,
+                               const int* __restrict__ pos, int T, int H,
+                               int Dh, float base) {
   const int t = blockIdx.x;
   const int h = blockIdx.y;
   if (t >= T || h >= H) return;
@@ -206,8 +207,9 @@ void RopeInterleaved(float* x, const int* positions, int n_tokens, int n_heads,
                      int head_dim, float theta_base) {
   if (n_tokens <= 0 || n_heads <= 0 || head_dim <= 0) return;
   dim3 grid(n_tokens, n_heads);
-  const int threads = head_dim / 2 < kThreads ? (head_dim / 2 > 0 ? head_dim / 2 : 1)
-                                              : kThreads;
+  const int threads = head_dim / 2 < kThreads
+                          ? (head_dim / 2 > 0 ? head_dim / 2 : 1)
+                          : kThreads;
   RopeKernel<<<grid, threads>>>(x, positions, n_tokens, n_heads, head_dim,
                                 theta_base);
   CheckCudaError(cudaGetLastError(), __FILE__, __LINE__);
@@ -224,10 +226,11 @@ void RopeHalf(float* x, const int* positions, int n_tokens, int n_heads,
               int head_dim, float theta_base, cudaStream_t stream) {
   if (n_tokens <= 0 || n_heads <= 0 || head_dim <= 0) return;
   dim3 grid(n_tokens, n_heads);
-  const int threads = head_dim / 2 < kThreads ? (head_dim / 2 > 0 ? head_dim / 2 : 1)
-                                              : kThreads;
-  RopeHalfKernel<<<grid, threads, 0, stream>>>(x, positions, n_tokens, n_heads, head_dim,
-                                    theta_base);
+  const int threads = head_dim / 2 < kThreads
+                          ? (head_dim / 2 > 0 ? head_dim / 2 : 1)
+                          : kThreads;
+  RopeHalfKernel<<<grid, threads, 0, stream>>>(x, positions, n_tokens, n_heads,
+                                               head_dim, theta_base);
   CheckCudaError(cudaGetLastError(), __FILE__, __LINE__);
 }
 
@@ -240,8 +243,8 @@ inline void LaunchWarp(const float* q, const float* k, const float* v,
                        int c, int n_pairs) {
   dim3 block(kWarp, kWarpsPerBlock);
   const int grid = (n_pairs + kWarpsPerBlock - 1) / kWarpsPerBlock;
-  GqaAttnWarpKernel<ELEMS><<<grid, block>>>(q, k, v, out, T, Hq, Hkv, Dh, scale,
-                                            c, n_pairs);
+  GqaAttnWarpKernel<ELEMS>
+      <<<grid, block>>>(q, k, v, out, T, Hq, Hkv, Dh, scale, c, n_pairs);
 }
 
 }  // namespace
@@ -258,16 +261,35 @@ void GqaAttention(const float* q, const float* k, const float* v, float* out,
   // shared-memory tiling is used -- a tiled variant was measured slower in this
   // regime. ELEMS is rounded up to a supported register-array width spanning Dh
   // (Qwen3-ASR uses Dh=128 -> ELEMS=4).
-  const int e = elems <= 1 ? 1 : elems <= 2 ? 2 : elems <= 3 ? 3
-                : elems <= 4 ? 4 : elems <= 8 ? 8 : elems <= 16 ? 16 : 32;
+  const int e = elems <= 1    ? 1
+                : elems <= 2  ? 2
+                : elems <= 3  ? 3
+                : elems <= 4  ? 4
+                : elems <= 8  ? 8
+                : elems <= 16 ? 16
+                              : 32;
   switch (e) {
-    case 1: LaunchWarp<1>(q, k, v, out, T, Hq, Hkv, Dh, scale, c, n_pairs); break;
-    case 2: LaunchWarp<2>(q, k, v, out, T, Hq, Hkv, Dh, scale, c, n_pairs); break;
-    case 3: LaunchWarp<3>(q, k, v, out, T, Hq, Hkv, Dh, scale, c, n_pairs); break;
-    case 4: LaunchWarp<4>(q, k, v, out, T, Hq, Hkv, Dh, scale, c, n_pairs); break;
-    case 8: LaunchWarp<8>(q, k, v, out, T, Hq, Hkv, Dh, scale, c, n_pairs); break;
-    case 16: LaunchWarp<16>(q, k, v, out, T, Hq, Hkv, Dh, scale, c, n_pairs); break;
-    default: LaunchWarp<32>(q, k, v, out, T, Hq, Hkv, Dh, scale, c, n_pairs); break;
+    case 1:
+      LaunchWarp<1>(q, k, v, out, T, Hq, Hkv, Dh, scale, c, n_pairs);
+      break;
+    case 2:
+      LaunchWarp<2>(q, k, v, out, T, Hq, Hkv, Dh, scale, c, n_pairs);
+      break;
+    case 3:
+      LaunchWarp<3>(q, k, v, out, T, Hq, Hkv, Dh, scale, c, n_pairs);
+      break;
+    case 4:
+      LaunchWarp<4>(q, k, v, out, T, Hq, Hkv, Dh, scale, c, n_pairs);
+      break;
+    case 8:
+      LaunchWarp<8>(q, k, v, out, T, Hq, Hkv, Dh, scale, c, n_pairs);
+      break;
+    case 16:
+      LaunchWarp<16>(q, k, v, out, T, Hq, Hkv, Dh, scale, c, n_pairs);
+      break;
+    default:
+      LaunchWarp<32>(q, k, v, out, T, Hq, Hkv, Dh, scale, c, n_pairs);
+      break;
   }
   CheckCudaError(cudaGetLastError(), __FILE__, __LINE__);
 }
@@ -284,7 +306,10 @@ __global__ void ArgmaxBannedKernel(const float* __restrict__ x, int n, int ban0,
   for (int i = threadIdx.x; i < n; i += blockDim.x) {
     if (i == ban0 || i == ban1) continue;
     const float v = x[i];
-    if (v > best) { best = v; bi = i; }
+    if (v > best) {
+      best = v;
+      bi = i;
+    }
   }
   sval[threadIdx.x] = best;
   sidx[threadIdx.x] = bi;

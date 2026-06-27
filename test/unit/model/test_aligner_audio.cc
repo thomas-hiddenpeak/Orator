@@ -16,7 +16,10 @@ using namespace orator;
 
 static std::vector<float> ReadF32(const std::string& p, bool* ok) {
   std::ifstream f(p, std::ios::binary | std::ios::ate);
-  if (!f) { *ok = false; return {}; }
+  if (!f) {
+    *ok = false;
+    return {};
+  }
   std::streamsize n = f.tellg();
   f.seekg(0);
   std::vector<float> v(n / sizeof(float));
@@ -45,8 +48,8 @@ int main() {
               ref_tokens, out_dim);
 
   io::ShardedSafeTensors w(model);
-  model::AsrAudioConfig cfg;          // defaults already match (d_model=1024 ...)
-  cfg.output_dim = 1024;              // aligner projects to 1024, not ASR's 2048
+  model::AsrAudioConfig cfg;  // defaults already match (d_model=1024 ...)
+  cfg.output_dim = 1024;      // aligner projects to 1024, not ASR's 2048
   model::AsrAudioTower tower{cfg};
   model::AsrAudioTower::WeightNames names;
   names.prefix = "model.audio_tower.";
@@ -71,9 +74,10 @@ int main() {
     const double m = std::abs(static_cast<double>(ref[i]));
     max_ref = m > max_ref ? m : max_ref;
   }
-  std::printf("  max abs err = %.3e, mean abs err = %.3e, max|ref| = %.3e, "
-              "rel = %.3e\n",
-              max_abs, sum_abs / n, max_ref, max_abs / (max_ref + 1e-9));
+  std::printf(
+      "  max abs err = %.3e, mean abs err = %.3e, max|ref| = %.3e, "
+      "rel = %.3e\n",
+      max_abs, sum_abs / n, max_ref, max_abs / (max_ref + 1e-9));
 
   // bf16 weights -> fp32 compute. The mean error is the correctness signal
   // (~1e-3); the max is bf16 rounding on the largest-magnitude features

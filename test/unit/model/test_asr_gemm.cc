@@ -16,8 +16,8 @@
 namespace gemm = orator::model::asr_gemm;
 
 // Host bf16 round-to-nearest-even, matching __float2bfloat16 for finite values.
-// Used by the independent f64 reference (T100): the GEMM quantizes both operands
-// to bf16, so the reference must too.
+// Used by the independent f64 reference (T100): the GEMM quantizes both
+// operands to bf16, so the reference must too.
 static uint16_t HostF32ToBf16(float f) {
   uint32_t x;
   std::memcpy(&x, &f, sizeof(x));
@@ -42,11 +42,19 @@ struct GpuBuf {
   explicit GpuBuf(size_t count) : n(count) {
     cudaMalloc(&ptr, n * sizeof(float));
   }
-  ~GpuBuf() { if (ptr) cudaFree(ptr); }
-  GpuBuf(GpuBuf&& o) noexcept : ptr(o.ptr), n(o.n) { o.ptr = nullptr; o.n = 0; }
+  ~GpuBuf() {
+    if (ptr) cudaFree(ptr);
+  }
+  GpuBuf(GpuBuf&& o) noexcept : ptr(o.ptr), n(o.n) {
+    o.ptr = nullptr;
+    o.n = 0;
+  }
   GpuBuf& operator=(GpuBuf&& o) noexcept {
     if (ptr) cudaFree(ptr);
-    ptr = o.ptr; n = o.n; o.ptr = nullptr; o.n = 0;
+    ptr = o.ptr;
+    n = o.n;
+    o.ptr = nullptr;
+    o.n = 0;
     return *this;
   }
   void Upload(const float* src) {
@@ -64,11 +72,19 @@ struct GpuBufU16 {
   explicit GpuBufU16(size_t count) : n(count) {
     cudaMalloc(&ptr, n * sizeof(uint16_t));
   }
-  ~GpuBufU16() { if (ptr) cudaFree(ptr); }
-  GpuBufU16(GpuBufU16&& o) noexcept : ptr(o.ptr), n(o.n) { o.ptr = nullptr; o.n = 0; }
+  ~GpuBufU16() {
+    if (ptr) cudaFree(ptr);
+  }
+  GpuBufU16(GpuBufU16&& o) noexcept : ptr(o.ptr), n(o.n) {
+    o.ptr = nullptr;
+    o.n = 0;
+  }
   GpuBufU16& operator=(GpuBufU16&& o) noexcept {
     if (ptr) cudaFree(ptr);
-    ptr = o.ptr; n = o.n; o.ptr = nullptr; o.n = 0;
+    ptr = o.ptr;
+    n = o.n;
+    o.ptr = nullptr;
+    o.n = 0;
     return *this;
   }
 };
@@ -79,21 +95,27 @@ struct GpuBufU16 {
 static int g_failures = 0;
 static int g_tests = 0;
 
-#define TEST(name) do { ++g_tests; printf("  RUN  %s\n", name); } while (0)
-#define ASSERT_NEAR(a, b, tol) do {                                           \
-  float va_ = (a), vb_ = (b);                                                 \
-  if (std::abs(va_ - vb_) > tol) {                                           \
-    printf("  FAIL %s:%d: expected %.6f ≈ %.6f (tol=%.2e)\n",                \
-           __FILE__, __LINE__, double(va_), double(vb_), double(tol));        \
-    ++g_failures;                                                             \
-  }                                                                           \
-} while (0)
-#define ASSERT_TRUE(cond) do {                                                \
-  if (!(cond)) {                                                              \
-    printf("  FAIL %s:%d: expected true\n", __FILE__, __LINE__);              \
-    ++g_failures;                                                             \
-  }                                                                           \
-} while (0)
+#define TEST(name)               \
+  do {                           \
+    ++g_tests;                   \
+    printf("  RUN  %s\n", name); \
+  } while (0)
+#define ASSERT_NEAR(a, b, tol)                                            \
+  do {                                                                    \
+    float va_ = (a), vb_ = (b);                                           \
+    if (std::abs(va_ - vb_) > tol) {                                      \
+      printf("  FAIL %s:%d: expected %.6f ≈ %.6f (tol=%.2e)\n", __FILE__, \
+             __LINE__, double(va_), double(vb_), double(tol));            \
+      ++g_failures;                                                       \
+    }                                                                     \
+  } while (0)
+#define ASSERT_TRUE(cond)                                          \
+  do {                                                             \
+    if (!(cond)) {                                                 \
+      printf("  FAIL %s:%d: expected true\n", __FILE__, __LINE__); \
+      ++g_failures;                                                \
+    }                                                              \
+  } while (0)
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -120,10 +142,11 @@ static void TestF32Bf16Roundtrip() {
     const float abs_err = std::abs(out[i] - in[i]);
     const float rel_err = abs_err / std::max(1e-6f, std::abs(in[i]));
     if (rel_err > 0.01f && abs_err > 1e-4f) {
-      printf("  FAIL %s:%d: BF16 roundtrip rel_err=%.2e abs_err=%.2e at [%d]: "
-             "got %.6f expected %.6f\n",
-             __FILE__, __LINE__, double(rel_err), double(abs_err), i,
-             double(out[i]), double(in[i]));
+      printf(
+          "  FAIL %s:%d: BF16 roundtrip rel_err=%.2e abs_err=%.2e at [%d]: "
+          "got %.6f expected %.6f\n",
+          __FILE__, __LINE__, double(rel_err), double(abs_err), i,
+          double(out[i]), double(in[i]));
       ++g_failures;
     }
   }
@@ -139,13 +162,11 @@ static void TestLinearIdentity() {
   TEST("TestLinearIdentity: out = in @ I (+ no bias, no act)");
   const int M = 2, K = 3, N = 3;
   // Input: row-major [M, K]
-  std::vector<float> in = {1.0f, 2.0f, 3.0f,
-                           4.0f, 5.0f, 6.0f};
+  std::vector<float> in = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f};
   // Identity weights: W[N,K] row-major, then Linear does out = in @ W^T
   // For identity: W = I (3x3), so W^T = I, out = in @ I = in
-  std::vector<float> W_f32 = {1.0f, 0.0f, 0.0f,
-                              0.0f, 1.0f, 0.0f,
-                              0.0f, 0.0f, 1.0f};
+  std::vector<float> W_f32 = {1.0f, 0.0f, 0.0f, 0.0f, 1.0f,
+                              0.0f, 0.0f, 0.0f, 1.0f};
   std::vector<float> out(M * N, 0.0f);
 
   GpuBuf d_in(M * K);
@@ -163,22 +184,18 @@ static void TestLinearIdentity() {
   cudaDeviceSynchronize();
   d_out.Download(out.data());
 
-  for (int i = 0; i < M * N; ++i)
-    ASSERT_NEAR(out[i], in[i], 1e-1f);
+  for (int i = 0; i < M * N; ++i) ASSERT_NEAR(out[i], in[i], 1e-1f);
 }
 
 static void TestLinearWithBias() {
   TEST("TestLinearWithBias: out = in @ I + bias");
   const int M = 2, K = 2, N = 2;
-  std::vector<float> in = {1.0f, 2.0f,
-                           3.0f, 4.0f};
-  std::vector<float> W_f32 = {1.0f, 0.0f,
-                              0.0f, 1.0f};
+  std::vector<float> in = {1.0f, 2.0f, 3.0f, 4.0f};
+  std::vector<float> W_f32 = {1.0f, 0.0f, 0.0f, 1.0f};
   std::vector<float> bias = {10.0f, 20.0f};
   std::vector<float> out(M * N, 0.0f);
   // Expected: in @ I + bias = in + bias
-  std::vector<float> expected = {11.0f, 22.0f,
-                                 13.0f, 24.0f};
+  std::vector<float> expected = {11.0f, 22.0f, 13.0f, 24.0f};
 
   GpuBuf d_in(M * K);
   GpuBuf d_out(M * N);
@@ -192,12 +209,12 @@ static void TestLinearWithBias() {
   gemm::F32ToBf16(d_W_f32.ptr, d_W_bf16.ptr, static_cast<long>(N) * K);
   cudaDeviceSynchronize();
 
-  gemm::Linear(d_in.ptr, d_W_bf16.ptr, d_bias.ptr, d_out.ptr, M, K, N, /*act=*/0);
+  gemm::Linear(d_in.ptr, d_W_bf16.ptr, d_bias.ptr, d_out.ptr, M, K, N,
+               /*act=*/0);
   cudaDeviceSynchronize();
   d_out.Download(out.data());
 
-  for (int i = 0; i < M * N; ++i)
-    ASSERT_NEAR(out[i], expected[i], 1e-1f);
+  for (int i = 0; i < M * N; ++i) ASSERT_NEAR(out[i], expected[i], 1e-1f);
 }
 
 static void TestLinearReLU() {
@@ -205,10 +222,8 @@ static void TestLinearReLU() {
   const int M = 1, K = 4, N = 4;
   // Mix of positive and negative values
   std::vector<float> in = {-2.0f, -1.0f, 1.0f, 3.0f};
-  std::vector<float> W_f32 = {1.0f, 0.0f, 0.0f, 0.0f,
-                              0.0f, 1.0f, 0.0f, 0.0f,
-                              0.0f, 0.0f, 1.0f, 0.0f,
-                              0.0f, 0.0f, 0.0f, 1.0f};
+  std::vector<float> W_f32 = {1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
+                              0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
   std::vector<float> out(M * N, 0.0f);
   // ReLU clamps negatives to 0
   std::vector<float> expected = {0.0f, 0.0f, 1.0f, 3.0f};
@@ -227,17 +242,15 @@ static void TestLinearReLU() {
   cudaDeviceSynchronize();
   d_out.Download(out.data());
 
-  for (int i = 0; i < M * N; ++i)
-    ASSERT_NEAR(out[i], expected[i], 1e-1f);
+  for (int i = 0; i < M * N; ++i) ASSERT_NEAR(out[i], expected[i], 1e-1f);
 }
 
 static void TestLinearPre() {
   TEST("TestLinearPre: LinearPre with pre-cast BF16 input");
   const int M = 1, K = 3, N = 3;
   std::vector<float> in = {1.0f, 2.0f, 3.0f};
-  std::vector<float> W_f32 = {1.0f, 0.0f, 0.0f,
-                              0.0f, 1.0f, 0.0f,
-                              0.0f, 0.0f, 1.0f};
+  std::vector<float> W_f32 = {1.0f, 0.0f, 0.0f, 0.0f, 1.0f,
+                              0.0f, 0.0f, 0.0f, 1.0f};
   std::vector<float> out(M * N, 0.0f);
 
   GpuBuf d_in_f32(M * K);
@@ -252,12 +265,12 @@ static void TestLinearPre() {
   gemm::F32ToBf16(d_W_f32.ptr, d_W_bf16.ptr, static_cast<long>(N) * K);
   cudaDeviceSynchronize();
 
-  gemm::LinearPre(d_in_bf16.ptr, d_W_bf16.ptr, nullptr, d_out.ptr, M, K, N, /*act=*/0);
+  gemm::LinearPre(d_in_bf16.ptr, d_W_bf16.ptr, nullptr, d_out.ptr, M, K, N,
+                  /*act=*/0);
   cudaDeviceSynchronize();
   d_out.Download(out.data());
 
-  for (int i = 0; i < M * N; ++i)
-    ASSERT_NEAR(out[i], in[i], 1e-1f);
+  for (int i = 0; i < M * N; ++i) ASSERT_NEAR(out[i], in[i], 1e-1f);
 }
 
 // ---------------------------------------------------------------------------
@@ -271,21 +284,24 @@ static void TestLinearPre() {
 // difference vs the f64 reference.
 // ---------------------------------------------------------------------------
 static void TestLinearVsF64Reference() {
-  TEST("TestLinearVsF64Reference: bf16 GEMM matches f64 reference (production shapes)");
-  struct Shape { int M, K, N; const char* tag; };
+  TEST(
+      "TestLinearVsF64Reference: bf16 GEMM matches f64 reference (production "
+      "shapes)");
+  struct Shape {
+    int M, K, N;
+    const char* tag;
+  };
   // (M,K,N) sampled from the encoder / decoder / aligner production shapes.
   // M==1 exercises the memory-bound GEMV decode path (GemvBf16Vec4Kernel, the
   // 128-bit float4 variant -- every production K is a multiple of 8); M>1
-  // exercises the in-project tiled bf16 GEMM. The f64 CPU reference is O(M*N*K);
-  // the default ctest run uses a fast representative subset, and
+  // exercises the in-project tiled bf16 GEMM. The f64 CPU reference is
+  // O(M*N*K); the default ctest run uses a fast representative subset, and
   // ORATOR_GEMM_FULL=1 adds the large-K/N production shapes (used when
   // validating the in-project GEMM, Spec 002 P2.1).
   std::vector<Shape> shapes = {
-    {1, 1024, 1024, "decode-gemv-attn"},
-    {1, 1024, 2048, "decode-gemv-qkv"},
-    {4, 1024, 1024, "attn-qkvo"},
-    {4, 1024, 2048, "q_proj/proj2"},
-    {2, 1024, 1024, "prefill-small"},
+      {1, 1024, 1024, "decode-gemv-attn"}, {1, 1024, 2048, "decode-gemv-qkv"},
+      {4, 1024, 1024, "attn-qkvo"},        {4, 1024, 2048, "q_proj/proj2"},
+      {2, 1024, 1024, "prefill-small"},
   };
   if (std::getenv("ORATOR_GEMM_FULL") != nullptr) {
     shapes.push_back({1, 6144, 1024, "decode-gemv-down"});
@@ -302,15 +318,18 @@ static void TestLinearVsF64Reference() {
   double worst = 0.0;
   for (const auto& s : shapes) {
     const int M = s.M, K = s.K, N = s.N;
-    std::vector<float> in(static_cast<size_t>(M) * K), W(static_cast<size_t>(N) * K),
-        bias(N), out(static_cast<size_t>(M) * N);
+    std::vector<float> in(static_cast<size_t>(M) * K),
+        W(static_cast<size_t>(N) * K), bias(N), out(static_cast<size_t>(M) * N);
     for (auto& v : in) v = dist(rng);
     for (auto& v : W) v = dist(rng);
     for (auto& v : bias) v = dist(rng);
-    // Pre-quantize operands to bf16 once (shared across the activation variants).
+    // Pre-quantize operands to bf16 once (shared across the activation
+    // variants).
     std::vector<float> inq(in.size()), Wq(W.size());
-    for (size_t i = 0; i < in.size(); ++i) inq[i] = HostBf16ToF32(HostF32ToBf16(in[i]));
-    for (size_t i = 0; i < W.size(); ++i) Wq[i] = HostBf16ToF32(HostF32ToBf16(W[i]));
+    for (size_t i = 0; i < in.size(); ++i)
+      inq[i] = HostBf16ToF32(HostF32ToBf16(in[i]));
+    for (size_t i = 0; i < W.size(); ++i)
+      Wq[i] = HostBf16ToF32(HostF32ToBf16(W[i]));
 
     GpuBuf d_in(static_cast<size_t>(M) * K), d_out(static_cast<size_t>(M) * N),
         d_Wf(static_cast<size_t>(N) * K), d_bias(N);
@@ -351,9 +370,11 @@ static void TestLinearVsF64Reference() {
         sum_rel += rel;
       }
       worst = std::max(worst, max_rel);
-      printf("    [%-14s K=%5d N=%5d M=%4d act=%d] max_rel=%.2e mean_rel=%.2e\n",
-             s.tag, K, N, M, act, max_rel, sum_rel / pre.size());
-      // FP32-accumulate vs f64 reference over K up to 7680 stays well within 2e-2.
+      printf(
+          "    [%-14s K=%5d N=%5d M=%4d act=%d] max_rel=%.2e mean_rel=%.2e\n",
+          s.tag, K, N, M, act, max_rel, sum_rel / pre.size());
+      // FP32-accumulate vs f64 reference over K up to 7680 stays well within
+      // 2e-2.
       if (max_rel > 2e-2) {
         printf("  FAIL %s:%d: shape %s act=%d max_rel=%.3e exceeds 2e-2\n",
                __FILE__, __LINE__, s.tag, act, max_rel);
@@ -373,36 +394,43 @@ static void TestLinearVsF64Reference() {
 static void BenchGemv() {
   printf("  BENCH GEMV (M=1) %s\n",
          std::getenv("ORATOR_GEMV_HALF2") ? "[half2]" : "[float4]");
-  struct Shape { int K, N; const char* tag; };
+  struct Shape {
+    int K, N;
+    const char* tag;
+  };
   const Shape shapes[] = {
-    {1024, 1024, "attn-o"},
-    {1024, 2048, "qkv"},
-    {1024, 6144, "gate/up"},
-    {6144, 1024, "down"},
-    {1024, 5000, "score-head"},
+      {1024, 1024, "attn-o"},     {1024, 2048, "qkv"},
+      {1024, 6144, "gate/up"},    {6144, 1024, "down"},
+      {1024, 5000, "score-head"},
   };
   const int iters = 2000, warmup = 200;
   for (const auto& s : shapes) {
     GpuBufU16 d_in(s.K), d_W(static_cast<size_t>(s.N) * s.K);
     GpuBuf d_out(s.N);
-    std::vector<uint16_t> hin(s.K, 0x3f80), hW(static_cast<size_t>(s.N) * s.K, 0x3f00);
+    std::vector<uint16_t> hin(s.K, 0x3f80),
+        hW(static_cast<size_t>(s.N) * s.K, 0x3f00);
     cudaMemcpy(d_in.ptr, hin.data(), hin.size() * 2, cudaMemcpyHostToDevice);
     cudaMemcpy(d_W.ptr, hW.data(), hW.size() * 2, cudaMemcpyHostToDevice);
     for (int i = 0; i < warmup; ++i)
       gemm::LinearPre(d_in.ptr, d_W.ptr, nullptr, d_out.ptr, 1, s.K, s.N, 0);
     cudaDeviceSynchronize();
-    cudaEvent_t a, b; cudaEventCreate(&a); cudaEventCreate(&b);
+    cudaEvent_t a, b;
+    cudaEventCreate(&a);
+    cudaEventCreate(&b);
     cudaEventRecord(a);
     for (int i = 0; i < iters; ++i)
       gemm::LinearPre(d_in.ptr, d_W.ptr, nullptr, d_out.ptr, 1, s.K, s.N, 0);
-    cudaEventRecord(b); cudaEventSynchronize(b);
-    float tot_ms = 0; cudaEventElapsedTime(&tot_ms, a, b);
-    cudaEventDestroy(a); cudaEventDestroy(b);
+    cudaEventRecord(b);
+    cudaEventSynchronize(b);
+    float tot_ms = 0;
+    cudaEventElapsedTime(&tot_ms, a, b);
+    cudaEventDestroy(a);
+    cudaEventDestroy(b);
     const double us = tot_ms * 1000.0 / iters;
     const double bytes = static_cast<double>(s.N) * s.K * 2.0;  // bf16 weights
     const double gbps = bytes / (us * 1e-6) / 1e9;
-    printf("    [%-11s K=%5d N=%5d] %.2f us/call  %.0f GB/s\n",
-           s.tag, s.K, s.N, us, gbps);
+    printf("    [%-11s K=%5d N=%5d] %.2f us/call  %.0f GB/s\n", s.tag, s.K, s.N,
+           us, gbps);
   }
 }
 
@@ -412,18 +440,19 @@ static void BenchGemv() {
 // faster tiling (T141). Representative encoder shapes at two row counts.
 static void BenchGemm() {
   printf("  BENCH GEMM (M>1, Bf16WmmaKernel)\n");
-  struct Shape { int M, K, N; const char* tag; };
+  struct Shape {
+    int M, K, N;
+    const char* tag;
+  };
   const Shape shapes[] = {
-    {256, 1024, 1024, "attn-proj"},
-    {256, 1024, 3072, "fc1"},
-    {256, 3072, 1024, "fc2"},
-    {256, 7680, 1024, "conv_out"},
-    {512, 1024, 1024, "attn-proj-512"},
-    {512, 1024, 3072, "fc1-512"},
+      {256, 1024, 1024, "attn-proj"},     {256, 1024, 3072, "fc1"},
+      {256, 3072, 1024, "fc2"},           {256, 7680, 1024, "conv_out"},
+      {512, 1024, 1024, "attn-proj-512"}, {512, 1024, 3072, "fc1-512"},
   };
   const int iters = 1000, warmup = 100;
   for (const auto& s : shapes) {
-    GpuBufU16 d_in(static_cast<size_t>(s.M) * s.K), d_W(static_cast<size_t>(s.N) * s.K);
+    GpuBufU16 d_in(static_cast<size_t>(s.M) * s.K),
+        d_W(static_cast<size_t>(s.N) * s.K);
     GpuBuf d_out(static_cast<size_t>(s.M) * s.N);
     std::vector<uint16_t> hin(static_cast<size_t>(s.M) * s.K, 0x3f80),
         hW(static_cast<size_t>(s.N) * s.K, 0x3f00);
@@ -432,17 +461,22 @@ static void BenchGemm() {
     for (int i = 0; i < warmup; ++i)
       gemm::LinearPre(d_in.ptr, d_W.ptr, nullptr, d_out.ptr, s.M, s.K, s.N, 0);
     cudaDeviceSynchronize();
-    cudaEvent_t a, b; cudaEventCreate(&a); cudaEventCreate(&b);
+    cudaEvent_t a, b;
+    cudaEventCreate(&a);
+    cudaEventCreate(&b);
     cudaEventRecord(a);
     for (int i = 0; i < iters; ++i)
       gemm::LinearPre(d_in.ptr, d_W.ptr, nullptr, d_out.ptr, s.M, s.K, s.N, 0);
-    cudaEventRecord(b); cudaEventSynchronize(b);
-    float tot_ms = 0; cudaEventElapsedTime(&tot_ms, a, b);
-    cudaEventDestroy(a); cudaEventDestroy(b);
+    cudaEventRecord(b);
+    cudaEventSynchronize(b);
+    float tot_ms = 0;
+    cudaEventElapsedTime(&tot_ms, a, b);
+    cudaEventDestroy(a);
+    cudaEventDestroy(b);
     const double us = tot_ms * 1000.0 / iters;
     const double gflops = 2.0 * s.M * s.N * s.K / (us * 1e-6) / 1e9;
-    printf("    [%-14s M=%4d K=%5d N=%5d] %.2f us/call  %.0f GFLOP/s\n",
-           s.tag, s.M, s.K, s.N, us, gflops);
+    printf("    [%-14s M=%4d K=%5d N=%5d] %.2f us/call  %.0f GFLOP/s\n", s.tag,
+           s.M, s.K, s.N, us, gflops);
   }
 }
 
@@ -455,13 +489,19 @@ int main() {
   int device_count = 0;
   cudaError_t ce = cudaGetDeviceCount(&device_count);
   if (ce != cudaSuccess || device_count < 1) {
-    printf("  SKIP: no CUDA device available (cudaGetDeviceCount=%d, count=%d)\n",
-           static_cast<int>(ce), device_count);
+    printf(
+        "  SKIP: no CUDA device available (cudaGetDeviceCount=%d, count=%d)\n",
+        static_cast<int>(ce), device_count);
     printf("Results: 0 / 0 passed (skipped)\n");
     return 0;
   }
 
-  if (std::getenv("ORATOR_GEMM_BENCH")) { BenchGemv(); BenchGemm(); gemm::Shutdown(); return 0; }
+  if (std::getenv("ORATOR_GEMM_BENCH")) {
+    BenchGemv();
+    BenchGemm();
+    gemm::Shutdown();
+    return 0;
+  }
 
   TestF32Bf16Roundtrip();
   TestF32Bf16Empty();

@@ -22,8 +22,9 @@ void EnsureBuiltinsRegistered() {
                 [] { return std::make_unique<SortformerDiarizer>(); });
 
   auto& asr = core::Registry<core::IAsr>::Instance();
-  // Native Qwen3-ASR (models/asr/Qwen/Qwen3-ASR-1.7B). Same core::IAsr contract,
-  // so consumers (pipeline / WS) need no changes; select via config.asr.
+  // Native Qwen3-ASR (models/asr/Qwen/Qwen3-ASR-1.7B). Same core::IAsr
+  // contract, so consumers (pipeline / WS) need no changes; select via
+  // config.asr.
   asr.Register("qwen3_asr", [] { return std::make_unique<Qwen3Asr>(); });
 
   auto& vad = core::Registry<core::IVad>::Instance();
@@ -38,4 +39,3 @@ void EnsureBuiltinsRegistered() {
 
 }  // namespace model
 }  // namespace orator
-

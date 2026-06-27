@@ -104,8 +104,7 @@ class PipelineRegistry {
   };
 
   // Fire a system event through the registered handler (if any).
-  void fire_system_event_(const std::string& topic,
-                          const std::string& data);
+  void fire_system_event_(const std::string& topic, const std::string& data);
 
   std::map<std::string, PipelineEntry> pipelines_;
   long next_handle_id_ = 1;

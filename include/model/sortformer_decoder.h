@@ -16,8 +16,9 @@
 // sigmoid), producing per-frame speaker activity [T, 4].
 //
 // Mirrors NeMo's SortformerEncLabelModel.frontend_encoder(encoder_proj part) +
-// forward_infer + forward_speaker_sigmoids. Manual MHA: query/key pre-divided by
-// sqrt(sqrt(d_k)) so scores = q.k / sqrt(d_k); padded frames masked, preds*mask.
+// forward_infer + forward_speaker_sigmoids. Manual MHA: query/key pre-divided
+// by sqrt(sqrt(d_k)) so scores = q.k / sqrt(d_k); padded frames masked,
+// preds*mask.
 
 namespace orator {
 namespace model {
@@ -33,7 +34,7 @@ class SortformerDecoder {
   // `stream` is the CUDA stream for kernel launches and synchronization.
   // Returns preds [T, n_spk] (host vector). valid_len frames are kept, rest 0.
   std::vector<float> Forward(const float* conformer_out, int T, int valid_len,
-                              cudaStream_t stream = nullptr);
+                             cudaStream_t stream = nullptr);
 
  private:
   const float* W(const std::string& name) const;
@@ -41,7 +42,8 @@ class SortformerDecoder {
   // Persistent per-call scratch (grown lazily with T) to avoid per-call
   // cudaMallocManaged/cudaFree churn across 18 layers x many streaming chunks,
   // which accumulates as RSS on Tegra unified memory under high chunk rates.
-  // `predb` stays device memory (host-copied while other pipelines run kernels).
+  // `predb` stays device memory (host-copied while other pipelines run
+  // kernels).
   struct Scratch {
     gpu::UnifiedBuffer xb{0}, lnb{0}, qb{0}, kb{0}, vb{0}, cb{0}, tb{0}, ffb{0},
         qhb{0}, khb{0}, vtb{0}, scb{0};

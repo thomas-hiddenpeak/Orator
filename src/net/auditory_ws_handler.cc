@@ -22,11 +22,21 @@ std::string EscapeJsonString(const std::string& s) {
   out.reserve(s.size() + 16);
   for (char c : s) {
     switch (c) {
-      case '"': out += "\\\""; break;
-      case '\\': out += "\\\\"; break;
-      case '\n': out += "\\n"; break;
-      case '\r': out += "\\r"; break;
-      case '\t': out += "\\t"; break;
+      case '"':
+        out += "\\\"";
+        break;
+      case '\\':
+        out += "\\\\";
+        break;
+      case '\n':
+        out += "\\n";
+        break;
+      case '\r':
+        out += "\\r";
+        break;
+      case '\t':
+        out += "\\t";
+        break;
       default:
         if (static_cast<unsigned char>(c) < 0x20) {
           char buf[8];
@@ -46,40 +56,45 @@ bool HasTopicKey(const std::string& json) {
   const std::string needle = "\"topic\"";
   size_t pos = 0;
   while ((pos = json.find(needle, pos)) != std::string::npos) {
-    // Verify it's a key: check character before is { or , (with optional whitespace).
+    // Verify it's a key: check character before is { or , (with optional
+    // whitespace).
     if (pos == 0) {
       pos += needle.size();
       continue;
     }
     char prev = json[pos - 1];
-    if (prev == '{' || prev == ',' || prev == ' ' || prev == '\t' || prev == '\n' || prev == '\r') {
+    if (prev == '{' || prev == ',' || prev == ' ' || prev == '\t' ||
+        prev == '\n' || prev == '\r') {
       // Also verify there's a : after the key name
       size_t afterKey = pos + needle.size();
-      while (afterKey < json.size() && (json[afterKey] == ' ' || json[afterKey] == '\t'))
+      while (afterKey < json.size() &&
+             (json[afterKey] == ' ' || json[afterKey] == '\t'))
         ++afterKey;
-      if (afterKey < json.size() && json[afterKey] == ':')
-        return true;
+      if (afterKey < json.size() && json[afterKey] == ':') return true;
     }
     pos += needle.size();
   }
   return false;
 }
 
-// Extract the "type" value from a legacy JSON message. Returns empty string if not found.
+// Extract the "type" value from a legacy JSON message. Returns empty string if
+// not found.
 std::string ExtractType(const std::string& json) {
   const std::string needle = "\"type\"";
   size_t pos = json.find(needle);
   if (pos == std::string::npos) return "";
 
   size_t afterKey = pos + needle.size();
-  while (afterKey < json.size() && (json[afterKey] == ' ' || json[afterKey] == '\t'))
+  while (afterKey < json.size() &&
+         (json[afterKey] == ' ' || json[afterKey] == '\t'))
     ++afterKey;
   if (afterKey >= json.size() || json[afterKey] != ':') return "";
-  ++afterKey; // skip ':'
-  while (afterKey < json.size() && (json[afterKey] == ' ' || json[afterKey] == '\t'))
+  ++afterKey;  // skip ':'
+  while (afterKey < json.size() &&
+         (json[afterKey] == ' ' || json[afterKey] == '\t'))
     ++afterKey;
   if (afterKey >= json.size() || json[afterKey] != '"') return "";
-  ++afterKey; // skip opening quote
+  ++afterKey;  // skip opening quote
 
   size_t end = json.find('"', afterKey);
   if (end == std::string::npos) return "";
@@ -105,14 +120,11 @@ std::string WrapMessageInEnvelope(const std::string& json, int64_t msg_id) {
   // callback only passes raw JSON strings, not timestamps. Consumers
   // should read the actual timestamp from envelope.data.start or
   // envelope.data.time_sec.
-  std::string envelope = "{\"topic\":\"" + topic
-                         + "\",\"pipeline\":\"" + type
-                         + "\",\"pipeline_version\":\"1.0.0\""
-                         + ",\"msg_id\":" + std::to_string(msg_id)
-                         + ",\"ts\":0"
-                         + ",\"qos\":0"
-                         + ",\"schema_version\":1"
-                          + ",\"data\":\"" + escapedData + "\"}";
+  std::string envelope = "{\"topic\":\"" + topic + "\",\"pipeline\":\"" + type +
+                         "\",\"pipeline_version\":\"1.0.0\"" +
+                         ",\"msg_id\":" + std::to_string(msg_id) + ",\"ts\":0" +
+                         ",\"qos\":0" + ",\"schema_version\":1" +
+                         ",\"data\":\"" + escapedData + "\"}";
   return envelope;
 }
 
@@ -147,18 +159,18 @@ void AuditoryWsHandler::OnOpen(WebSocketConnection& conn) {
   const auto now = std::chrono::system_clock::now();
   const double wall_start =
       std::chrono::duration<double>(now.time_since_epoch()).count();
-  std::string ready = "{\"type\":\"ready\",\"sample_rate\":" +
-                       std::to_string(16000) +
-                       ",\"asr\":" + (stream_->asr_enabled() ? "true" : "false") +
-                       ",\"time_base\":\"absolute_samples\",\"origin_sample\":0,"
-                       "\"session_start_wall_sec\":" +
-                       std::to_string(wall_start) +
-                        ",\"protocol_version\":2,\"envelope_format\":true}";
+  std::string ready =
+      "{\"type\":\"ready\",\"sample_rate\":" + std::to_string(16000) +
+      ",\"asr\":" + (stream_->asr_enabled() ? "true" : "false") +
+      ",\"time_base\":\"absolute_samples\",\"origin_sample\":0,"
+      "\"session_start_wall_sec\":" +
+      std::to_string(wall_start) +
+      ",\"protocol_version\":2,\"envelope_format\":true}";
   conn.SendText(ready);
 }
 
 void AuditoryWsHandler::OnBinary(WebSocketConnection& conn, const uint8_t* data,
-                                  size_t n) {
+                                 size_t n) {
   (void)conn;
   LOG_DEBUG("OnBinary: received %zu bytes\n", n);
   std::vector<float> in;
@@ -184,7 +196,8 @@ void AuditoryWsHandler::OnBinary(WebSocketConnection& conn, const uint8_t* data,
   }
 }
 
-void AuditoryWsHandler::OnText(WebSocketConnection& conn, const std::string& text) {
+void AuditoryWsHandler::OnText(WebSocketConnection& conn,
+                               const std::string& text) {
   // Match known commands by JSON key (not substring) to avoid false positives.
   if (text.find("\"f32\"") != std::string::npos) {
     float_format_ = true;
@@ -222,10 +235,10 @@ void AuditoryWsHandler::OnText(WebSocketConnection& conn, const std::string& tex
     std::string resp = "{\"type\":\"sessions\",\"sessions\":[";
     for (size_t i = 0; i < list.size(); ++i) {
       if (i > 0) resp += ",";
-      resp += "{\"id\":\"" + list[i].session_id + "\",\"time\":" +
-              std::to_string(list[i].wall_clock_sec) + ",\"audio_sec\":" +
-              std::to_string(list[i].audio_sec) + ",\"file_size\":" +
-              std::to_string(list[i].file_size) + "}";
+      resp += "{\"id\":\"" + list[i].session_id +
+              "\",\"time\":" + std::to_string(list[i].wall_clock_sec) +
+              ",\"audio_sec\":" + std::to_string(list[i].audio_sec) +
+              ",\"file_size\":" + std::to_string(list[i].file_size) + "}";
     }
     resp += "]}";
     conn.SendText(resp);

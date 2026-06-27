@@ -17,19 +17,36 @@ std::vector<uint32_t> Utf8ToCodepoints(const std::string& s) {
     const unsigned char c = static_cast<unsigned char>(s[i]);
     uint32_t cp = 0;
     int extra = 0;
-    if (c < 0x80) { cp = c; extra = 0; }
-    else if ((c >> 5) == 0x6) { cp = c & 0x1F; extra = 1; }
-    else if ((c >> 4) == 0xE) { cp = c & 0x0F; extra = 2; }
-    else if ((c >> 3) == 0x1E) { cp = c & 0x07; extra = 3; }
-    else { ++i; continue; }  // invalid lead byte; skip
+    if (c < 0x80) {
+      cp = c;
+      extra = 0;
+    } else if ((c >> 5) == 0x6) {
+      cp = c & 0x1F;
+      extra = 1;
+    } else if ((c >> 4) == 0xE) {
+      cp = c & 0x0F;
+      extra = 2;
+    } else if ((c >> 3) == 0x1E) {
+      cp = c & 0x07;
+      extra = 3;
+    } else {
+      ++i;
+      continue;
+    }  // invalid lead byte; skip
     if (i + extra >= n) break;
     bool ok = true;
     for (int k = 1; k <= extra; ++k) {
       const unsigned char cc = static_cast<unsigned char>(s[i + k]);
-      if ((cc >> 6) != 0x2) { ok = false; break; }
+      if ((cc >> 6) != 0x2) {
+        ok = false;
+        break;
+      }
       cp = (cp << 6) | (cc & 0x3F);
     }
-    if (!ok) { ++i; continue; }
+    if (!ok) {
+      ++i;
+      continue;
+    }
     out.push_back(cp);
     i += extra + 1;
   }
@@ -57,14 +74,10 @@ void AppendUtf8(std::string* out, uint32_t cp) {
 
 // CJK ideograph test -- identical ranges to the reference `_is_cjk_char`.
 bool IsCjk(uint32_t cp) {
-  return (cp >= 0x4E00 && cp <= 0x9FFF) ||
-         (cp >= 0x3400 && cp <= 0x4DBF) ||
-         (cp >= 0x20000 && cp <= 0x2A6DF) ||
-         (cp >= 0x2A700 && cp <= 0x2B73F) ||
-         (cp >= 0x2B740 && cp <= 0x2B81F) ||
-         (cp >= 0x2B820 && cp <= 0x2CEAF) ||
-         (cp >= 0xF900 && cp <= 0xFAFF) ||
-         (cp >= 0x2F800 && cp <= 0x2FA1F);
+  return (cp >= 0x4E00 && cp <= 0x9FFF) || (cp >= 0x3400 && cp <= 0x4DBF) ||
+         (cp >= 0x20000 && cp <= 0x2A6DF) || (cp >= 0x2A700 && cp <= 0x2B73F) ||
+         (cp >= 0x2B740 && cp <= 0x2B81F) || (cp >= 0x2B820 && cp <= 0x2CEAF) ||
+         (cp >= 0xF900 && cp <= 0xFAFF) || (cp >= 0x2F800 && cp <= 0x2FA1F);
 }
 
 // Whitespace test (covers ASCII + common Unicode spaces).
@@ -94,7 +107,8 @@ bool IsLetterOrNumber(uint32_t cp) {
   if (cp >= 0xAC00 && cp <= 0xD7A3) return true;
   // Fullwidth digits / Latin letters.
   if (cp >= 0xFF10 && cp <= 0xFF19) return true;
-  if ((cp >= 0xFF21 && cp <= 0xFF3A) || (cp >= 0xFF41 && cp <= 0xFF5A)) return true;
+  if ((cp >= 0xFF21 && cp <= 0xFF3A) || (cp >= 0xFF41 && cp <= 0xFF5A))
+    return true;
   return false;
 }
 
@@ -105,8 +119,8 @@ bool IsKept(uint32_t cp) {
 
 }  // namespace
 
-std::vector<std::string> SplitWordsForAlignment(const std::string& text,
-                                                const std::string& /*language*/) {
+std::vector<std::string> SplitWordsForAlignment(
+    const std::string& text, const std::string& /*language*/) {
   const std::vector<uint32_t> cps = Utf8ToCodepoints(text);
   std::vector<std::string> tokens;
   std::string buffer;
@@ -145,10 +159,10 @@ int FloorDiv(int a, int b) {
 }  // namespace
 
 int AudioTokenLength(int mel_frames, int n_window) {
-  const int chunk_len = n_window * 2;  // 100 mel frames per chunk
-  const int remainder = mel_frames % chunk_len;       // frames in final chunk
-  const int feat = FloorDiv(remainder - 1, 2) + 1;    // after conv1 (stride 2)
-  const int per_chunk = FloorDiv(feat - 1, 2) + 1;    // after conv2 (stride 2)
+  const int chunk_len = n_window * 2;               // 100 mel frames per chunk
+  const int remainder = mel_frames % chunk_len;     // frames in final chunk
+  const int feat = FloorDiv(remainder - 1, 2) + 1;  // after conv1 (stride 2)
+  const int per_chunk = FloorDiv(feat - 1, 2) + 1;  // after conv2 (stride 2)
   const int token = FloorDiv(per_chunk - 1, 2) + 1 +  // after conv3 (stride 2)
                     (mel_frames / chunk_len) * 13;    // + 13 per full chunk
   return token;
@@ -187,7 +201,10 @@ std::vector<long> FixTimestamps(const std::vector<double>& raw_ms) {
   // First index achieving the maximum length (Python dp.index(max)).
   int max_len = 0, max_idx = 0;
   for (int i = 0; i < n; ++i) {
-    if (dp[i] > max_len) { max_len = dp[i]; max_idx = i; }
+    if (dp[i] > max_len) {
+      max_len = dp[i];
+      max_idx = i;
+    }
   }
   std::vector<bool> is_normal(n, false);
   for (int idx = max_idx; idx != -1; idx = parent[idx]) is_normal[idx] = true;
@@ -195,7 +212,10 @@ std::vector<long> FixTimestamps(const std::vector<double>& raw_ms) {
   std::vector<double> result = raw_ms;
   int block_start = 0;
   while (block_start < n) {
-    if (is_normal[block_start]) { ++block_start; continue; }
+    if (is_normal[block_start]) {
+      ++block_start;
+      continue;
+    }
     int block_end = block_start;
     while (block_end < n && !is_normal[block_end]) ++block_end;
     const int anomaly_count = block_end - block_start;
@@ -203,17 +223,27 @@ std::vector<long> FixTimestamps(const std::vector<double>& raw_ms) {
     bool has_left = false, has_right = false;
     double left_val = 0.0, right_val = 0.0;
     for (int scan = block_start - 1; scan >= 0; --scan) {
-      if (is_normal[scan]) { left_val = result[scan]; has_left = true; break; }
+      if (is_normal[scan]) {
+        left_val = result[scan];
+        has_left = true;
+        break;
+      }
     }
     for (int scan = block_end; scan < n; ++scan) {
-      if (is_normal[scan]) { right_val = result[scan]; has_right = true; break; }
+      if (is_normal[scan]) {
+        right_val = result[scan];
+        has_right = true;
+        break;
+      }
     }
 
     if (anomaly_count <= 2) {
       // Short block: snap each position to the nearer good neighbour.
       for (int pos = block_start; pos < block_end; ++pos) {
-        if (!has_left) result[pos] = right_val;
-        else if (!has_right) result[pos] = left_val;
+        if (!has_left)
+          result[pos] = right_val;
+        else if (!has_right)
+          result[pos] = left_val;
         else
           result[pos] = ((pos - (block_start - 1)) <= (block_end - pos))
                             ? left_val
@@ -226,9 +256,11 @@ std::vector<long> FixTimestamps(const std::vector<double>& raw_ms) {
         for (int pos = block_start; pos < block_end; ++pos)
           result[pos] = left_val + step * (pos - block_start + 1);
       } else if (has_left) {
-        for (int pos = block_start; pos < block_end; ++pos) result[pos] = left_val;
+        for (int pos = block_start; pos < block_end; ++pos)
+          result[pos] = left_val;
       } else if (has_right) {
-        for (int pos = block_start; pos < block_end; ++pos) result[pos] = right_val;
+        for (int pos = block_start; pos < block_end; ++pos)
+          result[pos] = right_val;
       }
     }
     block_start = block_end;
@@ -236,7 +268,8 @@ std::vector<long> FixTimestamps(const std::vector<double>& raw_ms) {
 
   std::vector<long> out(n);
   for (int i = 0; i < n; ++i)
-    out[i] = static_cast<long>(result[i]);  // Python int(): truncate toward zero
+    out[i] =
+        static_cast<long>(result[i]);  // Python int(): truncate toward zero
   return out;
 }
 

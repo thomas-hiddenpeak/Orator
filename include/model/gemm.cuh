@@ -159,15 +159,15 @@ static __global__ void SgemmKernel(const float* __restrict__ in,
 
 // act: 0 none, 1 SiLU, 2 ReLU, 3 sigmoid.
 inline void LaunchSgemm(const float* in, const float* W, const float* bias,
-                         float* out, int M, int K, int N, int act) {
+                        float* out, int M, int K, int N, int act) {
   dim3 block(kThreadsGemm);
   dim3 grid((N + BN - 1) / BN, (M + BM - 1) / BM);
   SgemmKernel<<<grid, block>>>(in, W, bias, out, M, K, N, act);
 }
 
 inline void LaunchSgemm(const float* in, const float* W, const float* bias,
-                         float* out, int M, int K, int N, int act,
-                         cudaStream_t stream) {
+                        float* out, int M, int K, int N, int act,
+                        cudaStream_t stream) {
   dim3 block(kThreadsGemm);
   dim3 grid((N + BN - 1) / BN, (M + BM - 1) / BM);
   SgemmKernel<<<grid, block, 0, stream>>>(in, W, bias, out, M, K, N, act);
@@ -249,22 +249,22 @@ static __global__ void SgemmBatchedKernel(const float* __restrict__ in,
 }
 
 inline void LaunchSgemmBatched(const float* in, const float* W, float* out,
-                                int M, int K, int N, int act, int batch,
-                                long strideIn, long strideW, long strideOut) {
+                               int M, int K, int N, int act, int batch,
+                               long strideIn, long strideW, long strideOut) {
   dim3 block(kThreadsGemm);
   dim3 grid((N + BN - 1) / BN, (M + BM - 1) / BM, batch);
   SgemmBatchedKernel<<<grid, block>>>(in, W, out, M, K, N, act, strideIn,
-                                       strideW, strideOut);
+                                      strideW, strideOut);
 }
 
 inline void LaunchSgemmBatched(const float* in, const float* W, float* out,
-                                int M, int K, int N, int act, int batch,
-                                long strideIn, long strideW, long strideOut,
-                                cudaStream_t stream) {
+                               int M, int K, int N, int act, int batch,
+                               long strideIn, long strideW, long strideOut,
+                               cudaStream_t stream) {
   dim3 block(kThreadsGemm);
   dim3 grid((N + BN - 1) / BN, (M + BM - 1) / BM, batch);
   SgemmBatchedKernel<<<grid, block, 0, stream>>>(in, W, out, M, K, N, act,
-                                                  strideIn, strideW, strideOut);
+                                                 strideIn, strideW, strideOut);
 }
 
 // ---------------------------------------------------------------------------
@@ -337,24 +337,29 @@ static __global__ void Bf16WmmaKernel(const __nv_bfloat16* __restrict__ in,
     for (int idx = tid; idx < BWM * BWK; idx += THREADS) {
       const int mm = idx / BWK, kk = idx % BWK;
       const int gm = m0 + mm;
-      As[mm][kk] = (gm < M) ? in[static_cast<size_t>(gm) * K + (k0 + kk)] : kZero;
+      As[mm][kk] =
+          (gm < M) ? in[static_cast<size_t>(gm) * K + (k0 + kk)] : kZero;
     }
     for (int idx = tid; idx < BWN * BWK; idx += THREADS) {
       const int nn = idx / BWK, kk = idx % BWK;
       const int gn = n0 + nn;
-      Bs[nn][kk] = (gn < N) ? W[static_cast<size_t>(gn) * K + (k0 + kk)] : kZero;
+      Bs[nn][kk] =
+          (gn < N) ? W[static_cast<size_t>(gn) * K + (k0 + kk)] : kZero;
     }
     __syncthreads();
 
-    wmma::fragment<wmma::matrix_a, WM, WN, WK, __nv_bfloat16, wmma::row_major> aFrag;
-    wmma::fragment<wmma::matrix_b, WM, WN, WK, __nv_bfloat16, wmma::col_major> bFrag;
+    wmma::fragment<wmma::matrix_a, WM, WN, WK, __nv_bfloat16, wmma::row_major>
+        aFrag;
+    wmma::fragment<wmma::matrix_b, WM, WN, WK, __nv_bfloat16, wmma::col_major>
+        bFrag;
     wmma::load_matrix_sync(aFrag, &As[wm * WM][0], BWK);
     wmma::load_matrix_sync(bFrag, &Bs[wn * WN][0], BWK);
     wmma::mma_sync(cFrag, aFrag, bFrag, cFrag);
     __syncthreads();
   }
 
-  wmma::store_matrix_sync(&Cs[wm * WM][wn * WN], cFrag, BWN, wmma::mem_row_major);
+  wmma::store_matrix_sync(&Cs[wm * WM][wn * WN], cFrag, BWN,
+                          wmma::mem_row_major);
   __syncthreads();
   for (int idx = tid; idx < BWM * BWN; idx += THREADS) {
     const int mm = idx / BWN, nn = idx % BWN;
@@ -370,20 +375,20 @@ static __global__ void Bf16WmmaKernel(const __nv_bfloat16* __restrict__ in,
 // Warp-tiled WMMA: each warp computes a 16x(WN*FN) output strip = FN bf16 MMA
 // fragments in N, reusing ONE loaded A fragment across all FN B fragments. This
 // raises arithmetic intensity per warp (fewer shared-memory fragment loads per
-// MMA) than the 1-fragment Bf16WmmaKernel, closing part of the small-GEMM gap to
-// cuBLAS. Ragged M/N edges are zero-padded on load and bounds-checked in the
+// MMA) than the 1-fragment Bf16WmmaKernel, closing part of the small-GEMM gap
+// to cuBLAS. Ragged M/N edges are zero-padded on load and bounds-checked in the
 // epilogue (validated against the f64 oracle, including non-tile-aligned shapes
 // such as N=5000, so a stray out-of-bounds access shows up as a numerical error
 // here rather than as the concurrency corruption an earlier warp-tiled attempt
 // hit). Portable nvcuda::wmma (SM 8.0+, runs on Orin); requires K % 16 == 0.
 namespace wmma_cfg2 {
 constexpr int WM = 16, WN = 16, WK = 16;
-constexpr int FN = 2;                        // N fragments per warp (16x32)
-constexpr int BWM = 64, BWN = 128, BWK = 16; // block output tile + K step
-constexpr int WARPS_M = BWM / WM;            // 4
-constexpr int WARPS_N = BWN / (WN * FN);     // 4
-constexpr int WARPS = WARPS_M * WARPS_N;     // 16
-constexpr int THREADS = WARPS * 32;          // 512
+constexpr int FN = 2;                         // N fragments per warp (16x32)
+constexpr int BWM = 64, BWN = 128, BWK = 16;  // block output tile + K step
+constexpr int WARPS_M = BWM / WM;             // 4
+constexpr int WARPS_N = BWN / (WN * FN);      // 4
+constexpr int WARPS = WARPS_M * WARPS_N;      // 16
+constexpr int THREADS = WARPS * 32;           // 512
 }  // namespace wmma_cfg2
 
 static __global__ void Bf16WmmaKernel2(const __nv_bfloat16* __restrict__ in,
@@ -413,20 +418,24 @@ static __global__ void Bf16WmmaKernel2(const __nv_bfloat16* __restrict__ in,
     for (int idx = tid; idx < BWM * BWK; idx += THREADS) {
       const int mm = idx / BWK, kk = idx % BWK;
       const int gm = m0 + mm;
-      As[mm][kk] = (gm < M) ? in[static_cast<size_t>(gm) * K + (k0 + kk)] : kZero;
+      As[mm][kk] =
+          (gm < M) ? in[static_cast<size_t>(gm) * K + (k0 + kk)] : kZero;
     }
     for (int idx = tid; idx < BWN * BWK; idx += THREADS) {
       const int nn = idx / BWK, kk = idx % BWK;
       const int gn = n0 + nn;
-      Bs[nn][kk] = (gn < N) ? W[static_cast<size_t>(gn) * K + (k0 + kk)] : kZero;
+      Bs[nn][kk] =
+          (gn < N) ? W[static_cast<size_t>(gn) * K + (k0 + kk)] : kZero;
     }
     __syncthreads();
 
-    wmma::fragment<wmma::matrix_a, WM, WN, WK, __nv_bfloat16, wmma::row_major> aFrag;
+    wmma::fragment<wmma::matrix_a, WM, WN, WK, __nv_bfloat16, wmma::row_major>
+        aFrag;
     wmma::load_matrix_sync(aFrag, &As[wm * WM][0], BWK);
 #pragma unroll
     for (int f = 0; f < FN; ++f) {
-      wmma::fragment<wmma::matrix_b, WM, WN, WK, __nv_bfloat16, wmma::col_major> bFrag;
+      wmma::fragment<wmma::matrix_b, WM, WN, WK, __nv_bfloat16, wmma::col_major>
+          bFrag;
       wmma::load_matrix_sync(bFrag, &Bs[(wn * FN + f) * WN][0], BWK);
       wmma::mma_sync(cFrag[f], aFrag, bFrag, cFrag[f]);
     }

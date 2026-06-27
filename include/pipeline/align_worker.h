@@ -2,18 +2,18 @@
 
 // AlignWorker: the forced-alignment pipeline as an independent unit.
 //
-// It owns the forced aligner and aligns each finalized ASR transcript segment to
-// its audio in a single non-autoregressive pass, producing precise per-unit
-// (word/character) timestamps. It is a downstream consumer of the ASR pipeline's
-// published transcript segments: when an `asr/transcript` segment arrives it
-// reads back exactly that audio span from a retained-window buffer and aligns
-// the known text against it.
+// It owns the forced aligner and aligns each finalized ASR transcript segment
+// to its audio in a single non-autoregressive pass, producing precise per-unit
+// (word/character) timestamps. It is a downstream consumer of the ASR
+// pipeline's published transcript segments: when an `asr/transcript` segment
+// arrives it reads back exactly that audio span from a retained-window buffer
+// and aligns the known text against it.
 //
-// Per Constitution Art. III the pipeline never reads another pipeline's internal
-// state -- it consumes only the published transcript (id, [start, end], text)
-// and the shared audio. Alignment runs on its own thread off the ASR hot path so
-// it never blocks ingest or ASR; jobs are queued and processed in order, and the
-// queue is drained on Stop().
+// Per Constitution Art. III the pipeline never reads another pipeline's
+// internal state -- it consumes only the published transcript (id, [start,
+// end], text) and the shared audio. Alignment runs on its own thread off the
+// ASR hot path so it never blocks ingest or ASR; jobs are queued and processed
+// in order, and the queue is drained on Stop().
 
 #include <atomic>
 #include <condition_variable>
@@ -39,9 +39,9 @@ class AlignWorker {
     double max_segment_sec = 300.0;  // skip absurdly long spans (safety cap)
   };
 
-  // Delivers aligned units for one transcript segment. `seg_start`/`seg_end` are
-  // the segment's bounds (common clock, sec); unit times are already mapped onto
-  // the common clock.
+  // Delivers aligned units for one transcript segment. `seg_start`/`seg_end`
+  // are the segment's bounds (common clock, sec); unit times are already mapped
+  // onto the common clock.
   using UnitsSink =
       std::function<void(long id, double seg_start, double seg_end,
                          const std::vector<core::AlignUnit>& units)>;

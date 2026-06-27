@@ -37,7 +37,8 @@ int main() {
   assert(ref.utterances[0].start_sec == 3.0);
   assert(ref.utterances[1].speaker == "Bob");
   // Continuation line merged.
-  assert(ref.utterances[1].text == "Hi Alice, good to see you. It has been a while.");
+  assert(ref.utterances[1].text ==
+         "Hi Alice, good to see you. It has been a while.");
   std::cout << "Utterance parsing + continuation OK" << std::endl;
 
   auto speakers = ref.Speakers();

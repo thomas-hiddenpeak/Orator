@@ -21,11 +21,10 @@ class Kernels {
   static float CosineSimilarity(const float* a, const float* b, int n,
                                 cudaStream_t stream = nullptr);
 
-  // Batch cosine similarity: compute similarity between one query and multiple keys
-  // query[n], keys[m*n], output[m]
+  // Batch cosine similarity: compute similarity between one query and multiple
+  // keys query[n], keys[m*n], output[m]
   static void BatchCosineSimilarity(const float* query, const float* keys,
-                                    int num_keys, int vec_dim,
-                                    float* output,
+                                    int num_keys, int vec_dim, float* output,
                                     cudaStream_t stream = nullptr);
 
   // Element-wise operations

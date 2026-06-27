@@ -7,14 +7,17 @@ namespace orator {
 namespace gpu {
 
 AudioBuffer::AudioBuffer(size_t capacity)
-    : capacity_(capacity), write_pos_(0), start_pos_(0),
+    : capacity_(capacity),
+      write_pos_(0),
+      start_pos_(0),
       device_buffer_(capacity * sizeof(float), GpuMemory::unified_allocator()) {
   ptr_ = static_cast<float*>(device_buffer_.data());
 }
 
 size_t AudioBuffer::Write(const float* samples, size_t num_samples) {
   if (num_samples > capacity_) {
-    throw std::invalid_argument("Cannot write more samples than buffer capacity");
+    throw std::invalid_argument(
+        "Cannot write more samples than buffer capacity");
   }
 
   size_t write_offset = write_pos_;
@@ -43,7 +46,8 @@ size_t AudioBuffer::Write(const float* samples, size_t num_samples) {
 void AudioBuffer::Read(size_t offset, size_t num_samples, float* output) {
   // Validate that we're not trying to read more than capacity
   if (num_samples > capacity_) {
-    throw std::invalid_argument("Cannot read more samples than buffer capacity");
+    throw std::invalid_argument(
+        "Cannot read more samples than buffer capacity");
   }
 
   // For ring buffer, handle wrap-around at the capacity boundary
@@ -62,4 +66,3 @@ void AudioBuffer::Read(size_t offset, size_t num_samples, float* output) {
 
 }  // namespace gpu
 }  // namespace orator
-

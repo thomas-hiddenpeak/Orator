@@ -14,13 +14,14 @@ namespace model {
 namespace {
 constexpr uint32_t kMagic = 0x524B5053;  // SPKR
 constexpr uint32_t kVersion = 1;
-}
+}  // namespace
 
 SpeakerDatabase::SpeakerDatabase(int max_speakers, int embedding_dim)
     : max_speakers_(max_speakers),
       embedding_dim_(embedding_dim),
       size_(0),
-      embeddings_(static_cast<size_t>(max_speakers) * embedding_dim * sizeof(float)) {
+      embeddings_(static_cast<size_t>(max_speakers) * embedding_dim *
+                  sizeof(float)) {
   if (max_speakers <= 0 || embedding_dim <= 0) {
     throw std::invalid_argument("invalid speaker db shape");
   }
@@ -28,7 +29,8 @@ SpeakerDatabase::SpeakerDatabase(int max_speakers, int embedding_dim)
   std::memset(embeddings_.data(), 0, embeddings_.size());
 }
 
-bool SpeakerDatabase::Enroll(const std::string& speaker_id, const float* embedding) {
+bool SpeakerDatabase::Enroll(const std::string& speaker_id,
+                             const float* embedding) {
   if (speaker_id.empty() || embedding == nullptr) return false;
   if (Contains(speaker_id) || size_ >= max_speakers_) return false;
   const int index = size_;
@@ -39,7 +41,8 @@ bool SpeakerDatabase::Enroll(const std::string& speaker_id, const float* embeddi
   return true;
 }
 
-bool SpeakerDatabase::Update(const std::string& speaker_id, const float* embedding) {
+bool SpeakerDatabase::Update(const std::string& speaker_id,
+                             const float* embedding) {
   if (speaker_id.empty() || embedding == nullptr) return false;
   const int index = IndexOf(speaker_id);
   if (index < 0) return false;
@@ -65,7 +68,8 @@ std::string SpeakerDatabase::SpeakerIdAt(int index) const {
 void SpeakerDatabase::WriteEmbeddingAt(int index, const float* embedding) {
   auto* base = static_cast<float*>(embeddings_.data());
   float* dst = base + static_cast<size_t>(index) * embedding_dim_;
-  std::memcpy(dst, embedding, static_cast<size_t>(embedding_dim_) * sizeof(float));
+  std::memcpy(dst, embedding,
+              static_cast<size_t>(embedding_dim_) * sizeof(float));
 }
 
 bool SpeakerDatabase::Save(const std::string& path) const {
@@ -74,8 +78,10 @@ bool SpeakerDatabase::Save(const std::string& path) const {
 
   out.write(reinterpret_cast<const char*>(&kMagic), sizeof(kMagic));
   out.write(reinterpret_cast<const char*>(&kVersion), sizeof(kVersion));
-  out.write(reinterpret_cast<const char*>(&max_speakers_), sizeof(max_speakers_));
-  out.write(reinterpret_cast<const char*>(&embedding_dim_), sizeof(embedding_dim_));
+  out.write(reinterpret_cast<const char*>(&max_speakers_),
+            sizeof(max_speakers_));
+  out.write(reinterpret_cast<const char*>(&embedding_dim_),
+            sizeof(embedding_dim_));
   out.write(reinterpret_cast<const char*>(&size_), sizeof(size_));
 
   for (int i = 0; i < size_; ++i) {
@@ -109,7 +115,8 @@ bool SpeakerDatabase::Load(const std::string& path) {
   in.read(reinterpret_cast<char*>(&size), sizeof(size));
 
   if (!in.good() || magic != kMagic || version != kVersion) return false;
-  if (max_speakers != max_speakers_ || embedding_dim != embedding_dim_) return false;
+  if (max_speakers != max_speakers_ || embedding_dim != embedding_dim_)
+    return false;
   if (size < 0 || size > max_speakers_) return false;
 
   speaker_ids_.clear();
@@ -130,7 +137,8 @@ bool SpeakerDatabase::Load(const std::string& path) {
   const size_t used_bytes =
       static_cast<size_t>(size) * embedding_dim_ * sizeof(float);
   std::memset(embeddings_.data(), 0, embeddings_.size());
-  in.read(static_cast<char*>(embeddings_.data()), static_cast<std::streamsize>(used_bytes));
+  in.read(static_cast<char*>(embeddings_.data()),
+          static_cast<std::streamsize>(used_bytes));
   if (!in.good()) return false;
   size_ = size;
   return true;
@@ -144,14 +152,16 @@ int SpeakerDatabase::Match(const float* query_embedding, float threshold,
     return -1;
   }
 
-  gpu::DeviceBuffer query_dev(static_cast<size_t>(embedding_dim_) * sizeof(float));
+  gpu::DeviceBuffer query_dev(static_cast<size_t>(embedding_dim_) *
+                              sizeof(float));
   gpu::DeviceBuffer scores_dev(static_cast<size_t>(size_) * sizeof(float));
-  gpu::GpuMemory::CopyHostToDevice(query_dev.data(), query_embedding,
-                                   static_cast<size_t>(embedding_dim_) * sizeof(float));
+  gpu::GpuMemory::CopyHostToDevice(
+      query_dev.data(), query_embedding,
+      static_cast<size_t>(embedding_dim_) * sizeof(float));
 
   gpu::Kernels::BatchCosineSimilarity(
-      static_cast<const float*>(query_dev.data()), Embeddings(), size_, embedding_dim_,
-      static_cast<float*>(scores_dev.data()));
+      static_cast<const float*>(query_dev.data()), Embeddings(), size_,
+      embedding_dim_, static_cast<float*>(scores_dev.data()));
 
   std::vector<float> scores(static_cast<size_t>(size_), 0.0f);
   gpu::GpuMemory::CopyDeviceToHost(scores.data(), scores_dev.data(),

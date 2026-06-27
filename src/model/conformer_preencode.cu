@@ -12,9 +12,9 @@ namespace orator {
 namespace model {
 
 using ::orator::gpu::CheckCudaError;
+using ::orator::gpu::DeviceBuffer;
 using ::orator::gpu::UnifiedAllocator;
 using ::orator::gpu::UnifiedBuffer;
-using ::orator::gpu::DeviceBuffer;
 
 namespace {
 
@@ -22,9 +22,10 @@ namespace {
 // bias[Cout], out[Cout, Hout, Wout]. Symmetric padding `pad`, square stride.
 __global__ void Conv2dKernel(const float* __restrict__ in,
                              const float* __restrict__ w,
-                             const float* __restrict__ bias, float* __restrict__ out,
-                             int Cin, int H, int W, int Cout, int KH, int KW,
-                             int Hout, int Wout, int stride, int pad, int groups) {
+                             const float* __restrict__ bias,
+                             float* __restrict__ out, int Cin, int H, int W,
+                             int Cout, int KH, int KW, int Hout, int Wout,
+                             int stride, int pad, int groups) {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   int total = Cout * Hout * Wout;
   if (idx >= total) return;
@@ -70,7 +71,8 @@ __global__ void TransposeKernel(const float* __restrict__ in,
   out[static_cast<size_t>(c) * R + r] = in[idx];
 }
 
-// Add per-channel bias to a channel-major [Cout, HW] tensor: out[oc,p]+=bias[oc].
+// Add per-channel bias to a channel-major [Cout, HW] tensor:
+// out[oc,p]+=bias[oc].
 __global__ void AddChannelBiasKernel(float* __restrict__ x,
                                      const float* __restrict__ bias, int Cout,
                                      int HW) {
@@ -117,16 +119,17 @@ std::unique_ptr<UnifiedBuffer> CopyWeight(const io::SafeTensorReader& reader,
 }
 
 void LaunchConv(const float* in, const UnifiedBuffer& w, const UnifiedBuffer& b,
-                 float* out, int Cin, int H, int W, int Cout, int K, int stride,
-                 int pad, int groups, int* Hout, int* Wout,
-                 cudaStream_t stream) {
+                float* out, int Cin, int H, int W, int Cout, int K, int stride,
+                int pad, int groups, int* Hout, int* Wout,
+                cudaStream_t stream) {
   *Hout = ConvOutLen(H, K, stride, pad);
   *Wout = ConvOutLen(W, K, stride, pad);
   int total = Cout * (*Hout) * (*Wout);
   int threads = 256;
   Conv2dKernel<<<(total + threads - 1) / threads, threads, 0, stream>>>(
-      in, static_cast<const float*>(w.data()), static_cast<const float*>(b.data()),
-      out, Cin, H, W, Cout, K, K, *Hout, *Wout, stride, pad, groups);
+      in, static_cast<const float*>(w.data()),
+      static_cast<const float*>(b.data()), out, Cin, H, W, Cout, K, K, *Hout,
+      *Wout, stride, pad, groups);
   CUDA_CHECK(cudaGetLastError());
 }
 
@@ -140,8 +143,8 @@ void LaunchRelu(float* x, int n, cudaStream_t stream) {
 // out[Cout,HW]: out[oc,p] = bias[oc] + sum_ic w[oc,ic]*in[ic,p].
 // Transpose in -> in_T[HW,Cin], then out[Cout,HW] = w[Cout,Cin] * in_T^T.
 void LaunchPointwise(const float* in, const UnifiedBuffer& w,
-                      const UnifiedBuffer& b, float* out, int Cin, int Cout,
-                      int HW, cudaStream_t stream) {
+                     const UnifiedBuffer& b, float* out, int Cin, int Cout,
+                     int HW, cudaStream_t stream) {
   UnifiedBuffer in_t(static_cast<size_t>(HW) * Cin * sizeof(float));
   int threads = 256;
   int total = Cin * HW;
@@ -149,13 +152,14 @@ void LaunchPointwise(const float* in, const UnifiedBuffer& w,
       in, static_cast<float*>(in_t.data()), Cin, HW);
   CUDA_CHECK(cudaGetLastError());
   gemm::LaunchSgemm(static_cast<const float*>(w.data()),
-                      static_cast<const float*>(in_t.data()),
-                      /*bias=*/nullptr, out, Cout, Cin, HW, 0, stream);
+                    static_cast<const float*>(in_t.data()),
+                    /*bias=*/nullptr, out, Cout, Cin, HW, 0, stream);
   CUDA_CHECK(cudaGetLastError());
   // Bias is per output channel (the M dimension here), so add it separately.
   int btotal = Cout * HW;
-  AddChannelBiasKernel<<<(btotal + threads - 1) / threads, threads, 0, stream>>>(
-      out, static_cast<const float*>(b.data()), Cout, HW);
+  AddChannelBiasKernel<<<(btotal + threads - 1) / threads, threads, 0,
+                         stream>>>(out, static_cast<const float*>(b.data()),
+                                   Cout, HW);
   CUDA_CHECK(cudaGetLastError());
 }
 
@@ -189,34 +193,37 @@ void ConformerPreEncode::LoadWeights(const io::SafeTensorReader& reader,
 }
 
 std::vector<float> ConformerPreEncode::Forward(const float* mel, int n_mels,
-                                                int n_frames, int valid_len,
-                                                int* out_frames,
-                                                int* out_valid_len,
-                                                cudaStream_t stream) {
-  if (!loaded_) throw std::runtime_error("ConformerPreEncode: weights not loaded");
+                                               int n_frames, int valid_len,
+                                               int* out_frames,
+                                               int* out_valid_len,
+                                               cudaStream_t stream) {
+  if (!loaded_)
+    throw std::runtime_error("ConformerPreEncode: weights not loaded");
   const int C = conv_channels_;
 
-  // Input as a single-channel image [1, H=n_frames, W=n_mels]. The caller passes
-  // mel as [n_mels, n_frames] (freq-major, NeMo's feat-dim first), but the conv
-  // image is time-major [T, n_mels], so transpose on host first.
+  // Input as a single-channel image [1, H=n_frames, W=n_mels]. The caller
+  // passes mel as [n_mels, n_frames] (freq-major, NeMo's feat-dim first), but
+  // the conv image is time-major [T, n_mels], so transpose on host first.
   std::vector<float> mel_t(static_cast<size_t>(n_frames) * n_mels);
   for (int m = 0; m < n_mels; ++m)
     for (int t = 0; t < n_frames; ++t)
       mel_t[static_cast<size_t>(t) * n_mels + m] =
           mel[static_cast<size_t>(m) * n_frames + t];
   UnifiedBuffer in0(static_cast<size_t>(n_frames) * n_mels * sizeof(float));
-  CUDA_CHECK(cudaMemcpyAsync(in0.data(), mel_t.data(),
-                              static_cast<size_t>(n_frames) * n_mels * sizeof(float),
-                              cudaMemcpyHostToDevice, stream));
-  LaunchMask(static_cast<float*>(in0.data()), 1, n_frames, n_mels, valid_len, stream);
+  CUDA_CHECK(
+      cudaMemcpyAsync(in0.data(), mel_t.data(),
+                      static_cast<size_t>(n_frames) * n_mels * sizeof(float),
+                      cudaMemcpyHostToDevice, stream));
+  LaunchMask(static_cast<float*>(in0.data()), 1, n_frames, n_mels, valid_len,
+             stream);
 
   // Stage 0: Conv2d(1->256,k3,s2,p1) + ReLU.
   int H0 = ConvOutLen(n_frames, 3, 2, 1), W0 = ConvOutLen(n_mels, 3, 2, 1);
   UnifiedBuffer buf1(static_cast<size_t>(C) * H0 * W0 * sizeof(float));
   int h, w;
   LaunchConv(static_cast<float*>(in0.data()), *w0_, *b0_,
-              static_cast<float*>(buf1.data()), 1, n_frames, n_mels, C, 3, 2, 1, 1,
-              &h, &w, stream);
+             static_cast<float*>(buf1.data()), 1, n_frames, n_mels, C, 3, 2, 1,
+             1, &h, &w, stream);
   int len0 = ConvOutLen(valid_len, 3, 2, 1);
   LaunchMask(static_cast<float*>(buf1.data()), C, H0, W0, len0, stream);
   LaunchRelu(static_cast<float*>(buf1.data()), C * H0 * W0, stream);
@@ -226,12 +233,12 @@ std::vector<float> ConformerPreEncode::Forward(const float* mel, int n_mels,
   int H1 = ConvOutLen(H0, 3, 2, 1), W1 = ConvOutLen(W0, 3, 2, 1);
   UnifiedBuffer dw1(static_cast<size_t>(C) * H1 * W1 * sizeof(float));
   LaunchConv(static_cast<float*>(buf1.data()), *w2_, *b2_,
-              static_cast<float*>(dw1.data()), C, H0, W0, C, 3, 2, 1, C, &h, &w,
-              stream);
+             static_cast<float*>(dw1.data()), C, H0, W0, C, 3, 2, 1, C, &h, &w,
+             stream);
   int len1 = ConvOutLen(len0, 3, 2, 1);
   UnifiedBuffer pw1(static_cast<size_t>(C) * H1 * W1 * sizeof(float));
   LaunchPointwise(static_cast<float*>(dw1.data()), *w3_, *b3_,
-                   static_cast<float*>(pw1.data()), C, C, H1 * W1, stream);
+                  static_cast<float*>(pw1.data()), C, C, H1 * W1, stream);
   LaunchRelu(static_cast<float*>(pw1.data()), C * H1 * W1, stream);
   LaunchMask(static_cast<float*>(pw1.data()), C, H1, W1, len1, stream);
 
@@ -239,12 +246,12 @@ std::vector<float> ConformerPreEncode::Forward(const float* mel, int n_mels,
   int H2 = ConvOutLen(H1, 3, 2, 1), W2 = ConvOutLen(W1, 3, 2, 1);
   UnifiedBuffer dw2(static_cast<size_t>(C) * H2 * W2 * sizeof(float));
   LaunchConv(static_cast<float*>(pw1.data()), *w5_, *b5_,
-              static_cast<float*>(dw2.data()), C, H1, W1, C, 3, 2, 1, C, &h, &w,
-              stream);
+             static_cast<float*>(dw2.data()), C, H1, W1, C, 3, 2, 1, C, &h, &w,
+             stream);
   int len2 = ConvOutLen(len1, 3, 2, 1);
   UnifiedBuffer pw2(static_cast<size_t>(C) * H2 * W2 * sizeof(float));
   LaunchPointwise(static_cast<float*>(dw2.data()), *w6_, *b6_,
-                   static_cast<float*>(pw2.data()), C, C, H2 * W2, stream);
+                  static_cast<float*>(pw2.data()), C, C, H2 * W2, stream);
   LaunchRelu(static_cast<float*>(pw2.data()), C * H2 * W2, stream);
   LaunchMask(static_cast<float*>(pw2.data()), C, H2, W2, len2, stream);
 
@@ -264,16 +271,17 @@ std::vector<float> ConformerPreEncode::Forward(const float* mel, int n_mels,
       H2, W2);
   CUDA_CHECK(cudaGetLastError());
   gemm::LaunchSgemm(static_cast<const float*>(flatbuf.data()),
-                      static_cast<const float*>(wout_->data()),
-                      static_cast<const float*>(bout_->data()),
-                      static_cast<float*>(outbuf.data()), H2, Kflat, D, 0, stream);
+                    static_cast<const float*>(wout_->data()),
+                    static_cast<const float*>(bout_->data()),
+                    static_cast<float*>(outbuf.data()), H2, Kflat, D, 0,
+                    stream);
   CUDA_CHECK(cudaGetLastError());
   CUDA_CHECK(cudaStreamSynchronize(stream));
 
   std::vector<float> result(static_cast<size_t>(H2) * D);
   CUDA_CHECK(cudaMemcpyAsync(result.data(), outbuf.data(),
-                              result.size() * sizeof(float),
-                              cudaMemcpyDeviceToHost, stream));
+                             result.size() * sizeof(float),
+                             cudaMemcpyDeviceToHost, stream));
   CUDA_CHECK(cudaStreamSynchronize(stream));
   *out_frames = H2;
   *out_valid_len = len2;

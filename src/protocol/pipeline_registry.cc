@@ -22,8 +22,10 @@ PipelineHandle::~PipelineHandle() {
 }
 
 PipelineHandle::PipelineHandle(PipelineHandle&& other) noexcept
-    : registry_(other.registry_), id_(other.id_),
-      desc_(std::move(other.desc_)), valid_(other.valid_) {
+    : registry_(other.registry_),
+      id_(other.id_),
+      desc_(std::move(other.desc_)),
+      valid_(other.valid_) {
   other.registry_ = nullptr;
   other.id_ = -1;
   other.valid_ = false;
@@ -63,11 +65,13 @@ void PipelineHandle::Heartbeat() {
 // PipelineRegistry
 // ---------------------------------------------------------------------------
 
-std::unique_ptr<PipelineHandle> PipelineRegistry::Register(PipelineDescriptor desc) {
+std::unique_ptr<PipelineHandle> PipelineRegistry::Register(
+    PipelineDescriptor desc) {
   std::unique_lock<std::mutex> lock(mutex_);
 
   if (desc.name.empty()) {
-    throw std::invalid_argument("PipelineRegistry: pipeline name must not be empty");
+    throw std::invalid_argument(
+        "PipelineRegistry: pipeline name must not be empty");
   }
 
   if (pipelines_.find(desc.name) != pipelines_.end()) {
@@ -84,8 +88,8 @@ std::unique_ptr<PipelineHandle> PipelineRegistry::Register(PipelineDescriptor de
   };
 
   PipelineEntry& entry = pipelines_[name];
-  std::string payload = "{\"name\":\"" + entry.desc.name +
-                        "\",\"version\":\"" + entry.desc.version + "\"}";
+  std::string payload = "{\"name\":\"" + entry.desc.name + "\",\"version\":\"" +
+                        entry.desc.version + "\"}";
 
   EventHandler handler = system_event_handler_;
   lock.unlock();
@@ -94,7 +98,8 @@ std::unique_ptr<PipelineHandle> PipelineRegistry::Register(PipelineDescriptor de
     handler(kSystemPipelineOnline.to_string(), payload);
   }
 
-  return std::unique_ptr<PipelineHandle>(new PipelineHandle(this, id, entry.desc));
+  return std::unique_ptr<PipelineHandle>(
+      new PipelineHandle(this, id, entry.desc));
 }
 
 void PipelineRegistry::Unregister(PipelineHandle& handle) {
@@ -146,7 +151,8 @@ void PipelineRegistry::Heartbeat(PipelineHandle& handle) {
   }
 }
 
-std::vector<std::string> PipelineRegistry::HealthCheck(double timeout_sec) const {
+std::vector<std::string> PipelineRegistry::HealthCheck(
+    double timeout_sec) const {
   std::lock_guard<std::mutex> lock(mutex_);
 
   auto now = std::chrono::steady_clock::now();

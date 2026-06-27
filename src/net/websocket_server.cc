@@ -133,21 +133,22 @@ void Sha1::Finalize() {
   uint64_t bits = count_ * 8;
   buffer_.push_back(0x80);
   while ((buffer_.size() % 64) != 56) buffer_.push_back(0);
-  for (int i = 7; i >= 0; --i) buffer_.push_back(uint8_t((bits >> (i * 8)) & 0xff));
+  for (int i = 7; i >= 0; --i)
+    buffer_.push_back(uint8_t((bits >> (i * 8)) & 0xff));
 
   for (size_t off = 0; off < buffer_.size(); off += 64)
     Transform(buffer_.data() + off);
   buffer_.clear();
 
   for (int i = 0; i < 5; ++i) {
-    digest[4 * i]     = uint8_t((h[i] >> 24) & 0xff);
+    digest[4 * i] = uint8_t((h[i] >> 24) & 0xff);
     digest[4 * i + 1] = uint8_t((h[i] >> 16) & 0xff);
     digest[4 * i + 2] = uint8_t((h[i] >> 8) & 0xff);
     digest[4 * i + 3] = uint8_t(h[i] & 0xff);
   }
 }
 
-}
+}  // namespace
 
 std::string Sha1Base64(const std::string& key, const std::string& magic) {
   Sha1 sha;
@@ -159,7 +160,8 @@ std::string Sha1Base64(const std::string& key, const std::string& magic) {
 
 std::string Sha1Base64(const std::string& combined) {
   Sha1 sha;
-  sha.Update(reinterpret_cast<const uint8_t*>(combined.data()), combined.size());
+  sha.Update(reinterpret_cast<const uint8_t*>(combined.data()),
+             combined.size());
   sha.Finalize();
   return Base64Encode(sha.digest.data(), sha.digest.size());
 }
@@ -167,9 +169,9 @@ std::string Sha1Base64(const std::string& combined) {
 }  // namespace detail
 
 struct per_session_data {
-  struct per_session_data *pss_list = nullptr;
-  struct lws *wsi_ = nullptr;
-  struct lws_context *context_ = nullptr;
+  struct per_session_data* pss_list = nullptr;
+  struct lws* wsi_ = nullptr;
+  struct lws_context* context_ = nullptr;
   WebSocketHandler* handler = nullptr;
   WebSocketConnection conn;
   std::vector<uint8_t> fragment_buf;
@@ -180,14 +182,13 @@ struct per_session_data {
 };
 
 // Retrieve the WebSocketServer instance stored in the lws context user data.
-inline WebSocketServer* GetServer(struct lws *wsi) {
-  return static_cast<WebSocketServer*>(
-      lws_context_user(lws_get_context(wsi)));
+inline WebSocketServer* GetServer(struct lws* wsi) {
+  return static_cast<WebSocketServer*>(lws_context_user(lws_get_context(wsi)));
 }
 
-int ws_callback(struct lws *wsi, enum lws_callback_reasons reason,
-                        void *user, void *in, size_t len) {
-  struct per_session_data *pss = static_cast<struct per_session_data *>(user);
+int ws_callback(struct lws* wsi, enum lws_callback_reasons reason, void* user,
+                void* in, size_t len) {
+  struct per_session_data* pss = static_cast<struct per_session_data*>(user);
   WebSocketServer* server = GetServer(wsi);
 
   switch (reason) {
@@ -211,7 +212,7 @@ int ws_callback(struct lws *wsi, enum lws_callback_reasons reason,
     }
 
     case LWS_CALLBACK_GET_THREAD_ID:
-      if (in) *(uint64_t *)in = (uint64_t)gettid();
+      if (in) *(uint64_t*)in = (uint64_t)gettid();
       break;
 
     case LWS_CALLBACK_LOCK_POLL:
@@ -220,115 +221,129 @@ int ws_callback(struct lws *wsi, enum lws_callback_reasons reason,
     case LWS_CALLBACK_UNLOCK_POLL:
       break;
 
-      case LWS_CALLBACK_EVENT_WAIT_CANCELLED: {
-        lws_start_foreach_llp(struct per_session_data **, ppss, server->pss_list_head_) {
-         std::lock_guard<std::mutex> lk(*(*ppss)->conn.mu_);
-         if (!(*ppss)->conn.pending_text_.empty() && !(*ppss)->pending_writable && !(*ppss)->conn.closed_) {
-           (*ppss)->pending_writable = true;
-           lws_callback_on_writable((*ppss)->wsi_);
-         }
-       } lws_end_foreach_llp(ppss, pss_list);
-       break;
-     }
-
-     case LWS_CALLBACK_RECEIVE: {
-       if (!pss || !pss->handler) return 0;
-
-       // Confirm validity to reset the keepalive/validity timer
-       lws_validity_confirmed(wsi);
-
-       if (lws_is_first_fragment(wsi)) {
-         pss->is_binary = lws_frame_is_binary(wsi);
-         pss->fragment_buf.clear();
-       }
-
-       pss->fragment_buf.insert(pss->fragment_buf.end(),
-                                 static_cast<const uint8_t *>(in),
-                                 static_cast<const uint8_t *>(in) + len);
-
-        if (lws_is_final_fragment(wsi)) {
-          LOG_DEBUG("RECEIVE: final fragment, is_binary=%d, len=%zu\n", pss->is_binary, pss->fragment_buf.size());
-          if (pss->is_binary) {
-            // Copy data to a local buffer before calling OnBinary to avoid memory issues
-            std::vector<uint8_t> data_copy(pss->fragment_buf.begin(), pss->fragment_buf.end());
-            pss->fragment_buf.clear();  // Clear before calling handler
-            pss->handler->OnBinary(pss->conn, data_copy.data(), data_copy.size());
-          } else {
-            std::string text(pss->fragment_buf.begin(), pss->fragment_buf.end());
-            pss->fragment_buf.clear();  // Clear before calling handler
-            pss->handler->OnText(pss->conn, text);
-          }
-          // Flush any pending text messages (VAD/ASR responses) that worker
-          // threads queued via SendText.  This is a safety net: it ensures
-          // messages are sent even if the EVENT_WAIT_CANCELLED→writable
-          // pipeline stalls (e.g. after flags were stuck *before* the fix in
-          // SERVER_WRITEABLE, or if lws_cancel_service from a worker thread
-          // races with the service thread).
-          {
-            std::lock_guard<std::mutex> lk(*pss->conn.mu_);
-            if (!pss->conn.pending_text_.empty() && !pss->conn.closed_) {
-              lws_callback_on_writable(wsi);
-            }
-          }
-          // Schedule completion in SERVER_WRITEABLE after response is flushed
-           if (server && server->serve_once_handler_) {
-            pss->message_processed = true;
-            lws_callback_on_writable(wsi);
-          }
-          break;
+    case LWS_CALLBACK_EVENT_WAIT_CANCELLED: {
+      lws_start_foreach_llp(struct per_session_data**, ppss,
+                            server->pss_list_head_) {
+        std::lock_guard<std::mutex> lk(*(*ppss)->conn.mu_);
+        if (!(*ppss)->conn.pending_text_.empty() &&
+            !(*ppss)->pending_writable && !(*ppss)->conn.closed_) {
+          (*ppss)->pending_writable = true;
+          lws_callback_on_writable((*ppss)->wsi_);
         }
-       break;
-     }
+      }
+      lws_end_foreach_llp(ppss, pss_list);
+      break;
+    }
 
-      case LWS_CALLBACK_SERVER_WRITEABLE: {
-        if (pss && pss->pending_open_send && pss->handler) {
-          pss->pending_open_send = false;
-          pss->handler->OnOpen(pss->conn);
+    case LWS_CALLBACK_RECEIVE: {
+      if (!pss || !pss->handler) return 0;
+
+      // Confirm validity to reset the keepalive/validity timer
+      lws_validity_confirmed(wsi);
+
+      if (lws_is_first_fragment(wsi)) {
+        pss->is_binary = lws_frame_is_binary(wsi);
+        pss->fragment_buf.clear();
+      }
+
+      pss->fragment_buf.insert(pss->fragment_buf.end(),
+                               static_cast<const uint8_t*>(in),
+                               static_cast<const uint8_t*>(in) + len);
+
+      if (lws_is_final_fragment(wsi)) {
+        LOG_DEBUG("RECEIVE: final fragment, is_binary=%d, len=%zu\n",
+                  pss->is_binary, pss->fragment_buf.size());
+        if (pss->is_binary) {
+          // Copy data to a local buffer before calling OnBinary to avoid memory
+          // issues
+          std::vector<uint8_t> data_copy(pss->fragment_buf.begin(),
+                                         pss->fragment_buf.end());
+          pss->fragment_buf.clear();  // Clear before calling handler
+          pss->handler->OnBinary(pss->conn, data_copy.data(), data_copy.size());
+        } else {
+          std::string text(pss->fragment_buf.begin(), pss->fragment_buf.end());
+          pss->fragment_buf.clear();  // Clear before calling handler
+          pss->handler->OnText(pss->conn, text);
         }
-        if (pss) {
-          std::vector<std::string> to_send;
-          {
-            std::lock_guard<std::mutex> lk(*pss->conn.mu_);
-            to_send.swap(pss->conn.pending_text_);
-          }
-          size_t sent = 0;
-          for (const auto& text : to_send) {
-            std::vector<uint8_t> buf(LWS_PRE + text.size());
-            std::memcpy(buf.data() + LWS_PRE, text.data(), text.size());
-            int ret = lws_write(pss->conn.wsi_, buf.data() + LWS_PRE, text.size(), LWS_WRITE_TEXT);
-            if (ret < 0) {
-              LOG_DEBUG("SERVER_WRITEABLE: lws_write failed (ret=%d), closing\n", ret);
-              pss->conn.closed_ = true;
-              lws_close_reason(pss->conn.wsi_, LWS_CLOSE_STATUS_NOSTATUS, nullptr, 0);
-              break;
-            }
-            ++sent;
-          }
-          // Reset flow-control flags so the next SendText/lws_cancel_service
-          // cycle can schedule a fresh writable callback.  This must happen
-          // *after* the send loop: when to_send was non-empty on entry the
-          // old code kept the flags set even after draining everything, which
-          // permanently blocked subsequent worker-thread messages.
-          {
-            std::lock_guard<std::mutex> lk(*pss->conn.mu_);
-            pss->pending_writable = false;
-            pss->conn.wakeup_pending_ = false;
-          }
-          if (sent < to_send.size() && !pss->conn.closed()) {
+        // Flush any pending text messages (VAD/ASR responses) that worker
+        // threads queued via SendText.  This is a safety net: it ensures
+        // messages are sent even if the EVENT_WAIT_CANCELLED→writable
+        // pipeline stalls (e.g. after flags were stuck *before* the fix in
+        // SERVER_WRITEABLE, or if lws_cancel_service from a worker thread
+        // races with the service thread).
+        {
+          std::lock_guard<std::mutex> lk(*pss->conn.mu_);
+          if (!pss->conn.pending_text_.empty() && !pss->conn.closed_) {
             lws_callback_on_writable(wsi);
           }
         }
-       if (pss && pss->message_processed && server && server->serve_once_handler_) {
-          server->serve_once_done_ = true;
-       }
-       break;
-     }
+        // Schedule completion in SERVER_WRITEABLE after response is flushed
+        if (server && server->serve_once_handler_) {
+          pss->message_processed = true;
+          lws_callback_on_writable(wsi);
+        }
+        break;
+      }
+      break;
+    }
+
+    case LWS_CALLBACK_SERVER_WRITEABLE: {
+      if (pss && pss->pending_open_send && pss->handler) {
+        pss->pending_open_send = false;
+        pss->handler->OnOpen(pss->conn);
+      }
+      if (pss) {
+        std::vector<std::string> to_send;
+        {
+          std::lock_guard<std::mutex> lk(*pss->conn.mu_);
+          to_send.swap(pss->conn.pending_text_);
+        }
+        size_t sent = 0;
+        for (const auto& text : to_send) {
+          std::vector<uint8_t> buf(LWS_PRE + text.size());
+          std::memcpy(buf.data() + LWS_PRE, text.data(), text.size());
+          int ret = lws_write(pss->conn.wsi_, buf.data() + LWS_PRE, text.size(),
+                              LWS_WRITE_TEXT);
+          if (ret < 0) {
+            LOG_DEBUG("SERVER_WRITEABLE: lws_write failed (ret=%d), closing\n",
+                      ret);
+            pss->conn.closed_ = true;
+            lws_close_reason(pss->conn.wsi_, LWS_CLOSE_STATUS_NOSTATUS, nullptr,
+                             0);
+            break;
+          }
+          ++sent;
+        }
+        // Reset flow-control flags so the next SendText/lws_cancel_service
+        // cycle can schedule a fresh writable callback.  This must happen
+        // *after* the send loop: when to_send was non-empty on entry the
+        // old code kept the flags set even after draining everything, which
+        // permanently blocked subsequent worker-thread messages.
+        {
+          std::lock_guard<std::mutex> lk(*pss->conn.mu_);
+          pss->pending_writable = false;
+          pss->conn.wakeup_pending_ = false;
+        }
+        if (sent < to_send.size() && !pss->conn.closed()) {
+          lws_callback_on_writable(wsi);
+        }
+      }
+      if (pss && pss->message_processed && server &&
+          server->serve_once_handler_) {
+        server->serve_once_done_ = true;
+      }
+      break;
+    }
 
     case LWS_CALLBACK_CLOSED:
     case LWS_CALLBACK_WS_PEER_INITIATED_CLOSE: {
-      LOG_DEBUG("CLOSED: reason=%d, pss=%p, handler=%p, closed_=%d\n", reason, (void*)pss, pss ? (void*)pss->handler : (void*)nullptr, pss ? pss->conn.closed_ : -1);
+      LOG_DEBUG("CLOSED: reason=%d, pss=%p, handler=%p, closed_=%d\n", reason,
+                (void*)pss, pss ? (void*)pss->handler : (void*)nullptr,
+                pss ? pss->conn.closed_ : -1);
       if (pss) {
-        if (server) lws_ll_fwd_remove(struct per_session_data, pss_list, pss, server->pss_list_head_);
+        if (server)
+          lws_ll_fwd_remove(struct per_session_data, pss_list, pss,
+                            server->pss_list_head_);
         pss->conn.closed_ = true;
       }
       if (pss && pss->handler) {
@@ -382,15 +397,12 @@ void WebSocketConnection::Close(uint16_t code) {
 
 WebSocketServer::WebSocketServer(int port) : port_(port) {}
 
-WebSocketServer::~WebSocketServer() {
-  Stop();
-}
+WebSocketServer::~WebSocketServer() { Stop(); }
 
 bool WebSocketServer::Start() {
   static struct lws_protocols protocols[] = {
       {"ws", ws_callback, sizeof(struct per_session_data), 0, 0, nullptr, 0},
-      {NULL, NULL, 0, 0, 0, nullptr, 0}
-  };
+      {NULL, NULL, 0, 0, 0, nullptr, 0}};
 
   struct lws_context_creation_info info;
   std::memset(&info, 0, sizeof(info));
@@ -407,7 +419,7 @@ bool WebSocketServer::Start() {
     return false;
   }
 
-  struct lws_vhost *vhost = lws_get_vhost_by_name(context_, "default");
+  struct lws_vhost* vhost = lws_get_vhost_by_name(context_, "default");
   if (vhost) {
     int actual_port = lws_get_vhost_port(vhost);
     if (actual_port > 0) {

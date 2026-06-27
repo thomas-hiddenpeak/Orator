@@ -6,7 +6,8 @@
 //
 // ProtocolTimeline owns all protocol-layer components and provides the unified
 // API: Register/Unregister pipelines, Publish messages (stored + routed),
-// Replay/LastRetained queries, and internal subscription for pipeline data flow.
+// Replay/LastRetained queries, and internal subscription for pipeline data
+// flow.
 
 #include <cstdint>
 #include <functional>
@@ -72,7 +73,8 @@ class ProtocolTimeline {
   Message const* LastRetained(const std::string& topic) const;
 
   // Configure per-topic retention/backend.
-  void SetTopicRetention(const std::string& topic, const TopicRetention& config);
+  void SetTopicRetention(const std::string& topic,
+                         const TopicRetention& config);
 
   // Clean up old data to prevent memory accumulation
   void CleanupOldData(double keep_until_sec);
@@ -88,7 +90,8 @@ class ProtocolTimeline {
   // Collects the event under mutex_, then dispatches via FireSystemEvents.
   void FireSystemEvent(const std::string& topic, const std::string& data);
   // Dispatch system events outside the lock.
-  void FireSystemEvents(const std::vector<std::pair<std::string, std::string>>& events);
+  void FireSystemEvents(
+      const std::vector<std::pair<std::string, std::string>>& events);
 
   std::unique_ptr<PipelineRegistry> registry_;
   std::unique_ptr<TopicRouter> router_;

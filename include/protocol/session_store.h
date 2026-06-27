@@ -20,9 +20,9 @@ namespace protocol {
 // Lightweight metadata returned by List().
 struct SessionInfo {
   std::string session_id;
-  double wall_clock_sec = 0.0;   // session_start_wall_sec from timeline
-  double audio_sec = 0.0;        // audio duration in seconds
-  size_t file_size = 0;          // JSON file size in bytes
+  double wall_clock_sec = 0.0;  // session_start_wall_sec from timeline
+  double audio_sec = 0.0;       // audio duration in seconds
+  size_t file_size = 0;         // JSON file size in bytes
 };
 
 class SessionStore {

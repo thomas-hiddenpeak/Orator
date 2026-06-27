@@ -40,8 +40,7 @@ void AuditoryStream::Start() {
     session_store_ = std::make_unique<protocol::SessionStore>(session_dir);
   }
   protocol_timeline_ = std::make_unique<protocol::ProtocolTimeline>(
-      128 * 1024 * 1024,
-      config_.storage_disk_path,
+      128 * 1024 * 1024, config_.storage_disk_path,
       "session_" + std::to_string(session_start_wall_sec_.load()));
 
   protocol::PipelineDescriptor ws_desc;
@@ -60,7 +59,8 @@ void AuditoryStream::Start() {
   protocol::PipelineDescriptor asr_desc;
   asr_desc.name = "asr";
   asr_desc.version = "1.0.0";
-  asr_desc.produces = {protocol::kAsrTranscript, protocol::kAsrTranscriptPartial};
+  asr_desc.produces = {protocol::kAsrTranscript,
+                       protocol::kAsrTranscriptPartial};
   asr_desc.consumes = {protocol::TopicPattern{"vad/+"}};
   asr_handle_ = protocol_timeline_->RegisterPipeline(std::move(asr_desc));
 
@@ -83,20 +83,19 @@ void AuditoryStream::Start() {
   }
 
   vad_sub_id_ = protocol_timeline_->SubscribeInternal(
-      protocol::TopicPattern{"vad/+"},
-      [this](const protocol::Message& msg) {
+      protocol::TopicPattern{"vad/+"}, [this](const protocol::Message& msg) {
         HandleVadSubscription(comp_, comp_mutex_, msg);
       });
   diar_sub_id_ = protocol_timeline_->SubscribeInternal(
-      protocol::TopicPattern{"diar/+"},
-      [this](const protocol::Message& msg) {
-        HandleDiarSubscription(comp_, comp_mutex_, msg,
+      protocol::TopicPattern{"diar/+"}, [this](const protocol::Message& msg) {
+        HandleDiarSubscription(
+            comp_, comp_mutex_, msg,
             [this](const std::string& rev_json) { EmitLocked(rev_json); });
       });
   asr_sub_id_ = protocol_timeline_->SubscribeInternal(
-      protocol::TopicPattern{"asr/+"},
-      [this](const protocol::Message& msg) {
-        HandleAsrSubscription(comp_, comp_mutex_, msg,
+      protocol::TopicPattern{"asr/+"}, [this](const protocol::Message& msg) {
+        HandleAsrSubscription(
+            comp_, comp_mutex_, msg,
             [this](const std::string& rev_json) { EmitLocked(rev_json); });
       });
 
@@ -124,7 +123,8 @@ void AuditoryStream::Start() {
   }
 
   if (!config_.diarizer_weights.empty()) {
-    diarizer_ = core::Registry<core::IDiarizer>::Instance().Create("sortformer");
+    diarizer_ =
+        core::Registry<core::IDiarizer>::Instance().Create("sortformer");
     core::DiarizationConfig dc;
     dc.sample_rate = config_.sample_rate;
     dc.max_speakers = config_.max_speakers;
@@ -142,7 +142,8 @@ void AuditoryStream::Start() {
     tuning.spkcache_refresh_rate = config_.diar_spkcache_refresh_rate;
     tuning.use_silence_profile = config_.diar_use_silence_profile ? 1 : 0;
     tuning.fifo_len = config_.diar_fifo_len;
-    static_cast<model::SortformerDiarizer*>(diarizer_.get())->ApplyStreamingTuning(tuning);
+    static_cast<model::SortformerDiarizer*>(diarizer_.get())
+        ->ApplyStreamingTuning(tuning);
     diar_stream_ = scheduler_.Register("diarization", /*priority_index=*/0,
                                        /*background=*/false,
                                        /*create_stream=*/true);
@@ -160,14 +161,14 @@ void AuditoryStream::Start() {
                                       /*create_stream=*/true);
     int greatest = 0, least = 0;
     scheduler_.PriorityRange(&greatest, &least);
-    LOG_INFO("[gpu-sched] priority range [greatest=%d, least=%d]; "
-             "asr at index 1 (foreground)\n",
-             greatest, least);
+    LOG_INFO(
+        "[gpu-sched] priority range [greatest=%d, least=%d]; "
+        "asr at index 1 (foreground)\n",
+        greatest, least);
   }
   if (align_on) {
-    aligner_ =
-        core::Registry<core::IForcedAligner>::Instance().Create(
-            "qwen3_forced_aligner");
+    aligner_ = core::Registry<core::IForcedAligner>::Instance().Create(
+        "qwen3_forced_aligner");
     aligner_->LoadWeights(config_.align_model_dir);
   }
   StartWorkers();
@@ -186,14 +187,12 @@ void AuditoryStream::StartWorkers() {
     dp.pad_offset = config_.diar_pad_offset;
     dp.min_dur_on = config_.diar_min_dur_on;
     dp.min_dur_off = config_.diar_min_dur_off;
-    diar_worker_ =
-        std::make_unique<DiarizationWorker>(diarizer_.get(), dp,
-            common_time_base(), diar_stream_);
+    diar_worker_ = std::make_unique<DiarizationWorker>(
+        diarizer_.get(), dp, common_time_base(), diar_stream_);
     diar_worker_->set_speaker_sink(
         [this](const std::vector<core::DiarSegment>& segs) {
           HandleSpeakerSink(comp_mutex_, last_segments_,
-                            protocol_timeline_.get(), diar_handle_.get(),
-                            segs);
+                            protocol_timeline_.get(), diar_handle_.get(), segs);
         });
     diar_audio_ = MakeAudioCache();
     diar_thread_ = std::thread([this] {
@@ -217,7 +216,8 @@ void AuditoryStream::StartWorkers() {
     p.max_audio_tokens = config_.asr_max_audio_tokens;
 
     // VAD gate: ASR reads VAD speech segments from local cache populated by
-    // ProtocolTimeline subscription. Eliminates O(N^2) Replay calls on hot path.
+    // ProtocolTimeline subscription. Eliminates O(N^2) Replay calls on hot
+    // path.
     vad_cache_ = std::make_unique<orator::pipeline::AsrWorker::VadCache>();
 
     // Subscribe to VAD events from ProtocolTimeline to populate the cache.
@@ -238,15 +238,14 @@ void AuditoryStream::StartWorkers() {
           if (h >= 0.0) vad_cache_->set_horizon(h);
         });
 
-    asr_worker_ = std::make_unique<AsrWorker>(asr_.get(), p,
-        [this](const std::string& json) { EmitLocked(json); },
+    asr_worker_ = std::make_unique<AsrWorker>(
+        asr_.get(), p, [this](const std::string& json) { EmitLocked(json); },
         common_time_base(), asr_stream_, vad_cache_.get());
-    asr_worker_->set_text_sink(
-        [this](long id, double start, double end, const std::string& text,
-               bool is_final) {
-          HandleTextSink(protocol_timeline_.get(), asr_handle_.get(),
-                         id, start, end, text, is_final);
-        });
+    asr_worker_->set_text_sink([this](long id, double start, double end,
+                                      const std::string& text, bool is_final) {
+      HandleTextSink(protocol_timeline_.get(), asr_handle_.get(), id, start,
+                     end, text, is_final);
+    });
     asr_audio_ = MakeAudioCache();
     asr_thread_ = std::thread([this] {
       std::vector<float> chunk;
@@ -272,13 +271,13 @@ void AuditoryStream::StartWorkers() {
     ap.max_segment_sec = config_.align_max_segment_sec;
     align_worker_ = std::make_unique<AlignWorker>(
         aligner_.get(), align_audio_.get(), ap, common_time_base());
-    align_worker_->set_sink(
-        [this](long id, double seg_start, double seg_end,
-               const std::vector<core::AlignUnit>& units) {
-          HandleAlignSink(protocol_timeline_.get(), align_handle_.get(),
-                          [this](const std::string& j) { EmitLocked(j); },
-                          id, seg_start, seg_end, units);
-        });
+    align_worker_->set_sink([this](long id, double seg_start, double seg_end,
+                                   const std::vector<core::AlignUnit>& units) {
+      HandleAlignSink(
+          protocol_timeline_.get(), align_handle_.get(),
+          [this](const std::string& j) { EmitLocked(j); }, id, seg_start,
+          seg_end, units);
+    });
     align_worker_->Start();
   }
   if (config_.vad_stream) {
@@ -297,8 +296,7 @@ void AuditoryStream::StartWorkers() {
     core::Registry<core::IVad>::Instance().Register(
         "silero_vad",
         [vad_params_ptr] { return std::make_unique<GpuVad>(*vad_params_ptr); });
-    vad_detector_ =
-        core::Registry<core::IVad>::Instance().Create("silero_vad");
+    vad_detector_ = core::Registry<core::IVad>::Instance().Create("silero_vad");
     vad_audio_ = MakeAudioCache();
     vad_thread_ = std::thread([this] {
       const core::TimeBase tb = common_time_base();
@@ -340,17 +338,17 @@ void AuditoryStream::StartWorkers() {
       drain(/*finalize=*/true);
       // Final horizon = everything fed is now decided; lets ASR skip any
       // trailing silence before its own finalize.
-      PublishVadProgress(protocol_timeline_.get(), vad_handle_.get(),
-                         tb.SecondsAt(span_start_abs +
-                                      static_cast<long>(chunk.size())));
+      PublishVadProgress(
+          protocol_timeline_.get(), vad_handle_.get(),
+          tb.SecondsAt(span_start_abs + static_cast<long>(chunk.size())));
       progress_cv_.notify_all();
     });
   }
   if (config_.gpu_telemetry_interval_sec > 0.0) {
     telemetry_stop_ = false;
     telemetry_thread_ = std::thread([this] {
-      const auto interval = std::chrono::duration<double>(
-          config_.gpu_telemetry_interval_sec);
+      const auto interval =
+          std::chrono::duration<double>(config_.gpu_telemetry_interval_sec);
       for (;;) {
         {
           std::unique_lock<std::mutex> lk(telemetry_mutex_);
@@ -363,18 +361,18 @@ void AuditoryStream::StartWorkers() {
       }
     });
   }
-  
+
   // Cursor progress telemetry thread
   if (config_.cursor_telemetry_interval_sec > 0.0) {
     cursor_telemetry_stop_ = false;
     cursor_telemetry_thread_ = std::thread([this] {
-      const auto interval = std::chrono::duration<double>(
-          config_.cursor_telemetry_interval_sec);
+      const auto interval =
+          std::chrono::duration<double>(config_.cursor_telemetry_interval_sec);
       for (;;) {
         {
           std::unique_lock<std::mutex> lk(cursor_telemetry_mutex_);
-          cursor_telemetry_cv_.wait_for(lk, interval,
-                                        [this] { return cursor_telemetry_stop_; });
+          cursor_telemetry_cv_.wait_for(
+              lk, interval, [this] { return cursor_telemetry_stop_; });
           if (cursor_telemetry_stop_) break;
         }
         const std::string msg = SerializeCursorTelemetry();
@@ -393,14 +391,14 @@ void AuditoryStream::StopWorkers() {
   }
   telemetry_cv_.notify_all();
   if (telemetry_thread_.joinable()) telemetry_thread_.join();
-  
+
   {
     std::lock_guard<std::mutex> lk(cursor_telemetry_mutex_);
     cursor_telemetry_stop_ = true;
   }
   cursor_telemetry_cv_.notify_all();
   if (cursor_telemetry_thread_.joinable()) cursor_telemetry_thread_.join();
-  
+
   if (diar_audio_) diar_audio_->Close();
   if (asr_audio_) asr_audio_->Close();
   if (vad_audio_) vad_audio_->Close();
@@ -453,7 +451,8 @@ std::string AuditoryStream::SerializeCursorTelemetry() const {
   json += "]";
 
   // Add lag warnings if configured.
-  if (config_.cursor_lag_warn_samples > 0 || config_.cursor_lag_critical_samples > 0) {
+  if (config_.cursor_lag_warn_samples > 0 ||
+      config_.cursor_lag_critical_samples > 0) {
     json += ",\"lags\":{";
     bool first_lag = true;
     for (const auto& c : caches) {
@@ -540,7 +539,8 @@ void AuditoryStream::Reset() {
   if (session_store_ && session_store_->enabled()) {
     std::string timeline_json = Serialize();
     const auto now = std::chrono::system_clock::now();
-    double wall_sec = std::chrono::duration<double>(now.time_since_epoch()).count();
+    double wall_sec =
+        std::chrono::duration<double>(now.time_since_epoch()).count();
     char session_id_buf[64];
     std::snprintf(session_id_buf, sizeof(session_id_buf), "%08x%08x",
                   static_cast<unsigned>(static_cast<long long>(wall_sec)),

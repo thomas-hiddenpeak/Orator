@@ -10,7 +10,10 @@ using namespace orator;
 
 static std::vector<float> ReadF32(const std::string& p, bool* ok) {
   std::ifstream f(p, std::ios::binary | std::ios::ate);
-  if (!f) { *ok = false; return {}; }
+  if (!f) {
+    *ok = false;
+    return {};
+  }
   std::streamsize n = f.tellg();
   f.seekg(0);
   std::vector<float> v(n / sizeof(float));
@@ -32,7 +35,8 @@ int main() {
 
   const int n_mels = 128;
   const int ref_frames = static_cast<int>(ref.size()) / n_mels;
-  std::printf("  wav=%zu samples, ref mel=[%d, %d]\n", wav.size(), n_mels, ref_frames);
+  std::printf("  wav=%zu samples, ref mel=[%d, %d]\n", wav.size(), n_mels,
+              ref_frames);
 
   feature::WhisperMel mel{};
   int frames = 0;
@@ -51,7 +55,8 @@ int main() {
     max_abs = e > max_abs ? e : max_abs;
     sum_abs += e;
   }
-  std::printf("  max abs err = %.3e, mean abs err = %.3e\n", max_abs, sum_abs / n);
+  std::printf("  max abs err = %.3e, mean abs err = %.3e\n", max_abs,
+              sum_abs / n);
 
   // The reference itself notes ~1e-5 tolerance vs Whisper's torch path; our
   // direct-DFT power spectrum + Slaney filterbank should be well within 1e-2.

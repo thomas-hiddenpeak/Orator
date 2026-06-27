@@ -16,8 +16,8 @@
 // This class is independent of the transport: results are delivered through the
 // `Emit` callback as JSON strings (incremental {"type":"asr",...} messages from
 // the ASR worker, and the {"type":"timeline",...} document on flush/end). It
-// contains no socket code; the WebSocket handler and the streaming test drive it
-// through the same interface.
+// contains no socket code; the WebSocket handler and the streaming test drive
+// it through the same interface.
 
 #include <atomic>
 #include <condition_variable>
@@ -40,8 +40,8 @@
 #include "pipeline/diarization_worker.h"
 #include "pipeline/pipeline_audio_cache.h"
 #include "pipeline/retained_audio_buffer.h"
-// Forward declarations for protocol types (layering: pipeline depends on protocol
-// interfaces only, not includes).
+// Forward declarations for protocol types (layering: pipeline depends on
+// protocol interfaces only, not includes).
 namespace orator {
 namespace protocol {
 class ProtocolTimeline;
@@ -67,7 +67,7 @@ class AuditoryStream {
 
     // ── Server ───────────────────────────────────────────────────────
     int port = 8765;
-    int ui_port = 0;        // 0 = auto (port+1)
+    int ui_port = 0;  // 0 = auto (port+1)
     std::string ui_root = "web";
 
     // ── ASR pipeline ─────────────────────────────────────────────────
@@ -84,8 +84,8 @@ class AuditoryStream {
     bool asr_profile = false;
 
     // ── Forced alignment pipeline ────────────────────────────────────
-    std::string align_model_dir = "";   // empty = forced aligner disabled
-    bool align_enable = false;           // master switch (also needs model dir)
+    std::string align_model_dir = "";  // empty = forced aligner disabled
+    bool align_enable = false;         // master switch (also needs model dir)
     std::string align_language = "Chinese";
     double align_max_segment_sec = 300.0;  // skip absurdly long spans
     double align_retain_sec = 180.0;       // retained audio window for readback
@@ -103,30 +103,31 @@ class AuditoryStream {
     double diar_merge_gap_sec = 0.8;
     double diar_deliver_interval_sec = 1.0;
     // Sortformer streaming tuning (affects speaker segmentation quality)
-    int diar_spkcache_len = 188;           // speaker cache length (frames)
-    int diar_chunk_len = 340;              // processing chunk size (frames)
-    int diar_spkcache_update_period = 300; // cache update interval (frames)
-    int diar_chunk_left_context = 1;       // left context chunks
-    int diar_chunk_right_context = 40;     // right context chunks
-    int diar_spkcache_sil_frames = 5;      // silent frames before cache reset
-    int diar_fifo_len = 0;                // FIFO length for async streaming (0=off)
-    int diar_spkcache_refresh_rate = 0;   // cache refresh cadence (0=drain all)
-    bool diar_use_silence_profile = false;// v2.1: use silence profile in cache
+    int diar_spkcache_len = 188;            // speaker cache length (frames)
+    int diar_chunk_len = 340;               // processing chunk size (frames)
+    int diar_spkcache_update_period = 300;  // cache update interval (frames)
+    int diar_chunk_left_context = 1;        // left context chunks
+    int diar_chunk_right_context = 40;      // right context chunks
+    int diar_spkcache_sil_frames = 5;       // silent frames before cache reset
+    int diar_fifo_len = 0;  // FIFO length for async streaming (0=off)
+    int diar_spkcache_refresh_rate = 0;  // cache refresh cadence (0=drain all)
+    bool diar_use_silence_profile =
+        false;  // v2.1: use silence profile in cache
     // Onset/offset post-processing (NeMo-style double threshold)
-    double diar_onset = 0.45;              // probability to START a segment
-    double diar_offset = 0.25;             // probability to END a segment (lower = sticky)
-    double diar_pad_onset = 0.0;           // extra time added before each segment start
-    double diar_pad_offset = 0.0;          // extra time added after each segment end
-    double diar_min_dur_on = 0.5;          // minimum segment duration (seconds)
-    double diar_min_dur_off = 1.0;         // minimum gap to merge segments (seconds)
+    double diar_onset = 0.45;   // probability to START a segment
+    double diar_offset = 0.25;  // probability to END a segment (lower = sticky)
+    double diar_pad_onset = 0.0;   // extra time added before each segment start
+    double diar_pad_offset = 0.0;  // extra time added after each segment end
+    double diar_min_dur_on = 0.5;  // minimum segment duration (seconds)
+    double diar_min_dur_off = 1.0;  // minimum gap to merge segments (seconds)
 
     // ── Storage ──────────────────────────────────────────────────────
     std::string storage_disk_path = "/tmp/orator/storage/";
     std::string session_dir;
 
     // ── Buffer ───────────────────────────────────────────────────────
-    size_t buffer_max_samples = 0;        // 0 = no limit
-    size_t buffer_shrink_threshold = 10000000; // 10M samples ~ 40MB
+    size_t buffer_max_samples = 0;              // 0 = no limit
+    size_t buffer_shrink_threshold = 10000000;  // 10M samples ~ 40MB
 
     // ── Telemetry ────────────────────────────────────────────────────
     double gpu_telemetry_interval_sec = 0.0;
@@ -137,14 +138,14 @@ class AuditoryStream {
     size_t cursor_lag_critical_samples = 0;
 
     // ── Debug ────────────────────────────────────────────────────────
-    int log_level = 2;   // 0=DEBUG, 1=INFO, 2=WARN, 3=ERROR
+    int log_level = 2;  // 0=DEBUG, 1=INFO, 2=WARN, 3=ERROR
     bool timebase_check = false;
     bool stream_progress = false;
   };
 
-  // Delivers a result event as a JSON string. Invoked from the ASR worker thread
-  // (incremental events) and from the controller (timeline); the controller
-  // serializes these calls so the transport sees one at a time.
+  // Delivers a result event as a JSON string. Invoked from the ASR worker
+  // thread (incremental events) and from the controller (timeline); the
+  // controller serializes these calls so the transport sees one at a time.
   using Emit = std::function<void(const std::string&)>;
 
   AuditoryStream(const Config& config, Emit emit);
@@ -173,13 +174,17 @@ class AuditoryStream {
   void Reset();
 
   bool asr_enabled() const { return asr_ != nullptr; }
-  const std::vector<core::DiarSegment>& diar_segments() const { return last_segments_; }
+  const std::vector<core::DiarSegment>& diar_segments() const {
+    return last_segments_;
+  }
   const core::Transcript& transcript() const { return last_transcript_; }
   double audio_sec() const;
   double diar_compute_sec() const;
   double asr_compute_sec() const;
 
-  double session_start_wall_sec() const { return session_start_wall_sec_.load(); }
+  double session_start_wall_sec() const {
+    return session_start_wall_sec_.load();
+  }
   bool wall_clock_ok() const { return wall_clock_ok_.load(); }
 
   // Spec 004 Phase 12: access to protocol timeline for describe command.
@@ -188,16 +193,14 @@ class AuditoryStream {
   }
 
   // Spec 004 Phase 13: access to session store for session list/load.
-  protocol::SessionStore* session_store() const {
-    return session_store_.get();
-  }
+  protocol::SessionStore* session_store() const { return session_store_.get(); }
 
  private:
-  void StartWorkers();           // start diar + asr threads
-  void StopWorkers();            // close buffer, join threads
+  void StartWorkers();  // start diar + asr threads
+  void StopWorkers();   // close buffer, join threads
   // Block until both workers have processed up to `target_samples`.
   void WaitForBarrier(long target_samples);
-  std::string Serialize();       // build the comprehensive timeline JSON
+  std::string Serialize();  // build the comprehensive timeline JSON
   // Serialize one revision (Spec 004) to a {"type":"revision",...} message.
   static std::string SerializeRevision(const ComprehensiveTimeline::Revision& r,
                                        const char* source);
@@ -229,7 +232,8 @@ class AuditoryStream {
 
   std::unique_ptr<core::IDiarizer> diarizer_;
   std::unique_ptr<core::IAsr> asr_;  // null when ASR disabled
-  std::unique_ptr<core::IForcedAligner> aligner_;  // null when alignment disabled
+  std::unique_ptr<core::IForcedAligner>
+      aligner_;  // null when alignment disabled
 
   // Per-pipeline private audio caches (Constitution Art. III). PushAudio fans
   // each frame out to every active cache; each worker drains only its own.
@@ -256,14 +260,15 @@ class AuditoryStream {
   std::thread vad_thread_;
 
   // Spec 002: per-pipeline GPU stream priority registry. Each pipeline declares
-  // a priority index + class at registration and (when stream-routed) receives a
-  // prioritized CUDA stream owned by the scheduler. It is also the single source
-  // of truth for the GPU-scheduling telemetry snapshot.
+  // a priority index + class at registration and (when stream-routed) receives
+  // a prioritized CUDA stream owned by the scheduler. It is also the single
+  // source of truth for the GPU-scheduling telemetry snapshot.
   gpu::GpuScheduler scheduler_;
   // Per-pipeline GPU streams sourced from the scheduler (owned by it).
   cudaStream_t diar_stream_ = nullptr;
   cudaStream_t asr_stream_ = nullptr;
-  // VAD pipeline GPU stream, sourced from the scheduler (owned by it, not here).
+  // VAD pipeline GPU stream, sourced from the scheduler (owned by it, not
+  // here).
   cudaStream_t vad_stream_ = nullptr;
 
   // Wakes WaitForBarrier whenever a worker advances or finishes.

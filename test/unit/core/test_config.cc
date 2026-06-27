@@ -12,23 +12,29 @@ using namespace orator;
 
 static int fails = 0;
 
-#define CHECK(cond, msg)                                                \
-  do {                                                                  \
-    if (!(cond)) {                                                      \
+#define CHECK(cond, msg)                                                    \
+  do {                                                                      \
+    if (!(cond)) {                                                          \
       std::fprintf(stderr, "  FAIL [%s:%d] %s\n", __FILE__, __LINE__, msg); \
-      ++fails;                                                          \
-    } else {                                                            \
-      std::printf("  OK %s\n", msg);                                    \
-    }                                                                   \
+      ++fails;                                                              \
+    } else {                                                                \
+      std::printf("  OK %s\n", msg);                                        \
+    }                                                                       \
   } while (0)
 
 // Write a string to a temp file and return the path.
 static std::string WriteTemp(const char* content) {
   char path[] = "/tmp/orator_test_config_XXXXXX";
   int fd = mkstemp(path);
-  if (fd == -1) { std::perror("mkstemp"); std::abort(); }
+  if (fd == -1) {
+    std::perror("mkstemp");
+    std::abort();
+  }
   FILE* f = fdopen(fd, "w");
-  if (!f) { std::perror("fdopen"); std::abort(); }
+  if (!f) {
+    std::perror("fdopen");
+    std::abort();
+  }
   std::fprintf(f, "%s", content);
   std::fclose(f);
   return path;
@@ -108,7 +114,8 @@ gpu_scheduling = "concurrent"
     CHECK(cfg.asr_max_audio_tokens == 2000, "cfg.asr_max_audio_tokens == 2000");
     CHECK(cfg.asr_segment_sec == 30.0, "cfg.asr_segment_sec == 30.0");
     CHECK(cfg.asr_language == "English", "cfg.asr_language == English");
-    CHECK(cfg.asr_system_prompt == "Translate to French", "cfg.asr_system_prompt");
+    CHECK(cfg.asr_system_prompt == "Translate to French",
+          "cfg.asr_system_prompt");
     CHECK(cfg.asr_ban_steps == 5, "cfg.asr_ban_steps == 5");
     CHECK(cfg.asr_decode_batch == 8, "cfg.asr_decode_batch == 8");
     CHECK(cfg.asr_profile == true, "cfg.asr_profile == true");
@@ -122,24 +129,28 @@ gpu_scheduling = "concurrent"
     CHECK(cfg.vad_speech_pad_ms == 80, "cfg.vad_speech_pad_ms == 80");
 
     // [diarizer]
-    CHECK(cfg.diarizer_weights == "/models/diar/custom.safetensors", "cfg.diarizer_weights");
+    CHECK(cfg.diarizer_weights == "/models/diar/custom.safetensors",
+          "cfg.diarizer_weights");
     CHECK(cfg.max_speakers == 8, "cfg.max_speakers == 8");
     CHECK(cfg.diar_threshold == 0.6f, "cfg.diar_threshold == 0.6");
     CHECK(cfg.diar_merge_gap_sec == 1.0, "cfg.diar_merge_gap_sec == 1.0");
-    CHECK(cfg.diar_deliver_interval_sec == 2.0, "cfg.diar_deliver_interval_sec == 2.0");
+    CHECK(cfg.diar_deliver_interval_sec == 2.0,
+          "cfg.diar_deliver_interval_sec == 2.0");
 
     // [storage]
     CHECK(cfg.storage_disk_path == "/custom/storage", "cfg.storage_disk_path");
     CHECK(cfg.session_dir == "/custom/sessions", "cfg.session_dir");
 
     // [telemetry]
-    CHECK(cfg.gpu_telemetry_interval_sec == 5.0, "cfg.gpu_telemetry_interval_sec == 5.0");
+    CHECK(cfg.gpu_telemetry_interval_sec == 5.0,
+          "cfg.gpu_telemetry_interval_sec == 5.0");
 
     // [debug]
     CHECK(cfg.log_level == 1, "cfg.log_level == 1");
     CHECK(cfg.timebase_check == true, "cfg.timebase_check == true");
     CHECK(cfg.stream_progress == true, "cfg.stream_progress == true");
-    CHECK(cfg.gpu_scheduling_mode == 2, "cfg.gpu_scheduling_mode == 2 (concurrent)");
+    CHECK(cfg.gpu_scheduling_mode == 2,
+          "cfg.gpu_scheduling_mode == 2 (concurrent)");
 
     std::remove(path.c_str());
   }
@@ -153,11 +164,14 @@ gpu_scheduling = "concurrent"
     cfg.asr_vad_gate = false;
     cfg.vad_threshold = 0.9f;
 
-    bool ok = io::ApplyTomlConfig("/tmp/orator_nonexistent_config_XXXXXX.toml", cfg);
+    bool ok =
+        io::ApplyTomlConfig("/tmp/orator_nonexistent_config_XXXXXX.toml", cfg);
     CHECK(!ok, "ApplyTomlConfig returns false for missing file");
     CHECK(cfg.port == 1234, "cfg.port unchanged after missing file");
-    CHECK(cfg.asr_vad_gate == false, "cfg.asr_vad_gate unchanged after missing file");
-    CHECK(cfg.vad_threshold == 0.9f, "cfg.vad_threshold unchanged after missing file");
+    CHECK(cfg.asr_vad_gate == false,
+          "cfg.asr_vad_gate unchanged after missing file");
+    CHECK(cfg.vad_threshold == 0.9f,
+          "cfg.vad_threshold unchanged after missing file");
   }
 
   // ── Malformed TOML ──────────────────────────────────────────────────
@@ -196,7 +210,8 @@ port = 7777
     CHECK(ok, "ApplyTomlConfig returns true for partial TOML");
     CHECK(cfg.port == 7777, "cfg.port == 7777 from partial TOML");
     // Fields not in the TOML should retain their original values
-    CHECK(cfg.asr_vad_gate == true, "cfg.asr_vad_gate unchanged (not in partial TOML)");
+    CHECK(cfg.asr_vad_gate == true,
+          "cfg.asr_vad_gate unchanged (not in partial TOML)");
 
     std::remove(path.c_str());
   }

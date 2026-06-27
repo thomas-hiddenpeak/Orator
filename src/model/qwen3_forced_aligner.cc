@@ -11,8 +11,8 @@ namespace orator {
 namespace model {
 namespace {
 AsrAudioConfig AlignerAudioConfig() {
-  AsrAudioConfig c;       // defaults already match the aligner encoder
-  c.output_dim = 1024;    // aligner projects to 1024 (ASR uses 2048)
+  AsrAudioConfig c;     // defaults already match the aligner encoder
+  c.output_dim = 1024;  // aligner projects to 1024 (ASR uses 2048)
   return c;
 }
 constexpr double kTimestampSegmentMs = 80.0;
@@ -48,7 +48,8 @@ std::vector<core::AlignUnit> Qwen3ForcedAligner::Align(
   std::vector<float> mel = mel_.Compute(pcm, n, &n_frames);
   const auto t_mel = now();
   int n_audio = 0;
-  std::vector<float> audio_feats = tower_.Forward(mel.data(), n_frames, &n_audio);
+  std::vector<float> audio_feats =
+      tower_.Forward(mel.data(), n_frames, &n_audio);
   const auto t_tower = now();
 
   // 3. word tokenisation -> 4. assemble input_ids.
@@ -76,7 +77,10 @@ std::vector<core::AlignUnit> Qwen3ForcedAligner::Align(
     int best = 0;
     float bestv = row[0];
     for (int j = 1; j < NL; ++j)
-      if (row[j] > bestv) { bestv = row[j]; best = j; }
+      if (row[j] > bestv) {
+        bestv = row[j];
+        best = j;
+      }
     raw_ms.push_back(static_cast<double>(best) * kTimestampSegmentMs);
   }
   std::vector<long> fixed = FixTimestamps(raw_ms);
@@ -86,11 +90,11 @@ std::vector<core::AlignUnit> Qwen3ForcedAligner::Align(
     auto ms = [](auto a, auto b) {
       return std::chrono::duration<double, std::milli>(b - a).count();
     };
-    LOG_INFO("[align-profile] mel=%.1fms tower=%.1fms asm=%.1fms lm=%.1fms "
-             "decode=%.1fms (T=%zu n_audio=%d words=%zu)\n",
-             ms(t0, t_mel), ms(t_mel, t_tower), ms(t_tower, t_asm),
-             ms(t_asm, t_lm), ms(t_lm, now()), input_ids.size(), n_audio,
-             words.size());
+    LOG_INFO(
+        "[align-profile] mel=%.1fms tower=%.1fms asm=%.1fms lm=%.1fms "
+        "decode=%.1fms (T=%zu n_audio=%d words=%zu)\n",
+        ms(t0, t_mel), ms(t_mel, t_tower), ms(t_tower, t_asm), ms(t_asm, t_lm),
+        ms(t_lm, now()), input_ids.size(), n_audio, words.size());
   }
   return units;
 }

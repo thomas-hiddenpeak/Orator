@@ -30,22 +30,19 @@ namespace pipeline {
 class ComprehensiveTimeline;
 
 // VAD subscription: parse {"start":..., "end":...} → comp_.AddVad()
-void HandleVadSubscription(ComprehensiveTimeline& comp,
-                           std::mutex& comp_mutex,
+void HandleVadSubscription(ComprehensiveTimeline& comp, std::mutex& comp_mutex,
                            const protocol::Message& msg);
 
 // Diar subscription: parse {"segments":[{...},...]} → comp_.ReplaceSpeakers()
 // emit_rev is called outside comp_mutex for each revision produced.
-void HandleDiarSubscription(ComprehensiveTimeline& comp,
-                            std::mutex& comp_mutex,
+void HandleDiarSubscription(ComprehensiveTimeline& comp, std::mutex& comp_mutex,
                             const protocol::Message& msg,
                             RevisionEmitter emit_rev);
 
 // ASR subscription: parse {"id":..., "start":..., "end":..., "text":"..."}
 // → comp_.UpsertText(). emit_rev is called outside comp_mutex for each
 // revision produced.
-void HandleAsrSubscription(ComprehensiveTimeline& comp,
-                           std::mutex& comp_mutex,
+void HandleAsrSubscription(ComprehensiveTimeline& comp, std::mutex& comp_mutex,
                            const protocol::Message& msg,
                            RevisionEmitter emit_rev);
 
@@ -68,9 +65,8 @@ void HandleSpeakerSink(std::mutex& comp_mutex,
 // aligner subscribes to asr/transcript only, so it aligns each segment once,
 // against its finalized text -- not every partial revision.
 void HandleTextSink(protocol::ProtocolTimeline* protocol_timeline,
-                    protocol::PipelineHandle* asr_handle,
-                    long id, double start, double end,
-                    const std::string& text, bool is_final);
+                    protocol::PipelineHandle* asr_handle, long id, double start,
+                    double end, const std::string& text, bool is_final);
 
 // Align sink callback: forced-alignment worker → protocol publish + WS emit.
 // Builds the align/units message (per-unit timestamps for one transcript
@@ -78,17 +74,15 @@ void HandleTextSink(protocol::ProtocolTimeline* protocol_timeline,
 // the transport so the client receives the alignment incrementally.
 void HandleAlignSink(protocol::ProtocolTimeline* protocol_timeline,
                      protocol::PipelineHandle* align_handle,
-                     const RevisionEmitter& emit,
-                     long id, double seg_start, double seg_end,
-                     const std::vector<core::AlignUnit>& units);
+                     const RevisionEmitter& emit, long id, double seg_start,
+                     double seg_end, const std::vector<core::AlignUnit>& units);
 
 // VAD drain: extract segments from IVad and publish to protocol timeline.
 void HandleVadDrain(core::IVad* vad_detector,
                     protocol::ProtocolTimeline* protocol_timeline,
                     protocol::PipelineHandle* vad_handle,
                     const core::TimeBase& tb,
-                    std::vector<core::VadSegmentResult>* segs,
-                    bool finalize);
+                    std::vector<core::VadSegmentResult>* segs, bool finalize);
 
 // Publish a VAD progress/horizon heartbeat: the absolute time (common clock)
 // up to which VAD has processed and confirmed silence, so ASR can skip

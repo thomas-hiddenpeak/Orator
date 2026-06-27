@@ -94,11 +94,13 @@ void SafeTensorReader::ParseHeader(const std::string& header_json) {
         const size_t last = tok.find_last_not_of(" \t\n");
         if (last != std::string::npos) tok.erase(last + 1);
         if (!tok.empty()) {
-  try { meta.shape.push_back(std::stoll(tok)); }
-  catch (const std::exception&) {
-    throw std::runtime_error("safetensors: invalid header entry: '" + tok + "'");
-  }
-}
+          try {
+            meta.shape.push_back(std::stoll(tok));
+          } catch (const std::exception&) {
+            throw std::runtime_error("safetensors: invalid header entry: '" +
+                                     tok + "'");
+          }
+        }
       }
     }
 
@@ -121,11 +123,13 @@ void SafeTensorReader::ParseHeader(const std::string& header_json) {
         const size_t last = tok.find_last_not_of(" \t\n");
         if (last != std::string::npos) tok.erase(last + 1);
         if (!tok.empty()) {
-  try { offs.push_back(std::stoll(tok)); }
-  catch (const std::exception&) {
-    throw std::runtime_error("safetensors: invalid offset entry: '" + tok + "'");
-  }
-}
+          try {
+            offs.push_back(std::stoll(tok));
+          } catch (const std::exception&) {
+            throw std::runtime_error("safetensors: invalid offset entry: '" +
+                                     tok + "'");
+          }
+        }
       }
       if (offs.size() >= 2) {
         meta.data_offset = static_cast<int64_t>(data_base) + offs[0];

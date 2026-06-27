@@ -38,10 +38,14 @@ std::vector<std::string> Utf8Chars(const std::string& s) {
   while (i < s.size()) {
     const unsigned char c = static_cast<unsigned char>(s[i]);
     size_t len = 1;
-    if ((c & 0x80) == 0) len = 1;
-    else if ((c & 0xE0) == 0xC0) len = 2;
-    else if ((c & 0xF0) == 0xE0) len = 3;
-    else if ((c & 0xF8) == 0xF0) len = 4;
+    if ((c & 0x80) == 0)
+      len = 1;
+    else if ((c & 0xE0) == 0xC0)
+      len = 2;
+    else if ((c & 0xF0) == 0xE0)
+      len = 3;
+    else if ((c & 0xF8) == 0xF0)
+      len = 4;
     out.push_back(s.substr(i, len));
     i += len;
   }
@@ -75,29 +79,53 @@ void BuildByteUnicode(std::unordered_map<int, std::string>* b2u,
 std::string Unescape(const std::string& s) {
   std::string out;
   for (size_t i = 0; i < s.size(); ++i) {
-    if (s[i] != '\\') { out += s[i]; continue; }
+    if (s[i] != '\\') {
+      out += s[i];
+      continue;
+    }
     ++i;
     if (i >= s.size()) break;
     switch (s[i]) {
-      case 'n': out += '\n'; break;
-      case 't': out += '\t'; break;
-      case 'r': out += '\r'; break;
-      case 'b': out += '\b'; break;
-      case 'f': out += '\f'; break;
-      case '"': out += '"'; break;
-      case '\\': out += '\\'; break;
-      case '/': out += '/'; break;
+      case 'n':
+        out += '\n';
+        break;
+      case 't':
+        out += '\t';
+        break;
+      case 'r':
+        out += '\r';
+        break;
+      case 'b':
+        out += '\b';
+        break;
+      case 'f':
+        out += '\f';
+        break;
+      case '"':
+        out += '"';
+        break;
+      case '\\':
+        out += '\\';
+        break;
+      case '/':
+        out += '/';
+        break;
       case 'u': {
         if (i + 4 < s.size()) {
           int cp = 0;
-          try { cp = std::stoi(s.substr(i + 1, 4), nullptr, 16); }
-          catch (const std::exception&) { cp = 0xFFFD; }
+          try {
+            cp = std::stoi(s.substr(i + 1, 4), nullptr, 16);
+          } catch (const std::exception&) {
+            cp = 0xFFFD;
+          }
           out += Utf8(cp);
           i += 4;
         }
         break;
       }
-      default: out += s[i]; break;
+      default:
+        out += s[i];
+        break;
     }
   }
   return out;
@@ -128,7 +156,10 @@ bool BpeTokenizer::Load(const std::string& model_dir) {
     // find closing quote, respecting escapes
     size_t q1 = q0 + 1;
     while (q1 < vjson.size()) {
-      if (vjson[q1] == '\\') { q1 += 2; continue; }
+      if (vjson[q1] == '\\') {
+        q1 += 2;
+        continue;
+      }
       if (vjson[q1] == '"') break;
       ++q1;
     }
@@ -141,8 +172,11 @@ bool BpeTokenizer::Load(const std::string& model_dir) {
     while (ne < vjson.size() && (isdigit(vjson[ne]) || vjson[ne] == '-')) ++ne;
     if (ne == ns) break;
     int id = -1;
-    try { id = std::stoi(vjson.substr(ns, ne - ns)); }
-    catch (const std::exception&) { break; }
+    try {
+      id = std::stoi(vjson.substr(ns, ne - ns));
+    } catch (const std::exception&) {
+      break;
+    }
     token_to_id_[key] = id;
     id_to_token_[id] = key;
     pos = ne;
@@ -166,8 +200,10 @@ bool BpeTokenizer::Load(const std::string& model_dir) {
     merge_rank_[{a, b}] = rank++;
   }
 
-  // ---- special tokens: parse added_tokens_decoder ids from tokenizer_config ----
-  std::ifstream tf(dir + "tokenizer_config.json", std::ios::binary | std::ios::ate);
+  // ---- special tokens: parse added_tokens_decoder ids from tokenizer_config
+  // ----
+  std::ifstream tf(dir + "tokenizer_config.json",
+                   std::ios::binary | std::ios::ate);
   if (tf) {
     std::streamsize tn = tf.tellg();
     tf.seekg(0);
@@ -183,8 +219,8 @@ bool BpeTokenizer::Load(const std::string& model_dir) {
         size_t q1 = tj.find('"', q0 + 1);
         if (q1 == std::string::npos) break;
         std::string key = tj.substr(q0 + 1, q1 - q0 - 1);
-        bool numeric = !key.empty() &&
-                       std::all_of(key.begin(), key.end(), ::isdigit);
+        bool numeric =
+            !key.empty() && std::all_of(key.begin(), key.end(), ::isdigit);
         if (numeric) {
           size_t brace = tj.find('{', q1);
           size_t braceEnd = tj.find('}', brace);
@@ -192,15 +228,18 @@ bool BpeTokenizer::Load(const std::string& model_dir) {
             std::string obj = tj.substr(brace, braceEnd - brace);
             if (obj.find("\"special\": true") != std::string::npos ||
                 obj.find("\"special\":true") != std::string::npos) {
-              try { special_ids_[std::stoi(key)] = true; }
-              catch (const std::exception&) { /* skip malformed key */ }
+              try {
+                special_ids_[std::stoi(key)] = true;
+              } catch (const std::exception&) { /* skip malformed key */
+              }
             }
             p = braceEnd;
             continue;
           }
         }
         p = q1;
-        if (tj.compare(p, 2, "}}") == 0) {}
+        if (tj.compare(p, 2, "}}") == 0) {
+        }
         if (p > adt + 200000) break;  // safety bound
       }
     }
@@ -216,7 +255,8 @@ std::vector<std::string> BpeTokenizer::BpeWord(const std::string& token) const {
     size_t best_i = 0;
     for (size_t i = 0; i + 1 < word.size(); ++i) {
       auto it = merge_rank_.find({word[i], word[i + 1]});
-      if (it != merge_rank_.end() && (best_rank < 0 || it->second < best_rank)) {
+      if (it != merge_rank_.end() &&
+          (best_rank < 0 || it->second < best_rank)) {
         best_rank = it->second;
         best_i = i;
       }
@@ -239,7 +279,8 @@ std::vector<std::string> BpeTokenizer::BpeWord(const std::string& token) const {
 
 // GPT-2-style pre-tokenizer, sufficient for the ASCII prompt prefix: split on
 // whitespace, attaching a leading space to the following word.
-std::vector<std::string> BpeTokenizer::PreTokenize(const std::string& text) const {
+std::vector<std::string> BpeTokenizer::PreTokenize(
+    const std::string& text) const {
   std::vector<std::string> pieces;
   size_t i = 0;
   while (i < text.size()) {
@@ -279,7 +320,8 @@ std::string BpeTokenizer::Decode(const std::vector<int>& ids,
     // token is a sequence of byte-unicode code points; map each back to a byte
     for (const std::string& ch : Utf8Chars(it->second)) {
       auto bit = unicode_to_byte_.find(ch);
-      if (bit != unicode_to_byte_.end()) bytes += static_cast<char>(bit->second);
+      if (bit != unicode_to_byte_.end())
+        bytes += static_cast<char>(bit->second);
     }
   }
   return bytes;  // already valid UTF-8

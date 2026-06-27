@@ -13,7 +13,8 @@
 // Replicates NeMo's ConvSubsampling(subsampling="dw_striding", factor=8):
 //   mel [C=128, T] (transposed to [T,128] then treated as a [1,T,128] image)
 //   -> Conv2d(1->256, k3, s2, p1) + ReLU
-//   -> depthwise Conv2d(256->256, k3, s2, p1, groups=256) + pointwise Conv2d(k1) + ReLU
+//   -> depthwise Conv2d(256->256, k3, s2, p1, groups=256) + pointwise
+//   Conv2d(k1) + ReLU
 //   -> depthwise + pointwise + ReLU
 //   -> flatten [256,T'',16] (channel-major per frame) -> Linear(4096->512)
 // with NeMo's length masking so padded tail frames match exactly.
@@ -39,17 +40,17 @@ class ConformerPreEncode {
   // Returns [out_frames, 512] row-major in a host-readable vector and sets
   // out_frames / out_valid_len.
   std::vector<float> Forward(const float* mel, int n_mels, int n_frames,
-                              int valid_len, int* out_frames, int* out_valid_len,
-                              cudaStream_t stream = nullptr);
+                             int valid_len, int* out_frames, int* out_valid_len,
+                             cudaStream_t stream = nullptr);
 
  private:
   // Each weight copied into unified memory for GPU access.
-  std::unique_ptr<gpu::UnifiedBuffer> w0_, b0_;       // conv0 [256,1,3,3]
-  std::unique_ptr<gpu::UnifiedBuffer> w2_, b2_;       // dw    [256,1,3,3]
-  std::unique_ptr<gpu::UnifiedBuffer> w3_, b3_;       // pw    [256,256,1,1]
-  std::unique_ptr<gpu::UnifiedBuffer> w5_, b5_;       // dw    [256,1,3,3]
-  std::unique_ptr<gpu::UnifiedBuffer> w6_, b6_;       // pw    [256,256,1,1]
-  std::unique_ptr<gpu::UnifiedBuffer> wout_, bout_;   // linear [512,4096]
+  std::unique_ptr<gpu::UnifiedBuffer> w0_, b0_;      // conv0 [256,1,3,3]
+  std::unique_ptr<gpu::UnifiedBuffer> w2_, b2_;      // dw    [256,1,3,3]
+  std::unique_ptr<gpu::UnifiedBuffer> w3_, b3_;      // pw    [256,256,1,1]
+  std::unique_ptr<gpu::UnifiedBuffer> w5_, b5_;      // dw    [256,1,3,3]
+  std::unique_ptr<gpu::UnifiedBuffer> w6_, b6_;      // pw    [256,256,1,1]
+  std::unique_ptr<gpu::UnifiedBuffer> wout_, bout_;  // linear [512,4096]
   int conv_channels_ = 256;
   int d_model_ = 512;
   bool loaded_ = false;

@@ -30,7 +30,8 @@ int main() {
   assert(segs.size() == 2);
   std::cout << "Got " << segs.size() << " segments" << std::endl;
 
-  // Sorted by start: first is speaker 0 [0.0, 0.5], second speaker 1 [0.6, 1.0].
+  // Sorted by start: first is speaker 0 [0.0, 0.5], second speaker 1
+  // [0.6, 1.0].
   assert(segs[0].local_speaker == 0);
   assert(std::abs(segs[0].start_sec - 0.0) < 1e-6);
   assert(std::abs(segs[0].end_sec - 0.5) < 1e-6);

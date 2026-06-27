@@ -11,7 +11,10 @@ using namespace orator;
 
 static std::vector<float> ReadF32(const std::string& p, bool* ok) {
   std::ifstream f(p, std::ios::binary | std::ios::ate);
-  if (!f) { *ok = false; return {}; }
+  if (!f) {
+    *ok = false;
+    return {};
+  }
   std::streamsize n = f.tellg();
   f.seekg(0);
   std::vector<float> v(n / sizeof(float));
@@ -25,10 +28,13 @@ int main() {
   const std::string dir = "models/reference/asr/";
   const std::string model = "models/asr/Qwen/Qwen3-ASR-1.7B";
   bool a, b;
-  auto embeds = ReadF32(dir + "text_embeds_fp32.f32", &a);  // [T, 2048]
+  auto embeds = ReadF32(dir + "text_embeds_fp32.f32", &a);       // [T, 2048]
   auto ref = ReadF32(dir + "prefill_last_logits_fp32.f32", &b);  // [vocab]
-  if (!(a && b) || !std::ifstream(model + "/model.safetensors.index.json").good()) {
-    std::printf("[skip] need weights + fp32 dump (asr_oracle.py --dump --dtype fp32)\n");
+  if (!(a && b) ||
+      !std::ifstream(model + "/model.safetensors.index.json").good()) {
+    std::printf(
+        "[skip] need weights + fp32 dump (asr_oracle.py --dump --dtype "
+        "fp32)\n");
     return 0;
   }
 
@@ -53,13 +59,14 @@ int main() {
   double max_abs = 0.0;
   for (int i = 0; i < vocab; ++i)
     max_abs = std::max(max_abs, std::abs((double)logits[i] - ref[i]));
-  std::printf("  argmax ours=%d ref=%d ; logits max abs err = %.3e\n",
-              our_am, ref_am, max_abs);
+  std::printf("  argmax ours=%d ref=%d ; logits max abs err = %.3e\n", our_am,
+              ref_am, max_abs);
   if (our_am != ref_am) {
     std::printf("FAIL: argmax mismatch\n");
     return 1;
   }
-  // bf16 tensor-core GEMM vs fp32 oracle: looser tolerance than the old fp32 path.
+  // bf16 tensor-core GEMM vs fp32 oracle: looser tolerance than the old fp32
+  // path.
   if (max_abs > 2.0) {
     std::printf("FAIL: logits exceed tolerance\n");
     return 1;
@@ -75,8 +82,8 @@ int main() {
   const int split = T / 2;
   dec.ResetCache();
   dec.PrefillAt(embeds.data(), split, 0);
-  dec.PrefillAt(embeds.data() + static_cast<size_t>(split) * hidden,
-                T - split, split);
+  dec.PrefillAt(embeds.data() + static_cast<size_t>(split) * hidden, T - split,
+                split);
   if (dec.cache_len() != T) {
     std::printf("FAIL: cache_len=%d expected %d\n", dec.cache_len(), T);
     return 1;
@@ -85,10 +92,11 @@ int main() {
   int inc_am = dec.Argmax();
   double inc_max_abs = 0.0;
   for (int i = 0; i < vocab; ++i)
-    inc_max_abs = std::max(inc_max_abs,
-                           std::abs((double)logits_inc[i] - logits[i]));
-  std::printf("  split=%d argmax inc=%d single=%d ; logits max abs diff = %.3e\n",
-              split, inc_am, our_am, inc_max_abs);
+    inc_max_abs =
+        std::max(inc_max_abs, std::abs((double)logits_inc[i] - logits[i]));
+  std::printf(
+      "  split=%d argmax inc=%d single=%d ; logits max abs diff = %.3e\n",
+      split, inc_am, our_am, inc_max_abs);
   if (inc_am != our_am) {
     std::printf("FAIL: incremental argmax mismatch\n");
     return 1;
@@ -108,8 +116,8 @@ int main() {
     std::printf("FAIL: TruncateCache did not set cache_len\n");
     return 1;
   }
-  dec.PrefillAt(embeds.data() + static_cast<size_t>(split) * hidden,
-                T - split, split);
+  dec.PrefillAt(embeds.data() + static_cast<size_t>(split) * hidden, T - split,
+                split);
   int retry_am = dec.Argmax();
   if (retry_am != our_am) {
     std::printf("FAIL: re-prefill after truncate argmax mismatch (%d vs %d)\n",

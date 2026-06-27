@@ -1,8 +1,9 @@
 // Protocol subscription bridge callbacks for AuditoryStream.
 //
-// Extracted from auditory_stream.cc to keep the controller focused on lifecycle.
-// Each function handles one protocol subscription or pipeline sink callback,
-// receiving only the AuditoryStream members it needs as explicit parameters.
+// Extracted from auditory_stream.cc to keep the controller focused on
+// lifecycle. Each function handles one protocol subscription or pipeline sink
+// callback, receiving only the AuditoryStream members it needs as explicit
+// parameters.
 
 #include "pipeline/auditory_stream_subscriptions.h"
 
@@ -25,8 +26,8 @@ namespace orator {
 namespace pipeline {
 
 // Shared revision serializer defined in src/pipeline/json_util.cc.
-std::string SerializeRevisionToJson(
-    const ComprehensiveTimeline::Revision& r, const char* source);
+std::string SerializeRevisionToJson(const ComprehensiveTimeline::Revision& r,
+                                    const char* source);
 
 // ---------------------------------------------------------------------------
 // Local helper: serialize a Revision to JSON and emit via callback.
@@ -42,8 +43,7 @@ void DoEmitRevision(const ComprehensiveTimeline::Revision& r,
 // ---------------------------------------------------------------------------
 // VAD subscription: parse {"start":..., "end":...} → comp_.AddVad()
 // ---------------------------------------------------------------------------
-void HandleVadSubscription(ComprehensiveTimeline& comp,
-                           std::mutex& comp_mutex,
+void HandleVadSubscription(ComprehensiveTimeline& comp, std::mutex& comp_mutex,
                            const protocol::Message& msg) {
   // Only speech segments populate the timeline; vad/progress heartbeats (same
   // vad/+ subscription) carry no segment and must not create vad entries.
@@ -57,8 +57,7 @@ void HandleVadSubscription(ComprehensiveTimeline& comp,
 // ---------------------------------------------------------------------------
 // Diar subscription: parse {"segments":[{...},...]} → comp_.ReplaceSpeakers()
 // ---------------------------------------------------------------------------
-void HandleDiarSubscription(ComprehensiveTimeline& comp,
-                            std::mutex& comp_mutex,
+void HandleDiarSubscription(ComprehensiveTimeline& comp, std::mutex& comp_mutex,
                             const protocol::Message& msg,
                             RevisionEmitter emit_rev) {
   const std::string& data = msg.data;
@@ -69,8 +68,10 @@ void HandleDiarSubscription(ComprehensiveTimeline& comp,
   int bracket_depth = 1;
   size_t pos = seg_start;
   while (pos < data.size() && bracket_depth > 0) {
-    if (data[pos] == '[') bracket_depth++;
-    else if (data[pos] == ']') bracket_depth--;
+    if (data[pos] == '[')
+      bracket_depth++;
+    else if (data[pos] == ']')
+      bracket_depth--;
     pos++;
   }
   if (bracket_depth != 0) return;
@@ -110,8 +111,7 @@ void HandleDiarSubscription(ComprehensiveTimeline& comp,
 // ASR subscription: parse {"id":..., "start":..., "end":..., "text":"..."}
 // → comp_.UpsertText()
 // ---------------------------------------------------------------------------
-void HandleAsrSubscription(ComprehensiveTimeline& comp,
-                           std::mutex& comp_mutex,
+void HandleAsrSubscription(ComprehensiveTimeline& comp, std::mutex& comp_mutex,
                            const protocol::Message& msg,
                            RevisionEmitter emit_rev) {
   const std::string& data = msg.data;
@@ -154,8 +154,10 @@ void HandleAlignSubscription(ComprehensiveTimeline& comp,
   int depth = 1;
   size_t pos = arr_start;
   while (pos < data.size() && depth > 0) {
-    if (data[pos] == '[') depth++;
-    else if (data[pos] == ']') depth--;
+    if (data[pos] == '[')
+      depth++;
+    else if (data[pos] == ']')
+      depth--;
     pos++;
   }
   if (depth != 0) return;
@@ -200,9 +202,8 @@ void HandleSpeakerSink(std::mutex& comp_mutex,
     for (size_t i = 0; i < segs.size(); ++i) {
       const auto& s = segs[i];
       const std::string label =
-          s.speaker_id.empty()
-              ? ("speaker_" + std::to_string(s.local_speaker))
-              : s.speaker_id;
+          s.speaker_id.empty() ? ("speaker_" + std::to_string(s.local_speaker))
+                               : s.speaker_id;
       char b[160];
       std::snprintf(b, sizeof(b),
                     "{\"start\":%.3f,\"end\":%.3f,\"speaker\":\"%s\","
@@ -223,8 +224,8 @@ void HandleSpeakerSink(std::mutex& comp_mutex,
   msg.schema_version = 1;
   msg.data = "{\"source\":\"sortformer\",\"segments\":" + segments_json + "}";
 
-  protocol_timeline->Publish(*diar_handle, protocol::kDiarSpeakerSegment,
-                             msg, protocol::QoS::AT_LEAST_ONCE);
+  protocol_timeline->Publish(*diar_handle, protocol::kDiarSpeakerSegment, msg,
+                             protocol::QoS::AT_LEAST_ONCE);
 }
 
 // ---------------------------------------------------------------------------
@@ -233,13 +234,13 @@ void HandleSpeakerSink(std::mutex& comp_mutex,
 // the asr/transcript topic.
 // ---------------------------------------------------------------------------
 void HandleTextSink(protocol::ProtocolTimeline* protocol_timeline,
-                    protocol::PipelineHandle* asr_handle,
-                    long id, double start, double end,
-                    const std::string& text, bool is_final) {
-  // Finals go to asr/transcript, in-progress partials to asr/transcript_partial.
-  // The comprehensive timeline subscribes to asr/+ (both, in-place revision by
-  // id); the forced aligner subscribes to asr/transcript only, so it aligns each
-  // segment exactly once against its finalized text.
+                    protocol::PipelineHandle* asr_handle, long id, double start,
+                    double end, const std::string& text, bool is_final) {
+  // Finals go to asr/transcript, in-progress partials to
+  // asr/transcript_partial. The comprehensive timeline subscribes to asr/+
+  // (both, in-place revision by id); the forced aligner subscribes to
+  // asr/transcript only, so it aligns each segment exactly once against its
+  // finalized text.
   const protocol::Topic& topic =
       is_final ? protocol::kAsrTranscript : protocol::kAsrTranscriptPartial;
   protocol::Message msg;
@@ -249,10 +250,10 @@ void HandleTextSink(protocol::ProtocolTimeline* protocol_timeline,
   msg.timestamp_sec = start;
   msg.qos = static_cast<uint8_t>(protocol::QoS::AT_LEAST_ONCE);
   msg.schema_version = 1;
-  msg.data = "{\"id\":" + std::to_string(id)
-             + ",\"start\":" + std::to_string(start)
-             + ",\"end\":" + std::to_string(end)
-             + ",\"text\":\"" + JsonEscape(text) + "\"}";
+  msg.data = "{\"id\":" + std::to_string(id) +
+             ",\"start\":" + std::to_string(start) +
+             ",\"end\":" + std::to_string(end) + ",\"text\":\"" +
+             JsonEscape(text) + "\"}";
   protocol_timeline->Publish(*asr_handle, topic, msg,
                              protocol::QoS::AT_LEAST_ONCE);
 }
@@ -264,25 +265,24 @@ void HandleTextSink(protocol::ProtocolTimeline* protocol_timeline,
 // ---------------------------------------------------------------------------
 void HandleAlignSink(protocol::ProtocolTimeline* protocol_timeline,
                      protocol::PipelineHandle* align_handle,
-                     const RevisionEmitter& emit,
-                     long id, double seg_start, double seg_end,
+                     const RevisionEmitter& emit, long id, double seg_start,
+                     double seg_end,
                      const std::vector<core::AlignUnit>& units) {
   std::string units_json = "[";
   for (size_t i = 0; i < units.size(); ++i) {
     const auto& u = units[i];
     char b[256];
-    std::snprintf(b, sizeof(b),
-                  "{\"text\":\"%s\",\"start\":%.3f,\"end\":%.3f}",
+    std::snprintf(b, sizeof(b), "{\"text\":\"%s\",\"start\":%.3f,\"end\":%.3f}",
                   JsonEscape(u.text).c_str(), u.start_sec, u.end_sec);
     units_json += b;
     if (i + 1 < units.size()) units_json += ",";
   }
   units_json += "]";
 
-  std::string payload = "{\"id\":" + std::to_string(id)
-      + ",\"start\":" + std::to_string(seg_start)
-      + ",\"end\":" + std::to_string(seg_end)
-      + ",\"units\":" + units_json + "}";
+  std::string payload = "{\"id\":" + std::to_string(id) +
+                        ",\"start\":" + std::to_string(seg_start) +
+                        ",\"end\":" + std::to_string(seg_end) +
+                        ",\"units\":" + units_json + "}";
 
   protocol::Message msg;
   msg.topic = protocol::kAlignUnits.to_string();
@@ -292,8 +292,8 @@ void HandleAlignSink(protocol::ProtocolTimeline* protocol_timeline,
   msg.qos = static_cast<uint8_t>(protocol::QoS::AT_LEAST_ONCE);
   msg.schema_version = 1;
   msg.data = payload;
-  protocol_timeline->Publish(*align_handle, protocol::kAlignUnits,
-                             msg, protocol::QoS::AT_LEAST_ONCE);
+  protocol_timeline->Publish(*align_handle, protocol::kAlignUnits, msg,
+                             protocol::QoS::AT_LEAST_ONCE);
 
   if (emit) emit("{\"type\":\"align\"," + payload.substr(1));
 }
@@ -305,8 +305,7 @@ void HandleVadDrain(core::IVad* vad_detector,
                     protocol::ProtocolTimeline* protocol_timeline,
                     protocol::PipelineHandle* vad_handle,
                     const core::TimeBase& tb,
-                    std::vector<core::VadSegmentResult>* segs,
-                    bool finalize) {
+                    std::vector<core::VadSegmentResult>* segs, bool finalize) {
   segs->clear();
   vad_detector->DrainSegments(finalize, segs);
   for (const auto& sp : *segs) {
@@ -321,11 +320,11 @@ void HandleVadDrain(core::IVad* vad_detector,
     msg.schema_version = 1;
     char buf[128];
     std::snprintf(buf, sizeof(buf),
-                  "{\"start\":%.3f,\"end\":%.3f,\"source\":\"silero_gpu\"}",
-                  s, e);
+                  "{\"start\":%.3f,\"end\":%.3f,\"source\":\"silero_gpu\"}", s,
+                  e);
     msg.data = buf;
-    protocol_timeline->Publish(*vad_handle, protocol::kVadSpeechSegment,
-                                msg, protocol::QoS::AT_LEAST_ONCE);
+    protocol_timeline->Publish(*vad_handle, protocol::kVadSpeechSegment, msg,
+                               protocol::QoS::AT_LEAST_ONCE);
   }
 }
 

@@ -19,9 +19,8 @@ bool ApplyTomlConfig(const std::string& path,
   try {
     config = toml::parse_file(path);
   } catch (const toml::parse_error& e) {
-    std::cerr << "[config] parse error in " << path << ": "
-              << e.description() << " (" << e.source().begin << ")"
-              << std::endl;
+    std::cerr << "[config] parse error in " << path << ": " << e.description()
+              << " (" << e.source().begin << ")" << std::endl;
     return false;
   }
 
@@ -196,10 +195,12 @@ bool ApplyTomlConfig(const std::string& path,
   // ── [buffer] ──────────────────────────────────────────────────────
   if (auto* sec = config["buffer"].as_table()) {
     if (auto v = sec->get("max_samples")) {
-      if (auto u = v->value<uint64_t>()) cfg.buffer_max_samples = static_cast<size_t>(*u);
+      if (auto u = v->value<uint64_t>())
+        cfg.buffer_max_samples = static_cast<size_t>(*u);
     }
     if (auto v = sec->get("shrink_threshold")) {
-      if (auto u = v->value<uint64_t>()) cfg.buffer_shrink_threshold = static_cast<size_t>(*u);
+      if (auto u = v->value<uint64_t>())
+        cfg.buffer_shrink_threshold = static_cast<size_t>(*u);
     }
   }
 
@@ -216,10 +217,12 @@ bool ApplyTomlConfig(const std::string& path,
       if (auto d = v->value<double>()) cfg.cursor_telemetry_interval_sec = *d;
     }
     if (auto v = sec->get("lag_warn_samples")) {
-      if (auto u = v->value<uint64_t>()) cfg.cursor_lag_warn_samples = static_cast<size_t>(*u);
+      if (auto u = v->value<uint64_t>())
+        cfg.cursor_lag_warn_samples = static_cast<size_t>(*u);
     }
     if (auto v = sec->get("lag_critical_samples")) {
-      if (auto u = v->value<uint64_t>()) cfg.cursor_lag_critical_samples = static_cast<size_t>(*u);
+      if (auto u = v->value<uint64_t>())
+        cfg.cursor_lag_critical_samples = static_cast<size_t>(*u);
     }
   }
 
@@ -236,9 +239,12 @@ bool ApplyTomlConfig(const std::string& path,
     }
     if (auto v = sec->get("gpu_scheduling")) {
       if (auto s = v->value<std::string>()) {
-        if (*s == "serial") cfg.gpu_scheduling_mode = 1;
-        else if (*s == "concurrent") cfg.gpu_scheduling_mode = 2;
-        else cfg.gpu_scheduling_mode = 0;  // auto
+        if (*s == "serial")
+          cfg.gpu_scheduling_mode = 1;
+        else if (*s == "concurrent")
+          cfg.gpu_scheduling_mode = 2;
+        else
+          cfg.gpu_scheduling_mode = 0;  // auto
       }
     }
   }

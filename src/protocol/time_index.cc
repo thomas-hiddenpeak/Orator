@@ -10,8 +10,8 @@ bool TimeIndex::Append(const std::string& topic, double timestamp_sec,
   std::lock_guard<std::mutex> lock(mutex_);
 
   auto& entries = index_[topic];
-  bool out_of_order = !entries.empty() &&
-                      timestamp_sec < entries.back().timestamp_sec;
+  bool out_of_order =
+      !entries.empty() && timestamp_sec < entries.back().timestamp_sec;
 
   IndexedMessage im;
   im.timestamp_sec = timestamp_sec;
@@ -21,9 +21,7 @@ bool TimeIndex::Append(const std::string& topic, double timestamp_sec,
   // Binary insert to maintain sorted order by timestamp.
   auto it = std::lower_bound(
       entries.begin(), entries.end(), timestamp_sec,
-      [](const IndexedMessage& e, double ts) {
-        return e.timestamp_sec < ts;
-      });
+      [](const IndexedMessage& e, double ts) { return e.timestamp_sec < ts; });
   entries.insert(it, std::move(im));
 
   return out_of_order;
@@ -39,9 +37,7 @@ std::vector<IndexedMessage> TimeIndex::Replay(const std::string& topic,
   const auto& entries = it->second;
   auto start = std::lower_bound(
       entries.begin(), entries.end(), from_sec,
-      [](const IndexedMessage& e, double ts) {
-        return e.timestamp_sec < ts;
-      });
+      [](const IndexedMessage& e, double ts) { return e.timestamp_sec < ts; });
 
   return std::vector<IndexedMessage>(start, entries.end());
 }
@@ -73,9 +69,7 @@ void TimeIndex::Retain(const std::string& topic, double cutoff_sec) {
   auto& entries = it->second;
   auto start = std::lower_bound(
       entries.begin(), entries.end(), cutoff_sec,
-      [](const IndexedMessage& e, double ts) {
-        return e.timestamp_sec < ts;
-      });
+      [](const IndexedMessage& e, double ts) { return e.timestamp_sec < ts; });
 
   if (start != entries.begin()) {
     entries.erase(entries.begin(), start);
@@ -87,11 +81,11 @@ void TimeIndex::CleanupOldEntries(double keep_until_sec) {
 
   for (auto it = index_.begin(); it != index_.end();) {
     auto& entries = it->second;
-    auto start = std::lower_bound(
-        entries.begin(), entries.end(), keep_until_sec,
-        [](const IndexedMessage& e, double ts) {
-          return e.timestamp_sec < ts;
-        });
+    auto start =
+        std::lower_bound(entries.begin(), entries.end(), keep_until_sec,
+                         [](const IndexedMessage& e, double ts) {
+                           return e.timestamp_sec < ts;
+                         });
 
     if (start != entries.begin()) {
       entries.erase(entries.begin(), start);

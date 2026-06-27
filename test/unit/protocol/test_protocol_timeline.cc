@@ -12,19 +12,19 @@ using orator::protocol::PipelineHandle;
 using orator::protocol::ProtocolTimeline;
 using orator::protocol::QoS;
 using orator::protocol::Schema;
-using orator::protocol::TopicSchema;
 using orator::protocol::StorageRef;
 using orator::protocol::Topic;
 using orator::protocol::TopicPattern;
 using orator::protocol::TopicRetention;
+using orator::protocol::TopicSchema;
 
 static int g_fail = 0;
-#define CHECK(cond, msg)                \
-  do {                                  \
-    if (!(cond)) {                      \
-      std::printf("FAIL: %s\n", msg);   \
-      ++g_fail;                         \
-    }                                   \
+#define CHECK(cond, msg)              \
+  do {                                \
+    if (!(cond)) {                    \
+      std::printf("FAIL: %s\n", msg); \
+      ++g_fail;                       \
+    }                                 \
   } while (0)
 
 int main() {
@@ -186,9 +186,8 @@ int main() {
     auto handle = tl.RegisterPipeline(std::move(desc));
 
     std::vector<Message> events;
-    tl.SubscribeInternal(
-        TopicPattern{"system/#"},
-        [&events](const Message& m) { events.push_back(m); });
+    tl.SubscribeInternal(TopicPattern{"system/#"},
+                         [&events](const Message& m) { events.push_back(m); });
 
     Message m1;
     m1.timestamp_sec = 1.0;
@@ -200,10 +199,9 @@ int main() {
     m2.data = "out-of-order";
     tl.Publish(*handle, Topic{"audio/raw"}, m2, QoS::AT_MOST_ONCE);
 
-    bool found_ooo = std::any_of(events.begin(), events.end(),
-        [](const Message& m) {
-          return m.topic == "system/out_of_order";
-        });
+    bool found_ooo = std::any_of(
+        events.begin(), events.end(),
+        [](const Message& m) { return m.topic == "system/out_of_order"; });
     CHECK(found_ooo, "Out-of-order publish fires system/out_of_order event");
   }
 

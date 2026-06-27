@@ -60,9 +60,8 @@ long JsonParseLong(const std::string& data, const char* key) {
   }
 }
 
-std::string SerializeRevisionToJson(
-    const ComprehensiveTimeline::Revision& r,
-    const char* source) {
+std::string SerializeRevisionToJson(const ComprehensiveTimeline::Revision& r,
+                                    const char* source) {
   char buf[160];
   std::string out = "{\"type\":\"revision\",\"source\":\"";
   out += source;
@@ -75,9 +74,13 @@ std::string SerializeRevisionToJson(
     const auto& e = r.entries[i];
     int spk_idx = -1;
     if (e.speaker.size() > 8 && e.speaker.substr(0, 8) == "speaker_") {
-      try { spk_idx = std::stoi(e.speaker.substr(8)); }
-      catch (const std::invalid_argument&) { spk_idx = -1; }
-      catch (const std::out_of_range&) { spk_idx = -1; }
+      try {
+        spk_idx = std::stoi(e.speaker.substr(8));
+      } catch (const std::invalid_argument&) {
+        spk_idx = -1;
+      } catch (const std::out_of_range&) {
+        spk_idx = -1;
+      }
     }
     std::snprintf(buf, sizeof(buf),
                   "{\"start\":%.3f,\"end\":%.3f,\"text_id\":%ld,\"speaker\":%d,"

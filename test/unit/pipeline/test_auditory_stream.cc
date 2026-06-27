@@ -10,28 +10,28 @@
 #include "core/types.h"
 #include "pipeline/auditory_stream.h"
 
-using orator::core::IDiarizer;
-using orator::core::IAsr;
-using orator::core::IVad;
-using orator::core::DiarizationConfig;
 using orator::core::AsrConfig;
+using orator::core::AudioChunk;
+using orator::core::DiarizationConfig;
+using orator::core::DiarizationFrames;
+using orator::core::IAsr;
+using orator::core::IDiarizer;
+using orator::core::IVad;
+using orator::core::Registry;
+using orator::core::Transcript;
 using orator::core::VadConfig;
 using orator::core::VadSegmentResult;
-using orator::core::DiarizationFrames;
-using orator::core::AudioChunk;
-using orator::core::Transcript;
-using orator::core::Registry;
 using orator::pipeline::AuditoryStream;
 
 static int g_fail = 0;
-#define CHECK(cond, msg)                                                  \
-  do {                                                                    \
-    if (!(cond)) {                                                        \
-      std::printf("FAIL: %s\n", msg);                                     \
-      ++g_fail;                                                           \
-    } else {                                                              \
-      std::printf("PASS: %s\n", msg);                                     \
-    }                                                                     \
+#define CHECK(cond, msg)              \
+  do {                                \
+    if (!(cond)) {                    \
+      std::printf("FAIL: %s\n", msg); \
+      ++g_fail;                       \
+    } else {                          \
+      std::printf("PASS: %s\n", msg); \
+    }                                 \
   } while (0)
 
 // ============================================================================
@@ -64,8 +64,8 @@ class TestDiarizer : public IDiarizer {
     return DiarizationFrames{};
   }
   DiarizationFrames StreamAudio(const float* /*samples*/, int /*n*/,
-                                 bool /*final*/,
-                                 cudaStream_t /*stream*/) override {
+                                bool /*final*/,
+                                cudaStream_t /*stream*/) override {
     return DiarizationFrames{};
   }
   int max_speakers() const override { return 4; }
@@ -90,7 +90,9 @@ class TestAsr : public IAsr {
   void set_max_new_tokens(int /*max_tokens*/) override {}
   void StreamReset(long /*base_sample*/) override {}
   std::string StreamChunk(const float* /*pcm*/, int /*n*/,
-                          cudaStream_t /*stream*/) override { return ""; }
+                          cudaStream_t /*stream*/) override {
+    return "";
+  }
   std::string StreamFinalize(cudaStream_t /*stream*/) override { return ""; }
   int stream_audio_tokens() const override { return 0; }
   std::string name() const override { return "test_asr"; }
@@ -121,10 +123,10 @@ class TestVad : public IVad {
 // controller shell (no workers, no GPU compute, no model loading).
 static AuditoryStream::Config MakeTestConfig() {
   AuditoryStream::Config cfg;
-  cfg.diarizer_weights = "";   // disable diarization pipeline
-  cfg.asr_model_dir = "";      // disable ASR pipeline
-  cfg.vad_model = "";          // disable VAD model path
-  cfg.vad_stream = false;      // disable VAD stream thread
+  cfg.diarizer_weights = "";  // disable diarization pipeline
+  cfg.asr_model_dir = "";     // disable ASR pipeline
+  cfg.vad_model = "";         // disable VAD model path
+  cfg.vad_stream = false;     // disable VAD stream thread
   cfg.storage_disk_path = "/tmp/orator_test/";
   cfg.gpu_telemetry_interval_sec = 0.0;
   return cfg;
@@ -165,7 +167,8 @@ int main() {
     auto frames = diar.ProcessChunk(AudioChunk{});
     CHECK(diar.process_count == 1,
           "TestDiarizer ProcessChunk increments count");
-    CHECK(frames.probs.empty(), "TestDiarizer ProcessChunk returns empty frames");
+    CHECK(frames.probs.empty(),
+          "TestDiarizer ProcessChunk returns empty frames");
     CHECK(frames.num_frames == 0, "TestDiarizer ProcessChunk num_frames == 0");
 
     TestAsr asr;
@@ -178,8 +181,7 @@ int main() {
     asr.Reset();
     CHECK(asr.reset_count == 1, "TestAsr Reset increments count");
     auto transcript = asr.Transcribe(AudioChunk{});
-    CHECK(asr.transcribe_count == 1,
-          "TestAsr Transcribe increments count");
+    CHECK(asr.transcribe_count == 1, "TestAsr Transcribe increments count");
     CHECK(transcript.tokens.empty(),
           "TestAsr Transcribe returns empty transcript");
 
@@ -262,8 +264,7 @@ int main() {
     stream.Start();
     stream.PushAudio(nullptr, 0);  // zero samples, no-op
     stream.EmitTimeline(true);
-    CHECK(!last_emit.empty(),
-          "EmitTimeline after empty push produced output");
+    CHECK(!last_emit.empty(), "EmitTimeline after empty push produced output");
     std::printf("\n");
   }
 

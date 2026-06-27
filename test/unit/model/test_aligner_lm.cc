@@ -17,7 +17,10 @@ using namespace orator;
 
 static std::vector<float> ReadF32(const std::string& p, bool* ok) {
   std::ifstream f(p, std::ios::binary | std::ios::ate);
-  if (!f) { *ok = false; return {}; }
+  if (!f) {
+    *ok = false;
+    return {};
+  }
   std::streamsize n = f.tellg();
   f.seekg(0);
   std::vector<float> v(n / sizeof(float));
@@ -27,7 +30,10 @@ static std::vector<float> ReadF32(const std::string& p, bool* ok) {
 }
 static std::vector<int> ReadI32(const std::string& p, bool* ok) {
   std::ifstream f(p, std::ios::binary | std::ios::ate);
-  if (!f) { *ok = false; return {}; }
+  if (!f) {
+    *ok = false;
+    return {};
+  }
   std::streamsize n = f.tellg();
   f.seekg(0);
   std::vector<int> v(n / sizeof(int));
@@ -45,7 +51,8 @@ int main() {
   auto ref_labels = ReadI32(dump + "ts_labels.i32", &b);
   auto audio_feats = ReadF32(dump + "audio_feats.f32", &c);  // [78,1024]
   auto ref_hidden = ReadF32(dump + "lm_hidden.f32", &d);     // [128,1024]
-  if (!(a && b && c && d) || !std::ifstream(model + "/model.safetensors").good()) {
+  if (!(a && b && c && d) ||
+      !std::ifstream(model + "/model.safetensors").good()) {
     std::printf("[skip] need weights + oracle dump (aligner_oracle.py)\n");
     return 0;
   }
@@ -53,7 +60,8 @@ int main() {
   const int kAudioPad = 151676, kTs = 151705, Hh = 1024, NL = 5000;
   const int n_audio = static_cast<int>(audio_feats.size()) / Hh;
   const int T = static_cast<int>(input_ids.size());
-  std::printf("  T=%d n_audio=%d ts_labels=%zu\n", T, n_audio, ref_labels.size());
+  std::printf("  T=%d n_audio=%d ts_labels=%zu\n", T, n_audio,
+              ref_labels.size());
 
   io::ShardedSafeTensors w(model);
   model::AlignerLm lm{};
@@ -83,7 +91,10 @@ int main() {
     int best = 0;
     float bestv = row[0];
     for (int j = 1; j < NL; ++j)
-      if (row[j] > bestv) { bestv = row[j]; best = j; }
+      if (row[j] > bestv) {
+        bestv = row[j];
+        best = j;
+      }
     if (li < static_cast<int>(ref_labels.size()) && best != ref_labels[li]) {
       if (mism < 8)
         std::printf("  label[%d] mismatch: ours=%d oracle=%d\n", li, best,

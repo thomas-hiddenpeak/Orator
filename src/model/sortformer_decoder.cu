@@ -11,8 +11,8 @@ namespace orator {
 namespace model {
 
 using ::orator::gpu::CheckCudaError;
-using ::orator::gpu::UnifiedBuffer;
 using ::orator::gpu::DeviceBuffer;
+using ::orator::gpu::UnifiedBuffer;
 
 namespace {
 
@@ -20,8 +20,8 @@ constexpr int kThreads = 256;
 inline int Blocks(int n) { return (n + kThreads - 1) / kThreads; }
 
 inline void LaunchLinear(const float* in, const float* W, const float* bias,
-                          float* out, int M, int K, int N, int act,
-                          cudaStream_t stream) {
+                         float* out, int M, int K, int N, int act,
+                         cudaStream_t stream) {
   // Local act codes: 0 none, 1 ReLU, 2 sigmoid. Remap to universal SGEMM
   // codes: 0 none, 2 ReLU, 3 sigmoid.
   int gact = (act == 1) ? 2 : (act == 2) ? 3 : 0;
@@ -36,7 +36,8 @@ __global__ void ReluKernel(const float* in, float* out, int n) {
 __global__ void LayerNormKernel(const float* __restrict__ in,
                                 const float* __restrict__ gamma,
                                 const float* __restrict__ beta,
-                                float* __restrict__ out, int M, int D, float eps) {
+                                float* __restrict__ out, int M, int D,
+                                float eps) {
   int m = blockIdx.x;
   if (m >= M) return;
   const float* xr = in + static_cast<size_t>(m) * D;
@@ -169,8 +170,8 @@ __global__ void ScatterHeadMajorKernel(const float* __restrict__ ctxh,
 
 }  // namespace
 
-SortformerDecoder::SortformerDecoder(int d_enc, int d_model, int n_heads, int d_ff,
-                                     int n_layers, int n_spk)
+SortformerDecoder::SortformerDecoder(int d_enc, int d_model, int n_heads,
+                                     int d_ff, int n_layers, int n_spk)
     : d_enc_(d_enc),
       d_model_(d_model),
       n_heads_(n_heads),
@@ -200,9 +201,10 @@ void SortformerDecoder::LoadWeights(const io::SafeTensorReader& reader) {
   load("sortformer_modules.single_hidden_to_spks.bias");
   for (int l = 0; l < n_layers_; ++l) {
     std::string p = "transformer_encoder.layers." + std::to_string(l) + ".";
-    for (const char* s : {"first_sub_layer.query_net", "first_sub_layer.key_net",
-                          "first_sub_layer.value_net", "first_sub_layer.out_projection",
-                          "second_sub_layer.dense_in", "second_sub_layer.dense_out"}) {
+    for (const char* s :
+         {"first_sub_layer.query_net", "first_sub_layer.key_net",
+          "first_sub_layer.value_net", "first_sub_layer.out_projection",
+          "second_sub_layer.dense_in", "second_sub_layer.dense_out"}) {
       load(p + s + ".weight");
       load(p + s + ".bias");
     }
@@ -237,8 +239,8 @@ void SortformerDecoder::Scratch::Ensure(int T, int D, int H, int Dff,
 }
 
 std::vector<float> SortformerDecoder::Forward(const float* conformer_out, int T,
-                                               int valid_len,
-                                               cudaStream_t stream) {
+                                              int valid_len,
+                                              cudaStream_t stream) {
   const int De = d_enc_, D = d_model_, H = n_heads_, Dk = d_k_, Dff = d_ff_;
   const float eps = 1e-5f;
 
@@ -246,9 +248,9 @@ std::vector<float> SortformerDecoder::Forward(const float* conformer_out, int T,
   scr_.Ensure(T, D, H, Dff, n_spk_);
   float* x = static_cast<float*>(scr_.xb.data());
   // encoder_proj: 512 -> 192
-  LaunchLinear(conformer_out,
-      W("sortformer_modules.encoder_proj.weight"),
-      W("sortformer_modules.encoder_proj.bias"), x, T, De, D, 0, stream);
+  LaunchLinear(conformer_out, W("sortformer_modules.encoder_proj.weight"),
+               W("sortformer_modules.encoder_proj.bias"), x, T, De, D, 0,
+               stream);
 
   float* lnp = static_cast<float*>(scr_.lnb.data());
   float* qp = static_cast<float*>(scr_.qb.data());
@@ -268,60 +270,72 @@ std::vector<float> SortformerDecoder::Forward(const float* conformer_out, int T,
   for (int l = 0; l < n_layers_; ++l) {
     std::string p = "transformer_encoder.layers." + std::to_string(l) + ".";
     LaunchLinear(x, W(p + "first_sub_layer.query_net.weight"),
-        W(p + "first_sub_layer.query_net.bias"), qp, T, D, D, 0, stream);
+                 W(p + "first_sub_layer.query_net.bias"), qp, T, D, D, 0,
+                 stream);
     LaunchLinear(x, W(p + "first_sub_layer.key_net.weight"),
-        W(p + "first_sub_layer.key_net.bias"), kp, T, D, D, 0, stream);
+                 W(p + "first_sub_layer.key_net.bias"), kp, T, D, D, 0, stream);
     LaunchLinear(x, W(p + "first_sub_layer.value_net.weight"),
-        W(p + "first_sub_layer.value_net.bias"), vp, T, D, D, 0, stream);
+                 W(p + "first_sub_layer.value_net.bias"), vp, T, D, D, 0,
+                 stream);
     dim3 grid(T, H);
     // GEMM-decomposed MHA: scores = Qh @ Kh^T, softmax, ctx = scores @ V.
-    GatherHeadMajorKernel<<<Blocks(H * T * Dk), kThreads, 0, stream>>>(qp, qhp, T, H, Dk);
-    GatherHeadMajorKernel<<<Blocks(H * T * Dk), kThreads, 0, stream>>>(kp, khp, T, H, Dk);
-    GatherVtHeadMajorKernel<<<Blocks(H * Dk * T), kThreads, 0, stream>>>(vp, vtp, T, H, Dk);
-    gemm::LaunchSgemmBatched(qhp, khp, scp, T, Dk, T, 0, H,
-                             static_cast<long>(T) * Dk,
-                             static_cast<long>(T) * Dk, static_cast<long>(T) * T,
-                             stream);
-    ScaleMaskScoresKernel<<<Blocks(H * T * T), kThreads, 0, stream>>>(scp, T, H, valid_len,
-                                                            attn_scale);
+    GatherHeadMajorKernel<<<Blocks(H * T * Dk), kThreads, 0, stream>>>(
+        qp, qhp, T, H, Dk);
+    GatherHeadMajorKernel<<<Blocks(H * T * Dk), kThreads, 0, stream>>>(
+        kp, khp, T, H, Dk);
+    GatherVtHeadMajorKernel<<<Blocks(H * Dk * T), kThreads, 0, stream>>>(
+        vp, vtp, T, H, Dk);
+    gemm::LaunchSgemmBatched(
+        qhp, khp, scp, T, Dk, T, 0, H, static_cast<long>(T) * Dk,
+        static_cast<long>(T) * Dk, static_cast<long>(T) * T, stream);
+    ScaleMaskScoresKernel<<<Blocks(H * T * T), kThreads, 0, stream>>>(
+        scp, T, H, valid_len, attn_scale);
     AttnSoftmaxKernel<<<H * T, kThreads, 0, stream>>>(scp, T);
-    gemm::LaunchSgemmBatched(scp, vtp, qhp, T, T, Dk, 0, H,
-                             static_cast<long>(T) * T, static_cast<long>(Dk) * T,
-                             static_cast<long>(T) * Dk, stream);
-    ScatterHeadMajorKernel<<<Blocks(H * T * Dk), kThreads, 0, stream>>>(qhp, cp, T, H, Dk);
+    gemm::LaunchSgemmBatched(
+        scp, vtp, qhp, T, T, Dk, 0, H, static_cast<long>(T) * T,
+        static_cast<long>(Dk) * T, static_cast<long>(T) * Dk, stream);
+    ScatterHeadMajorKernel<<<Blocks(H * T * Dk), kThreads, 0, stream>>>(
+        qhp, cp, T, H, Dk);
     // out_projection -> tp, residual add to x, then LN1.
     LaunchLinear(cp, W(p + "first_sub_layer.out_projection.weight"),
-        W(p + "first_sub_layer.out_projection.bias"), tp, T, D, D, 0, stream);
+                 W(p + "first_sub_layer.out_projection.bias"), tp, T, D, D, 0,
+                 stream);
     AddKernel<<<Blocks(T * D), kThreads, 0, stream>>>(tp, x, T * D);
-    LayerNormKernel<<<T, kThreads, 0, stream>>>(tp, W(p + "layer_norm_1.weight"),
-                                     W(p + "layer_norm_1.bias"), x, T, D, eps);
+    LayerNormKernel<<<T, kThreads, 0, stream>>>(
+        tp, W(p + "layer_norm_1.weight"), W(p + "layer_norm_1.bias"), x, T, D,
+        eps);
     // FFN: dense_in(relu) -> dense_out, residual, LN2.
     LaunchLinear(x, W(p + "second_sub_layer.dense_in.weight"),
-        W(p + "second_sub_layer.dense_in.bias"), ffp, T, D, Dff, 1, stream);
+                 W(p + "second_sub_layer.dense_in.bias"), ffp, T, D, Dff, 1,
+                 stream);
     LaunchLinear(ffp, W(p + "second_sub_layer.dense_out.weight"),
-        W(p + "second_sub_layer.dense_out.bias"), tp, T, Dff, D, 0, stream);
+                 W(p + "second_sub_layer.dense_out.bias"), tp, T, Dff, D, 0,
+                 stream);
     AddKernel<<<Blocks(T * D), kThreads, 0, stream>>>(tp, x, T * D);
-    LayerNormKernel<<<T, kThreads, 0, stream>>>(tp, W(p + "layer_norm_2.weight"),
-                                     W(p + "layer_norm_2.bias"), x, T, D, eps);
+    LayerNormKernel<<<T, kThreads, 0, stream>>>(
+        tp, W(p + "layer_norm_2.weight"), W(p + "layer_norm_2.bias"), x, T, D,
+        eps);
   }
 
-  // Speaker head: relu -> first_hidden_to_hidden -> relu -> single_hidden_to_spks
+  // Speaker head: relu -> first_hidden_to_hidden -> relu ->
+  // single_hidden_to_spks
   // -> sigmoid -> *mask.
   ReluKernel<<<Blocks(T * D), kThreads, 0, stream>>>(x, lnp, T * D);
-  LaunchLinear(lnp,
-      W("sortformer_modules.first_hidden_to_hidden.weight"),
-      W("sortformer_modules.first_hidden_to_hidden.bias"), tp, T, D, D, 1, stream);
+  LaunchLinear(lnp, W("sortformer_modules.first_hidden_to_hidden.weight"),
+               W("sortformer_modules.first_hidden_to_hidden.bias"), tp, T, D, D,
+               1, stream);
   // Spec 002 Phase 7 (T071): the per-frame sigmoid result is copied to the host
   // (cudaMemcpy DtoH below). It MUST be DEVICE memory, not managed: a host copy
   // from managed memory while the concurrent (lock-free) ASR pipeline runs a
   // kernel faults on Tegra (R1). Device memory does not page-migrate, so the
-  // DtoH copy is safe regardless of concurrent kernels. GPU-only working buffers
-  // above stay managed (only the GPU touches them).
+  // DtoH copy is safe regardless of concurrent kernels. GPU-only working
+  // buffers above stay managed (only the GPU touches them).
   float* predp = static_cast<float*>(scr_.predb.data());
-  LaunchLinear(tp,
-      W("sortformer_modules.single_hidden_to_spks.weight"),
-      W("sortformer_modules.single_hidden_to_spks.bias"), predp, T, D, n_spk_, 2, stream);
-  MaskRowsKernel<<<Blocks(T * n_spk_), kThreads, 0, stream>>>(predp, T, n_spk_, valid_len);
+  LaunchLinear(tp, W("sortformer_modules.single_hidden_to_spks.weight"),
+               W("sortformer_modules.single_hidden_to_spks.bias"), predp, T, D,
+               n_spk_, 2, stream);
+  MaskRowsKernel<<<Blocks(T * n_spk_), kThreads, 0, stream>>>(predp, T, n_spk_,
+                                                              valid_len);
   CUDA_CHECK(cudaStreamSynchronize(stream));
 
   std::vector<float> preds(static_cast<size_t>(T) * n_spk_);

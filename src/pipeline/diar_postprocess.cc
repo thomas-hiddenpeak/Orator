@@ -5,8 +5,8 @@
 namespace orator {
 namespace pipeline {
 
-using core::DiarSegment;
 using core::DiarizationFrames;
+using core::DiarSegment;
 
 std::vector<DiarSegment> FramesToSegments(const DiarizationFrames& frames,
                                           float threshold, double max_gap_sec) {
@@ -87,10 +87,12 @@ std::vector<DiarSegment> CoalesceSegments(std::vector<DiarSegment> segments,
   return merged;
 }
 
-std::vector<DiarSegment> OnsetOffsetSegments(
-    const DiarizationFrames& frames,
-    double onset, double offset, double pad_onset, double pad_offset,
-    double min_dur_on, double min_dur_off) {
+std::vector<DiarSegment> OnsetOffsetSegments(const DiarizationFrames& frames,
+                                             double onset, double offset,
+                                             double pad_onset,
+                                             double pad_offset,
+                                             double min_dur_on,
+                                             double min_dur_off) {
   std::vector<DiarSegment> segments;
   const double period = frames.frame_period_sec;
   const int max_gap_frames = static_cast<int>(min_dur_off / period);
