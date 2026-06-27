@@ -209,6 +209,7 @@ Findings:
 - [specs/006-web-ui/spec.md](006-web-ui/spec.md) — implemented (16/16 tasks complete)
 - [specs/006-web-ui/plan.md](006-web-ui/plan.md) — implemented
 - [specs/006-web-ui/tasks.md](006-web-ui/tasks.md) — implemented
+- [specs/010-speaker-id/spec.md](010-speaker-id/spec.md) — **In progress** (Draft): speaker identity (TitaNet-Large voiceprint enrollment / re-identification as a post-diarization stage inside the diar pipeline, Art. III). Phase A1 (acquire+convert weights → `models/speaker/titanet_large.safetensors`, 108 tensors) and A2 (NeMo oracle `tools/reference/titanet_oracle.py` in isolated `tools/.venv-nemo`, dumps to `models/reference/speaker/`) **done & committed**. Next: A3 C++/CUDA `model::TitaNetEmbedder` (mel front-end needs 80-mel slaney + preemphasis + per_feature norm vs the diar mel) + A4 oracle-validated `test_titanet`.
 
 ## 7. Immediate next step
 

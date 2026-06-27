@@ -112,6 +112,14 @@ Front-end: `AudioToMelSpectrogramPreprocessor` — 16 kHz, 80 mel, window 25 ms,
 stride 10 ms, n_fft 512, Hann, `normalize: per_feature` (per-utterance per-mel
 mean/std normalization — NOTE: differs from ASR mel; verify against oracle).
 
+A3 mel detail (found while building): the existing `feature::MelSpectrogram`
+(diar) is n_fft 512 / 16 kHz with configurable `n_mels`, so its FFT + filterbank
+framework is reusable, but TitaNet's front-end additionally needs (vs the diar
+mel): 80-mel **slaney** filterbank, **preemphasis 0.97**, log, and **per_feature
+normalization** (subtract per-utterance per-mel mean, divide by std). These are
+the concrete deltas to add for A3; validate the produced mel against
+`models/reference/speaker/span*_mel.f32` before trusting the encoder.
+
 Encoder `ConvASREncoder` (ContextNet, all `separable: true`, `se: true`,
 `relu`), 5 blocks `encoder.encoder.{0..4}`:
 - Each conv = depthwise (`mconv.N.conv.weight` shape `[C,1,k]`) + pointwise
