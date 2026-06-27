@@ -19,6 +19,8 @@
 // edges are guarded.
 
 #include <cuda_runtime.h>
+#include <cuda_bf16.h>
+#include <mma.h>
 
 namespace orator {
 namespace gemm {
@@ -272,10 +274,10 @@ inline void LaunchSgemmBatched(const float* in, const float* W, float* out,
 // the high 16 bits of an FP32). The bias + activation are FUSED in the epilogue
 // (no separate pass). `actAsr`: 0 none, 1 GELU(exact erf), 2 ReLU.
 //
-// Two kernels: a fast 128x128 tiled / double-buffered path (requires K % 8 == 0,
-// true for every projection in the model), and a robust scalar fallback for odd
-// K (the first conv's im2col K = Cin*9 = 9). Both are allocation-free and run on
-// the caller's stream — capturable in a CUDA graph (unlike cuBLAS).
+// Two kernels: a 16x16x16 bf16 tensor-core (WMMA) path (requires K % 16 == 0,
+// true for every projection in the model), and a robust scalar fallback for the
+// one odd K (the first conv's im2col K = Cin*9 = 9). Both are allocation-free
+// and run on the caller's stream — capturable in a CUDA graph (unlike cuBLAS).
 // ---------------------------------------------------------------------------
 
 __device__ __forceinline__ float Bf2f(uint16_t b) {
@@ -288,100 +290,77 @@ __device__ __forceinline__ float ApplyActAsr(float v, int act) {
   return v;
 }
 
-static __global__ void Bf16GemmKernel(const uint16_t* __restrict__ in,
-                                      const uint16_t* __restrict__ W,
+// WMMA tensor-core tiling: a 64x64 block output tile (16 warps), one 16x16x16
+// bf16 MMA fragment per warp with FP32 accumulation, operands staged through
+// shared memory. (A warp-tiled 32x32-per-warp variant was faster in isolation
+// but exposed a concurrency-mode instability; this simpler form is stable under
+// the production lock-free concurrency. Closing the remaining throughput gap to
+// the former cuBLAS path is ongoing Spec 002 P2.1 work.)
+namespace wmma_cfg {
+constexpr int WM = 16, WN = 16, WK = 16;     // one MMA fragment
+constexpr int BWM = 64, BWN = 64, BWK = 16;  // block output tile + K step
+constexpr int WARPS_M = BWM / WM;            // 4
+constexpr int WARPS_N = BWN / WN;            // 4
+constexpr int WARPS = WARPS_M * WARPS_N;     // 16
+constexpr int THREADS = WARPS * 32;          // 512
+}  // namespace wmma_cfg
+
+// Tensor-core bf16 GEMM: out[M,N] = act(bias[n] + in[M,K] @ W[N,K]^T).
+// A = in (row-major [M,K]); B = W viewed as W^T -- a col-major load of the
+// [N,K] row-major W with ldm=K yields B[k][n] = W[n][k] = W^T[k][n]. Requires
+// K % 16 == 0; bias + activation fused in the epilogue.
+static __global__ void Bf16WmmaKernel(const __nv_bfloat16* __restrict__ in,
+                                      const __nv_bfloat16* __restrict__ W,
                                       const float* __restrict__ bias,
                                       float* __restrict__ out, int M, int K,
                                       int N, int act) {
-  __shared__ float As[2][BK][BM];  // transposed: As[buf][k][m] (converted f32)
-  __shared__ float Ws[2][BK][BN];  // transposed: Ws[buf][k][n] (converted f32)
+  using namespace nvcuda;
+  using namespace wmma_cfg;
+  __shared__ __nv_bfloat16 As[BWM][BWK];  // in[m][k]
+  __shared__ __nv_bfloat16 Bs[BWN][BWK];  // W[n][k]
+  __shared__ float Cs[BWM][BWN];          // staged output tile
 
+  const int m0 = blockIdx.y * BWM;
+  const int n0 = blockIdx.x * BWN;
   const int tid = threadIdx.x;
-  const int threadCol = tid % (BN / TN);
-  const int threadRow = tid / (BN / TN);
-  const int m0 = blockIdx.y * BM;
-  const int n0 = blockIdx.x * BN;
-  const int aRow = tid / (BK / 4);
-  const int aCol4 = (tid % (BK / 4)) * 4;
-  const int wRow = tid / (BK / 4);
-  const int wCol4 = (tid % (BK / 4)) * 4;
-  const int aM = m0 + aRow;
-  const int wN = n0 + wRow;
-  const bool aValid = aM < M;
-  const bool wValid = wN < N;
-  const uint16_t* aPtr = in + (size_t(aM) * K + aCol4);
-  const uint16_t* wPtr = W + (size_t(wN) * K + wCol4);
+  const int warp = tid / 32;
+  const int wm = warp / WARPS_N;  // 0..3
+  const int wn = warp % WARPS_N;  // 0..3
 
-  float acc[TM][TN];
-#pragma unroll
-  for (int i = 0; i < TM; ++i)
-#pragma unroll
-    for (int j = 0; j < TN; ++j) acc[i][j] = 0.0f;
-  float aFrag[TM], bFrag[TN];
+  wmma::fragment<wmma::accumulator, WM, WN, WK, float> cFrag;
+  wmma::fill_fragment(cFrag, 0.0f);
 
-  auto convStore = [&](int buf, ushort4 av, ushort4 wv) {
-    As[buf][aCol4 + 0][aRow] = Bf2f(av.x);
-    As[buf][aCol4 + 1][aRow] = Bf2f(av.y);
-    As[buf][aCol4 + 2][aRow] = Bf2f(av.z);
-    As[buf][aCol4 + 3][aRow] = Bf2f(av.w);
-    Ws[buf][wCol4 + 0][wRow] = Bf2f(wv.x);
-    Ws[buf][wCol4 + 1][wRow] = Bf2f(wv.y);
-    Ws[buf][wCol4 + 2][wRow] = Bf2f(wv.z);
-    Ws[buf][wCol4 + 3][wRow] = Bf2f(wv.w);
-  };
-  auto load = [&](int k0, ushort4& av, ushort4& wv) {
-    av = make_ushort4(0, 0, 0, 0);
-    wv = make_ushort4(0, 0, 0, 0);
-    if (aValid) av = *reinterpret_cast<const ushort4*>(aPtr + k0);
-    if (wValid) wv = *reinterpret_cast<const ushort4*>(wPtr + k0);
-  };
-
-  ushort4 av0, wv0;
-  load(0, av0, wv0);
-  convStore(0, av0, wv0);
-  __syncthreads();
-
-  int buf = 0;
-  for (int k0 = 0; k0 < K; k0 += BK) {
-    const int k0n = k0 + BK;
-    ushort4 avN = make_ushort4(0, 0, 0, 0), wvN = make_ushort4(0, 0, 0, 0);
-    if (k0n < K) load(k0n, avN, wvN);
-
-#pragma unroll
-    for (int k = 0; k < BK; ++k) {
-#pragma unroll
-      for (int i = 0; i < TM; i += 4)
-        *reinterpret_cast<float4*>(&aFrag[i]) =
-            *reinterpret_cast<const float4*>(&As[buf][k][threadRow * TM + i]);
-#pragma unroll
-      for (int j = 0; j < TN; j += 4)
-        *reinterpret_cast<float4*>(&bFrag[j]) =
-            *reinterpret_cast<const float4*>(&Ws[buf][k][threadCol * TN + j]);
-#pragma unroll
-      for (int i = 0; i < TM; ++i)
-#pragma unroll
-        for (int j = 0; j < TN; ++j) acc[i][j] += aFrag[i] * bFrag[j];
+  const __nv_bfloat16 kZero = __float2bfloat16(0.0f);
+  for (int k0 = 0; k0 < K; k0 += BWK) {
+    for (int idx = tid; idx < BWM * BWK; idx += THREADS) {
+      const int mm = idx / BWK, kk = idx % BWK;
+      const int gm = m0 + mm;
+      As[mm][kk] = (gm < M) ? in[static_cast<size_t>(gm) * K + (k0 + kk)] : kZero;
     }
-
-    if (k0n < K) {
-      const int nextBuf = buf ^ 1;
-      convStore(nextBuf, avN, wvN);
-      __syncthreads();
-      buf = nextBuf;
+    for (int idx = tid; idx < BWN * BWK; idx += THREADS) {
+      const int nn = idx / BWK, kk = idx % BWK;
+      const int gn = n0 + nn;
+      Bs[nn][kk] = (gn < N) ? W[static_cast<size_t>(gn) * K + (k0 + kk)] : kZero;
     }
+    __syncthreads();
+
+    wmma::fragment<wmma::matrix_a, WM, WN, WK, __nv_bfloat16, wmma::row_major> aFrag;
+    wmma::fragment<wmma::matrix_b, WM, WN, WK, __nv_bfloat16, wmma::col_major> bFrag;
+    wmma::load_matrix_sync(aFrag, &As[wm * WM][0], BWK);
+    wmma::load_matrix_sync(bFrag, &Bs[wn * WN][0], BWK);
+    wmma::mma_sync(cFrag, aFrag, bFrag, cFrag);
+    __syncthreads();
   }
 
-#pragma unroll
-  for (int i = 0; i < TM; ++i) {
-    const int m = m0 + threadRow * TM + i;
-    if (m >= M) continue;
-#pragma unroll
-    for (int j = 0; j < TN; ++j) {
-      const int n = n0 + threadCol * TN + j;
-      if (n >= N) continue;
-      float v = acc[i][j];
-      if (bias) v += bias[n];
-      out[size_t(m) * N + n] = ApplyActAsr(v, act);
+  wmma::store_matrix_sync(&Cs[wm * WM][wn * WN], cFrag, BWN, wmma::mem_row_major);
+  __syncthreads();
+  for (int idx = tid; idx < BWM * BWN; idx += THREADS) {
+    const int mm = idx / BWN, nn = idx % BWN;
+    const int gm = m0 + mm, gn = n0 + nn;
+    if (gm < M && gn < N) {
+      float v = Cs[mm][nn];
+      if (bias) v += bias[gn];
+      out[static_cast<size_t>(gm) * N + gn] = ApplyActAsr(v, act);
     }
   }
 }
@@ -408,10 +387,13 @@ inline void LaunchBf16Gemm(const uint16_t* in, const uint16_t* W,
                            const float* bias, float* out, int M, int K, int N,
                            int act, cudaStream_t stream) {
   if (M <= 0 || K <= 0 || N <= 0) return;
-  if (K % BK == 0) {
-    dim3 block(kThreadsGemm);
-    dim3 grid((N + BN - 1) / BN, (M + BM - 1) / BM);
-    Bf16GemmKernel<<<grid, block, 0, stream>>>(in, W, bias, out, M, K, N, act);
+  if (K % wmma_cfg::WK == 0) {
+    dim3 block(wmma_cfg::THREADS);
+    dim3 grid((N + wmma_cfg::BWN - 1) / wmma_cfg::BWN,
+              (M + wmma_cfg::BWM - 1) / wmma_cfg::BWM);
+    Bf16WmmaKernel<<<grid, block, 0, stream>>>(
+        reinterpret_cast<const __nv_bfloat16*>(in),
+        reinterpret_cast<const __nv_bfloat16*>(W), bias, out, M, K, N, act);
   } else {
     dim3 block(256);
     dim3 grid((N + 255) / 256, M);

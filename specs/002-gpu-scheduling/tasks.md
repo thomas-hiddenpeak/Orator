@@ -196,17 +196,17 @@ PROJECT_STATE updated.
   the full production shape set (M 1..few-thousand; K,N in {1024,2048,3072,5000,
   6144,7680,vocab}); record max relative error. Gate: baseline (current cuBLAS)
   passes the new reference within ~3e-3 — establishes the oracle before the swap.
-- [ ] **T101** Add a bf16 GEMM to `orator::gemm` (gemm.cuh): bf16 in / FP32
+- [x] **T101** Add a bf16 GEMM to `orator::gemm` (gemm.cuh): bf16 in / FP32
   accumulate, row-major `out[M,N]=in[M,K]@W[N,K]^T`, tiled (extend the existing
   double-buffered SGEMM; add an mma/tensor-core path). Allocation-free,
   stream-explicit, no global handle.
-- [ ] **T102** Fused epilogue: bias + activation (0 none / 1 GELU exact-erf /
+- [x] **T102** Fused epilogue: bias + activation (0 none / 1 GELU exact-erf /
   2 ReLU) in the GEMM, matching `BiasActKernel` numerics.
-- [ ] **T103** Switch `asr_gemm::LinearPre`/`Linear` M>1 path to the in-project
+- [x] **T103** Switch `asr_gemm::LinearPre`/`Linear` M>1 path to the in-project
   GEMM; remove `BiasActKernel` post-pass and the `ORATOR_ASR_CUBLAS_GEMV` hatch.
   Validate: `test_asr_gemm` (vs f64 ref) + `test_asr_encoder`/`_decoder`/
   `test_aligner_*` oracle gates unchanged-pass.
-- [ ] **T104** Remove `cublas` from `orator_core` link and `<cublas_v2.h>` from
+- [x] **T104** Remove `cublas` from `orator_core` link and `<cublas_v2.h>` from
   `asr_gemm.cu`; delete the cuBLAS handle (`Handle()`, `g_handle`, `Shutdown`).
   Build clean `-Wall -Wextra`, zero warnings.
 - [ ] **T105** Real-WS gate (rate=0, 120s): transcript diff vs the cuBLAS build
