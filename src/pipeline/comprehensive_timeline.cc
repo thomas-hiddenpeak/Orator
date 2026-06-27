@@ -168,17 +168,34 @@ ComprehensiveTimeline::SplitTextByDiar(const TextSeg& t) const {
   }
 
   // Alignment-aware allocation (preferred): when per-unit timestamps exist for
-  // this text, assign each aligned unit's text to the diarization turn whose
-  // interval contains the unit's midpoint -- exact attribution from the real
-  // per-character timing, instead of the time-proportional approximation below.
+  // this text, attribute its characters by their real timing rather than by the
+  // time-proportional approximation below. Units are first grouped into RUNS
+  // separated by pauses (a gap > kPauseSec between consecutive units); each
+  // whole run is assigned to the diarization turn containing its MIDPOINT, so a
+  // continuous utterance is never split across speaker turns -- in effect the
+  // diarization boundary is snapped to the surrounding pause, where a real
+  // speaker change actually occurs. ORATOR_TIMELINE_NO_SNAP=1 falls back to
+  // per-unit midpoint assignment (A/B + safety).
   if (auto ait = align_.find(t.id);
       ait != align_.end() && !ait->second.units.empty()) {
+    static const bool no_snap =
+        std::getenv("ORATOR_TIMELINE_NO_SNAP") != nullptr;
+    constexpr double kPauseSec = 0.25;
+    const auto& units = ait->second.units;
     std::vector<std::string> slices(turns.size());
-    std::size_t ti = 0;
-    for (const auto& u : ait->second.units) {
-      const double mid = 0.5 * (u.start + u.end);
+    std::size_t i = 0;
+    while (i < units.size()) {
+      std::size_t j = i;  // extend the run while consecutive units are gapless
+      if (!no_snap) {
+        while (j + 1 < units.size() &&
+               units[j + 1].start - units[j].end <= kPauseSec)
+          ++j;
+      }
+      const double mid = 0.5 * (units[i].start + units[j].end);
+      std::size_t ti = 0;
       while (ti + 1 < turns.size() && mid >= turns[ti].end) ++ti;
-      slices[ti] += u.text;
+      for (std::size_t k = i; k <= j; ++k) slices[ti] += units[k].text;
+      i = j + 1;
     }
     std::vector<Entry> out;
     out.reserve(turns.size());

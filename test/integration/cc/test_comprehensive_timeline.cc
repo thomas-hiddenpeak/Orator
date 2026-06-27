@@ -189,6 +189,29 @@ int main() {
     }
   }
 
+  // ---- 8. Alignment run-coherence: a continuous (gapless) run of aligned
+  // units that straddles a diarization boundary is attributed WHOLE to one
+  // speaker (the run-midpoint's), not split mid-utterance. The speaker boundary
+  // is effectively snapped to the surrounding pause. ----
+  {
+    TestComprehensiveTimeline tl;
+    tl.UpsertText(0, 0.0, 1.2, "ABCD");
+    // Diar boundary at 1.0 falls INSIDE the run (unit D spans 0.9-1.2).
+    tl.ReplaceSpeakers(
+        {{0.0, 1.0, "speaker_0", 0.9f}, {1.0, 4.0, "speaker_1", 0.9f}});
+    // Four gapless units -> one run [0,1.2], midpoint 0.6 in speaker_0's turn.
+    tl.UpsertAlign(
+        0, 0.0, 1.2,
+        {{0.0, 0.3, "A"}, {0.3, 0.6, "B"}, {0.6, 0.9, "C"}, {0.9, 1.2, "D"}});
+    auto snap = tl.Snapshot();
+    CHECK(snap.size() == 1, "gapless run not split across the diar boundary");
+    if (snap.size() == 1) {
+      CHECK(snap[0].speaker == "speaker_0",
+            "whole run attributed to the run-midpoint speaker");
+      CHECK(snap[0].text == "ABCD", "run text kept intact (no mid-run cut)");
+    }
+  }
+
   if (g_fail == 0) {
     std::printf("ComprehensiveTimeline test PASSED\n");
     return 0;

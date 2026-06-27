@@ -9,6 +9,7 @@ struct TestComprehensiveTimeline : public ComprehensiveTimeline {
   using ComprehensiveTimeline::AddVad;
   using ComprehensiveTimeline::ReplaceSpeakers;
   using ComprehensiveTimeline::SpeakerInput;
+  using ComprehensiveTimeline::UpsertAlign;
   using ComprehensiveTimeline::UpsertSpeaker;
   using ComprehensiveTimeline::UpsertText;
 };
