@@ -5,6 +5,7 @@
 #include <memory>
 #include <vector>
 
+#include "gpu/device_scratch.h"
 #include "gpu/memory.h"
 #include "io/safetensor.h"
 
@@ -54,6 +55,9 @@ class ConformerPreEncode {
   int conv_channels_ = 256;
   int d_model_ = 512;
   bool loaded_ = false;
+  // Per-instance device scratch for Forward's per-call working buffers (one
+  // diarization worker -> single-thread-of-control per instance).
+  gpu::DeviceScratch scratch_;
 };
 
 }  // namespace model

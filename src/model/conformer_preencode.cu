@@ -144,15 +144,15 @@ void LaunchRelu(float* x, int n, cudaStream_t stream) {
 // Transpose in -> in_T[HW,Cin], then out[Cout,HW] = w[Cout,Cin] * in_T^T.
 void LaunchPointwise(const float* in, const UnifiedBuffer& w,
                      const UnifiedBuffer& b, float* out, int Cin, int Cout,
-                     int HW, cudaStream_t stream) {
-  UnifiedBuffer in_t(static_cast<size_t>(HW) * Cin * sizeof(float));
+                     int HW, gpu::DeviceScratch& scratch, int slot,
+                     cudaStream_t stream) {
+  float* in_t = scratch.GetT<float>(slot, static_cast<size_t>(HW) * Cin);
   int threads = 256;
   int total = Cin * HW;
   TransposeKernel<<<(total + threads - 1) / threads, threads, 0, stream>>>(
-      in, static_cast<float*>(in_t.data()), Cin, HW);
+      in, in_t, Cin, HW);
   CUDA_CHECK(cudaGetLastError());
-  gemm::LaunchSgemm(static_cast<const float*>(w.data()),
-                    static_cast<const float*>(in_t.data()),
+  gemm::LaunchSgemm(static_cast<const float*>(w.data()), in_t,
                     /*bias=*/nullptr, out, Cout, Cin, HW, 0, stream);
   CUDA_CHECK(cudaGetLastError());
   // Bias is per output channel (the M dimension here), so add it separately.
@@ -209,77 +209,66 @@ std::vector<float> ConformerPreEncode::Forward(const float* mel, int n_mels,
     for (int t = 0; t < n_frames; ++t)
       mel_t[static_cast<size_t>(t) * n_mels + m] =
           mel[static_cast<size_t>(m) * n_frames + t];
-  UnifiedBuffer in0(static_cast<size_t>(n_frames) * n_mels * sizeof(float));
-  CUDA_CHECK(
-      cudaMemcpyAsync(in0.data(), mel_t.data(),
-                      static_cast<size_t>(n_frames) * n_mels * sizeof(float),
-                      cudaMemcpyHostToDevice, stream));
-  LaunchMask(static_cast<float*>(in0.data()), 1, n_frames, n_mels, valid_len,
-             stream);
+  float* in0 = scratch_.GetT<float>(0, static_cast<size_t>(n_frames) * n_mels);
+  CUDA_CHECK(cudaMemcpyAsync(
+      in0, mel_t.data(), static_cast<size_t>(n_frames) * n_mels * sizeof(float),
+      cudaMemcpyHostToDevice, stream));
+  LaunchMask(in0, 1, n_frames, n_mels, valid_len, stream);
 
   // Stage 0: Conv2d(1->256,k3,s2,p1) + ReLU.
   int H0 = ConvOutLen(n_frames, 3, 2, 1), W0 = ConvOutLen(n_mels, 3, 2, 1);
-  UnifiedBuffer buf1(static_cast<size_t>(C) * H0 * W0 * sizeof(float));
+  float* buf1 = scratch_.GetT<float>(1, static_cast<size_t>(C) * H0 * W0);
   int h, w;
-  LaunchConv(static_cast<float*>(in0.data()), *w0_, *b0_,
-             static_cast<float*>(buf1.data()), 1, n_frames, n_mels, C, 3, 2, 1,
-             1, &h, &w, stream);
+  LaunchConv(in0, *w0_, *b0_, buf1, 1, n_frames, n_mels, C, 3, 2, 1, 1, &h, &w,
+             stream);
   int len0 = ConvOutLen(valid_len, 3, 2, 1);
-  LaunchMask(static_cast<float*>(buf1.data()), C, H0, W0, len0, stream);
-  LaunchRelu(static_cast<float*>(buf1.data()), C * H0 * W0, stream);
-  LaunchMask(static_cast<float*>(buf1.data()), C, H0, W0, len0, stream);
+  LaunchMask(buf1, C, H0, W0, len0, stream);
+  LaunchRelu(buf1, C * H0 * W0, stream);
+  LaunchMask(buf1, C, H0, W0, len0, stream);
 
   // Stage 1: depthwise(k3,s2,p1,g256) -> pointwise(k1) + ReLU.
   int H1 = ConvOutLen(H0, 3, 2, 1), W1 = ConvOutLen(W0, 3, 2, 1);
-  UnifiedBuffer dw1(static_cast<size_t>(C) * H1 * W1 * sizeof(float));
-  LaunchConv(static_cast<float*>(buf1.data()), *w2_, *b2_,
-             static_cast<float*>(dw1.data()), C, H0, W0, C, 3, 2, 1, C, &h, &w,
-             stream);
+  float* dw1 = scratch_.GetT<float>(2, static_cast<size_t>(C) * H1 * W1);
+  LaunchConv(buf1, *w2_, *b2_, dw1, C, H0, W0, C, 3, 2, 1, C, &h, &w, stream);
   int len1 = ConvOutLen(len0, 3, 2, 1);
-  UnifiedBuffer pw1(static_cast<size_t>(C) * H1 * W1 * sizeof(float));
-  LaunchPointwise(static_cast<float*>(dw1.data()), *w3_, *b3_,
-                  static_cast<float*>(pw1.data()), C, C, H1 * W1, stream);
-  LaunchRelu(static_cast<float*>(pw1.data()), C * H1 * W1, stream);
-  LaunchMask(static_cast<float*>(pw1.data()), C, H1, W1, len1, stream);
+  float* pw1 = scratch_.GetT<float>(3, static_cast<size_t>(C) * H1 * W1);
+  LaunchPointwise(dw1, *w3_, *b3_, pw1, C, C, H1 * W1, scratch_, 8, stream);
+  LaunchRelu(pw1, C * H1 * W1, stream);
+  LaunchMask(pw1, C, H1, W1, len1, stream);
 
   // Stage 2: depthwise -> pointwise + ReLU.
   int H2 = ConvOutLen(H1, 3, 2, 1), W2 = ConvOutLen(W1, 3, 2, 1);
-  UnifiedBuffer dw2(static_cast<size_t>(C) * H2 * W2 * sizeof(float));
-  LaunchConv(static_cast<float*>(pw1.data()), *w5_, *b5_,
-             static_cast<float*>(dw2.data()), C, H1, W1, C, 3, 2, 1, C, &h, &w,
-             stream);
+  float* dw2 = scratch_.GetT<float>(4, static_cast<size_t>(C) * H2 * W2);
+  LaunchConv(pw1, *w5_, *b5_, dw2, C, H1, W1, C, 3, 2, 1, C, &h, &w, stream);
   int len2 = ConvOutLen(len1, 3, 2, 1);
-  UnifiedBuffer pw2(static_cast<size_t>(C) * H2 * W2 * sizeof(float));
-  LaunchPointwise(static_cast<float*>(dw2.data()), *w6_, *b6_,
-                  static_cast<float*>(pw2.data()), C, C, H2 * W2, stream);
-  LaunchRelu(static_cast<float*>(pw2.data()), C * H2 * W2, stream);
-  LaunchMask(static_cast<float*>(pw2.data()), C, H2, W2, len2, stream);
+  float* pw2 = scratch_.GetT<float>(5, static_cast<size_t>(C) * H2 * W2);
+  LaunchPointwise(dw2, *w6_, *b6_, pw2, C, C, H2 * W2, scratch_, 8, stream);
+  LaunchRelu(pw2, C * H2 * W2, stream);
+  LaunchMask(pw2, C, H2, W2, len2, stream);
 
   // Flatten [C,H2,W2] + Linear(C*W2 -> 512) via gather + register-blocked GEMM.
   const int D = d_model_;
   const int Kflat = C * W2;
-  UnifiedBuffer flatbuf(static_cast<size_t>(H2) * Kflat * sizeof(float));
+  float* flatbuf = scratch_.GetT<float>(6, static_cast<size_t>(H2) * Kflat);
   // Spec 002 Phase 7 (T071): the pre-encode output is copied to the host
-  // (cudaMemcpy DtoH below), so it MUST be DEVICE memory, not managed — a host
+  // (cudaMemcpy DtoH below), so it MUST be DEVICE memory, not managed -- a host
   // copy from managed memory while the concurrent lock-free ASR pipeline runs a
-  // kernel faults on Tegra (R1). Device memory is safe for the DtoH copy.
-  DeviceBuffer outbuf(static_cast<size_t>(H2) * D * sizeof(float));
+  // kernel faults on Tegra (R1). DeviceScratch is device memory, so the DtoH
+  // copy is safe; all working buffers above share that property now.
+  float* outbuf = scratch_.GetT<float>(7, static_cast<size_t>(H2) * D);
   int threads = 256;
   int gtotal = H2 * Kflat;
   FlattenGatherKernel<<<(gtotal + threads - 1) / threads, threads, 0, stream>>>(
-      static_cast<float*>(pw2.data()), static_cast<float*>(flatbuf.data()), C,
-      H2, W2);
+      pw2, flatbuf, C, H2, W2);
   CUDA_CHECK(cudaGetLastError());
-  gemm::LaunchSgemm(static_cast<const float*>(flatbuf.data()),
-                    static_cast<const float*>(wout_->data()),
-                    static_cast<const float*>(bout_->data()),
-                    static_cast<float*>(outbuf.data()), H2, Kflat, D, 0,
-                    stream);
+  gemm::LaunchSgemm(flatbuf, static_cast<const float*>(wout_->data()),
+                    static_cast<const float*>(bout_->data()), outbuf, H2, Kflat,
+                    D, 0, stream);
   CUDA_CHECK(cudaGetLastError());
   CUDA_CHECK(cudaStreamSynchronize(stream));
 
   std::vector<float> result(static_cast<size_t>(H2) * D);
-  CUDA_CHECK(cudaMemcpyAsync(result.data(), outbuf.data(),
+  CUDA_CHECK(cudaMemcpyAsync(result.data(), outbuf,
                              result.size() * sizeof(float),
                              cudaMemcpyDeviceToHost, stream));
   CUDA_CHECK(cudaStreamSynchronize(stream));
