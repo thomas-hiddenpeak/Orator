@@ -1,12 +1,12 @@
 #include "model/asr_gemm.h"
 
-#include <cublas_v2.h>
 #include <cuda_bf16.h>
 
 #include <cstdlib>
 #include <stdexcept>
 
 #include "gpu/memory.h"
+#include "model/gemm.cuh"
 
 namespace orator {
 namespace model {
@@ -19,27 +19,16 @@ namespace {
 constexpr int kThreads = 256;
 inline int Blocks(long n) { return static_cast<int>((n + kThreads - 1) / kThreads); }
 
-// Per-THREAD cuBLAS handle + bf16 cast scratch. asr_gemm::Linear is called
+// Per-THREAD bf16 cast scratch for the `in` operand. asr_gemm::Linear is called
 // concurrently from independent pipeline threads (the ASR worker on asr_stream
 // and the forced-alignment worker on the default stream) which, in the
 // production lock-free concurrency mode, are NOT mutually excluded. A single
-// shared handle/scratch would race: cublasSetStream mutates the handle's stream
-// from two threads at once, and Scratch()'s grow path (cudaFree + cudaMalloc)
+// shared scratch would race: Scratch()'s grow path (cudaFree + cudaMalloc)
 // could free the buffer out from under another thread's queued GEMM
 // (use-after-free on device memory). thread_local gives each pipeline thread its
-// own handle and scratch, removing the race and letting the pipelines run truly
-// concurrently. (Per-thread buffers are reclaimed at process exit.)
-thread_local cublasHandle_t g_handle = nullptr;
+// own scratch. (Per-thread buffers are reclaimed at process exit.)
 thread_local uint16_t* g_scratch = nullptr;   // bf16 cast scratch for the `in` operand
 thread_local long g_scratch_cap = 0;
-
-cublasHandle_t Handle() {
-  if (g_handle == nullptr) {
-    if (cublasCreate(&g_handle) != CUBLAS_STATUS_SUCCESS)
-      throw std::runtime_error("cublasCreate failed");
-  }
-  return g_handle;
-}
 
 uint16_t* Scratch(long n) {
   if (n > g_scratch_cap) {
@@ -104,17 +93,8 @@ __global__ void GemvBf16Kernel(const __nv_bfloat16* __restrict__ in,
 }
 
 // out[m,n] += bias[n]; act: 0 none, 1 GELU(exact erf), 2 ReLU.
-__global__ void BiasActKernel(float* __restrict__ out, const float* __restrict__ bias,
-                             int M, int N, int act) {
-  const long idx = static_cast<long>(blockIdx.x) * blockDim.x + threadIdx.x;
-  const long total = static_cast<long>(M) * N;
-  if (idx >= total) return;
-  float v = out[idx];
-  if (bias) v += bias[idx % N];
-  if (act == 1) v = 0.5f * v * (1.0f + erff(v * 0.70710678118654752440f));
-  else if (act == 2) v = fmaxf(v, 0.0f);
-  out[idx] = v;
-}
+// (Retained: the M>1 epilogue is now fused into the in-project bf16 GEMM; this
+// kernel is no longer launched.)
 
 }  // namespace
 
@@ -146,9 +126,7 @@ void LinearPre(const uint16_t* in_bf16, const uint16_t* W_bf16,
 
   // M==1 (autoregressive decode): memory-bound GEMV with coalesced weight reads.
   // K is even for every Qwen3 projection (1024/2048/6144) so the half2 path is safe.
-  // ORATOR_ASR_CUBLAS_GEMV=1 falls back to cuBLAS for A/B comparison.
-  static const bool kUseCublasGemv = std::getenv("ORATOR_ASR_CUBLAS_GEMV") != nullptr;
-  if (M == 1 && (K & 1) == 0 && !kUseCublasGemv) {
+  if (M == 1 && (K & 1) == 0) {
     const int grid = (N + kGemvWarps - 1) / kGemvWarps;
     const size_t shmem = static_cast<size_t>(K) * sizeof(__nv_bfloat16);
     GemvBf16Kernel<<<grid, kGemvWarps * 32, shmem, stream>>>(
@@ -158,32 +136,14 @@ void LinearPre(const uint16_t* in_bf16, const uint16_t* W_bf16,
     return;
   }
 
-  cublasHandle_t h = Handle();
-  cublasSetStream(h, stream);
-
-  // Row-major out[M,N] = in[M,K] @ W[N,K]^T. In cuBLAS column-major this is
-  //   out_cm[N,M] = W_cm[K,N]^T @ in_cm[K,M]
-  // i.e. op(A)=T on A=W (CUDA_R_16BF, lda=K), op(B)=N on B=in (lda=K),
-  //      C=out (CUDA_R_32F, ldc=N), m=N, n=M, k=K, FP32 accumulate.
-  const float alpha = 1.0f, beta = 0.0f;
-  cublasStatus_t st = cublasGemmEx(
-      h, CUBLAS_OP_T, CUBLAS_OP_N, N, M, K, &alpha,
-      reinterpret_cast<const __nv_bfloat16*>(W_bf16), CUDA_R_16BF, K,
-      reinterpret_cast<const __nv_bfloat16*>(in_bf16), CUDA_R_16BF, K, &beta,
-      out_f32, CUDA_R_32F, N, CUBLAS_COMPUTE_32F, CUBLAS_GEMM_DEFAULT);
-  if (st != CUBLAS_STATUS_SUCCESS)
-    throw std::runtime_error("cublasGemmEx failed: " + std::to_string(st));
-
-  if (bias_f32 != nullptr || act != 0) {
-    BiasActKernel<<<Blocks(static_cast<long>(M) * N), kThreads, 0, stream>>>(
-        out_f32, bias_f32, M, N, act);
-    CheckCudaError(cudaGetLastError(), __FILE__, __LINE__);
-  }
+  // M>1 (and the rare M==1 odd-K): in-project tiled bf16 GEMM with the bias +
+  // activation epilogue fused. Replaces cuBLAS (Spec 002 P2.1, Constitution
+  // Art. I): allocation-free, stream-explicit, no global handle -> capturable.
+  gemm::LaunchBf16Gemm(in_bf16, W_bf16, bias_f32, out_f32, M, K, N, act, stream);
 }
 
 void Shutdown() {
   if (g_scratch) { CUDA_CHECK(cudaFree(g_scratch)); g_scratch = nullptr; g_scratch_cap = 0; }
-  if (g_handle) { cublasDestroy(g_handle); g_handle = nullptr; }
 }
 
 }  // namespace asr_gemm

@@ -263,5 +263,162 @@ inline void LaunchSgemmBatched(const float* in, const float* W, float* out,
                                                   strideIn, strideW, strideOut);
 }
 
+// ---------------------------------------------------------------------------
+// In-project bf16 GEMM (Spec 002 P2.1) — replaces cuBLAS on the ASR path.
+//
+// out[M,N] (FP32) = act( bias[n] + sum_k in[m,k] * W[n,k] ), with `in` and `W`
+// stored as native BF16 (uint16) and the dot product accumulated in FP32 (the
+// cublasGemmEx CUBLAS_COMPUTE_32F contract). BF16 -> FP32 is lossless (BF16 is
+// the high 16 bits of an FP32). The bias + activation are FUSED in the epilogue
+// (no separate pass). `actAsr`: 0 none, 1 GELU(exact erf), 2 ReLU.
+//
+// Two kernels: a fast 128x128 tiled / double-buffered path (requires K % 8 == 0,
+// true for every projection in the model), and a robust scalar fallback for odd
+// K (the first conv's im2col K = Cin*9 = 9). Both are allocation-free and run on
+// the caller's stream — capturable in a CUDA graph (unlike cuBLAS).
+// ---------------------------------------------------------------------------
+
+__device__ __forceinline__ float Bf2f(uint16_t b) {
+  return __uint_as_float(static_cast<uint32_t>(b) << 16);
+}
+
+__device__ __forceinline__ float ApplyActAsr(float v, int act) {
+  if (act == 1) return 0.5f * v * (1.0f + erff(v * 0.70710678118654752440f));
+  if (act == 2) return fmaxf(v, 0.0f);
+  return v;
+}
+
+static __global__ void Bf16GemmKernel(const uint16_t* __restrict__ in,
+                                      const uint16_t* __restrict__ W,
+                                      const float* __restrict__ bias,
+                                      float* __restrict__ out, int M, int K,
+                                      int N, int act) {
+  __shared__ float As[2][BK][BM];  // transposed: As[buf][k][m] (converted f32)
+  __shared__ float Ws[2][BK][BN];  // transposed: Ws[buf][k][n] (converted f32)
+
+  const int tid = threadIdx.x;
+  const int threadCol = tid % (BN / TN);
+  const int threadRow = tid / (BN / TN);
+  const int m0 = blockIdx.y * BM;
+  const int n0 = blockIdx.x * BN;
+  const int aRow = tid / (BK / 4);
+  const int aCol4 = (tid % (BK / 4)) * 4;
+  const int wRow = tid / (BK / 4);
+  const int wCol4 = (tid % (BK / 4)) * 4;
+  const int aM = m0 + aRow;
+  const int wN = n0 + wRow;
+  const bool aValid = aM < M;
+  const bool wValid = wN < N;
+  const uint16_t* aPtr = in + (size_t(aM) * K + aCol4);
+  const uint16_t* wPtr = W + (size_t(wN) * K + wCol4);
+
+  float acc[TM][TN];
+#pragma unroll
+  for (int i = 0; i < TM; ++i)
+#pragma unroll
+    for (int j = 0; j < TN; ++j) acc[i][j] = 0.0f;
+  float aFrag[TM], bFrag[TN];
+
+  auto convStore = [&](int buf, ushort4 av, ushort4 wv) {
+    As[buf][aCol4 + 0][aRow] = Bf2f(av.x);
+    As[buf][aCol4 + 1][aRow] = Bf2f(av.y);
+    As[buf][aCol4 + 2][aRow] = Bf2f(av.z);
+    As[buf][aCol4 + 3][aRow] = Bf2f(av.w);
+    Ws[buf][wCol4 + 0][wRow] = Bf2f(wv.x);
+    Ws[buf][wCol4 + 1][wRow] = Bf2f(wv.y);
+    Ws[buf][wCol4 + 2][wRow] = Bf2f(wv.z);
+    Ws[buf][wCol4 + 3][wRow] = Bf2f(wv.w);
+  };
+  auto load = [&](int k0, ushort4& av, ushort4& wv) {
+    av = make_ushort4(0, 0, 0, 0);
+    wv = make_ushort4(0, 0, 0, 0);
+    if (aValid) av = *reinterpret_cast<const ushort4*>(aPtr + k0);
+    if (wValid) wv = *reinterpret_cast<const ushort4*>(wPtr + k0);
+  };
+
+  ushort4 av0, wv0;
+  load(0, av0, wv0);
+  convStore(0, av0, wv0);
+  __syncthreads();
+
+  int buf = 0;
+  for (int k0 = 0; k0 < K; k0 += BK) {
+    const int k0n = k0 + BK;
+    ushort4 avN = make_ushort4(0, 0, 0, 0), wvN = make_ushort4(0, 0, 0, 0);
+    if (k0n < K) load(k0n, avN, wvN);
+
+#pragma unroll
+    for (int k = 0; k < BK; ++k) {
+#pragma unroll
+      for (int i = 0; i < TM; i += 4)
+        *reinterpret_cast<float4*>(&aFrag[i]) =
+            *reinterpret_cast<const float4*>(&As[buf][k][threadRow * TM + i]);
+#pragma unroll
+      for (int j = 0; j < TN; j += 4)
+        *reinterpret_cast<float4*>(&bFrag[j]) =
+            *reinterpret_cast<const float4*>(&Ws[buf][k][threadCol * TN + j]);
+#pragma unroll
+      for (int i = 0; i < TM; ++i)
+#pragma unroll
+        for (int j = 0; j < TN; ++j) acc[i][j] += aFrag[i] * bFrag[j];
+    }
+
+    if (k0n < K) {
+      const int nextBuf = buf ^ 1;
+      convStore(nextBuf, avN, wvN);
+      __syncthreads();
+      buf = nextBuf;
+    }
+  }
+
+#pragma unroll
+  for (int i = 0; i < TM; ++i) {
+    const int m = m0 + threadRow * TM + i;
+    if (m >= M) continue;
+#pragma unroll
+    for (int j = 0; j < TN; ++j) {
+      const int n = n0 + threadCol * TN + j;
+      if (n >= N) continue;
+      float v = acc[i][j];
+      if (bias) v += bias[n];
+      out[size_t(m) * N + n] = ApplyActAsr(v, act);
+    }
+  }
+}
+
+// Robust scalar fallback for arbitrary K (one thread per output element).
+static __global__ void Bf16GemmGenericKernel(const uint16_t* __restrict__ in,
+                                             const uint16_t* __restrict__ W,
+                                             const float* __restrict__ bias,
+                                             float* __restrict__ out, int M,
+                                             int K, int N, int act) {
+  const int n = blockIdx.x * blockDim.x + threadIdx.x;
+  const int m = blockIdx.y;
+  if (m >= M || n >= N) return;
+  const uint16_t* a = in + size_t(m) * K;
+  const uint16_t* w = W + size_t(n) * K;
+  float acc = 0.0f;
+  for (int k = 0; k < K; ++k) acc += Bf2f(a[k]) * Bf2f(w[k]);
+  if (bias) acc += bias[n];
+  out[size_t(m) * N + n] = ApplyActAsr(acc, act);
+}
+
+// out[M,N] = actAsr(bias + in[M,K] @ W[N,K]^T), bf16 operands, FP32 accumulate.
+inline void LaunchBf16Gemm(const uint16_t* in, const uint16_t* W,
+                           const float* bias, float* out, int M, int K, int N,
+                           int act, cudaStream_t stream) {
+  if (M <= 0 || K <= 0 || N <= 0) return;
+  if (K % BK == 0) {
+    dim3 block(kThreadsGemm);
+    dim3 grid((N + BN - 1) / BN, (M + BM - 1) / BM);
+    Bf16GemmKernel<<<grid, block, 0, stream>>>(in, W, bias, out, M, K, N, act);
+  } else {
+    dim3 block(256);
+    dim3 grid((N + 255) / 256, M);
+    Bf16GemmGenericKernel<<<grid, block, 0, stream>>>(in, W, bias, out, M, K, N,
+                                                      act);
+  }
+}
+
 }  // namespace gemm
 }  // namespace orator

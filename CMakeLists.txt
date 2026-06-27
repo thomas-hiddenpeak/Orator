@@ -129,7 +129,7 @@ target_include_directories(orator_core PUBLIC
 target_include_directories(orator_core PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/minimp3
 )
-target_link_libraries(orator_core PUBLIC cudart cublas Threads::Threads websockets tomlplusplus::tomlplusplus)
+target_link_libraries(orator_core PUBLIC cudart Threads::Threads websockets tomlplusplus::tomlplusplus)
 if(NOT MSVC)
     target_compile_options(orator_core PRIVATE
         $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra>)
