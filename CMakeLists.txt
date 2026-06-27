@@ -91,6 +91,7 @@ set(ORATOR_CORE_SOURCES
     src/model/qwen3_aligner_lm.cu
     src/model/qwen3_forced_aligner.cc
     src/model/speaker_database.cc
+    src/model/titanet_embedder.cu
     src/model/builtin_registration.cc
     # pipeline orchestration
     src/pipeline/diar_postprocess.cc

@@ -16,13 +16,20 @@ Each task gates on build clean `-Wall -Wextra` + relevant test.
   embedding to `models/reference/speaker/` (local, regenerated like other
   reference dumps). Sanity cosine matrix on test.mp3 spans 0/30/60 s:
   diag 1.0, span1–span2 0.54, span0 distinct — embeddings self-consistent.
-- [ ] **A3** Implement `model::TitaNetEmbedder : core::ISpeakerEmbedder`
+- [x] **A3** `model::TitaNetEmbedder : core::ISpeakerEmbedder`
   (`include/model/titanet_embedder.h` + `src/model/titanet_embedder.cu`):
-  mel (reuse `MelSpectrogram`) → SE/depthwise-separable 1D conv encoder →
-  attentive statistics pooling → linear → L2-normalized 192-d. bf16 weights,
-  fp32 accumulate, stream-explicit, RAII (`DeviceScratch`).
-- [ ] **A4** `test/unit/model/test_titanet.cc` (`test_titanet`): C++ embedding
-  and cosine vs the A2 oracle within tolerance; register in CMake + ctest.
+  time-major [T,C] forward — mel (reuse `MelSpectrogram` with the model's own
+  `preprocessor.featurizer.{fb,window}` + per_feature norm) → 5-block ContextNet
+  encoder (depthwise `DepthwiseConvKernel` + pointwise `LaunchSgemm` + BatchNorm
+  (enc eps 1e-3) + ReLU + SqueezeExcite + residual) → attentive statistics
+  pooling (global mean/std context → conv→ReLU→BN→tanh→conv → softmax-over-time
+  → weighted mean⊕std, dec eps 1e-5) → BatchNorm + linear → L2-normalized 192-d.
+  Weights F32 via `SafeTensorReader`/`UnifiedBuffer`, scratch via `DeviceScratch`.
+  Builds clean (`-Wall -Wextra`, no warnings).
+- [x] **A4** `test/unit/model/test_titanet.cc` (`test_titanet`): feeds the exact
+  oracle waveforms, requires cosine(C++, NeMo) per span and reproduces the
+  cross-span cosine matrix. **Measured: span cosine 1.000000 / 0.999999 /
+  1.000000; cross-span matrix matches the oracle to 4 decimals.** ctest 46/46.
 
 ## Phase B — Identity stage
 - [ ] **B5** Clean-segment gate: VAD-confirmed + single-speaker (no diar
