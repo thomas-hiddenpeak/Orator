@@ -246,6 +246,27 @@ void AsrTextDecoder::LoadWeights(const io::ShardedSafeTensors& w) {
                                              : embed_;  // tied
 
   layers_.resize(config_.num_layers);
+  // Concatenate bf16 weight tensors along the output (row) dim into one buffer.
+  auto concat_bf16 = [](std::initializer_list<const BfBuf*> parts,
+                        std::initializer_list<size_t> counts) -> BfBuf {
+    size_t total = 0;
+    for (size_t c : counts) total += c;
+    BfBuf out;
+    out.buf = std::make_shared<UnifiedBuffer>(sizeof(uint16_t) * total);
+    out.p = static_cast<uint16_t*>(out.buf->data());
+    size_t off = 0;
+    auto pit = parts.begin();
+    auto cit = counts.begin();
+    for (; pit != parts.end(); ++pit, ++cit) {
+      std::memcpy(out.p + off, (*pit)->p, sizeof(uint16_t) * (*cit));
+      off += *cit;
+    }
+    return out;
+  };
+  const size_t Hh = config_.hidden_size;
+  const size_t Qd = static_cast<size_t>(config_.num_q_heads) * config_.head_dim;
+  const size_t KVd = static_cast<size_t>(config_.num_kv_heads) * config_.head_dim;
+  const size_t I = config_.intermediate_size;
   for (int i = 0; i < config_.num_layers; ++i) {
     const std::string p = M + "layers." + std::to_string(i) + ".";
     Layer& L = layers_[i];
@@ -260,6 +281,16 @@ void AsrTextDecoder::LoadWeights(const io::ShardedSafeTensors& w) {
     L.gate_w = LoadBf16(w, p + "mlp.gate_proj.weight");
     L.up_w = LoadBf16(w, p + "mlp.up_proj.weight");
     L.down_w = LoadBf16(w, p + "mlp.down_proj.weight");
+    // Fuse q|k|v and gate|up into single contiguous bf16 weights. The decode
+    // path (Tq==1) issues one GEMV whose output row is contiguous, so q/k/v and
+    // gate/up are read as offset slices -- cutting kernel launches on the decode
+    // hot path (75% of ASR). The prefill path (Tq>1) reads the same fused
+    // buffers as row-slices. Numerically identical (same bf16 weights).
+    L.qkv_w = concat_bf16({&L.q_w, &L.k_w, &L.v_w}, {Qd * Hh, KVd * Hh, KVd * Hh});
+    L.gateup_w = concat_bf16({&L.gate_w, &L.up_w}, {I * Hh, I * Hh});
+    // Release the parts: both decode (Tq==1, fused GEMV) and prefill (Tq>1,
+    // sliced GEMMs) now read only the fused buffers. No weight duplication.
+    L.q_w = L.k_w = L.v_w = L.gate_w = L.up_w = BfBuf{};
   }
 
   k_cache_.resize(config_.num_layers);
@@ -325,13 +356,17 @@ void AsrTextDecoder::DecodeForwardOnStream(float* d_x, const int* d_pos,
   if (prof) { cudaEventCreate(&e0); cudaEventCreate(&e1); cudaEventRecord(e0, s); }
 
   float* d_norm = Work(14, Hh);
-  float* d_q = Work(15, Qd);
-  float* d_k = Work(16, KVd);
-  float* d_v = Work(17, KVd);
+  // Fused q|k|v output in one contiguous buffer; k/v are offset slices.
+  float* d_qkv = Work(15, Qd + 2 * KVd);
+  float* d_q = d_qkv;
+  float* d_k = d_qkv + Qd;
+  float* d_v = d_qkv + Qd + KVd;
   float* d_attn = Work(18, Qd);
   float* d_proj = Work(19, Hh);
-  float* d_gate = Work(20, I);
-  float* d_up = Work(21, I);
+  // Fused gate|up output in one contiguous buffer; up is the second half.
+  float* d_gateup = Work(20, 2 * I);
+  float* d_gate = d_gateup;
+  float* d_up = d_gateup + I;
   auto* norm_bf16 = reinterpret_cast<uint16_t*>(Work(23, Hh / 2 + 1));
   // Dedicated bf16 cast buffers so the M=1 GEMMs use LinearPre (no global
   // scratch / no lazy cudaMalloc) -> the whole decode body is allocation-free
@@ -347,9 +382,7 @@ void AsrTextDecoder::DecodeForwardOnStream(float* d_x, const int* d_pos,
 
     asr_ops::RmsNorm(d_x, L.in_ln.p, d_norm, 1, Hh, eps, s);
     asr_gemm::F32ToBf16(d_norm, norm_bf16, Hh, s);
-    asr_gemm::LinearPre(norm_bf16, L.q_w.p, nullptr, d_q, 1, Hh, Qd, 0, s);
-    asr_gemm::LinearPre(norm_bf16, L.k_w.p, nullptr, d_k, 1, Hh, KVd, 0, s);
-    asr_gemm::LinearPre(norm_bf16, L.v_w.p, nullptr, d_v, 1, Hh, KVd, 0, s);
+    asr_gemm::LinearPre(norm_bf16, L.qkv_w.p, nullptr, d_qkv, 1, Hh, Qd + 2 * KVd, 0, s);
     asr_ops::RmsNorm(d_q, L.q_norm.p, d_q, Hq, Dh, eps, s);
     asr_ops::RmsNorm(d_k, L.k_norm.p, d_k, Hkv, Dh, eps, s);
     asr_ops::RopeHalf(d_q, d_pos, 1, Hq, Dh, config_.rope_theta, s);
@@ -365,8 +398,7 @@ void AsrTextDecoder::DecodeForwardOnStream(float* d_x, const int* d_pos,
 
     asr_ops::RmsNorm(d_x, L.post_ln.p, d_norm, 1, Hh, eps, s);
     asr_gemm::F32ToBf16(d_norm, norm_bf16, Hh, s);
-    asr_gemm::LinearPre(norm_bf16, L.gate_w.p, nullptr, d_gate, 1, Hh, I, 0, s);
-    asr_gemm::LinearPre(norm_bf16, L.up_w.p, nullptr, d_up, 1, Hh, I, 0, s);
+    asr_gemm::LinearPre(norm_bf16, L.gateup_w.p, nullptr, d_gateup, 1, Hh, 2 * I, 0, s);
     asr_ops::SwiGLU(d_gate, d_up, d_gate, I, s);
     asr_gemm::F32ToBf16(d_gate, gate_bf16, I, s);
     asr_gemm::LinearPre(gate_bf16, L.down_w.p, nullptr, d_proj, 1, I, Hh, 0, s);
@@ -453,9 +485,14 @@ void AsrTextDecoder::Forward(float* d_x, int Tq, int pos0, cudaStream_t stream) 
 
     asr_ops::RmsNorm(d_x, L.in_ln.p, d_norm, Tq, Hh, eps, stream);
     asr_gemm::F32ToBf16(d_norm, norm_bf16, static_cast<long>(Tq) * Hh, stream);
-    asr_gemm::LinearPre(norm_bf16, L.q_w.p, nullptr, d_q, Tq, Hh, Qd, 0, stream);
-    asr_gemm::LinearPre(norm_bf16, L.k_w.p, nullptr, d_k, Tq, Hh, KVd, 0, stream);
-    asr_gemm::LinearPre(norm_bf16, L.v_w.p, nullptr, d_v, Tq, Hh, KVd, 0, stream);
+    // Prefill (Tq>1) reads the fused qkv_w as three row-slices into separate
+    // contiguous q/k/v buffers (a fused output would be row-interleaved). Same
+    // weights as the decode path; the parts were released after concatenation.
+    asr_gemm::LinearPre(norm_bf16, L.qkv_w.p, nullptr, d_q, Tq, Hh, Qd, 0, stream);
+    asr_gemm::LinearPre(norm_bf16, L.qkv_w.p + static_cast<size_t>(Qd) * Hh,
+                        nullptr, d_k, Tq, Hh, KVd, 0, stream);
+    asr_gemm::LinearPre(norm_bf16, L.qkv_w.p + static_cast<size_t>(Qd + KVd) * Hh,
+                        nullptr, d_v, Tq, Hh, KVd, 0, stream);
     asr_ops::RmsNorm(d_q, L.q_norm.p, d_q, Tq * Hq, Dh, eps, stream);
     asr_ops::RmsNorm(d_k, L.k_norm.p, d_k, Tq * Hkv, Dh, eps, stream);
     asr_ops::RopeHalf(d_q, d_pos, Tq, Hq, Dh, config_.rope_theta, stream);
@@ -473,8 +510,9 @@ void AsrTextDecoder::Forward(float* d_x, int Tq, int pos0, cudaStream_t stream) 
 
     asr_ops::RmsNorm(d_x, L.post_ln.p, d_norm, Tq, Hh, eps, stream);
     asr_gemm::F32ToBf16(d_norm, norm_bf16, static_cast<long>(Tq) * Hh, stream);
-    asr_gemm::LinearPre(norm_bf16, L.gate_w.p, nullptr, d_gate, Tq, Hh, I, 0, stream);
-    asr_gemm::LinearPre(norm_bf16, L.up_w.p, nullptr, d_up, Tq, Hh, I, 0, stream);
+    asr_gemm::LinearPre(norm_bf16, L.gateup_w.p, nullptr, d_gate, Tq, Hh, I, 0, stream);
+    asr_gemm::LinearPre(norm_bf16, L.gateup_w.p + static_cast<size_t>(I) * Hh,
+                        nullptr, d_up, Tq, Hh, I, 0, stream);
     asr_ops::SwiGLU(d_gate, d_up, d_gate, Tq * I, stream);
     asr_gemm::Linear(d_gate, L.down_w.p, nullptr, d_proj, Tq, I, Hh, 0, stream);
     AddResidualKernel<<<Blocks(static_cast<long>(Tq) * Hh), kThreads, 0, stream>>>(

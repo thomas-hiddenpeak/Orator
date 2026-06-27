@@ -118,6 +118,11 @@ class AsrTextDecoder {
   struct Layer {
     F32Buf in_ln, q_norm, k_norm, post_ln;          // small norm weights (f32)
     BfBuf q_w, k_w, v_w, o_w, gate_w, up_w, down_w;  // matmul weights (bf16)
+    // Fused projections (built at load time, parts then released): one GEMV for
+    // q|k|v and one for gate|up cuts per-token kernel launches on the decode hot
+    // path. qkv_w = [Qd+2*KVd, Hh], gateup_w = [2*I, Hh]; outputs are contiguous
+    // so q/k/v and gate/up are read as offset slices. Numerically identical.
+    BfBuf qkv_w, gateup_w;
   };
 
   void Forward(float* d_x, int Tq, int pos0, cudaStream_t stream = 0);
