@@ -95,7 +95,13 @@ std::vector<DiarSegment> OnsetOffsetSegments(const DiarizationFrames& frames,
                                              double min_dur_off) {
   std::vector<DiarSegment> segments;
   const double period = frames.frame_period_sec;
-  const int max_gap_frames = static_cast<int>(min_dur_off / period);
+  // NOTE (audit finding): `offset` is a configured hysteresis exit threshold
+  // that this implementation does NOT yet use -- the exit condition below tests
+  // `prob < onset`, so onset/offset hysteresis is effectively disabled. Wiring
+  // `offset` changes diarization accuracy and must be validated against the
+  // oracle (Constitution Art. II); tracked as a separate change, not silently
+  // altered here.
+  (void)offset;
 
   for (int spk = 0; spk < frames.num_speakers; ++spk) {
     bool active = false;
