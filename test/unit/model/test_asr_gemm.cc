@@ -273,17 +273,23 @@ static void TestLinearPre() {
 static void TestLinearVsF64Reference() {
   TEST("TestLinearVsF64Reference: bf16 GEMM matches f64 reference (production shapes)");
   struct Shape { int M, K, N; const char* tag; };
-  // (M,K,N) sampled from the encoder / decoder / aligner production shapes;
-  // M>1 so the cuBLAS (soon in-project) path is exercised, not the M=1 GEMV.
-  // The f64 CPU reference is O(M*N*K); the default ctest run uses a fast
-  // representative subset, and ORATOR_GEMM_FULL=1 adds the large-K/N production
-  // shapes (used when validating the in-project GEMM, Spec 002 P2.1).
+  // (M,K,N) sampled from the encoder / decoder / aligner production shapes.
+  // M==1 exercises the memory-bound GEMV decode path (GemvBf16Vec4Kernel, the
+  // 128-bit float4 variant -- every production K is a multiple of 8); M>1
+  // exercises the in-project tiled bf16 GEMM. The f64 CPU reference is O(M*N*K);
+  // the default ctest run uses a fast representative subset, and
+  // ORATOR_GEMM_FULL=1 adds the large-K/N production shapes (used when
+  // validating the in-project GEMM, Spec 002 P2.1).
   std::vector<Shape> shapes = {
+    {1, 1024, 1024, "decode-gemv-attn"},
+    {1, 1024, 2048, "decode-gemv-qkv"},
     {4, 1024, 1024, "attn-qkvo"},
     {4, 1024, 2048, "q_proj/proj2"},
     {2, 1024, 1024, "prefill-small"},
   };
   if (std::getenv("ORATOR_GEMM_FULL") != nullptr) {
+    shapes.push_back({1, 6144, 1024, "decode-gemv-down"});
+    shapes.push_back({1, 1024, 6144, "decode-gemv-gateup"});
     shapes.push_back({6, 1024, 3072, "ffn-fc1"});
     shapes.push_back({6, 3072, 1024, "ffn-fc2"});
     shapes.push_back({4, 7680, 1024, "conv_out"});
@@ -359,6 +365,48 @@ static void TestLinearVsF64Reference() {
 }
 
 // ---------------------------------------------------------------------------
+// GEMV microbenchmark (ORATOR_GEMM_BENCH=1) -- segmentation-independent
+// isolation of the M=1 decode kernel. Run twice to A/B the variants:
+//   ./test_asr_gemm  (default = GemvBf16Vec4Kernel, 128-bit float4 loads)
+//   ORATOR_GEMV_HALF2=1 ./test_asr_gemm  (legacy GemvBf16Kernel, half2 loads)
+// Reports avg us/call and effective weight-read bandwidth (GB/s) per shape.
+static void BenchGemv() {
+  printf("  BENCH GEMV (M=1) %s\n",
+         std::getenv("ORATOR_GEMV_HALF2") ? "[half2]" : "[float4]");
+  struct Shape { int K, N; const char* tag; };
+  const Shape shapes[] = {
+    {1024, 1024, "attn-o"},
+    {1024, 2048, "qkv"},
+    {1024, 6144, "gate/up"},
+    {6144, 1024, "down"},
+    {1024, 5000, "score-head"},
+  };
+  const int iters = 2000, warmup = 200;
+  for (const auto& s : shapes) {
+    GpuBufU16 d_in(s.K), d_W(static_cast<size_t>(s.N) * s.K);
+    GpuBuf d_out(s.N);
+    std::vector<uint16_t> hin(s.K, 0x3f80), hW(static_cast<size_t>(s.N) * s.K, 0x3f00);
+    cudaMemcpy(d_in.ptr, hin.data(), hin.size() * 2, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_W.ptr, hW.data(), hW.size() * 2, cudaMemcpyHostToDevice);
+    for (int i = 0; i < warmup; ++i)
+      gemm::LinearPre(d_in.ptr, d_W.ptr, nullptr, d_out.ptr, 1, s.K, s.N, 0);
+    cudaDeviceSynchronize();
+    cudaEvent_t a, b; cudaEventCreate(&a); cudaEventCreate(&b);
+    cudaEventRecord(a);
+    for (int i = 0; i < iters; ++i)
+      gemm::LinearPre(d_in.ptr, d_W.ptr, nullptr, d_out.ptr, 1, s.K, s.N, 0);
+    cudaEventRecord(b); cudaEventSynchronize(b);
+    float tot_ms = 0; cudaEventElapsedTime(&tot_ms, a, b);
+    cudaEventDestroy(a); cudaEventDestroy(b);
+    const double us = tot_ms * 1000.0 / iters;
+    const double bytes = static_cast<double>(s.N) * s.K * 2.0;  // bf16 weights
+    const double gbps = bytes / (us * 1e-6) / 1e9;
+    printf("    [%-11s K=%5d N=%5d] %.2f us/call  %.0f GB/s\n",
+           s.tag, s.K, s.N, us, gbps);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 int main() {
@@ -372,6 +420,8 @@ int main() {
     printf("Results: 0 / 0 passed (skipped)\n");
     return 0;
   }
+
+  if (std::getenv("ORATOR_GEMM_BENCH")) { BenchGemv(); gemm::Shutdown(); return 0; }
 
   TestF32Bf16Roundtrip();
   TestF32Bf16Empty();

@@ -230,11 +230,33 @@ PROJECT_STATE updated.
   ctest 45/45 (encoder + aligner oracles unchanged-pass); real WS 120s rate=0
   transcript identical, server stable, stream_rt 2.585x (vs 2.35x pre-pool).
 
-### P2.3 — Event-based fine-grained scheduling  [outline, high-risk]
-- [ ] **T120** Replace the binary `DeviceLock` mode with per-pipeline stream +
-  CUDA-event ordering; isolate a capture stream from concurrent issuance.
+### P2.3 / P2.4 — CUDA Graph path  [ABANDONED — empirically not a perf lever]
+Controlled A/B (serial mode, only variable = graph on/off; real WS 120s rate=0,
+deterministic 39 utterances) measured graph's decode benefit at **1.45%**:
+serial+graph 17206.5 ms total decode vs serial+NOGRAPH 17460.1 ms. Root cause:
+after the cuBLAS removal the decode bottleneck is the **memory-bandwidth-bound
+M=1 GEMV** (28 layers reading large bf16 weight matrices per token), not CPU
+launch overhead — the eager path already batches launches, so the CPU work is
+hidden behind async enqueue / GPU execution. Collapsing ~170 kernel launches per
+token into one graph launch therefore recovers only the small residual CPU cost.
+Under concurrency the GPU is even more contended, so graph helps less, not more.
+Conclusion: CUDA Graph (and the high-risk P2.3 event-scheduling rewrite it would
+require) cannot recover the ~35% cuBLAS gap. The real lever is faster GEMV/GEMM
+kernels (P2.5). The decoder retains its capture path gated on
+`!ConcurrentGpuActive()` (off by default); not removed, just not pursued further.
+- [~] **T120 / T130** Not pursued (see finding above).
 
-### P2.4 — CUDA Graph for decode + encoder  [outline, depends on P2.1-3]
-- [ ] **T130** Capture the allocation-free / cuBLAS-free decode body and the
-  fixed-shape streaming encoder Forward; replay under concurrency. Measure
-  decode/encode speedup; oracle + real-WS gates.
+### P2.5 — Faster GEMV/GEMM kernels (the actual perf lever)  [in progress]
+- [x] **T140** 128-bit (`float4` = 8 bf16) vectorized M=1 decode GEMV
+  (`GemvBf16Vec4Kernel`): each lane issues a single 16-byte load (512-byte
+  coalesced warp transaction) instead of half2, raising memory-level parallelism
+  on the bandwidth-bound decode. Dispatched for K%8==0 (every Qwen3 projection);
+  half2 `GemvBf16Kernel` retained as fallback + `ORATOR_GEMV_HALF2=1` A/B toggle.
+  Added M=1 oracle shapes to `test_asr_gemm` (max_rel ≤ 4.8e-4) and a
+  segmentation-independent `BenchGemv` microbench (`ORATOR_GEMM_BENCH=1`).
+  Measured isolated speedup: +2.9%/+5.4%/+9.9%/+3.6%/+10.1% (attn-o / qkv /
+  gate-up / down / score-head); the large decode-dominant kernels gain most
+  (~10%), peak ~718 GB/s. Validated: build clean; ctest 45/45; real WS 120s
+  rate=0 transcript correct, server stable.
+- [ ] **T141** (optional) Faster encoder GEMM: fix the warp-tiled 32x32 WMMA
+  concurrency crash or rewrite a better tiled WMMA (basic 16-warp = 2.35x).

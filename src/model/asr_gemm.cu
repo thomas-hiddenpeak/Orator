@@ -92,6 +92,54 @@ __global__ void GemvBf16Kernel(const __nv_bfloat16* __restrict__ in,
   }
 }
 
+// 128-bit (float4 = 8 bf16) vectorized variant of GemvBf16Kernel. Each lane
+// issues a single 16-byte load per step, so the 32-lane warp reads a 512-byte
+// coalesced transaction -- higher memory-level parallelism (more bytes in flight
+// per instruction, 4x fewer loop iterations) than the half2 path on the
+// bandwidth-bound M=1 decode. Requires K % 8 == 0 (true for every Qwen3
+// projection: 1024/2048/6144); the row offset row*K is then a multiple of 8, so
+// each row's float4 stream is 16-byte aligned. x is staged in shared (16-byte
+// aligned dynamic shared memory) and reused across the block's WARPS rows.
+__global__ void GemvBf16Vec4Kernel(const __nv_bfloat16* __restrict__ in,
+                                   const __nv_bfloat16* __restrict__ W,
+                                   const float* __restrict__ bias,
+                                   float* __restrict__ out, int K, int N, int act) {
+  extern __shared__ __nv_bfloat16 sx[];  // [K]
+  const int tid = threadIdx.x;
+  const int lane = tid & 31;
+  const int warp = tid >> 5;
+  for (int i = tid; i < K; i += blockDim.x) sx[i] = in[i];
+  __syncthreads();
+
+  const int row = blockIdx.x * kGemvWarps + warp;
+  if (row >= N) return;
+
+  const float4* w4 = reinterpret_cast<const float4*>(W + static_cast<size_t>(row) * K);
+  const float4* x4 = reinterpret_cast<const float4*>(sx);
+  const int K8 = K >> 3;  // float4 (8 bf16) chunks
+  union Pack { float4 v; __nv_bfloat162 h[4]; };
+  float acc = 0.0f;
+  for (int k = lane; k < K8; k += 32) {
+    Pack wp, xp;
+    wp.v = w4[k];
+    xp.v = x4[k];
+#pragma unroll
+    for (int j = 0; j < 4; ++j) {
+      const float2 wf = __bfloat1622float2(wp.h[j]);
+      const float2 xf = __bfloat1622float2(xp.h[j]);
+      acc += wf.x * xf.x + wf.y * xf.y;
+    }
+  }
+#pragma unroll
+  for (int m = 16; m > 0; m >>= 1) acc += __shfl_xor_sync(0xffffffffu, acc, m);
+  if (lane == 0) {
+    if (bias) acc += bias[row];
+    if (act == 1) acc = 0.5f * acc * (1.0f + erff(acc * 0.70710678118654752440f));
+    else if (act == 2) acc = fmaxf(acc, 0.0f);
+    out[row] = acc;
+  }
+}
+
 // out[m,n] += bias[n]; act: 0 none, 1 GELU(exact erf), 2 ReLU.
 // (Retained: the M>1 epilogue is now fused into the in-project bf16 GEMM; this
 // kernel is no longer launched.)
@@ -125,13 +173,22 @@ void LinearPre(const uint16_t* in_bf16, const uint16_t* W_bf16,
   if (M <= 0 || K <= 0 || N <= 0) return;
 
   // M==1 (autoregressive decode): memory-bound GEMV with coalesced weight reads.
-  // K is even for every Qwen3 projection (1024/2048/6144) so the half2 path is safe.
+  // K is even for every Qwen3 projection (1024/2048/6144) so the half2 path is safe;
+  // K % 8 == 0 holds for all of them too, so the 128-bit float4 path is preferred.
   if (M == 1 && (K & 1) == 0) {
     const int grid = (N + kGemvWarps - 1) / kGemvWarps;
     const size_t shmem = static_cast<size_t>(K) * sizeof(__nv_bfloat16);
-    GemvBf16Kernel<<<grid, kGemvWarps * 32, shmem, stream>>>(
-        reinterpret_cast<const __nv_bfloat16*>(in_bf16),
-        reinterpret_cast<const __nv_bfloat16*>(W_bf16), bias_f32, out_f32, K, N, act);
+    // ORATOR_GEMV_HALF2=1 forces the legacy half2 kernel (A/B + safety fallback).
+    static const bool force_half2 = std::getenv("ORATOR_GEMV_HALF2") != nullptr;
+    if ((K & 7) == 0 && !force_half2) {
+      GemvBf16Vec4Kernel<<<grid, kGemvWarps * 32, shmem, stream>>>(
+          reinterpret_cast<const __nv_bfloat16*>(in_bf16),
+          reinterpret_cast<const __nv_bfloat16*>(W_bf16), bias_f32, out_f32, K, N, act);
+    } else {
+      GemvBf16Kernel<<<grid, kGemvWarps * 32, shmem, stream>>>(
+          reinterpret_cast<const __nv_bfloat16*>(in_bf16),
+          reinterpret_cast<const __nv_bfloat16*>(W_bf16), bias_f32, out_f32, K, N, act);
+    }
     CheckCudaError(cudaGetLastError(), __FILE__, __LINE__);
     return;
   }
