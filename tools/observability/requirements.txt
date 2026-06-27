@@ -1,0 +1,5 @@
+# Offline observability tool dependencies (Constitution Art. I: third-party
+# libraries are allowed under tools/, never in the C++/CUDA runtime).
+# Install into the uv-managed tools venv:
+#   uv pip install --python tools/.venv/bin/python -r tools/observability/requirements.txt
+rerun-sdk==0.33.1
