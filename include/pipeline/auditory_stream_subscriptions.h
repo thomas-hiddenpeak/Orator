@@ -48,10 +48,12 @@ void HandleAsrSubscription(ComprehensiveTimeline& comp, std::mutex& comp_mutex,
 
 // Align subscription: parse {"id":..,"start":..,"end":..,"units":[{...}]}
 // → comp_.UpsertAlign(). Incorporates the forced-alignment per-unit timestamps
-// into the comprehensive timeline's align track (time-base consistent).
+// into the comprehensive timeline, refining each text's diarization split by
+// exact per-unit timing; emit_rev pushes the resulting revisions.
 void HandleAlignSubscription(ComprehensiveTimeline& comp,
                              std::mutex& comp_mutex,
-                             const protocol::Message& msg);
+                             const protocol::Message& msg,
+                             const RevisionEmitter& emit_rev);
 
 // Speaker sink callback: diarization worker → protocol publish
 void HandleSpeakerSink(std::mutex& comp_mutex,

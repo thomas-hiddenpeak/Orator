@@ -131,6 +131,29 @@ ComprehensiveTimeline::SplitTextByDiar(const TextSeg& t) const {
         Entry{turns[0].start, turns[0].end, turns[0].speaker, t.text, t.id}};
   }
 
+  // Alignment-aware allocation (preferred): when per-unit timestamps exist for
+  // this text, assign each aligned unit's text to the diarization turn whose
+  // interval contains the unit's midpoint -- exact attribution from the real
+  // per-character timing, instead of the time-proportional approximation below.
+  if (auto ait = align_.find(t.id);
+      ait != align_.end() && !ait->second.units.empty()) {
+    std::vector<std::string> slices(turns.size());
+    std::size_t ti = 0;
+    for (const auto& u : ait->second.units) {
+      const double mid = 0.5 * (u.start + u.end);
+      while (ti + 1 < turns.size() && mid >= turns[ti].end) ++ti;
+      slices[ti] += u.text;
+    }
+    std::vector<Entry> out;
+    out.reserve(turns.size());
+    for (std::size_t k = 0; k < turns.size(); ++k) {
+      if (slices[k].empty()) continue;
+      out.push_back({turns[k].start, turns[k].end, turns[k].speaker,
+                     std::move(slices[k]), t.id});
+    }
+    if (!out.empty()) return out;
+  }
+
   // Proportional codepoint allocation across turns (cumulative to avoid drift).
   const std::vector<std::size_t> offs = Utf8Offsets(t.text);
   const int ncp = static_cast<int>(offs.size()) - 1;
@@ -292,7 +315,7 @@ ComprehensiveTimeline::SnapshotRawTexts() const {
   return out;
 }
 
-void ComprehensiveTimeline::UpsertAlign(
+std::vector<ComprehensiveTimeline::Revision> ComprehensiveTimeline::UpsertAlign(
     long text_id, double start, double end,
     const std::vector<AlignUnitSeg>& units) {
   AlignGroup g;
@@ -301,6 +324,16 @@ void ComprehensiveTimeline::UpsertAlign(
   g.end = end;
   g.units = units;
   align_[text_id] = std::move(g);  // idempotent replace by id
+  // Re-project the matching text now that exact per-unit timestamps refine its
+  // diarization split (it was time-proportional before alignment arrived).
+  std::vector<Revision> revs;
+  for (const auto& t : texts_) {
+    if (t.id == text_id) {
+      ReprojectText(t, &revs);
+      break;
+    }
+  }
+  return revs;
 }
 
 std::vector<ComprehensiveTimeline::AlignGroup>

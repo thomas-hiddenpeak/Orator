@@ -118,7 +118,9 @@ void AuditoryStream::Start() {
     align_units_sub_id_ = protocol_timeline_->SubscribeInternal(
         protocol::TopicPattern(protocol::kAlignUnits.to_string()),
         [this](const protocol::Message& msg) {
-          HandleAlignSubscription(comp_, comp_mutex_, msg);
+          HandleAlignSubscription(
+              comp_, comp_mutex_, msg,
+              [this](const std::string& rev_json) { EmitLocked(rev_json); });
         });
   }
 

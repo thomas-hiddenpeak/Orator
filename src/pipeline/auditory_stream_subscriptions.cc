@@ -141,7 +141,8 @@ void HandleAsrSubscription(ComprehensiveTimeline& comp, std::mutex& comp_mutex,
 // ---------------------------------------------------------------------------
 void HandleAlignSubscription(ComprehensiveTimeline& comp,
                              std::mutex& comp_mutex,
-                             const protocol::Message& msg) {
+                             const protocol::Message& msg,
+                             const RevisionEmitter& emit_rev) {
   const std::string& data = msg.data;
   const long id = JsonParseLong(data, "id");
   if (id < 0) return;
@@ -181,8 +182,14 @@ void HandleAlignSubscription(ComprehensiveTimeline& comp,
     obj_pos = brace_end + 1;
   }
 
-  std::lock_guard<std::mutex> lk(comp_mutex);
-  comp.UpsertAlign(id, seg_start, seg_end, units);
+  std::vector<ComprehensiveTimeline::Revision> revs;
+  {
+    std::lock_guard<std::mutex> lk(comp_mutex);
+    revs = comp.UpsertAlign(id, seg_start, seg_end, units);
+  }
+  for (const auto& r : revs) {
+    DoEmitRevision(r, "align", emit_rev);
+  }
 }
 
 // ---------------------------------------------------------------------------

@@ -133,8 +133,9 @@ class ComprehensiveTimeline {
   friend void HandleAsrSubscription(
       ComprehensiveTimeline&, std::mutex&, const orator::protocol::Message&,
       const std::function<void(const std::string&)>&);
-  friend void HandleAlignSubscription(ComprehensiveTimeline&, std::mutex&,
-                                      const orator::protocol::Message&);
+  friend void HandleAlignSubscription(
+      ComprehensiveTimeline&, std::mutex&, const orator::protocol::Message&,
+      const std::function<void(const std::string&)>&);
   // Deposit a speaker segment (who/when). Returns revisions caused by
   // attribution changes in overlapping text segments.
   std::vector<Revision> UpsertSpeaker(double start, double end,
@@ -158,9 +159,12 @@ class ComprehensiveTimeline {
 
   // Deposit (or replace) the forced-alignment units for one ASR text segment,
   // keyed by its source text_id. Idempotent: re-depositing the same id replaces
-  // its units. Times must already be on the common time base.
-  void UpsertAlign(long text_id, double start, double end,
-                   const std::vector<AlignUnitSeg>& units);
+  // its units. Times must already be on the common time base. Re-projects the
+  // matching text so the comprehensive view splits it at diarization boundaries
+  // by each unit's exact timestamp (instead of the time-proportional fallback);
+  // returns the resulting revisions.
+  std::vector<Revision> UpsertAlign(long text_id, double start, double end,
+                                    const std::vector<AlignUnitSeg>& units);
 
   // Clean up old data to prevent memory accumulation
   void CleanupOldData(double keep_until_sec);
