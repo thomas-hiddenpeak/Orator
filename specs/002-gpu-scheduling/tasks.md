@@ -258,5 +258,20 @@ kernels (P2.5). The decoder retains its capture path gated on
   gate-up / down / score-head); the large decode-dominant kernels gain most
   (~10%), peak ~718 GB/s. Validated: build clean; ctest 45/45; real WS 120s
   rate=0 transcript correct, server stable.
-- [ ] **T141** (optional) Faster encoder GEMM: fix the warp-tiled 32x32 WMMA
-  concurrency crash or rewrite a better tiled WMMA (basic 16-warp = 2.35x).
+- [x] **T141** Warp-tiled WMMA encoder GEMM (`Bf16WmmaKernel2`, gemm.cuh): each
+  warp computes a 16x32 strip = FN=2 bf16 fragments in N, reusing one loaded A
+  fragment across both B fragments (64x128 block tile, 16 warps). Raises
+  arithmetic intensity vs the 1-fragment `Bf16WmmaKernel`, which the GEMM
+  microbench (`BenchGemm`) showed was the small-GEMM bottleneck. Ragged M/N edges
+  zero-padded on load + bounds-checked in the epilogue; the f64 oracle (incl.
+  non-aligned N=5000) is the safety net that catches any stray out-of-bounds as a
+  numerical error -- the root cause of the earlier warp-tiled attempt's
+  *concurrency* crash (a latent OOB that corrupted a concurrent stream, benign
+  only under CUDA_LAUNCH_BLOCKING). Portable `nvcuda::wmma` (SM 8.0+, runs on
+  Orin). Old 1-fragment kernel retained as `ORATOR_GEMM_WMMA1=1` A/B + fallback.
+  Measured isolated speedup +17-24% on M=256 encoder shapes
+  (attn-proj/fc1/fc2/conv_out), +5-17% on M=512. Validated: build clean; full
+  oracle 7/7 (worst 1.09e-2); ctest 45/45; 5 concurrent real-WS 120s runs all
+  server-stable, transcript correct. End-to-end stream_rt effect (~+1-2%, encode
+  is 24% of ASR) is below the rate=0 VAD-segmentation noise floor; the
+  kernel-level bench is authoritative.
