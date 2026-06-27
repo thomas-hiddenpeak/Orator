@@ -410,20 +410,18 @@ std::vector<float> SortformerDiarizer::ForwardEncoderDecoder(
   std::vector<float> xin(emb_seq.size());
   for (size_t i = 0; i < emb_seq.size(); ++i) xin[i] = emb_seq[i] * xscale;
 
-  gpu::DeviceBuffer dx(xin.size() * sizeof(float));
-  CUDA_CHECK(cudaMemcpyAsync(dx.data(), xin.data(), xin.size() * sizeof(float),
+  gpu::DeviceScratch& scr = enc_scratch_;
+  float* dx = scr.GetT<float>(0, xin.size());
+  CUDA_CHECK(cudaMemcpyAsync(dx, xin.data(), xin.size() * sizeof(float),
                              cudaMemcpyHostToDevice, stream));
   std::vector<float> posemb = ConformerLayer::BuildPosEmb(T, D);
-  gpu::DeviceBuffer dpe(posemb.size() * sizeof(float));
-  CUDA_CHECK(cudaMemcpyAsync(dpe.data(), posemb.data(),
-                             posemb.size() * sizeof(float),
+  float* dpe = scr.GetT<float>(1, posemb.size());
+  CUDA_CHECK(cudaMemcpyAsync(dpe, posemb.data(), posemb.size() * sizeof(float),
                              cudaMemcpyHostToDevice, stream));
   for (auto& layer : conformer_layers_) {
-    layer->Forward(static_cast<float*>(dx.data()), T, valid,
-                   static_cast<const float*>(dpe.data()), stream);
+    layer->Forward(dx, T, valid, dpe, stream);
   }
-  std::vector<float> preds =
-      decoder_->Forward(static_cast<float*>(dx.data()), T, valid, stream);
+  std::vector<float> preds = decoder_->Forward(dx, T, valid, stream);
 
   // apply_mask_to_preds: zero frames at/after the valid length.
   const int n_spk = config_.max_num_speakers;

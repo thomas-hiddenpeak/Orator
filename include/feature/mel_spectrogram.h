@@ -4,6 +4,8 @@
 
 #include <vector>
 
+#include "gpu/device_scratch.h"
+
 // Log-mel spectrogram: the real Streaming Sortformer audio front-end.
 //
 // Matches the model's preprocessor config (model_config.yaml):
@@ -84,6 +86,9 @@ class MelSpectrogram {
   std::vector<float> RunStftMel(const float* sig, int num_samples,
                                 int input_offset, int num_frames,
                                 cudaStream_t stream) const;
+  // Per-instance device scratch for RunStftMel's working buffers (one diar
+  // worker -> single-thread-of-control per instance).
+  mutable gpu::DeviceScratch scratch_;
 };
 
 }  // namespace feature

@@ -20,6 +20,7 @@
 
 #include "core/stages.h"
 #include "feature/mel_spectrogram.h"
+#include "gpu/device_scratch.h"
 #include "gpu/memory.h"
 #include "io/safetensor.h"
 #include "model/conformer_layer.h"
@@ -206,6 +207,9 @@ class SortformerDiarizer final : public core::IDiarizer {
   std::unique_ptr<SortformerDecoder> decoder_;
   int num_conformer_layers_ = 17;
   HostStreamState stream_state_;
+  // Device scratch for ForwardEncoderDecoder's per-call dx/dpe buffers (single
+  // diarization worker thread -> single-thread-of-control per instance).
+  gpu::DeviceScratch enc_scratch_;
 
   // --- Incremental real-time streaming state (persists across StreamAudio
   // calls for speaker-identity continuity; reset by Reset()). ---

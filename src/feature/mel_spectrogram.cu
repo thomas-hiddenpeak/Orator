@@ -188,45 +188,42 @@ std::vector<float> MelSpectrogram::RunStftMel(const float* sig, int num_samples,
   const int pad_left = config_.center ? config_.n_fft / 2 : 0;
   const int win_off = (config_.n_fft - config_.win_length) / 2;
 
-  gpu::DeviceBuffer d_samples(static_cast<size_t>(num_samples) * sizeof(float));
-  gpu::DeviceBuffer d_win(static_cast<size_t>(config_.win_length) *
-                          sizeof(float));
-  gpu::DeviceBuffer d_filters(mel_filters_.size() * sizeof(float));
-  gpu::DeviceBuffer d_power(static_cast<size_t>(num_frames) * n_freqs *
-                            sizeof(float));
-  gpu::DeviceBuffer d_mel(static_cast<size_t>(num_frames) * n_mels *
-                          sizeof(float));
+  float* d_samples = scratch_.GetT<float>(0, static_cast<size_t>(num_samples));
+  float* d_win =
+      scratch_.GetT<float>(1, static_cast<size_t>(config_.win_length));
+  float* d_filters = scratch_.GetT<float>(2, mel_filters_.size());
+  float* d_power =
+      scratch_.GetT<float>(3, static_cast<size_t>(num_frames) * n_freqs);
+  float* d_mel =
+      scratch_.GetT<float>(4, static_cast<size_t>(num_frames) * n_mels);
 
   gpu::GpuMemory::CopyHostToDevice(
-      d_samples.data(), sig, static_cast<size_t>(num_samples) * sizeof(float));
-  gpu::GpuMemory::CopyHostToDevice(d_win.data(), hann_.data(),
+      d_samples, sig, static_cast<size_t>(num_samples) * sizeof(float));
+  gpu::GpuMemory::CopyHostToDevice(d_win, hann_.data(),
                                    hann_.size() * sizeof(float));
-  gpu::GpuMemory::CopyHostToDevice(d_filters.data(), mel_filters_.data(),
+  gpu::GpuMemory::CopyHostToDevice(d_filters, mel_filters_.data(),
                                    mel_filters_.size() * sizeof(float));
 
   const int block = 256;
   const long power_total = static_cast<long>(num_frames) * n_freqs;
   const int power_grid = static_cast<int>((power_total + block - 1) / block);
   PowerSpectrumKernel<<<power_grid, block, 0, stream>>>(
-      static_cast<const float*>(d_samples.data()), num_samples,
-      static_cast<const float*>(d_win.data()), config_.win_length,
-      config_.hop_length, config_.n_fft, n_freqs, num_frames, pad_left, win_off,
-      input_offset, static_cast<float*>(d_power.data()));
+      d_samples, num_samples, d_win, config_.win_length, config_.hop_length,
+      config_.n_fft, n_freqs, num_frames, pad_left, win_off, input_offset,
+      d_power);
   CUDA_CHECK(cudaGetLastError());
 
   const long mel_total = static_cast<long>(num_frames) * n_mels;
   const int mel_grid = static_cast<int>((mel_total + block - 1) / block);
-  MelLogKernel<<<mel_grid, block, 0, stream>>>(
-      static_cast<const float*>(d_power.data()), n_freqs,
-      static_cast<const float*>(d_filters.data()), n_mels, num_frames,
-      config_.log_zero_guard, static_cast<float*>(d_mel.data()));
+  MelLogKernel<<<mel_grid, block, 0, stream>>>(d_power, n_freqs, d_filters,
+                                               n_mels, num_frames,
+                                               config_.log_zero_guard, d_mel);
   CUDA_CHECK(cudaGetLastError());
   CUDA_CHECK(cudaStreamSynchronize(stream));
 
   std::vector<float> mel(static_cast<size_t>(num_frames) * n_mels);
-  CUDA_CHECK(cudaMemcpyAsync(mel.data(), d_mel.data(),
-                             mel.size() * sizeof(float), cudaMemcpyDeviceToHost,
-                             stream));
+  CUDA_CHECK(cudaMemcpyAsync(mel.data(), d_mel, mel.size() * sizeof(float),
+                             cudaMemcpyDeviceToHost, stream));
   CUDA_CHECK(cudaStreamSynchronize(stream));
   return mel;
 }
