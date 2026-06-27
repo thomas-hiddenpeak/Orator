@@ -10,6 +10,21 @@ env:
   BUILD_TYPE: Release
 
 jobs:
+  format-check:
+    # Pin to ubuntu-24.04 whose default clang-format is 18.x, matching the
+    # version the tree was formatted with (avoids cross-version format skew).
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install clang-format
+        run: sudo apt-get update && sudo apt-get install -y clang-format
+      - name: Check formatting (clang-format --dry-run --Werror)
+        run: |
+          clang-format --version
+          find src include test \
+            \( -name '*.cc' -o -name '*.cu' -o -name '*.h' -o -name '*.cuh' \) \
+            -print0 | xargs -0 clang-format --dry-run --Werror
+
   build-and-test:
     runs-on: ubuntu-22.04
 
