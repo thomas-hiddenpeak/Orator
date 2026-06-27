@@ -200,6 +200,10 @@ int ws_callback(struct lws* wsi, enum lws_callback_reasons reason, void* user,
         if (server->serve_once_handler_) {
           pss->handler = server->serve_once_handler_;
         } else if (server->serve_factory_) {
+          // Ownership crosses RAII -> C here: the factory's unique_ptr is
+          // release()d into libwebsockets' C per-session storage (pss is
+          // lws-allocated and memset, so it cannot hold a C++ smart pointer).
+          // The matching delete is the CLOSED branch below.
           pss->handler = server->serve_factory_().release();
         }
         lws_ll_fwd_insert(pss, pss_list, server->pss_list_head_);
@@ -349,6 +353,10 @@ int ws_callback(struct lws* wsi, enum lws_callback_reasons reason, void* user,
       if (pss && pss->handler) {
         pss->handler->OnClose();
         if (!server || !server->serve_once_handler_) {
+          // Raw delete (justified C-interop): reclaims the handler whose
+          // ownership was release()d into lws' per-session pointer at
+          // ESTABLISHED. The serve_once handler is owned elsewhere and is left
+          // untouched.
           delete pss->handler;
         }
         pss->handler = nullptr;

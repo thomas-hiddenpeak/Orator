@@ -98,6 +98,10 @@ std::unique_ptr<PipelineHandle> PipelineRegistry::Register(
     handler(kSystemPipelineOnline.to_string(), payload);
   }
 
+  // new (not make_unique): PipelineHandle's constructor is private with
+  // PipelineRegistry as its only friend, so make_unique -- a non-friend --
+  // cannot construct it. The raw new is wrapped immediately in unique_ptr, so
+  // ownership is still RAII-managed.
   return std::unique_ptr<PipelineHandle>(
       new PipelineHandle(this, id, entry.desc));
 }
