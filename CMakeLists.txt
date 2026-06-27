@@ -6,6 +6,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CUDA_STANDARD 20)
 set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 
+# Emit compile_commands.json for clang-tidy / editor tooling (governance).
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # CUDA setup
 find_package(CUDA REQUIRED)
 find_package(Threads REQUIRED)

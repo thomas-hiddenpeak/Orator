@@ -64,6 +64,18 @@ jobs:
       - name: Build
         run: cmake --build build -j $(nproc)
 
+      - name: clang-tidy (curated safety gate, .cc TUs)
+        run: |
+          # Match the local clang-tidy 18 the .clang-tidy was tuned against;
+          # fall back to the distro default if the pinned package is absent.
+          sudo apt-get install -y clang-tidy-18 || sudo apt-get install -y clang-tidy
+          TIDY=$(command -v clang-tidy-18 || command -v clang-tidy)
+          "$TIDY" --version
+          # compile_commands.json is emitted by the Configure step
+          # (CMAKE_EXPORT_COMPILE_COMMANDS). .cu/.cuh are excluded (nvcc).
+          find src -name '*.cc' -print0 \
+            | xargs -0 -P "$(nproc)" "$TIDY" -p build --warnings-as-errors='*'
+
       - name: Run CTest
         working-directory: build
         run: ctest --output-on-failure -j $(nproc) --timeout 60

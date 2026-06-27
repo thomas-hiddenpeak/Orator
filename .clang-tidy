@@ -1,0 +1,31 @@
+# Orator clang-tidy: a curated, low-noise SAFETY gate for C++ translation units
+# (.cc). Governance rationale (Constitution Art. V):
+#
+# - readability-identifier-naming is intentionally NOT enabled. The codebase
+#   uses a consistent but MIXED method style (PascalCase actions like Register()
+#   alongside lower_case accessors like name()/valid()/to_string()) plus
+#   UPPER_CASE enum constants; one clang-tidy rule cannot express that, so
+#   enforcing it would mass-rename ~7.5k identifiers for no behavior gain.
+#   Naming stays consistent by review against the existing patterns.
+# - Noisy/low-value checks are disabled: performance-enum-size (micro-opt),
+#   bugprone-casting-through-void (the RAII GpuBuffer::data()->void*->cast
+#   idiom), bugprone-macro-parentheses (CUDA_CHECK-style macros), and the
+#   swappable/narrowing families.
+# - .cu/.cuh are excluded (nvcc-compiled; clang-tidy's CUDA frontend differs).
+Checks: >
+  -*,
+  bugprone-*,
+  performance-*,
+  misc-definitions-in-headers,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-narrowing-conversions,
+  -bugprone-implicit-widening-of-multiplication-result,
+  -bugprone-reserved-identifier,
+  -bugprone-casting-through-void,
+  -bugprone-macro-parentheses,
+  -performance-enum-size,
+  -performance-avoid-endl
+
+WarningsAsErrors: ''
+HeaderFilterRegex: '(include|src)/.*\.h$'
+FormatStyle: file
