@@ -5,12 +5,32 @@
 
 #include <cuda_runtime.h>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
+#include <random>
 #include <vector>
 
 namespace gemm = orator::model::asr_gemm;
+
+// Host bf16 round-to-nearest-even, matching __float2bfloat16 for finite values.
+// Used by the independent f64 reference (T100): the GEMM quantizes both operands
+// to bf16, so the reference must too.
+static uint16_t HostF32ToBf16(float f) {
+  uint32_t x;
+  std::memcpy(&x, &f, sizeof(x));
+  const uint32_t lsb = (x >> 16) & 1u;
+  x += 0x7fffu + lsb;
+  return static_cast<uint16_t>(x >> 16);
+}
+static float HostBf16ToF32(uint16_t b) {
+  const uint32_t x = static_cast<uint32_t>(b) << 16;
+  float f;
+  std::memcpy(&f, &x, sizeof(f));
+  return f;
+}
 
 // ---------------------------------------------------------------------------
 // GPU memory RAII helper (mirrors test_kernels.cc pattern)
@@ -241,6 +261,104 @@ static void TestLinearPre() {
 }
 
 // ---------------------------------------------------------------------------
+// T100 — independent f64 reference across the production shape set.
+//
+// The GEMM is bf16-in / FP32-accumulate. The reference quantizes both operands
+// to bf16 (matching the kernel), accumulates each dot product in f64 (the
+// precise truth), then applies bias + activation exactly as the epilogue does.
+// Establishes the oracle the in-project bf16 GEMM (Spec 002 P2.1) must meet
+// BEFORE cuBLAS is removed. Tolerance covers the FP32-accumulation order
+// difference vs the f64 reference.
+// ---------------------------------------------------------------------------
+static void TestLinearVsF64Reference() {
+  TEST("TestLinearVsF64Reference: bf16 GEMM matches f64 reference (production shapes)");
+  struct Shape { int M, K, N; const char* tag; };
+  // (M,K,N) sampled from the encoder / decoder / aligner production shapes;
+  // M>1 so the cuBLAS (soon in-project) path is exercised, not the M=1 GEMV.
+  // The f64 CPU reference is O(M*N*K); the default ctest run uses a fast
+  // representative subset, and ORATOR_GEMM_FULL=1 adds the large-K/N production
+  // shapes (used when validating the in-project GEMM, Spec 002 P2.1).
+  std::vector<Shape> shapes = {
+    {4, 1024, 1024, "attn-qkvo"},
+    {4, 1024, 2048, "q_proj/proj2"},
+    {2, 1024, 1024, "prefill-small"},
+  };
+  if (std::getenv("ORATOR_GEMM_FULL") != nullptr) {
+    shapes.push_back({6, 1024, 3072, "ffn-fc1"});
+    shapes.push_back({6, 3072, 1024, "ffn-fc2"});
+    shapes.push_back({4, 7680, 1024, "conv_out"});
+    shapes.push_back({4, 1024, 5000, "score-head"});
+    shapes.push_back({8, 1024, 2048, "encoder-proj"});
+  }
+  std::mt19937 rng(20260627u);
+  std::uniform_real_distribution<float> dist(-1.0f, 1.0f);
+
+  double worst = 0.0;
+  for (const auto& s : shapes) {
+    const int M = s.M, K = s.K, N = s.N;
+    std::vector<float> in(static_cast<size_t>(M) * K), W(static_cast<size_t>(N) * K),
+        bias(N), out(static_cast<size_t>(M) * N);
+    for (auto& v : in) v = dist(rng);
+    for (auto& v : W) v = dist(rng);
+    for (auto& v : bias) v = dist(rng);
+    // Pre-quantize operands to bf16 once (shared across the activation variants).
+    std::vector<float> inq(in.size()), Wq(W.size());
+    for (size_t i = 0; i < in.size(); ++i) inq[i] = HostBf16ToF32(HostF32ToBf16(in[i]));
+    for (size_t i = 0; i < W.size(); ++i) Wq[i] = HostBf16ToF32(HostF32ToBf16(W[i]));
+
+    GpuBuf d_in(static_cast<size_t>(M) * K), d_out(static_cast<size_t>(M) * N),
+        d_Wf(static_cast<size_t>(N) * K), d_bias(N);
+    GpuBufU16 d_Wb(static_cast<size_t>(N) * K);
+    d_in.Upload(in.data());
+    d_Wf.Upload(W.data());
+    d_bias.Upload(bias.data());
+    gemm::F32ToBf16(d_Wf.ptr, d_Wb.ptr, static_cast<long>(N) * K);
+    cudaDeviceSynchronize();
+
+    // The dot product is independent of the activation; compute the
+    // pre-activation reference (acc + bias) once, then apply each act cheaply.
+    std::vector<float> pre(static_cast<size_t>(M) * N);
+    for (int m = 0; m < M; ++m) {
+      const float* a = &inq[static_cast<size_t>(m) * K];
+      for (int n = 0; n < N; ++n) {
+        const float* w = &Wq[static_cast<size_t>(n) * K];
+        double acc = 0.0;
+        for (int k = 0; k < K; ++k) acc += static_cast<double>(a[k]) * w[k];
+        pre[static_cast<size_t>(m) * N + n] = static_cast<float>(acc) + bias[n];
+      }
+    }
+
+    for (int act : {0, 1, 2}) {
+      gemm::Linear(d_in.ptr, d_Wb.ptr, d_bias.ptr, d_out.ptr, M, K, N, act);
+      cudaDeviceSynchronize();
+      d_out.Download(out.data());
+
+      double max_rel = 0.0, sum_rel = 0.0;
+      for (size_t i = 0; i < pre.size(); ++i) {
+        float v = pre[i];
+        if (act == 1)
+          v = 0.5f * v * (1.0f + std::erf(v * 0.70710678118654752440f));
+        else if (act == 2)
+          v = std::fmax(v, 0.0f);
+        const float rel = std::abs(out[i] - v) / std::max(1e-3f, std::abs(v));
+        max_rel = std::max(max_rel, static_cast<double>(rel));
+        sum_rel += rel;
+      }
+      worst = std::max(worst, max_rel);
+      printf("    [%-14s K=%5d N=%5d M=%4d act=%d] max_rel=%.2e mean_rel=%.2e\n",
+             s.tag, K, N, M, act, max_rel, sum_rel / pre.size());
+      // FP32-accumulate vs f64 reference over K up to 7680 stays well within 2e-2.
+      if (max_rel > 2e-2) {
+        printf("  FAIL %s:%d: shape %s act=%d max_rel=%.3e exceeds 2e-2\n",
+               __FILE__, __LINE__, s.tag, act, max_rel);
+        ++g_failures;
+      }
+    }
+  }
+  printf("    worst max_rel across all shapes/acts = %.2e\n", worst);
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 int main() {
@@ -261,6 +379,7 @@ int main() {
   TestLinearWithBias();
   TestLinearReLU();
   TestLinearPre();
+  TestLinearVsF64Reference();
 
   // Clean up global cuBLAS handle and scratch buffer
   gemm::Shutdown();

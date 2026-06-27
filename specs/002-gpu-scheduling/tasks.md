@@ -192,7 +192,7 @@ PROJECT_STATE updated.
 ## Phase 2 tasks (re-opened 2026-06-27) — see spec §10
 
 ### P2.1 — In-project bf16 GEMM (keystone; removes cuBLAS)
-- [ ] **T100** Extend `test_asr_gemm`: add an f64 CPU reference (NOT cuBLAS) and
+- [x] **T100** Extend `test_asr_gemm`: add an f64 CPU reference (NOT cuBLAS) and
   the full production shape set (M 1..few-thousand; K,N in {1024,2048,3072,5000,
   6144,7680,vocab}); record max relative error. Gate: baseline (current cuBLAS)
   passes the new reference within ~3e-3 — establishes the oracle before the swap.
