@@ -10,9 +10,12 @@ Each task gates on build clean `-Wall -Wextra` + relevant test.
   torch-zip `archive/` prefix and tolerate a missing `byteorder` entry). Config
   at `models/speaker/titanet_large_config.yaml`. Full weight layout / forward
   blueprint recorded in plan.md §6.
-- [ ] **A2** NeMo Python oracle: dump reference 192-d embeddings (and key
-  intermediate activations) for a few clean spans of `test.mp3` to
-  `models/reference/speaker/`. Tool: `tools/reference/titanet_oracle.py`.
+- [x] **A2** NeMo Python oracle (`tools/reference/titanet_oracle.py`, runs in an
+  isolated `tools/.venv-nemo` so it never touches the runtime tool venv): dumps
+  per-span waveform / mel [80,F] / encoder [3072,F] / L2-normalized 192-d
+  embedding to `models/reference/speaker/` (local, regenerated like other
+  reference dumps). Sanity cosine matrix on test.mp3 spans 0/30/60 s:
+  diag 1.0, span1–span2 0.54, span0 distinct — embeddings self-consistent.
 - [ ] **A3** Implement `model::TitaNetEmbedder : core::ISpeakerEmbedder`
   (`include/model/titanet_embedder.h` + `src/model/titanet_embedder.cu`):
   mel (reuse `MelSpectrogram`) → SE/depthwise-separable 1D conv encoder →
