@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <cstdlib>
 
 namespace orator {
 namespace pipeline {
@@ -121,6 +122,41 @@ ComprehensiveTimeline::SplitTextByDiar(const TextSeg& t) const {
     } else {
       turns.push_back({s, e, spk});
     }
+  }
+
+  // Low-risk gap fill: a sub-interval with no diarization coverage ("unknown")
+  // is attributed to the surrounding speaker ONLY when the diarization segments
+  // bounding the gap on BOTH sides are the SAME speaker -- a brief pause inside
+  // one speaker's turn. A gap at a speaker transition (different speakers on
+  // each side), or with no segment on one side, stays "unknown": the layer
+  // never guesses across a speaker change. ORATOR_TIMELINE_NO_GAPFILL=1
+  // disables it (A/B + safety fallback to the honest-unknown behaviour).
+  static const bool no_gapfill =
+      std::getenv("ORATOR_TIMELINE_NO_GAPFILL") != nullptr;
+  if (!no_gapfill) {
+    for (auto& tn : turns) {
+      if (tn.speaker != "unknown") continue;
+      const SpeakerSeg* before = nullptr;  // largest end <= the gap start
+      const SpeakerSeg* after = nullptr;   // smallest start >= the gap end
+      for (const auto& sp : speakers_) {
+        if (sp.end <= tn.start + 1e-9 && (!before || sp.end > before->end))
+          before = &sp;
+        if (sp.start >= tn.end - 1e-9 && (!after || sp.start < after->start))
+          after = &sp;
+      }
+      if (before && after && before->speaker == after->speaker)
+        tn.speaker = before->speaker;
+    }
+    // Re-coalesce consecutive same-speaker turns after the fill.
+    std::vector<Turn> merged;
+    merged.reserve(turns.size());
+    for (const auto& tn : turns) {
+      if (!merged.empty() && merged.back().speaker == tn.speaker)
+        merged.back().end = tn.end;
+      else
+        merged.push_back(tn);
+    }
+    turns.swap(merged);
   }
 
   if (turns.empty()) {
