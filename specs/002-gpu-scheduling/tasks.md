@@ -186,3 +186,44 @@ unchanged within tolerance (numeric gates green); full suite green under
 `-Wall -Wextra`; total wall-time change reported with no regression; full-hour
 real-WS gate passed on the production-default configuration; memory and
 PROJECT_STATE updated.
+
+---
+
+## Phase 2 tasks (re-opened 2026-06-27) — see spec §10
+
+### P2.1 — In-project bf16 GEMM (keystone; removes cuBLAS)
+- [ ] **T100** Extend `test_asr_gemm`: add an f64 CPU reference (NOT cuBLAS) and
+  the full production shape set (M 1..few-thousand; K,N in {1024,2048,3072,5000,
+  6144,7680,vocab}); record max relative error. Gate: baseline (current cuBLAS)
+  passes the new reference within ~3e-3 — establishes the oracle before the swap.
+- [ ] **T101** Add a bf16 GEMM to `orator::gemm` (gemm.cuh): bf16 in / FP32
+  accumulate, row-major `out[M,N]=in[M,K]@W[N,K]^T`, tiled (extend the existing
+  double-buffered SGEMM; add an mma/tensor-core path). Allocation-free,
+  stream-explicit, no global handle.
+- [ ] **T102** Fused epilogue: bias + activation (0 none / 1 GELU exact-erf /
+  2 ReLU) in the GEMM, matching `BiasActKernel` numerics.
+- [ ] **T103** Switch `asr_gemm::LinearPre`/`Linear` M>1 path to the in-project
+  GEMM; remove `BiasActKernel` post-pass and the `ORATOR_ASR_CUBLAS_GEMV` hatch.
+  Validate: `test_asr_gemm` (vs f64 ref) + `test_asr_encoder`/`_decoder`/
+  `test_aligner_*` oracle gates unchanged-pass.
+- [ ] **T104** Remove `cublas` from `orator_core` link and `<cublas_v2.h>` from
+  `asr_gemm.cu`; delete the cuBLAS handle (`Handle()`, `g_handle`, `Shutdown`).
+  Build clean `-Wall -Wextra`, zero warnings.
+- [ ] **T105** Real-WS gate (rate=0, 120s): transcript diff vs the cuBLAS build
+  (byte-identical or within tolerance); `[asr-stream]` encode/decode timing
+  no-regression (stream_rt >= 3.6x); diar/VAD unaffected; server stable. Update
+  `PROJECT_STATE.md` (Art. VIII).
+
+### P2.2 — Device memory pool (prereq for graph)  [outline]
+- [ ] **T110** Per-context pre-allocated device pool (acquire/release); migrate
+  `AsrAudioTower::Forward`'s per-Forward DeviceBuffers to the pool. No cudaMalloc
+  on the hot path. Oracle gates unchanged-pass.
+
+### P2.3 — Event-based fine-grained scheduling  [outline, high-risk]
+- [ ] **T120** Replace the binary `DeviceLock` mode with per-pipeline stream +
+  CUDA-event ordering; isolate a capture stream from concurrent issuance.
+
+### P2.4 — CUDA Graph for decode + encoder  [outline, depends on P2.1-3]
+- [ ] **T130** Capture the allocation-free / cuBLAS-free decode body and the
+  fixed-shape streaming encoder Forward; replay under concurrency. Measure
+  decode/encode speedup; oracle + real-WS gates.

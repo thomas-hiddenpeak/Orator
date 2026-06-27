@@ -6,9 +6,9 @@ conflicts with the Constitution, the Constitution takes precedence. Amending it
 is a deliberate, recorded action (see *Amendment Process*), not an undocumented
 change.
 
-- **Version**: 1.4.0
+- **Version**: 1.5.0
 - **Ratified**: 2026-06-12
-- **Last amended**: 2026-06-22
+- **Last amended**: 2026-06-27
 
 ---
 
@@ -19,16 +19,28 @@ change.
    `orator_core` library, or any artifact that runs in production).
 2. Permitted, and explicitly NOT considered third-party dependencies:
    - The C++ standard library and libc.
-   - The CUDA toolkit runtime libraries (`cudart`, `cuBLAS`, `cuFFT`, …).
-   - OS facilities reached through libc/POSIX (sockets, threads, mmap). The
-     WebSocket server is implemented directly on POSIX sockets for this
-     reason — networking is an OS facility, not a dependency.
-3. Vendored sources (e.g. `third_party/minimp3`) are allowed **only** in offline
+   - The CUDA toolkit **base only**: `cudart` (the CUDA runtime API) plus the
+     core CUDA C++ language, intrinsics, and PTX. Pinned to **CUDA 13.3**.
+   - OS facilities reached through libc/POSIX (sockets, threads, mmap).
+   - A **named, closed carve-out** of two already-integrated boundary-
+     infrastructure libraries: `libwebsockets` (WebSocket transport) and
+     `tomlplusplus` (config parsing). This list is **closed**: no additional
+     external library may be added, and neither may grow into compute/operator
+     territory.
+3. **NOT permitted on any runtime path.** Operator/compute libraries must be
+   referenced, then reimplemented in-project: `cuBLAS`, `cuBLASLt`, `cuFFT`,
+   `cuDNN`, `CUTLASS`, `Thrust`, `CUB`, and any equivalent. Rationale: depending
+   on a closed operator library leaves no room for the kernel-level
+   modifications the project requires — epilogue fusion, CUDA-graph
+   capturability, allocation-free / stream-explicit execution, and full
+   numerical audit. (Migration of the one remaining such dependency, `cuBLAS` in
+   `asr_gemm`, is tracked under Spec 002.)
+4. Vendored sources (e.g. `third_party/minimp3`) are allowed **only** in offline
    tooling and tests, never on a runtime path.
-4. Python, PyTorch, and similar tools are permitted **only** as offline oracles
+5. Python, PyTorch, and similar tools are permitted **only** as offline oracles
    and dump utilities under `tools/`. They never enter the build of a runtime
    artifact.
-5. Adding any new dependency requires a Constitution amendment. There is no
+6. Adding any new dependency requires a Constitution amendment. There is no
    "temporary" exception.
 
 **Rationale**: the deployment target is a Jetson edge device; a self-contained
@@ -339,4 +351,4 @@ state claim:
 - When guidance is silent, Articles II (accuracy) and V (quality) take
   precedence over other considerations.
 
-**Version 1.4.0 · Ratified 2026-06-12 · Last amended 2026-06-22**
+**Version 1.5.0 · Ratified 2026-06-12 · Last amended 2026-06-27**

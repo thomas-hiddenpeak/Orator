@@ -1,7 +1,7 @@
 # Spec 002 — GPU Scheduling for Concurrent Pipelines
 
 - **Feature**: `002-gpu-scheduling`
-- **Status**: Implemented (2026-06-17) — all 17 tasks complete, build clean, 20/20 tests pass
+- **Status**: Phase 1 Implemented (2026-06-17, 17 tasks, 20/20 tests). **Phase 2 re-opened (2026-06-27)** — the binary lock/concurrent model leaves CUDA Graph unusable under concurrency and the runtime still links `cuBLAS`; see §10.
 - **Created**: 2026-06-12
 - **Owner**: project owner
 - **Constitution**: v1.2.1
@@ -272,3 +272,60 @@ two pipelines' GPU work overlaps) was tested directly and **confirmed**:
   is queried at runtime and reported, rather than assumed.
 - **Q1 (resolved)** Direction approved by the owner: pursue per-pipeline streams
   and priority instead of the single global mutex.
+
+## 10. Phase 2 — re-opened 2026-06-27 (in-project compute + graph-ready scheduling)
+
+Phase 1 delivered per-pipeline streams + priorities + lock removal, but left the
+GPU-execution model coarse: a binary serial-vs-concurrent mode (`DeviceLock`),
+per-`Forward` `cudaMalloc`, and an opaque `cuBLAS` GEMM. Together these make CUDA
+Graph capture unusable in the production concurrent mode (validated 2026-06-27:
+forcing decode-graph capture under concurrency crashes the server) and leave no
+room for kernel-level fusion. Phase 2 completes the scheduling mission so the
+launch-bound decode (75% of ASR, measured) and the encoder can be graph-captured.
+
+**Constitution Check**: Article I (amended **v1.5.0**) now forbids operator
+libraries on the runtime path; §10.1 is the compliance action for the one
+remaining such dependency (`cuBLAS`). All work stays pure C++20/CUDA.
+
+### 10.1 In-project bf16 GEMM (keystone — removes the cuBLAS dependency)
+- **WHAT**: replace the `cublasGemmEx`-backed `M>1` path in
+  `asr_gemm::LinearPre`/`Linear` with an in-project `orator::gemm` bf16 GEMM;
+  drop the `cublas` link from `orator_core`. The `M==1` decode path is already
+  in-project (`GemvBf16Kernel`).
+- **WHY**: cuBLAS holds handle state, does lazy init / internal streams /
+  allocations (not capturable), and cannot fuse the bias+activation epilogue.
+- **Requirements**: bf16 in / FP32 accumulate (match cublasGemmEx semantics,
+  row-major `out[M,N]=in[M,K]@W[N,K]^T`); numerical parity within bf16 tolerance
+  (~3e-3) across the production shape set, validated by `test_asr_gemm` (vs an
+  f64 CPU reference, NOT cuBLAS) and the unchanged encoder/decoder/aligner oracle
+  gates; allocation-free, stream-explicit, no global handle; optional fused
+  bias + GELU(exact-erf)/ReLU epilogue (removes `BiasActKernel`); end-to-end ASR
+  throughput no worse than the cuBLAS baseline (real WS, rate=0); transcript
+  byte-identical (or within documented tolerance). Start from the existing tiled
+  double-buffered `orator::gemm` SGEMM; add a bf16 (mma) path.
+- **Risk**: tensor-core utilization vs cuBLAS; gate on measurement.
+
+### 10.2 Device memory pool (Holoscan/GStreamer pattern, in-project)
+- **WHAT**: a per-context pre-allocated device memory pool so the encoder's
+  per-`Forward` `cudaMalloc`/`cudaFree` become pool acquire/release.
+- **WHY**: `cudaMalloc` is illegal inside a graph-capture region and is fixed
+  per-segment overhead. Pure C++/CUDA. Prerequisite for §10.4.
+
+### 10.3 Event-based fine-grained scheduling (Holoscan/GXF pattern, in-project)
+- **WHAT**: evolve the binary `DeviceLock` model into per-pipeline streams
+  ordered by CUDA events, so a pipeline can capture a graph on an isolated stream
+  without other pipelines' concurrent issuance corrupting the capture.
+- **WHY**: the current concurrency model is what blocks graph capture (§10).
+  Highest-risk item; gated on §10.1+§10.2 landing first.
+
+### 10.4 CUDA Graph for encoder + decode step (now feasible)
+- **WHAT**: capture the (now allocation-free, cuBLAS-free, isolated-stream)
+  per-token decode body and the fixed-shape streaming encoder `Forward` as CUDA
+  graphs, replayed under concurrency.
+- **WHY**: decode is launch-bound (75% of ASR); the tower is now all-GPU with a
+  single sync. Depends on §10.1–§10.3.
+
+**Order**: 10.1 → 10.2 → 10.3 → 10.4. Each gated on the encoder/decoder/aligner
+oracle and a real-WS no-regression measurement. rerun-based offline observability
+(visualizing per-stage timing + the comprehensive timeline) is tracked under
+Spec 006/008, not here.
