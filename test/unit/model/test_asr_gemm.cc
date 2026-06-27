@@ -406,6 +406,46 @@ static void BenchGemv() {
   }
 }
 
+// GEMM microbenchmark (ORATOR_GEMM_BENCH=1): the M>1 encoder path
+// (Bf16WmmaKernel). Reports avg us/call and achieved bf16 throughput (GFLOP/s)
+// so the headroom vs the tensor-core peak is visible before investing in a
+// faster tiling (T141). Representative encoder shapes at two row counts.
+static void BenchGemm() {
+  printf("  BENCH GEMM (M>1, Bf16WmmaKernel)\n");
+  struct Shape { int M, K, N; const char* tag; };
+  const Shape shapes[] = {
+    {256, 1024, 1024, "attn-proj"},
+    {256, 1024, 3072, "fc1"},
+    {256, 3072, 1024, "fc2"},
+    {256, 7680, 1024, "conv_out"},
+    {512, 1024, 1024, "attn-proj-512"},
+    {512, 1024, 3072, "fc1-512"},
+  };
+  const int iters = 1000, warmup = 100;
+  for (const auto& s : shapes) {
+    GpuBufU16 d_in(static_cast<size_t>(s.M) * s.K), d_W(static_cast<size_t>(s.N) * s.K);
+    GpuBuf d_out(static_cast<size_t>(s.M) * s.N);
+    std::vector<uint16_t> hin(static_cast<size_t>(s.M) * s.K, 0x3f80),
+        hW(static_cast<size_t>(s.N) * s.K, 0x3f00);
+    cudaMemcpy(d_in.ptr, hin.data(), hin.size() * 2, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_W.ptr, hW.data(), hW.size() * 2, cudaMemcpyHostToDevice);
+    for (int i = 0; i < warmup; ++i)
+      gemm::LinearPre(d_in.ptr, d_W.ptr, nullptr, d_out.ptr, s.M, s.K, s.N, 0);
+    cudaDeviceSynchronize();
+    cudaEvent_t a, b; cudaEventCreate(&a); cudaEventCreate(&b);
+    cudaEventRecord(a);
+    for (int i = 0; i < iters; ++i)
+      gemm::LinearPre(d_in.ptr, d_W.ptr, nullptr, d_out.ptr, s.M, s.K, s.N, 0);
+    cudaEventRecord(b); cudaEventSynchronize(b);
+    float tot_ms = 0; cudaEventElapsedTime(&tot_ms, a, b);
+    cudaEventDestroy(a); cudaEventDestroy(b);
+    const double us = tot_ms * 1000.0 / iters;
+    const double gflops = 2.0 * s.M * s.N * s.K / (us * 1e-6) / 1e9;
+    printf("    [%-14s M=%4d K=%5d N=%5d] %.2f us/call  %.0f GFLOP/s\n",
+           s.tag, s.M, s.K, s.N, us, gflops);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -421,7 +461,7 @@ int main() {
     return 0;
   }
 
-  if (std::getenv("ORATOR_GEMM_BENCH")) { BenchGemv(); gemm::Shutdown(); return 0; }
+  if (std::getenv("ORATOR_GEMM_BENCH")) { BenchGemv(); BenchGemm(); gemm::Shutdown(); return 0; }
 
   TestF32Bf16Roundtrip();
   TestF32Bf16Empty();
