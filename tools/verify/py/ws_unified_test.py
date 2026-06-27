@@ -457,6 +457,17 @@ def main(args):
     with open(args.out, "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, indent=2)
 
+    if getattr(args, "rrd", None):
+        import os
+        import subprocess
+        script = os.path.join(os.path.dirname(__file__), "..", "..",
+                              "observability", "timeline_to_rerun.py")
+        try:
+            subprocess.run([sys.executable, script, "--in", args.out,
+                            "--out", args.rrd], check=True)
+        except (subprocess.CalledProcessError, FileNotFoundError, OSError) as e:
+            print(f"  [rrd] export skipped: {e}")
+
     m = out["meta"]
     n_diar = len(diar.get("entries", []))
     n_asr = len(asr.get("entries", []))
@@ -485,6 +496,8 @@ if __name__ == "__main__":
                     help="Push speed x real-time; 1.0 = real-time, 0 = max (no pacing)")
     ap.add_argument("--frame-ms", type=int, default=100)
     ap.add_argument("--out", help="Output JSON file path")
+    ap.add_argument("--rrd", help="Also export the timeline to a rerun .rrd "
+                    "recording (offline observability; needs rerun-sdk)")
     ap.add_argument("--timeline-timeout", type=float, default=600.0,
                     help="Seconds to wait for final timeline after sending end")
     ap.add_argument("--test-describe", action="store_true", help="Test describe command")

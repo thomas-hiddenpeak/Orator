@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -53,7 +54,12 @@ def _at(seconds: float) -> None:
 
 
 def _log_diarization(track: dict) -> None:
-    for e in track.get("entries", []):
+    entries = track.get("entries", [])
+    # Baseline every speaker lane at 0 so the activity step series starts low.
+    for spk in sorted({int(e.get("speaker", -1)) for e in entries}):
+        _at(0.0)
+        rr.log(f"activity/speaker_{spk}", rr.Scalars(0.0))
+    for e in entries:
         spk = int(e.get("speaker", -1))
         start, end = float(e["start"]), float(e["end"])
         _at(start)
@@ -64,8 +70,12 @@ def _log_diarization(track: dict) -> None:
                 level=rr.TextLogLevel.INFO,
             ),
         )
-        # A step series that marks which speaker is active at segment starts.
+        # Step series: 1 while the speaker is active, 0 otherwise -> a per-
+        # speaker activity bar lane that is scannable at a glance.
+        rr.log(f"activity/speaker_{spk}", rr.Scalars(1.0))
         rr.log("metrics/active_speaker", rr.Scalars(float(spk)))
+        _at(end)
+        rr.log(f"activity/speaker_{spk}", rr.Scalars(0.0))
 
 
 def _log_asr(track: dict) -> None:
@@ -116,6 +126,41 @@ def _log_comprehensive(entries: list) -> None:
         )
 
 
+def _parse_tegra(line: str) -> dict:
+    """Pull a few metrics out of one tegrastats snapshot line."""
+    out: dict = {}
+    m = re.search(r"RAM (\d+)/(\d+)MB", line)
+    if m:
+        out["ram_used_mb"] = float(m.group(1))
+    m = re.search(r"GR3D_FREQ (\d+)%", line)
+    if m:
+        out["gpu_pct"] = float(m.group(1))
+    return out
+
+
+def _log_tegrastats(data: dict, audio_sec: float) -> None:
+    """Log the coarse before/after/final device snapshots as scalar markers.
+
+    tegrastats here is only three wall-clock snapshots (not a true time series),
+    so these are placed approximately along the audio timeline as trend markers.
+    """
+    tg = data.get("tegrastats", {})
+    if not isinstance(tg, dict):
+        return
+    for key, t in (("before", 0.0),
+                   ("after", min(3.0, audio_sec)),
+                   ("final", audio_sec)):
+        s = tg.get(key)
+        if not isinstance(s, str):
+            continue
+        vals = _parse_tegra(s)
+        _at(t)
+        if "ram_used_mb" in vals:
+            rr.log("device/ram_used_mb", rr.Scalars(vals["ram_used_mb"]))
+        if "gpu_pct" in vals:
+            rr.log("device/gpu_pct", rr.Scalars(vals["gpu_pct"]))
+
+
 _TRACK_LOGGERS = {
     "diarization": _log_diarization,
     "asr": _log_asr,
@@ -152,6 +197,7 @@ def main() -> int:
     _log_comprehensive(timeline.get("comprehensive", []))
 
     meta = data.get("meta", {})
+    _log_tegrastats(data, float(meta.get("audio_sec", 0.0)))
     print(
         f"exported {len(tracks)} tracks "
         f"(audio={meta.get('audio_sec', '?')}s, "
