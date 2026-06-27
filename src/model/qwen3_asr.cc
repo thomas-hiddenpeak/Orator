@@ -243,6 +243,10 @@ std::string Qwen3Asr::StreamChunk(const float* pcm, int n, cudaStream_t stream) 
   if (pcm != nullptr && n > 0)
     seg_pcm_.insert(seg_pcm_.end(), pcm, pcm + n);
 
+  const bool prof = std::getenv("ORATOR_ASR_PROFILE") != nullptr;
+  auto pnow = [] { return std::chrono::steady_clock::now(); };
+  const auto ps0 = pnow();
+
   // Frames are indexed from the segment start. `seg_pcm_frame_offset_` is the
   // segment-absolute frame index of the frame computed from seg_pcm_[0]; the
   // already-encoded prefix is trimmed below so the per-call mel cost and GPU
@@ -268,6 +272,9 @@ std::string Qwen3Asr::StreamChunk(const float* pcm, int n, cudaStream_t stream) 
 
   bool changed = false;
   const int F = 128;
+  const auto ps_mel = pnow();
+  double encode_ms = 0.0;
+  int windows = 0;
   while ((seg_pcm_frame_offset_ + n_frames) - seg_encoded_frames_ >=
          kStreamWindowMel) {
     const int local_start = seg_encoded_frames_ - seg_pcm_frame_offset_;
@@ -280,6 +287,7 @@ std::string Qwen3Asr::StreamChunk(const float* pcm, int n, cudaStream_t stream) 
         sub[static_cast<size_t>(f) * kStreamWindowMel + t] =
             mel[static_cast<size_t>(f) * n_frames + (local_start + t)];
 
+    const auto e0 = pnow();
     int toks = 0;
     std::vector<float> enc =
         encoder_->Forward(sub.data(), kStreamWindowMel, &toks, stream);
@@ -290,9 +298,12 @@ std::string Qwen3Asr::StreamChunk(const float* pcm, int n, cudaStream_t stream) 
     // audio-pad embedding is overwritten by the encoder output, so the encoder
     // output IS the embedding at those positions.
     decoder_->PrefillAt(enc.data(), toks, stream_cache_ckpt_, stream);
+    if (prof)
+      encode_ms += std::chrono::duration<double, std::milli>(pnow() - e0).count();
     stream_cache_ckpt_ += toks;
     stream_audio_tokens_ += toks;
     seg_encoded_frames_ += kStreamWindowMel;
+    ++windows;
     changed = true;
   }
 
@@ -310,7 +321,16 @@ std::string Qwen3Asr::StreamChunk(const float* pcm, int n, cudaStream_t stream) 
   }
 
   if (!changed) return CurrentLiveText();
-  return StreamDecodeStep(stream);
+  const auto pd0 = pnow();
+  std::string decoded = StreamDecodeStep(stream);
+  if (prof) {
+    auto ms = [](auto a, auto b) {
+      return std::chrono::duration<double, std::milli>(b - a).count();
+    };
+    LOG_INFO("[asr-stream] mel=%.1f encode=%.1f decode=%.1f ms (windows=%d)\n",
+             ms(ps0, ps_mel), encode_ms, ms(pd0, pnow()), windows);
+  }
+  return decoded;
 }
 
 std::string Qwen3Asr::StreamDecodeStep(cudaStream_t stream) {
