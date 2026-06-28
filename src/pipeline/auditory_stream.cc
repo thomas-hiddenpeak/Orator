@@ -462,6 +462,21 @@ void AuditoryStream::StopWorkers() {
   // segments during Finalize(), which the align subscription enqueues, so the
   // aligner must drain its queue after the ASR thread has joined.
   if (align_worker_) align_worker_->Stop();
+
+  // Spec 010 D10: persist the speaker registry (+ name sidecar) once the diar
+  // thread has joined, so no enrollment races the write. Skip an empty registry
+  // so a session that enrolled nobody never clobbers a populated file on disk
+  // (every stream Loads the registry at start, so non-empty state is preserved).
+  if (speaker_db_ && !config_.speaker_registry_path.empty() &&
+      speaker_db_->Size() > 0) {
+    if (speaker_db_->Save(config_.speaker_registry_path)) {
+      LOG_INFO("[speaker-id] saved registry: %s (%d speakers)\n",
+               config_.speaker_registry_path.c_str(), speaker_db_->Size());
+    } else {
+      LOG_WARN("[speaker-id] failed to save registry: %s\n",
+               config_.speaker_registry_path.c_str());
+    }
+  }
   running_ = false;
 }
 

@@ -107,6 +107,9 @@ model_dir = "models/asr/Qwen/Qwen3-ASR-1.7B"
 # registry_path = ""
 
 # Cosine threshold for "same speaker" (re-identification). Higher = stricter.
+# Live diarized spans (with some boundary/crosstalk noise) score ~0.45-0.55 for
+# the same speaker and up to ~0.45 across speakers, so 0.45 is the empirical
+# operating point (lower = more merging / false-merge risk, higher = more splits)
 # match_threshold = 0.45
 
 # Shortest clean single-speaker span worth embedding (seconds)

@@ -1,7 +1,7 @@
 # Spec 010 — Speaker Identity (Voiceprint Enrollment / Re-identification)
 
 - **Feature**: `010-speaker-id`
-- **Status**: Draft (design agreed; Phase A starting)
+- **Status**: Implemented (Phases A–D landed; TitaNet embedder oracle-validated, speaker-identity stage in the diar pipeline, timeline injection + naming hook, persistence + cross-session re-id; τ tuning is an ongoing data-dependent refinement)
 - **Created**: 2026-06-28
 - **Owner**: project owner
 - **Constitution**: v1.5.0

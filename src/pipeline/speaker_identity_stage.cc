@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <cmath>
 
+#include "core/log.h"
+
 namespace orator {
 namespace pipeline {
 
@@ -101,13 +103,24 @@ void SpeakerIdentityStage::ResolveGlobal(int local) {
   }
   float score = 0.0f;
   const int idx = db_->Match(emb.data(), config_.match_threshold, &score);
+  std::string resolved;
+  bool enrolled = false;
   if (idx >= 0) {
-    local_to_global_[local] = db_->SpeakerIdAt(idx);
+    resolved = db_->SpeakerIdAt(idx);
   } else {
-    const std::string id = NewGlobalId();
-    db_->Enroll(id, emb.data());
-    session_enrolled_.insert(id);
-    local_to_global_[local] = id;
+    resolved = NewGlobalId();
+    db_->Enroll(resolved, emb.data());
+    session_enrolled_.insert(resolved);
+    enrolled = true;
+  }
+  // Log only when the local speaker's resolved identity is new or changes, so
+  // the trace stays at one line per identity decision (not per delivery).
+  const bool changed = mapped == local_to_global_.end() ||
+                       mapped->second != resolved;
+  local_to_global_[local] = resolved;
+  if (changed) {
+    LOG_INFO("[speaker-id] local %d -> %s (%s cosine=%.3f)\n", local,
+             resolved.c_str(), enrolled ? "enrolled" : "match", score);
   }
 }
 
@@ -121,10 +134,15 @@ void SpeakerIdentityStage::Process(std::vector<core::DiarSegment>& segs) {
   }
 
   // For each local speaker, pick the longest fresh clean span (one not already
-  // embedded) as this delivery's embedding candidate.
+  // embedded) as this delivery's embedding candidate. Only consider spans whose
+  // audio is still inside the retained window, otherwise an old longest span
+  // that has aged out would be re-picked every delivery (ReadSpan returns
+  // empty) and block the local speaker from ever being embedded.
+  const long audio_base = audio_.base_sample();
   std::map<int, const core::DiarSegment*> candidate;
   for (const auto& s : segs) {
     if (s.local_speaker < 0) continue;
+    if (tb_.SampleAt(s.start_sec) < audio_base) continue;  // audio aged out
     if (!IsClean(s, segs, vad)) continue;
     auto last = local_last_embedded_end_.find(s.local_speaker);
     if (last != local_last_embedded_end_.end() && s.end_sec <= last->second) {

@@ -66,13 +66,27 @@ Each task gates on build clean `-Wall -Wextra` + relevant test.
   `test_speaker_db` name + sidecar Save/Load round-trip.
 
 ## Phase D — Persistence + tuning + validation
-- [ ] **D10** Wire `SpeakerDatabase::Save/Load` to a configured path
-  (`orator.toml [speaker]`); load at startup, save on shutdown/checkpoint.
-- [ ] **D11** Tune threshold τ + min-duration on real WS 600 s: re-identify
-  known speakers across two runs; auto-register unseen; report false-merge /
-  false-split. Compare attributed speakers to `test.txt` item-by-item (Art. VI).
-- [ ] **D12** Update `PROJECT_STATE.md` + spec status to Implemented with commit
-  references (Art. VIII).
+- [x] **D10** `SpeakerDatabase::Save/Load` wired to `[speaker].registry_path`:
+  loaded at `Start()` (per stream), saved in `StopWorkers()` after the diar
+  thread joins (no enrollment race); an empty in-memory registry is never
+  written so a speaker-less session cannot clobber a populated file. Validated:
+  two consecutive server runs sharing one registry — run 1 enrolls, run 2
+  **re-identifies the same speakers** (no new enrollment; registry stays at the
+  same size; identical comprehensive id distribution across runs).
+- [x] **D11** Real-WS 600 s validation + τ finding. **Fixed a real bug**: the
+  embedding candidate was the longest clean span, which could be an early span
+  already aged out of the audio retain window — re-picked every delivery,
+  `ReadSpan` empty, blocking that local speaker forever; now only in-window
+  spans (`start_sample >= RetainedAudioBuffer::base_sample()`) are candidates
+  (1→3-4 local speakers embedded over 600 s). **τ finding** (measured): live
+  diarized spans score same-speaker ~0.45-0.55 but up to ~0.45-0.48 *across*
+  diarizer-local slots (boundary/crosstalk noise — much higher than the clean
+  oracle's ~0.05), so the global speaker count sits in a τ-sensitive zone and,
+  under the `rate=0` non-deterministic diar segmentation, varies run-to-run
+  (2 vs 3 globals). Default τ kept at 0.45 (empirical operating point);
+  definitive tuning needs deterministic input + ground-truth speaker labels
+  (not available for test.mp3) and/or a stricter clean gate.
+- [x] **D12** State docs synced (this change): `PROJECT_STATE.md` + this file.
 
 ## Config (orator.toml `[speaker]`, added in D10)
 - `enable`, `model_dir`, `registry_path`, `match_threshold`, `min_embed_sec`,
