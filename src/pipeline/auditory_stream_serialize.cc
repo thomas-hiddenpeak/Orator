@@ -8,11 +8,13 @@
 
 #include "core/log.h"
 #include "core/types.h"
+#include "model/speaker_database.h"
 #include "pipeline/comprehensive_timeline.h"
 #include "pipeline/json_util.h"
 
 #include <cstdio>
 #include <cstdlib>
+#include <map>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -96,6 +98,7 @@ std::string AuditoryStream::Serialize() {
   std::vector<ComprehensiveTimeline::VadSeg> vad_view;
   std::vector<ComprehensiveTimeline::RawTextSeg> raw_texts;
   std::vector<ComprehensiveTimeline::AlignGroup> align_view;
+  std::map<std::string, std::string> speaker_label_ids;
   {
     std::lock_guard<std::mutex> lk(comp_mutex_);
     diar_view = last_segments_;
@@ -103,6 +106,7 @@ std::string AuditoryStream::Serialize() {
     vad_view = comp_.SnapshotVad();
     raw_texts = comp_.SnapshotRawTexts();
     align_view = comp_.SnapshotAlign();
+    speaker_label_ids = comp_.SpeakerLabelIds();
   }
   // Populate last_transcript_ from raw_texts for the transcript() accessor.
   {
@@ -141,20 +145,20 @@ std::string AuditoryStream::Serialize() {
   out += buf;
   for (size_t i = 0; i < diar_view.size(); ++i) {
     const auto& s = diar_view[i];
-    if (s.speaker_id.empty()) {
-      std::snprintf(buf, sizeof(buf),
-                    "{\"start\":%.3f,\"end\":%.3f,\"speaker\":%d,"
-                    "\"confidence\":%.3f}",
-                    s.start_sec, s.end_sec, s.local_speaker, s.confidence);
-    } else {
-      // Spec 010: surface the resolved global voiceprint identity alongside the
-      // diarizer-local index (backward compatible: "speaker" stays integer).
-      std::snprintf(buf, sizeof(buf),
-                    "{\"start\":%.3f,\"end\":%.3f,\"speaker\":%d,"
-                    "\"speaker_id\":\"%s\",\"confidence\":%.3f}",
-                    s.start_sec, s.end_sec, s.local_speaker,
-                    s.speaker_id.c_str(), s.confidence);
+    std::snprintf(buf, sizeof(buf),
+                  "{\"start\":%.3f,\"end\":%.3f,\"speaker\":%d",
+                  s.start_sec, s.end_sec, s.local_speaker);
+    out += buf;
+    // Spec 010: surface the resolved global voiceprint identity (and optional
+    // display name) alongside the diarizer-local index (backward compatible:
+    // "speaker" stays integer).
+    if (!s.speaker_id.empty()) {
+      out += ",\"speaker_id\":\"" + s.speaker_id + "\"";
+      const std::string nm =
+          speaker_db_ ? speaker_db_->DisplayName(s.speaker_id) : std::string();
+      if (!nm.empty()) out += ",\"speaker_name\":\"" + JsonEscape(nm) + "\"";
     }
+    std::snprintf(buf, sizeof(buf), ",\"confidence\":%.3f}", s.confidence);
     out += buf;
     if (i + 1 < diar_view.size()) out += ",";
   }
@@ -247,9 +251,20 @@ std::string AuditoryStream::Serialize() {
       }
       std::snprintf(buf, sizeof(buf),
                     "{\"start\":%.3f,\"end\":%.3f,\"text_id\":%ld,"
-                    "\"speaker\":%d,\"text\":\"",
+                    "\"speaker\":%d",
                     e.start, e.end, e.text_id, spk_idx);
-      out += std::string(buf) + JsonEscape(e.text) + "\"}";
+      out += buf;
+      // Spec 010: the comprehensive turn carries the resolved global voiceprint
+      // id (and optional display name) when diarization resolved one.
+      auto id_it = speaker_label_ids.find(e.speaker);
+      if (id_it != speaker_label_ids.end() && !id_it->second.empty()) {
+        out += ",\"speaker_id\":\"" + id_it->second + "\"";
+        const std::string nm =
+            speaker_db_ ? speaker_db_->DisplayName(id_it->second)
+                        : std::string();
+        if (!nm.empty()) out += ",\"speaker_name\":\"" + JsonEscape(nm) + "\"";
+      }
+      out += ",\"text\":\"" + JsonEscape(e.text) + "\"}";
       if (i + 1 < comp_view.size()) out += ",";
     }
   }

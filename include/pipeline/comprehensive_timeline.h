@@ -110,6 +110,11 @@ class ComprehensiveTimeline {
   // The recorded VAD speech segments (sorted), for the serialized vad track.
   std::vector<VadSeg> SnapshotVad() const { return vad_; }
 
+  // Map of diarization speaker LABEL ("speaker_<n>") -> resolved global
+  // voiceprint id (Spec 010), for serializing the global identity onto the
+  // comprehensive view's speaker turns. Empty ids are omitted.
+  std::map<std::string, std::string> SpeakerLabelIds() const;
+
   // The forced-alignment groups (one per aligned text segment, ordered by
   // start), for the serialized align track. Each refines an ASR segment into
   // per-unit timestamps on the common time base.
@@ -147,6 +152,7 @@ class ComprehensiveTimeline {
     double end;
     std::string speaker;
     float conf;
+    std::string speaker_id;  // resolved global voiceprint id ("" if none)
   };
   std::vector<Revision> ReplaceSpeakers(const std::vector<SpeakerInput>& segs);
 
@@ -175,6 +181,7 @@ class ComprehensiveTimeline {
     double end = 0.0;
     std::string speaker;
     float conf = 0.0f;
+    std::string speaker_id;  // resolved global voiceprint id ("" if none)
   };
   struct TextSeg {
     long id = -1;

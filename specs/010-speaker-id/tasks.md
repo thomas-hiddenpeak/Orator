@@ -52,15 +52,18 @@ Each task gates on build clean `-Wall -Wextra` + relevant test.
   auto-enrolled (spk_0 x21, spk_1 x5), diar confidence 0.50-0.97. ctest 47/47.**
 
 ## Phase C — Injection
-- [~] **C8** Diar segments now carry the resolved global id: the published
+- [x] **C8** Global id injected through the whole timeline: the published
   `diar/speaker_segment` message and the serialized diar track expose a
-  `speaker_id` field alongside the integer local `speaker` (backward
-  compatible — done in Phase B). **Remaining**: thread `speaker_id` through
-  `ComprehensiveTimeline` (`SpeakerInput`→`SpeakerSeg`→`Entry`) so the
-  comprehensive speaker turns also carry the global id (revisable).
-- [ ] **C9** Naming hook: `SetDisplayName(global_id, name)` + `id -> name`
-  sidecar persisted alongside the registry; serialized into the timeline view.
-  No UI.
+  `speaker_id` next to the integer local `speaker`; `ComprehensiveTimeline`
+  threads it (`SpeakerInput`→`SpeakerSeg`, `SpeakerLabelIds()` label→id map) so
+  the comprehensive speaker turns also carry `speaker_id` (revisable, backward
+  compatible — integer `speaker` unchanged). Validated WS 120s: comprehensive
+  turns carry spk_0×9 / spk_1×10, unknown spans correctly id-less.
+- [x] **C9** Naming hook: `SpeakerDatabase::SetDisplayName(id, name)` /
+  `DisplayName(id)`, persisted in a `<registry>.names` sidecar (binary registry
+  format unchanged); the diar track + comprehensive view emit `speaker_name`
+  when a name is set. Hook only (no UI / no command wired yet). Validated:
+  `test_speaker_db` name + sidecar Save/Load round-trip.
 
 ## Phase D — Persistence + tuning + validation
 - [ ] **D10** Wire `SpeakerDatabase::Save/Load` to a configured path

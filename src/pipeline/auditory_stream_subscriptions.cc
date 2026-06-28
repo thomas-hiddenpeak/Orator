@@ -92,6 +92,7 @@ void HandleDiarSubscription(ComprehensiveTimeline& comp, std::mutex& comp_mutex,
     si.end = JsonParseNum(obj, "end");
     si.speaker = JsonParseStr(obj, "speaker");
     si.conf = static_cast<float>(JsonParseNum(obj, "confidence"));
+    si.speaker_id = JsonParseStr(obj, "speaker_id");  // "" when unresolved
     speakers.push_back(si);
 
     obj_pos = brace_end + 1;

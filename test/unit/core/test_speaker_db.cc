@@ -57,6 +57,20 @@ int main() {
   std::remove(path);
   std::cout << "Save/load round-trip works" << std::endl;
 
+  // Display-name hook + sidecar persistence (Spec 010 R6).
+  db.SetDisplayName("alice", "Alice Smith");
+  assert(db.DisplayName("alice") == "Alice Smith");
+  assert(db.DisplayName("bob").empty());
+  const std::string npath = "/tmp/orator_speaker_db_named.bin";
+  assert(db.Save(npath));
+  model::SpeakerDatabase db3(2000, dim);
+  assert(db3.Load(npath));
+  assert(db3.DisplayName("alice") == "Alice Smith");
+  assert(db3.DisplayName("bob").empty());
+  std::remove(npath.c_str());
+  std::remove((npath + ".names").c_str());
+  std::cout << "Display-name hook + sidecar round-trip works" << std::endl;
+
   std::cout << "\nAll speaker database tests passed!" << std::endl;
   return 0;
 }

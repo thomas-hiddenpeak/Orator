@@ -6,6 +6,7 @@
 // Retained but inactive — not currently wired into any runtime pipeline.
 
 #include <cstdint>
+#include <mutex>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -45,6 +46,12 @@ class SpeakerDatabase final : public core::ISpeakerRegistry {
   bool Save(const std::string& path) const;
   bool Load(const std::string& path);
 
+  // Display-name hook (Spec 010 R6): associate a human-readable name with a
+  // global voiceprint id. Names persist in a sidecar ("<path>.names") next to
+  // the registry; there is no UI -- this is an interface for a future caller.
+  void SetDisplayName(const std::string& speaker_id, const std::string& name);
+  std::string DisplayName(const std::string& speaker_id) const;
+
  private:
   int max_speakers_;
   int embedding_dim_;
@@ -53,6 +60,9 @@ class SpeakerDatabase final : public core::ISpeakerRegistry {
   gpu::UnifiedBuffer embeddings_;
   std::vector<std::string> speaker_ids_;
   std::unordered_map<std::string, int> speaker_to_index_;
+
+  mutable std::mutex names_mutex_;
+  std::unordered_map<std::string, std::string> names_;  // id -> display name
 
   void WriteEmbeddingAt(int index, const float* embedding);
 };

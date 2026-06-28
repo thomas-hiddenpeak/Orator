@@ -313,6 +313,7 @@ ComprehensiveTimeline::ReplaceSpeakers(const std::vector<SpeakerInput>& segs) {
     seg.end = s.end;
     seg.speaker = s.speaker;
     seg.conf = s.conf;
+    seg.speaker_id = s.speaker_id;
     auto pos = std::lower_bound(
         speakers_.begin(), speakers_.end(), s.start,
         [](const SpeakerSeg& a, double v) { return a.start < v; });
@@ -323,6 +324,15 @@ ComprehensiveTimeline::ReplaceSpeakers(const std::vector<SpeakerInput>& segs) {
   revs.reserve(texts_.size());  // Maximum possible revisions
   for (const auto& t : texts_) ReprojectText(t, &revs);
   return revs;
+}
+
+std::map<std::string, std::string> ComprehensiveTimeline::SpeakerLabelIds()
+    const {
+  std::map<std::string, std::string> out;
+  for (const auto& s : speakers_) {
+    if (!s.speaker_id.empty()) out[s.speaker] = s.speaker_id;
+  }
+  return out;
 }
 
 void ComprehensiveTimeline::AddVad(double start, double end) {

@@ -95,7 +95,23 @@ bool SpeakerDatabase::Save(const std::string& path) const {
       static_cast<size_t>(size_) * embedding_dim_ * sizeof(float);
   out.write(static_cast<const char*>(embeddings_.data()),
             static_cast<std::streamsize>(used_bytes));
-  return out.good();
+  if (!out.good()) return false;
+
+  // Display names persist in a sidecar so the binary registry format is
+  // unchanged and names stay independently editable (Spec 010 R6).
+  std::unordered_map<std::string, std::string> names;
+  {
+    std::lock_guard<std::mutex> lk(names_mutex_);
+    names = names_;
+  }
+  if (!names.empty()) {
+    std::ofstream nout(path + ".names");
+    for (const auto& kv : names) {
+      if (kv.second.empty()) continue;
+      nout << kv.first << '\t' << kv.second << '\n';
+    }
+  }
+  return true;
 }
 
 bool SpeakerDatabase::Load(const std::string& path) {
@@ -141,7 +157,32 @@ bool SpeakerDatabase::Load(const std::string& path) {
           static_cast<std::streamsize>(used_bytes));
   if (!in.good()) return false;
   size_ = size;
+
+  // Optional display-name sidecar (absent is fine).
+  {
+    std::ifstream nin(path + ".names");
+    std::lock_guard<std::mutex> lk(names_mutex_);
+    names_.clear();
+    std::string line;
+    while (std::getline(nin, line)) {
+      const auto tab = line.find('\t');
+      if (tab == std::string::npos) continue;
+      names_[line.substr(0, tab)] = line.substr(tab + 1);
+    }
+  }
   return true;
+}
+
+void SpeakerDatabase::SetDisplayName(const std::string& speaker_id,
+                                    const std::string& name) {
+  std::lock_guard<std::mutex> lk(names_mutex_);
+  names_[speaker_id] = name;
+}
+
+std::string SpeakerDatabase::DisplayName(const std::string& speaker_id) const {
+  std::lock_guard<std::mutex> lk(names_mutex_);
+  auto it = names_.find(speaker_id);
+  return it != names_.end() ? it->second : std::string();
 }
 
 int SpeakerDatabase::Match(const float* query_embedding, float threshold,
