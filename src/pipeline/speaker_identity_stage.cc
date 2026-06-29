@@ -149,6 +149,14 @@ void SpeakerIdentityStage::Process(std::vector<core::DiarSegment>& segs) {
       a += config_.edge_margin_sec;
       b -= config_.edge_margin_sec;
     }
+    // Cap the embedded window: a voiceprint needs only a few seconds, and a long
+    // single-speaker turn would otherwise feed huge audio to TitaNet (mel/encoder
+    // buffers grow with length) and exhaust GPU memory over a long session.
+    if (b - a > config_.max_embed_window_sec) {
+      const double mid = 0.5 * (a + b);
+      a = mid - 0.5 * config_.max_embed_window_sec;
+      b = mid + 0.5 * config_.max_embed_window_sec;
+    }
     std::vector<float> pcm =
         audio_.ReadSpan(tb_.SampleAt(a), tb_.SampleAt(b));
     if (pcm.empty()) continue;  // span aged out of the retain window

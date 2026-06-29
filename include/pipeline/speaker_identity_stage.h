@@ -39,6 +39,8 @@ struct SpeakerIdConfig {
   double overlap_eps_sec = 0.1;   // tolerance for "overlaps another speaker"
   int max_ref_segs = 6;           // best clean spans averaged per voiceprint
   double edge_margin_sec = 0.3;   // trim each span edge (avoid boundary crosstalk)
+  double max_embed_window_sec = 10.0;  // cap embedded audio (>10s is plenty for
+                                       // a voiceprint and bounds GPU memory)
   int enroll_min_refs = 2;        // best spans required before enrolling a NEW id
   double retain_sec = 180.0;      // audio retention window for span reads
 };
