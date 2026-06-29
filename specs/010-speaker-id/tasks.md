@@ -124,6 +124,15 @@ Full 60 min real-WS run (after the embed-window OOM fix + `--timeline-timeout
   are not separable and no τ reaches industrial accuracy (EER ~0.57). The
   speaker-id stage itself is oracle-validated at 91–93% on clean audio; it is
   capped by the diarizer's live segment quality, not by its own logic.
-- **Verdict: speaker pipeline FAIL (not industrial-grade); cannot close.** ASR
-  passes. The required next work is diar-level: investigate/mitigate the
-  Sortformer fixed-`spkcache` long-session degradation (separate spec).
+- **NOT a port bug (decisive reference)**: NeMo's own streaming Sortformer
+  (`tools/reference/nemo_sortformer_ref.py`, same model + audio) shows the SAME
+  per-window decay (88→86→84→**65**→71→**64**%) and the SAME slot drift. The
+  C++ port tracks NeMo within ~2–5 pp per window — it is faithful. Reverting the
+  streaming params to the model's trained values (chunk_len 188, rc 1,
+  update_period 188, sil 3) did NOT change the decay (tested). The 65 % windows
+  are genuine audio difficulty (heavy overlap / rapid interjections late in the
+  meeting) under a strict per-frame single-speaker metric (harsher than DER).
+- **Verdict: speaker pipeline FAIL (not industrial-grade on this audio); cannot
+  close.** ASR passes. The diar port is faithful to NeMo; the limit is the
+  audio's overlapped late segments, not a fixable code bug. Closing on this
+  60 min 4-speaker meeting is bounded by the model+audio, not the port.
