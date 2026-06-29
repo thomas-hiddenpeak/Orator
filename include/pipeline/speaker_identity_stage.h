@@ -31,8 +31,10 @@ namespace pipeline {
 
 struct SpeakerIdConfig {
   int embedding_dim = 192;
-  double min_embed_sec = 1.5;    // shortest clean span worth embedding
-  float match_threshold = 0.45f;  // cosine tau for "same speaker"
+  double min_embed_sec = 3.0;    // shortest clean span worth embedding (longer
+                                // = cleaner = better separation; EER ~halves
+                                // from 1.5s to 4s on the meeting ground truth)
+  float match_threshold = 0.55f;  // cosine tau ~ measured EER for ~3-4s spans
   float min_confidence = 0.5f;    // diar mean-activity gate
   double vad_min_coverage = 0.5;  // fraction of the span covered by VAD speech
   double overlap_eps_sec = 0.1;   // tolerance for "overlaps another speaker"

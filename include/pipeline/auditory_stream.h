@@ -137,8 +137,8 @@ class AuditoryStream {
     bool speaker_enable = false;  // master switch (also needs model dir)
     std::string speaker_model_dir = "";  // dir holding titanet_large.safetensors
     std::string speaker_registry_path = "";  // persistence file ("" = none)
-  float speaker_match_threshold = 0.45f;   // cosine tau for re-identification
-    double speaker_min_embed_sec = 1.5;      // shortest clean span to embed
+  float speaker_match_threshold = 0.55f;   // cosine tau for re-identification
+  double speaker_min_embed_sec = 3.0;      // shortest clean span to embed
     float speaker_min_confidence = 0.5f;     // diar mean-activity gate
     double speaker_retain_sec = 180.0;       // audio retention window
 

@@ -107,13 +107,14 @@ model_dir = "models/asr/Qwen/Qwen3-ASR-1.7B"
 # registry_path = ""
 
 # Cosine threshold for "same speaker" (re-identification). Higher = stricter.
-# Live diarized spans (with some boundary/crosstalk noise) score ~0.45-0.55 for
-# the same speaker and up to ~0.45 across speakers, so 0.45 is the empirical
-# operating point (lower = more merging / false-merge risk, higher = more splits)
-# match_threshold = 0.45
+# Ground-truth meeting eval: same-speaker spans ~0.66/0.72 (1.5s/4s), different
+# ~0.45, EER ~0.55-0.60; 0.55 is the balanced point (NeMo's 0.7 = near-zero
+# false-merge but rejects ~13% genuine). Lower = more merging, higher = splits.
+# match_threshold = 0.55
 
-# Shortest clean single-speaker span worth embedding (seconds)
-# min_embed_sec = 1.5
+# Shortest clean single-speaker span worth embedding (seconds). Longer is
+# cleaner: 1.5s->4s halves the meeting EER (21%->13%).
+# min_embed_sec = 3.0
 
 # Minimum diarization mean-activity confidence for a span to be embedded
 # min_confidence = 0.5
