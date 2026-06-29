@@ -220,5 +220,46 @@ int SpeakerDatabase::Match(const float* query_embedding, float threshold,
   return best_idx;
 }
 
+int SpeakerDatabase::MatchExcluding(const float* query_embedding,
+                                    float threshold,
+                                    const std::vector<std::string>& exclude_ids,
+                                    float* out_score) const {
+  if (size_ <= 0 || query_embedding == nullptr) {
+    if (out_score) *out_score = 0.0f;
+    return -1;
+  }
+  gpu::DeviceBuffer query_dev(static_cast<size_t>(embedding_dim_) *
+                              sizeof(float));
+  gpu::DeviceBuffer scores_dev(static_cast<size_t>(size_) * sizeof(float));
+  gpu::GpuMemory::CopyHostToDevice(
+      query_dev.data(), query_embedding,
+      static_cast<size_t>(embedding_dim_) * sizeof(float));
+  gpu::Kernels::BatchCosineSimilarity(
+      static_cast<const float*>(query_dev.data()), Embeddings(), size_,
+      embedding_dim_, static_cast<float*>(scores_dev.data()));
+  std::vector<float> scores(static_cast<size_t>(size_), 0.0f);
+  gpu::GpuMemory::CopyDeviceToHost(scores.data(), scores_dev.data(),
+                                   static_cast<size_t>(size_) * sizeof(float));
+
+  int best_idx = -1;
+  float best = threshold;
+  for (int i = 0; i < size_; ++i) {
+    bool excluded = false;
+    for (const auto& id : exclude_ids) {
+      if (speaker_ids_[static_cast<size_t>(i)] == id) {
+        excluded = true;
+        break;
+      }
+    }
+    if (excluded) continue;
+    if (scores[static_cast<size_t>(i)] > best) {
+      best = scores[static_cast<size_t>(i)];
+      best_idx = i;
+    }
+  }
+  if (out_score) *out_score = (best_idx >= 0) ? best : 0.0f;
+  return best_idx;
+}
+
 }  // namespace model
 }  // namespace orator

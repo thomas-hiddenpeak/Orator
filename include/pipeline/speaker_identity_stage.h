@@ -41,8 +41,14 @@ struct SpeakerIdConfig {
   double edge_margin_sec = 0.3;   // trim each span edge (avoid boundary crosstalk)
   double max_embed_window_sec = 10.0;  // cap embedded audio (>10s is plenty for
                                        // a voiceprint and bounds GPU memory)
-  int enroll_min_refs = 2;        // best spans required before enrolling a NEW id
+  int enroll_min_refs = 1;        // clean spans required before enrolling a NEW
+                                  // id; 1 is safe because the diarizer already
+                                  // separates within-session speakers (no false
+                                  // split) and same-session ids never merge
   double retain_sec = 180.0;      // audio retention window for span reads
+  int speakers_per_session = 4;   // diarizer slots per session (Sortformer = 4);
+                                  // two slots of one session are distinct
+                                  // speakers and never merge to one global id
 };
 
 class SpeakerIdentityStage {
@@ -74,6 +80,9 @@ class SpeakerIdentityStage {
   // Match the local centroid voiceprint against the registry; enroll if unseen.
   void ResolveGlobal(int local);
   std::string NewGlobalId();
+  // Embed the centre of a span (edge-trimmed, window-capped) with TitaNet;
+  // returns empty if the audio has aged out of the retain window.
+  std::vector<float> EmbedSpan(double start_sec, double end_sec);
 
   core::ISpeakerEmbedder* embedder_;
   model::SpeakerDatabase* db_;

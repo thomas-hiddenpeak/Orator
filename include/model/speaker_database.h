@@ -28,6 +28,12 @@ class SpeakerDatabase final : public core::ISpeakerRegistry {
   bool Enroll(const std::string& speaker_id, const float* embedding) override;
   int Match(const float* embedding, float threshold,
             float* out_score) const override;
+  // Like Match, but ignores any enrolled id in `exclude_ids` (used to honour the
+  // diarizer's within-session separation: two local slots of the same session
+  // are distinct speakers and must never resolve to the same global id).
+  int MatchExcluding(const float* embedding, float threshold,
+                     const std::vector<std::string>& exclude_ids,
+                     float* out_score) const;
   std::string SpeakerIdAt(int index) const override;
   int EmbeddingDim() const override { return embedding_dim_; }
   int Size() const override { return size_; }

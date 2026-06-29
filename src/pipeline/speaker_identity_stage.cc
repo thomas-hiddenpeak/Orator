@@ -84,8 +84,22 @@ void SpeakerIdentityStage::ResolveGlobal(int local) {
     db_->Update(mapped->second, emb.data());
     return;
   }
+  // Trust the diarizer's within-session separation: two local slots of the SAME
+  // session are distinct speakers, so a slot must not resolve to a global id
+  // already taken by another slot of its session. Matching is allowed across
+  // sessions (cross-session voiceprint stitching after a reset).
+  const int spk = config_.speakers_per_session > 0
+                      ? config_.speakers_per_session
+                      : 4;
+  const int session = local / spk;
+  std::vector<std::string> exclude;
+  for (const auto& kv : local_to_global_) {
+    if (kv.first != local && kv.first / spk == session)
+      exclude.push_back(kv.second);
+  }
   float score = 0.0f;
-  const int idx = db_->Match(emb.data(), config_.match_threshold, &score);
+  const int idx =
+      db_->MatchExcluding(emb.data(), config_.match_threshold, exclude, &score);
   std::string resolved;
   bool enrolled = false;
   if (idx >= 0) {
@@ -112,13 +126,42 @@ void SpeakerIdentityStage::ResolveGlobal(int local) {
   }
 }
 
+std::vector<float> SpeakerIdentityStage::EmbedSpan(double start_sec,
+                                                   double end_sec) {
+  // E1: embed the centre of the span (skip an edge margin) to avoid the
+  // onset/offset crosstalk that contaminates turn boundaries.
+  double a = start_sec, b = end_sec;
+  if ((b - a) > 2 * config_.edge_margin_sec + 0.5) {
+    a += config_.edge_margin_sec;
+    b -= config_.edge_margin_sec;
+  }
+  // Cap the embedded window: a voiceprint needs only a few seconds, and a long
+  // single-speaker turn would otherwise feed huge audio to TitaNet (mel/encoder
+  // buffers grow with length) and exhaust GPU memory over a long session.
+  if (b - a > config_.max_embed_window_sec) {
+    const double mid = 0.5 * (a + b);
+    a = mid - 0.5 * config_.max_embed_window_sec;
+    b = mid + 0.5 * config_.max_embed_window_sec;
+  }
+  std::vector<float> pcm = audio_.ReadSpan(tb_.SampleAt(a), tb_.SampleAt(b));
+  if (pcm.empty()) return {};  // span aged out of the retain window
+  core::AudioChunk chunk;
+  chunk.samples = pcm.data();
+  chunk.num_samples = static_cast<int>(pcm.size());
+  chunk.sample_rate = static_cast<int>(tb_.sample_rate());
+  chunk.t_start_sec = a;
+  std::vector<float> emb = embedder_->Embed(chunk);
+  if (static_cast<int>(emb.size()) != config_.embedding_dim) return {};
+  return emb;
+}
+
 void SpeakerIdentityStage::Process(std::vector<core::DiarSegment>& segs) {
   if (segs.empty() || embedder_ == nullptr || db_ == nullptr) return;
 
-  // Sortformer "提选优质段落": per local speaker, pick the highest-quality fresh
-  // clean span (quality = confidence x duration), only if its audio is still in
-  // the retained window (else it would be re-picked every delivery and never
-  // read). TitaNet then refines that speaker's centroid voiceprint.
+  // ── Enrolment (Sortformer "提选优质段落" -> TitaNet voiceprint) ──────────
+  // Per local speaker, pick the highest-quality fresh CLEAN span (single
+  // speaker, confidence x duration) still inside the retain window; TitaNet
+  // builds/refines that speaker's centroid voiceprint and enrols it.
   const long audio_base = audio_.base_sample();
   std::map<int, const core::DiarSegment*> candidate;
   std::map<int, double> best_q;
@@ -138,42 +181,23 @@ void SpeakerIdentityStage::Process(std::vector<core::DiarSegment>& segs) {
       best_q[s.local_speaker] = q;
     }
   }
-
   for (const auto& kv : candidate) {
     const int local = kv.first;
     const core::DiarSegment& s = *kv.second;
-    // E1: embed the centre of the span (skip an edge margin) to avoid the
-    // onset/offset crosstalk that contaminates turn boundaries.
-    double a = s.start_sec, b = s.end_sec;
-    if ((b - a) > 2 * config_.edge_margin_sec + 0.5) {
-      a += config_.edge_margin_sec;
-      b -= config_.edge_margin_sec;
-    }
-    // Cap the embedded window: a voiceprint needs only a few seconds, and a long
-    // single-speaker turn would otherwise feed huge audio to TitaNet (mel/encoder
-    // buffers grow with length) and exhaust GPU memory over a long session.
-    if (b - a > config_.max_embed_window_sec) {
-      const double mid = 0.5 * (a + b);
-      a = mid - 0.5 * config_.max_embed_window_sec;
-      b = mid + 0.5 * config_.max_embed_window_sec;
-    }
-    std::vector<float> pcm =
-        audio_.ReadSpan(tb_.SampleAt(a), tb_.SampleAt(b));
-    if (pcm.empty()) continue;  // span aged out of the retain window
-    core::AudioChunk chunk;
-    chunk.samples = pcm.data();
-    chunk.num_samples = static_cast<int>(pcm.size());
-    chunk.sample_rate = static_cast<int>(tb_.sample_rate());
-    chunk.t_start_sec = a;
-    std::vector<float> emb = embedder_->Embed(chunk);
-    if (static_cast<int>(emb.size()) != config_.embedding_dim) continue;
+    std::vector<float> emb = EmbedSpan(s.start_sec, s.end_sec);
+    if (emb.empty()) continue;
     AddReference(local, best_q[local], emb);
     local_last_embedded_end_[local] = s.end_sec;
     ResolveGlobal(local);
   }
 
-  // Assign the resolved global identity to every segment (revisable: the map
-  // may have changed since the last delivery).
+  // ── Identity assignment ─────────────────────────────────────────────────
+  // TitaNet resolves the global identity of EACH local speaker (its voiceprint
+  // centroid -> match/enrol against the registry, with cross-session stitching);
+  // every segment then carries its local speaker's resolved global id. Matching
+  // is done at the speaker level, not per-segment: a single short segment's
+  // voiceprint is too noisy to re-decide identity for these similar voices, and
+  // the diarizer has already grouped the segment under its speaker.
   for (auto& s : segs) {
     auto it = local_to_global_.find(s.local_speaker);
     if (it != local_to_global_.end()) s.speaker_id = it->second;

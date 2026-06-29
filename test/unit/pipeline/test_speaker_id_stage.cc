@@ -92,26 +92,25 @@ int main() {
     Check(db.Size() == 2, "two speakers enrolled");
   }
 
-  // Delivery 2: a new local slot (2) whose audio is speaker 0 must re-identify
-  // as spk_0 (cross-local match), not a new enrollment.
+  // Delivery 2: a NEW SESSION's local slot (4 = session 1, speakers_per_session
+  // = 4) whose audio is speaker 0 must re-identify as spk_0 by CROSS-SESSION
+  // voiceprint match. (Same-session slots never merge, but a later session's
+  // slot is stitched to an earlier global by matching.)
   {
     std::vector<core::DiarSegment> segs = {
-        Seg(0, 1.0, 4.0, 0.9f),    // already embedded -> spk_0
-        Seg(1, 9.0, 12.0, 0.9f),   // already embedded -> spk_1
-        Seg(2, 5.0, 7.5, 0.9f),    // speaker 0 audio -> match spk_0
+        Seg(4, 5.0, 7.5, 0.9f),    // speaker 0 audio -> match spk_0
     };
     stage.Process(segs);
-    Check(segs[2].speaker_id == "spk_0", "new local slot must re-id as spk_0");
+    Check(segs[0].speaker_id == "spk_0", "cross-session slot must re-id as spk_0");
     Check(db.Size() == 2, "no new enrollment on re-identification");
   }
 
-  // Overlapping different-speaker spans are not clean -> not embedded; the
-  // previously resolved ids still apply, but a brand-new overlapped local slot
-  // gets no identity.
+  // Overlapping different-speaker spans are not clean -> not embedded and not
+  // matched; a brand-new overlapped local slot gets no identity.
   {
     std::vector<core::DiarSegment> segs = {
-        Seg(3, 2.0, 5.0, 0.9f),    // overlaps local 4 below (different speaker)
-        Seg(4, 3.0, 6.0, 0.9f),
+        Seg(8, 2.0, 5.0, 0.9f),    // overlaps local 9 below (different speaker)
+        Seg(9, 3.0, 6.0, 0.9f),
     };
     stage.Process(segs);
     Check(segs[0].speaker_id.empty() && segs[1].speaker_id.empty(),
@@ -121,7 +120,7 @@ int main() {
 
   // Low-confidence spans are gated out.
   {
-    std::vector<core::DiarSegment> segs = {Seg(5, 1.0, 4.0, 0.2f)};
+    std::vector<core::DiarSegment> segs = {Seg(12, 1.0, 4.0, 0.2f)};
     stage.Process(segs);
     Check(segs[0].speaker_id.empty(), "low-confidence span must be gated");
   }
