@@ -37,6 +37,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("json")
     ap.add_argument("--txt", default="test/data/reference/test.txt")
+    ap.add_argument("--windows", type=int, default=0,
+                    help="per-window (seconds) diar ceiling + attribution decay")
     a = ap.parse_args()
     d = json.load(open(a.json))
     tl = d["timeline"]
@@ -71,6 +73,48 @@ def main():
           % (100 * correct / max(total, 1), correct, total))
     names = set(mapping.values())
     print("distinct gt names covered: %d/%d" % (len(names), len({g[2] for g in gt})))
+
+    # Per-window diarization ceiling: assign each diarizer-LOCAL slot to the GT
+    # name it overlaps most WITHIN the window (best case, independent of
+    # speaker-id enrollment). A decay over time isolates Sortformer's own
+    # long-session degradation from the voiceprint stage.
+    diar = [t for t in tl["tracks"] if t.get("kind") == "diarization"]
+    if a.windows and diar:
+        seg = [(e["start"], e["end"], e.get("speaker")) for e in diar[0]["entries"]]
+        print("\nwindow | diar_local_ceiling | attrib_acc")
+        for w in range(0, int(audio), a.windows):
+            we = min(w + a.windows, audio)
+            lg = collections.defaultdict(collections.Counter)
+            for cs, ce, loc in seg:
+                a0, a1 = max(cs, w), min(ce, we)
+                if a1 <= a0:
+                    continue
+                for gs, ge, nm in gt:
+                    o = overlap(a0, a1, gs, ge)
+                    if o > 0:
+                        lg[loc][nm] += o
+            lmap = {loc: c.most_common(1)[0][0] for loc, c in lg.items()}
+            dc = dt = ac = at = 0.0
+            for cs, ce, loc in seg:
+                a0, a1 = max(cs, w), min(ce, we)
+                if a1 <= a0:
+                    continue
+                for gs, ge, gnm in gt:
+                    o = overlap(a0, a1, gs, ge)
+                    if o > 0:
+                        dt += o
+                        dc += o if lmap.get(loc) == gnm else 0
+            for cs, ce, sid in comp:
+                a0, a1 = max(cs, w), min(ce, we)
+                if a1 <= a0:
+                    continue
+                for gs, ge, gnm in gt:
+                    o = overlap(a0, a1, gs, ge)
+                    if o > 0:
+                        at += o
+                        ac += o if mapping.get(sid) == gnm else 0
+            print("%4d-%4d | %5.1f%% | %5.1f%%"
+                  % (w, we, 100 * dc / max(dt, 1), 100 * ac / max(at, 1)))
 
 
 if __name__ == "__main__":

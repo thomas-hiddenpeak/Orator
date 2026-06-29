@@ -108,3 +108,22 @@ quality spans; TitaNet builds an accuracy-first centroid voiceprint; VAD dropped
 ## Config (orator.toml `[speaker]`, added in D10)
 - `enable`, `model_dir`, `registry_path`, `match_threshold`, `min_embed_sec`,
   `embedding_dim` (192), `max_ref_segs`.
+
+## Phase F — Closing full-length review (test-review-protocol)
+Full 60 min real-WS run (after the embed-window OOM fix + `--timeline-timeout
+900`): server survives, registry saved, final timeline delivered.
+- **ASR semantic**: ~88–92% (manual read vs test.txt — text tracks the
+  reference closely, early and late).
+- **Speaker / diarization**: end-to-end attribution **70.6%** dur-weighted
+  (`tools/verify/py/speaker_attrib_eval.py`), 2/4 speakers enrolled, real
+  speakers merged (朱杰+唐云峰 → one id at live cross-cosine 0.708).
+- **Root cause (data-confirmed)**: Sortformer long-session degradation +
+  local-slot drift — per-window diar ceiling (optimal local→name) decays
+  90% (0–600 s) → 66% (1800–2400 s) → 65% (3000–3600 s); live diarized spans
+  score ~0.7 across speakers (vs the clean oracle's ~0.05), so the embeddings
+  are not separable and no τ reaches industrial accuracy (EER ~0.57). The
+  speaker-id stage itself is oracle-validated at 91–93% on clean audio; it is
+  capped by the diarizer's live segment quality, not by its own logic.
+- **Verdict: speaker pipeline FAIL (not industrial-grade); cannot close.** ASR
+  passes. The required next work is diar-level: investigate/mitigate the
+  Sortformer fixed-`spkcache` long-session degradation (separate spec).
