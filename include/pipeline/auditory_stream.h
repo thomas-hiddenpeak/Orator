@@ -282,7 +282,6 @@ class AuditoryStream {
   std::unique_ptr<model::TitaNetEmbedder> speaker_embedder_;
   std::unique_ptr<model::SpeakerDatabase> speaker_db_;
   std::unique_ptr<SpeakerIdentityStage> speaker_id_stage_;
-  long speaker_vad_sub_id_ = 0;
 
   // Spec 004: independent VAD detector (third pipeline consumer).
   std::unique_ptr<core::IVad> vad_detector_;

@@ -1,4 +1,10 @@
 // SpeakerIdentityStage implementation (Spec 010). See header for the contract.
+//
+// Division of labour: Sortformer separates speakers fast and flags high-quality
+// spans (confidence x duration, no overlap); TitaNet runs only on those best
+// spans and builds an accuracy-first centroid voiceprint per speaker, matched
+// 1:N against the persistent registry. No VAD dependency: the end-to-end
+// diarizer already marks single-speaker speech.
 
 #include "pipeline/speaker_identity_stage.h"
 
@@ -26,29 +32,9 @@ void SpeakerIdentityStage::AppendAudio(const float* samples, int n) {
   audio_.Append(samples, n);
 }
 
-void SpeakerIdentityStage::AddVadSegment(double start_sec, double end_sec) {
-  if (end_sec <= start_sec) return;
-  std::lock_guard<std::mutex> lk(vad_mutex_);
-  vad_segments_.emplace_back(start_sec, end_sec);
-}
-
-double SpeakerIdentityStage::VadCoverage(
-    double start, double end,
-    const std::vector<std::pair<double, double>>& vad) const {
-  const double dur = end - start;
-  if (dur <= 0.0) return 0.0;
-  double covered = 0.0;
-  for (const auto& v : vad) {
-    const double a = std::max(start, v.first);
-    const double b = std::min(end, v.second);
-    if (b > a) covered += b - a;
-  }
-  return covered / dur;
-}
-
 bool SpeakerIdentityStage::IsClean(
-    const core::DiarSegment& s, const std::vector<core::DiarSegment>& all,
-    const std::vector<std::pair<double, double>>& vad) const {
+    const core::DiarSegment& s,
+    const std::vector<core::DiarSegment>& all) const {
   if (s.end_sec - s.start_sec < config_.min_embed_sec) return false;
   if (s.confidence < config_.min_confidence) return false;
   // Single speaker: no other-speaker segment overlaps this span.
@@ -59,30 +45,27 @@ bool SpeakerIdentityStage::IsClean(
     const double b = std::min(s.end_sec, o.end_sec);
     if (b - a > config_.overlap_eps_sec) return false;
   }
-  // VAD-confirmed (skipped when VAD is unavailable so the feature still works).
-  if (!vad.empty() &&
-      VadCoverage(s.start_sec, s.end_sec, vad) < config_.vad_min_coverage) {
-    return false;
-  }
   return true;
 }
 
-void SpeakerIdentityStage::UpdateLocalEmbedding(int local,
-                                                const std::vector<float>& emb) {
-  auto it = local_emb_.find(local);
-  if (it == local_emb_.end()) {
-    local_emb_[local] = emb;
-    return;
-  }
-  std::vector<float>& cur = it->second;
-  const float a = config_.ema_alpha;
+void SpeakerIdentityStage::AddReference(int local, double quality,
+                                        const std::vector<float>& emb) {
+  auto& refs = local_refs_[local];
+  refs.emplace_back(quality, emb);
+  // Keep the best `max_ref_segs` spans by quality (confidence x duration).
+  std::sort(refs.begin(), refs.end(),
+            [](const auto& a, const auto& b) { return a.first > b.first; });
+  if (static_cast<int>(refs.size()) > config_.max_ref_segs)
+    refs.resize(config_.max_ref_segs);
+  // Centroid = L2-normalized mean of the kept reference embeddings.
+  std::vector<float> c(config_.embedding_dim, 0.0f);
+  for (const auto& r : refs)
+    for (int i = 0; i < config_.embedding_dim; ++i) c[i] += r.second[i];
   double nrm = 0.0;
-  for (size_t i = 0; i < cur.size() && i < emb.size(); ++i) {
-    cur[i] = a * cur[i] + (1.0f - a) * emb[i];
-    nrm += static_cast<double>(cur[i]) * cur[i];
-  }
+  for (float v : c) nrm += static_cast<double>(v) * v;
   nrm = std::sqrt(nrm) + 1e-12;
-  for (float& v : cur) v = static_cast<float>(v / nrm);
+  for (float& v : c) v = static_cast<float>(v / nrm);
+  local_centroid_[local] = std::move(c);
 }
 
 std::string SpeakerIdentityStage::NewGlobalId() {
@@ -93,7 +76,7 @@ std::string SpeakerIdentityStage::NewGlobalId() {
 }
 
 void SpeakerIdentityStage::ResolveGlobal(int local) {
-  const std::vector<float>& emb = local_emb_[local];
+  const std::vector<float>& emb = local_centroid_[local];
   // If we already enrolled this local speaker, keep refining that entry.
   auto mapped = local_to_global_.find(local);
   if (mapped != local_to_global_.end() &&
@@ -119,50 +102,44 @@ void SpeakerIdentityStage::ResolveGlobal(int local) {
                        mapped->second != resolved;
   local_to_global_[local] = resolved;
   if (changed) {
-    LOG_INFO("[speaker-id] local %d -> %s (%s cosine=%.3f)\n", local,
-             resolved.c_str(), enrolled ? "enrolled" : "match", score);
+    LOG_INFO("[speaker-id] local %d -> %s (%s cosine=%.3f, %zu refs)\n", local,
+             resolved.c_str(), enrolled ? "enrolled" : "match", score,
+             local_refs_[local].size());
   }
 }
 
 void SpeakerIdentityStage::Process(std::vector<core::DiarSegment>& segs) {
   if (segs.empty() || embedder_ == nullptr || db_ == nullptr) return;
 
-  std::vector<std::pair<double, double>> vad;
-  {
-    std::lock_guard<std::mutex> lk(vad_mutex_);
-    vad = vad_segments_;
-  }
-
-  // For each local speaker, pick the longest fresh clean span (one not already
-  // embedded) as this delivery's embedding candidate. Only consider spans whose
-  // audio is still inside the retained window, otherwise an old longest span
-  // that has aged out would be re-picked every delivery (ReadSpan returns
-  // empty) and block the local speaker from ever being embedded.
+  // Sortformer "提选优质段落": per local speaker, pick the highest-quality fresh
+  // clean span (quality = confidence x duration), only if its audio is still in
+  // the retained window (else it would be re-picked every delivery and never
+  // read). TitaNet then refines that speaker's centroid voiceprint.
   const long audio_base = audio_.base_sample();
   std::map<int, const core::DiarSegment*> candidate;
+  std::map<int, double> best_q;
   for (const auto& s : segs) {
     if (s.local_speaker < 0) continue;
     if (tb_.SampleAt(s.start_sec) < audio_base) continue;  // audio aged out
-    if (!IsClean(s, segs, vad)) continue;
+    if (!IsClean(s, segs)) continue;
     auto last = local_last_embedded_end_.find(s.local_speaker);
     if (last != local_last_embedded_end_.end() && s.end_sec <= last->second) {
       continue;  // already covered
     }
+    const double q =
+        static_cast<double>(s.confidence) * (s.end_sec - s.start_sec);
     auto c = candidate.find(s.local_speaker);
-    if (c == candidate.end() ||
-        (s.end_sec - s.start_sec) >
-            (c->second->end_sec - c->second->start_sec)) {
+    if (c == candidate.end() || q > best_q[s.local_speaker]) {
       candidate[s.local_speaker] = &s;
+      best_q[s.local_speaker] = q;
     }
   }
 
-  // Embed each candidate, refine the per-local voiceprint, resolve identity.
   for (const auto& kv : candidate) {
     const int local = kv.first;
     const core::DiarSegment& s = *kv.second;
-    const long s0 = tb_.SampleAt(s.start_sec);
-    const long s1 = tb_.SampleAt(s.end_sec);
-    std::vector<float> pcm = audio_.ReadSpan(s0, s1);
+    std::vector<float> pcm =
+        audio_.ReadSpan(tb_.SampleAt(s.start_sec), tb_.SampleAt(s.end_sec));
     if (pcm.empty()) continue;  // span aged out of the retain window
     core::AudioChunk chunk;
     chunk.samples = pcm.data();
@@ -171,7 +148,7 @@ void SpeakerIdentityStage::Process(std::vector<core::DiarSegment>& segs) {
     chunk.t_start_sec = s.start_sec;
     std::vector<float> emb = embedder_->Embed(chunk);
     if (static_cast<int>(emb.size()) != config_.embedding_dim) continue;
-    UpdateLocalEmbedding(local, emb);
+    AddReference(local, best_q[local], emb);
     local_last_embedded_end_[local] = s.end_sec;
     ResolveGlobal(local);
   }
@@ -186,11 +163,8 @@ void SpeakerIdentityStage::Process(std::vector<core::DiarSegment>& segs) {
 
 void SpeakerIdentityStage::Reset() {
   audio_.Reset();
-  {
-    std::lock_guard<std::mutex> lk(vad_mutex_);
-    vad_segments_.clear();
-  }
-  local_emb_.clear();
+  local_refs_.clear();
+  local_centroid_.clear();
   local_last_embedded_end_.clear();
   local_to_global_.clear();
   session_enrolled_.clear();

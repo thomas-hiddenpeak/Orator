@@ -229,18 +229,13 @@ void AuditoryStream::StartWorkers() {
                             protocol_timeline_.get(), diar_handle_.get(), segs);
         });
     // Spec 010: resolve global voiceprint identities on the segment view before
-    // it is delivered. The worker depends only on a std::function (Art. III).
+    // it is delivered. The worker depends only on a std::function (Art. III);
+    // identity needs no VAD -- Sortformer's confidence + no-overlap already mark
+    // clean single-speaker spans.
     if (speaker_id_stage_) {
       diar_worker_->set_segment_processor(
           [this](std::vector<core::DiarSegment>& segs) {
             speaker_id_stage_->Process(segs);
-          });
-      speaker_vad_sub_id_ = protocol_timeline_->SubscribeInternal(
-          protocol::TopicPattern(protocol::kVadSpeechSegment.to_string()),
-          [this](const protocol::Message& msg) {
-            double s = JsonParseNum(msg.data, "start");
-            double e = JsonParseNum(msg.data, "end");
-            if (s >= 0.0 && e > s) speaker_id_stage_->AddVadSegment(s, e);
           });
     }
     diar_audio_ = MakeAudioCache();

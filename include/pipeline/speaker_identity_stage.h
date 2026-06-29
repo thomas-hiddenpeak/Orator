@@ -36,9 +36,8 @@ struct SpeakerIdConfig {
                                 // from 1.5s to 4s on the meeting ground truth)
   float match_threshold = 0.55f;  // cosine tau ~ measured EER for ~3-4s spans
   float min_confidence = 0.5f;    // diar mean-activity gate
-  double vad_min_coverage = 0.5;  // fraction of the span covered by VAD speech
   double overlap_eps_sec = 0.1;   // tolerance for "overlaps another speaker"
-  float ema_alpha = 0.7f;         // weight of the existing per-local embedding
+  int max_ref_segs = 6;           // best clean spans averaged per voiceprint
   double retain_sec = 180.0;      // audio retention window for span reads
 };
 
@@ -51,9 +50,6 @@ class SpeakerIdentityStage {
   // Feed mono-16k audio in stream order (called on the diarization thread).
   void AppendAudio(const float* samples, int n);
 
-  // Record a VAD speech segment (called from the VAD subscription thread).
-  void AddVadSegment(double start_sec, double end_sec);
-
   // Resolve global identities and fill DiarSegment::speaker_id in place
   // (called on the diarization thread, before the segments are delivered).
   void Process(std::vector<core::DiarSegment>& segs);
@@ -63,15 +59,15 @@ class SpeakerIdentityStage {
   int enrolled_count() const { return db_->Size(); }
 
  private:
-  // True when [s.start, s.end] is a clean single-speaker, VAD-confirmed span.
+  // True when [s.start, s.end] is a clean single-speaker span (Sortformer
+  // confidence + no other-speaker overlap; no VAD dependency — diar's
+  // end-to-end separation already marks single-speaker speech).
   bool IsClean(const core::DiarSegment& s,
-               const std::vector<core::DiarSegment>& all,
-               const std::vector<std::pair<double, double>>& vad) const;
-  double VadCoverage(double start, double end,
-                     const std::vector<std::pair<double, double>>& vad) const;
-  // Blend a new embedding into the per-local moving average (re-normalized).
-  void UpdateLocalEmbedding(int local, const std::vector<float>& emb);
-  // Match the local moving average against the registry; enroll if unseen.
+               const std::vector<core::DiarSegment>& all) const;
+  // Add a high-quality span's embedding to a local speaker's reference set
+  // (keeps the best `max_ref_segs` by quality) and recompute the centroid.
+  void AddReference(int local, double quality, const std::vector<float>& emb);
+  // Match the local centroid voiceprint against the registry; enroll if unseen.
   void ResolveGlobal(int local);
   std::string NewGlobalId();
 
@@ -81,11 +77,10 @@ class SpeakerIdentityStage {
   SpeakerIdConfig config_;
   RetainedAudioBuffer audio_;
 
-  mutable std::mutex vad_mutex_;
-  std::vector<std::pair<double, double>> vad_segments_;
-
-  // Diarization-thread-only state (no lock needed).
-  std::map<int, std::vector<float>> local_emb_;     // local -> moving-avg emb
+  // Diarization-thread-only state (no lock needed). Per local speaker: the best
+  // reference embeddings (quality = confidence x duration) + their centroid.
+  std::map<int, std::vector<std::pair<double, std::vector<float>>>> local_refs_;
+  std::map<int, std::vector<float>> local_centroid_;
   std::map<int, double> local_last_embedded_end_;   // local -> last span end
   std::map<int, std::string> local_to_global_;      // local -> global id
   std::set<std::string> session_enrolled_;          // ids this session created
@@ -94,3 +89,4 @@ class SpeakerIdentityStage {
 
 }  // namespace pipeline
 }  // namespace orator
+
