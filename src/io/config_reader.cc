@@ -180,6 +180,9 @@ bool ApplyTomlConfig(const std::string& path,
     if (auto v = sec->get("spkcache_sil_frames")) {
       if (auto n = v->value<int>()) cfg.diar_spkcache_sil_frames = *n;
     }
+    if (auto v = sec->get("reset_period_sec")) {
+      if (auto d = v->value<double>()) cfg.diar_reset_period_sec = *d;
+    }
     if (auto v = sec->get("fifo_len")) {
       if (auto n = v->value<int>()) cfg.diar_fifo_len = *n;
     }

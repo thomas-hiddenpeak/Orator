@@ -4,6 +4,7 @@
 
 #include <atomic>
 #include <functional>
+#include <utility>
 #include <vector>
 
 #include "core/time_base.h"
@@ -37,6 +38,11 @@ class DiarizationWorker {
     double pad_offset = 0.0;   // extra time after segment end
     double min_dur_on = 0.5;   // minimum segment duration (seconds)
     double min_dur_off = 1.0;  // minimum gap for merging (seconds)
+    // Spec 010: periodically reset the diarizer's streaming state so each window
+    // stays in the model's accurate regime (the fixed spkcache degrades over a
+    // long continuous session). Slots are offset per session and stitched back
+    // into stable global identities by the voiceprint stage. 0 = disabled.
+    double reset_period_sec = 0.0;
   };
 
   // Spec 004: delivers the pipeline's current speaker view (who/when) to the
@@ -94,6 +100,13 @@ class DiarizationWorker {
   std::vector<float> diar_probs_;
   int diar_speakers_ = 0;
   double diar_frame_period_sec_ = 0.0;
+  // Spec 010: per-session reset bookkeeping. Each entry is (start diar-frame
+  // index in diar_probs_, absolute start time sec) for a diarizer session; the
+  // first is (0, 0). Segments are derived per session with a local-speaker
+  // offset so a slot never spans a reset boundary (where slot identity changes),
+  // and each session's times are anchored to its absolute start.
+  std::vector<std::pair<int, double>> session_bounds_{{0, 0.0}};
+  long session_start_sample_ = 0;
 
   core::IDiarizer* diarizer_;
   Params params_;

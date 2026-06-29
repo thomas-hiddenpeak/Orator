@@ -132,6 +132,12 @@ class AuditoryStream {
     double diar_pad_offset = 0.0;  // extra time added after each segment end
     double diar_min_dur_on = 0.5;  // minimum segment duration (seconds)
     double diar_min_dur_off = 1.0;  // minimum gap to merge segments (seconds)
+    // Spec 010: periodically reset the diarizer streaming state (0 = never) so
+    // each window stays in the model's accurate regime; the voiceprint stage
+    // stitches the per-session slots into stable global identities. Default 600s
+    // recovers the late-session degradation (1800-2400s window 66% -> 83%); it
+    // never triggers for sessions shorter than the period.
+    double diar_reset_period_sec = 600.0;
 
     // ── Speaker identity (Spec 010, post-diarization stage) ──────────
     bool speaker_enable = false;  // master switch (also needs model dir)

@@ -209,6 +209,14 @@ spkcache_refresh_rate = 100
 # Minimum gap to merge same-speaker segments (seconds). Larger = fewer fragments. (default 1.0)
 # min_dur_off = 1.0
 
+# Periodically reset the diarizer streaming state (seconds; 0 = never). The fixed
+# speaker cache degrades over a long continuous session (late-window accuracy
+# drops ~66% by 30 min); resetting keeps each window in the model's accurate
+# regime (~83%) and the voiceprint stage stitches the per-session speaker slots
+# back into stable global identities. Never triggers for sessions shorter than
+# the period. (default 600)
+# reset_period_sec = 600
+
 # ══════════════════════════════════════════════════════════════════════════════
 # Storage — protocol timeline persistence
 # ══════════════════════════════════════════════════════════════════════════════

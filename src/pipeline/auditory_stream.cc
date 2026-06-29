@@ -221,6 +221,7 @@ void AuditoryStream::StartWorkers() {
     dp.pad_offset = config_.diar_pad_offset;
     dp.min_dur_on = config_.diar_min_dur_on;
     dp.min_dur_off = config_.diar_min_dur_off;
+    dp.reset_period_sec = config_.diar_reset_period_sec;
     diar_worker_ = std::make_unique<DiarizationWorker>(
         diarizer_.get(), dp, common_time_base(), diar_stream_);
     diar_worker_->set_speaker_sink(
