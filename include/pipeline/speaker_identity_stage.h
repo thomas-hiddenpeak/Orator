@@ -38,6 +38,8 @@ struct SpeakerIdConfig {
   float min_confidence = 0.5f;    // diar mean-activity gate
   double overlap_eps_sec = 0.1;   // tolerance for "overlaps another speaker"
   int max_ref_segs = 6;           // best clean spans averaged per voiceprint
+  double edge_margin_sec = 0.3;   // trim each span edge (avoid boundary crosstalk)
+  int enroll_min_refs = 2;        // best spans required before enrolling a NEW id
   double retain_sec = 180.0;      // audio retention window for span reads
 };
 

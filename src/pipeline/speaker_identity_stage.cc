@@ -91,6 +91,10 @@ void SpeakerIdentityStage::ResolveGlobal(int local) {
   if (idx >= 0) {
     resolved = db_->SpeakerIdAt(idx);
   } else {
+    // E2: only enrol a NEW identity once enough best spans agree, so a single
+    // noisy span cannot spawn a spurious speaker (false split).
+    if (static_cast<int>(local_refs_[local].size()) < config_.enroll_min_refs)
+      return;
     resolved = NewGlobalId();
     db_->Enroll(resolved, emb.data());
     session_enrolled_.insert(resolved);
@@ -138,14 +142,21 @@ void SpeakerIdentityStage::Process(std::vector<core::DiarSegment>& segs) {
   for (const auto& kv : candidate) {
     const int local = kv.first;
     const core::DiarSegment& s = *kv.second;
+    // E1: embed the centre of the span (skip an edge margin) to avoid the
+    // onset/offset crosstalk that contaminates turn boundaries.
+    double a = s.start_sec, b = s.end_sec;
+    if ((b - a) > 2 * config_.edge_margin_sec + 0.5) {
+      a += config_.edge_margin_sec;
+      b -= config_.edge_margin_sec;
+    }
     std::vector<float> pcm =
-        audio_.ReadSpan(tb_.SampleAt(s.start_sec), tb_.SampleAt(s.end_sec));
+        audio_.ReadSpan(tb_.SampleAt(a), tb_.SampleAt(b));
     if (pcm.empty()) continue;  // span aged out of the retain window
     core::AudioChunk chunk;
     chunk.samples = pcm.data();
     chunk.num_samples = static_cast<int>(pcm.size());
     chunk.sample_rate = static_cast<int>(tb_.sample_rate());
-    chunk.t_start_sec = s.start_sec;
+    chunk.t_start_sec = a;
     std::vector<float> emb = embedder_->Embed(chunk);
     if (static_cast<int>(emb.size()) != config_.embedding_dim) continue;
     AddReference(local, best_q[local], emb);

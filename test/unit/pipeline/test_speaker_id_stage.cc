@@ -69,6 +69,7 @@ int main() {
   cfg.match_threshold = 0.5f;
   cfg.min_confidence = 0.5f;
   cfg.retain_sec = 180.0;
+  cfg.enroll_min_refs = 1;  // enroll on first clean span for this unit test
   pipeline::SpeakerIdentityStage stage(&embedder, &db, tb, cfg);
 
   // 16 s of audio: [0,8) = speaker 0 (value 0), [8,16) = speaker 1 (value 1).

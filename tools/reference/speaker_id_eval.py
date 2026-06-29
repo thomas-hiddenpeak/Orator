@@ -118,6 +118,8 @@ def main():
     ap.add_argument("--audio", default=DEFAULT_AUDIO)
     ap.add_argument("--transcript", default=DEFAULT_TXT)
     ap.add_argument("--min-seg", type=float, default=1.5)
+    ap.add_argument("--edge", type=float, default=0.0,
+                    help="trim N s from each segment edge before embedding")
     ap.add_argument("--duration", type=float, default=0.0,
                     help="limit analysis to the first N seconds (0 = full)")
     args = ap.parse_args()
@@ -137,7 +139,10 @@ def main():
     # Embed every ground-truth segment (batched), grouped by speaker.
     metas, wavs = [], []
     for (s, e, spk) in segs:
-        wav = load_audio(args.audio, 16000, s, e)
+        a, b = s, e
+        if args.edge > 0 and (b - a) > 2 * args.edge + 0.5:
+            a, b = s + args.edge, e - args.edge
+        wav = load_audio(args.audio, 16000, a, b)
         if wav.shape[0] < int(0.5 * 16000):
             continue
         # Cap very long turns to keep batch padding bounded (head 20 s is plenty

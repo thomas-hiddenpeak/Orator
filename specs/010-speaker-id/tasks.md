@@ -88,6 +88,23 @@ Each task gates on build clean `-Wall -Wextra` + relevant test.
   (not available for test.mp3) and/or a stricter clean gate.
 - [x] **D12** State docs synced (this change): `PROJECT_STATE.md` + this file.
 
+## Phase E — Accuracy refinement + comprehensive-view presentation
+Two-model division of labour (committed): Sortformer separates + flags high-
+quality spans; TitaNet builds an accuracy-first centroid voiceprint; VAD dropped.
+- [x] **E1** Centered-window embedding: trim `edge_margin_sec` (0.3 s) each side
+  so the embed skips turn-boundary crosstalk. GT eval (≥4 s spans): 1:N 91.0 →
+  **93.1%**, cross-speaker mean 0.465 → 0.439.
+- [x] **E2** Enroll-confirm: enrol a NEW id only after `enroll_min_refs` (2) best
+  spans agree (centroid), so one noisy span cannot spawn a spurious speaker;
+  matching an EXISTING id uses τ. False-split guard.
+- [x] **E3** Naming: enrol once, name via the `<registry>.names` sidecar; future
+  sessions Load it and re-identified speakers carry the real name (no UI).
+- [x] **E4** Comprehensive-view presentation: every speaker turn carries
+  `speaker` (int local fallback) + `speaker_id` (global voiceprint) +
+  `speaker_name` (real name when known); consumers display name → id → local.
+  **Validated end-to-end**: enroll run, name sidecar, re-id run → comprehensive
+  turns show (spk_0, 朱杰)×10, (spk_1, 徐子景)×5. ctest 47/47.
+
 ## Config (orator.toml `[speaker]`, added in D10)
 - `enable`, `model_dir`, `registry_path`, `match_threshold`, `min_embed_sec`,
-  `embedding_dim` (192).
+  `embedding_dim` (192), `max_ref_segs`.
