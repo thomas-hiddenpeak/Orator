@@ -48,6 +48,10 @@ struct SpeakerIdConfig {
   int speakers_per_session = 4;   // diarizer slots per session (Sortformer = 4);
                                   // two slots of one session are distinct
                                   // speakers and never merge to one global id
+  float merge_threshold = 0.70f;  // cosine above which two global centroids are
+                                  // the SAME person and are merged (well above
+                                  // match_threshold and the max distinct-speaker
+                                  // similarity, so only confident duplicates fuse)
 };
 
 class SpeakerIdentityStage {
@@ -84,6 +88,13 @@ class SpeakerIdentityStage {
   // re-matches its existing id instead of fragmenting into a new one. The
   // registry is never capped -- genuinely new speakers still enroll.
   void RefreshGlobalCentroids();
+  // Reconcile the registry: merge any two global ids whose centroids are
+  // confidently the same person (cosine > merge_threshold). This repairs the
+  // unavoidable early-session duplicate (a returning speaker enrolled before its
+  // centroid was strong enough to match) WITHOUT capping the speaker count.
+  void MergeReconcile();
+  // Resolve a global id through the merge-alias chain to its canonical id.
+  std::string Canonical(std::string id) const;
   std::string NewGlobalId();
   // Embed the centre of a span (edge-trimmed, window-capped) with TitaNet;
   // returns empty if the audio has aged out of the retain window.
@@ -100,7 +111,9 @@ class SpeakerIdentityStage {
   std::map<int, std::vector<std::pair<double, std::vector<float>>>> local_refs_;
   std::map<int, std::vector<float>> local_centroid_;
   std::map<int, double> local_last_embedded_end_;   // local -> last span end
-  std::map<int, std::string> local_to_global_;      // local -> global id
+  std::map<int, std::string> local_to_global_;      // local -> canonical global id
+  std::map<std::string, std::vector<float>> global_centroid_;  // id -> centroid
+  std::map<std::string, std::string> alias_;        // merged id -> canonical id
   int next_global_id_ = 0;
 };
 
