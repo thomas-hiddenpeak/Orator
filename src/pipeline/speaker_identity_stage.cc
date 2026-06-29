@@ -76,17 +76,14 @@ std::string SpeakerIdentityStage::NewGlobalId() {
 }
 
 void SpeakerIdentityStage::ResolveGlobal(int local) {
-  const std::vector<float>& emb = local_centroid_[local];
-  // If we already enrolled this local speaker, keep refining that entry.
+  // A slot that already has a global id keeps it (stable identity); its centroid
+  // is strengthened later in RefreshGlobalCentroids.
   auto mapped = local_to_global_.find(local);
-  if (mapped != local_to_global_.end() &&
-      session_enrolled_.count(mapped->second)) {
-    db_->Update(mapped->second, emb.data());
-    return;
-  }
+  if (mapped != local_to_global_.end()) return;
+
   // Trust the diarizer's within-session separation: two local slots of the SAME
   // session are distinct speakers, so a slot must not resolve to a global id
-  // already taken by another slot of its session. Matching is allowed across
+  // already taken by another slot of its session. Matching IS allowed across
   // sessions (cross-session voiceprint stitching after a reset).
   const int spk = config_.speakers_per_session > 0
                       ? config_.speakers_per_session
@@ -98,31 +95,55 @@ void SpeakerIdentityStage::ResolveGlobal(int local) {
       exclude.push_back(kv.second);
   }
   float score = 0.0f;
-  const int idx =
-      db_->MatchExcluding(emb.data(), config_.match_threshold, exclude, &score);
+  const int idx = db_->MatchExcluding(local_centroid_[local].data(),
+                                      config_.match_threshold, exclude, &score);
   std::string resolved;
   bool enrolled = false;
   if (idx >= 0) {
-    resolved = db_->SpeakerIdAt(idx);
+    resolved = db_->SpeakerIdAt(idx);  // returning speaker -> existing id
   } else {
-    // E2: only enrol a NEW identity once enough best spans agree, so a single
-    // noisy span cannot spawn a spurious speaker (false split).
+    // No registry speaker matches: enrol a genuinely new identity. E2: require
+    // enough best spans first so a single noisy span cannot spawn a spurious
+    // speaker. The registry is never capped -- it grows to recognise everyone.
     if (static_cast<int>(local_refs_[local].size()) < config_.enroll_min_refs)
       return;
     resolved = NewGlobalId();
-    db_->Enroll(resolved, emb.data());
-    session_enrolled_.insert(resolved);
+    db_->Enroll(resolved, local_centroid_[local].data());
     enrolled = true;
   }
-  // Log only when the local speaker's resolved identity is new or changes, so
-  // the trace stays at one line per identity decision (not per delivery).
-  const bool changed = mapped == local_to_global_.end() ||
-                       mapped->second != resolved;
   local_to_global_[local] = resolved;
-  if (changed) {
-    LOG_INFO("[speaker-id] local %d -> %s (%s cosine=%.3f, %zu refs)\n", local,
-             resolved.c_str(), enrolled ? "enrolled" : "match", score,
-             local_refs_[local].size());
+  LOG_INFO("[speaker-id] local %d -> %s (%s cosine=%.3f, %zu refs)\n", local,
+           resolved.c_str(), enrolled ? "enrolled" : "match", score,
+           local_refs_[local].size());
+}
+
+void SpeakerIdentityStage::RefreshGlobalCentroids() {
+  // Cross-session accumulation: each global's registry centroid is the
+  // L2-normalized mean of the best references from ALL local slots mapped to it
+  // (across sessions). The more clean evidence a speaker accumulates, the more
+  // robust its voiceprint, so the speaker reliably re-matches next session
+  // instead of fragmenting into a duplicate id.
+  std::map<std::string, std::vector<std::pair<double, std::vector<float>>>> g;
+  for (const auto& kv : local_to_global_) {
+    auto it = local_refs_.find(kv.first);
+    if (it == local_refs_.end()) continue;
+    auto& refs = g[kv.second];
+    refs.insert(refs.end(), it->second.begin(), it->second.end());
+  }
+  for (auto& kv : g) {
+    auto& refs = kv.second;
+    std::sort(refs.begin(), refs.end(),
+              [](const auto& a, const auto& b) { return a.first > b.first; });
+    if (static_cast<int>(refs.size()) > config_.max_ref_segs)
+      refs.resize(config_.max_ref_segs);
+    std::vector<float> c(config_.embedding_dim, 0.0f);
+    for (const auto& r : refs)
+      for (int i = 0; i < config_.embedding_dim; ++i) c[i] += r.second[i];
+    double nrm = 0.0;
+    for (float v : c) nrm += static_cast<double>(v) * v;
+    nrm = std::sqrt(nrm) + 1e-12;
+    for (float& v : c) v = static_cast<float>(v / nrm);
+    db_->Update(kv.first, c.data());
   }
 }
 
@@ -190,6 +211,10 @@ void SpeakerIdentityStage::Process(std::vector<core::DiarSegment>& segs) {
     local_last_embedded_end_[local] = s.end_sec;
     ResolveGlobal(local);
   }
+  // Strengthen every global speaker's centroid with all accumulated references
+  // (cross-session), so returning speakers re-match reliably without capping the
+  // registry.
+  RefreshGlobalCentroids();
 
   // ── Identity assignment ─────────────────────────────────────────────────
   // TitaNet resolves the global identity of EACH local speaker (its voiceprint
@@ -210,7 +235,6 @@ void SpeakerIdentityStage::Reset() {
   local_centroid_.clear();
   local_last_embedded_end_.clear();
   local_to_global_.clear();
-  session_enrolled_.clear();
   next_global_id_ = db_ ? db_->Size() : 0;
 }
 

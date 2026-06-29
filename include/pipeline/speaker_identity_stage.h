@@ -15,7 +15,6 @@
 
 #include <map>
 #include <mutex>
-#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -79,6 +78,12 @@ class SpeakerIdentityStage {
   void AddReference(int local, double quality, const std::vector<float>& emb);
   // Match the local centroid voiceprint against the registry; enroll if unseen.
   void ResolveGlobal(int local);
+  // Rebuild every global speaker's registry centroid from the best references
+  // of all local slots currently mapped to it (cross-session accumulation): a
+  // returning speaker's voiceprint strengthens over sessions, so it reliably
+  // re-matches its existing id instead of fragmenting into a new one. The
+  // registry is never capped -- genuinely new speakers still enroll.
+  void RefreshGlobalCentroids();
   std::string NewGlobalId();
   // Embed the centre of a span (edge-trimmed, window-capped) with TitaNet;
   // returns empty if the audio has aged out of the retain window.
@@ -96,7 +101,6 @@ class SpeakerIdentityStage {
   std::map<int, std::vector<float>> local_centroid_;
   std::map<int, double> local_last_embedded_end_;   // local -> last span end
   std::map<int, std::string> local_to_global_;      // local -> global id
-  std::set<std::string> session_enrolled_;          // ids this session created
   int next_global_id_ = 0;
 };
 
