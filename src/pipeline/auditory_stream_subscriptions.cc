@@ -18,6 +18,7 @@
 #include "protocol/topic_router.h"
 
 #include <cstdio>
+#include <map>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -26,8 +27,9 @@ namespace orator {
 namespace pipeline {
 
 // Shared revision serializer defined in src/pipeline/json_util.cc.
-std::string SerializeRevisionToJson(const ComprehensiveTimeline::Revision& r,
-                                    const char* source);
+std::string SerializeRevisionToJson(
+    const ComprehensiveTimeline::Revision& r, const char* source,
+    const std::map<std::string, std::string>* label_ids = nullptr);
 
 // ---------------------------------------------------------------------------
 // Local helper: serialize a Revision to JSON and emit via callback.
@@ -35,8 +37,10 @@ std::string SerializeRevisionToJson(const ComprehensiveTimeline::Revision& r,
 // ---------------------------------------------------------------------------
 namespace {
 void DoEmitRevision(const ComprehensiveTimeline::Revision& r,
-                    const char* source, const RevisionEmitter& emit_rev) {
-  emit_rev(SerializeRevisionToJson(r, source));
+                    const char* source, const RevisionEmitter& emit_rev,
+                    const std::map<std::string, std::string>* label_ids =
+                        nullptr) {
+  emit_rev(SerializeRevisionToJson(r, source, label_ids));
 }
 }  // namespace
 
@@ -99,12 +103,14 @@ void HandleDiarSubscription(ComprehensiveTimeline& comp, std::mutex& comp_mutex,
   }
 
   std::vector<ComprehensiveTimeline::Revision> revs;
+  std::map<std::string, std::string> label_ids;
   {
     std::lock_guard<std::mutex> lk(comp_mutex);
     revs = comp.ReplaceSpeakers(speakers);
+    label_ids = comp.SpeakerLabelIds();
   }
   for (const auto& r : revs) {
-    DoEmitRevision(r, "diar", emit_rev);
+    DoEmitRevision(r, "diar", emit_rev, &label_ids);
   }
 }
 
@@ -125,12 +131,14 @@ void HandleAsrSubscription(ComprehensiveTimeline& comp, std::mutex& comp_mutex,
   if (id < 0) return;
 
   std::vector<ComprehensiveTimeline::Revision> revs;
+  std::map<std::string, std::string> label_ids;
   {
     std::lock_guard<std::mutex> lk(comp_mutex);
     revs = comp.UpsertText(id, start, end, text);
+    label_ids = comp.SpeakerLabelIds();
   }
   for (const auto& r : revs) {
-    DoEmitRevision(r, "asr", emit_rev);
+    DoEmitRevision(r, "asr", emit_rev, &label_ids);
   }
 }
 
@@ -184,12 +192,14 @@ void HandleAlignSubscription(ComprehensiveTimeline& comp,
   }
 
   std::vector<ComprehensiveTimeline::Revision> revs;
+  std::map<std::string, std::string> label_ids;
   {
     std::lock_guard<std::mutex> lk(comp_mutex);
     revs = comp.UpsertAlign(id, seg_start, seg_end, units);
+    label_ids = comp.SpeakerLabelIds();
   }
   for (const auto& r : revs) {
-    DoEmitRevision(r, "align", emit_rev);
+    DoEmitRevision(r, "align", emit_rev, &label_ids);
   }
 }
 

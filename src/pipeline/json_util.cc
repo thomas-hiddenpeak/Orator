@@ -3,6 +3,7 @@
 #include "pipeline/comprehensive_timeline.h"
 
 #include <cstdio>
+#include <map>
 #include <stdexcept>
 #include <string>
 
@@ -61,7 +62,9 @@ long JsonParseLong(const std::string& data, const char* key) {
 }
 
 std::string SerializeRevisionToJson(const ComprehensiveTimeline::Revision& r,
-                                    const char* source) {
+                                    const char* source,
+                                    const std::map<std::string, std::string>*
+                                        label_ids) {
   char buf[160];
   std::string out = "{\"type\":\"revision\",\"source\":\"";
   out += source;
@@ -83,10 +86,18 @@ std::string SerializeRevisionToJson(const ComprehensiveTimeline::Revision& r,
       }
     }
     std::snprintf(buf, sizeof(buf),
-                  "{\"start\":%.3f,\"end\":%.3f,\"text_id\":%ld,\"speaker\":%d,"
-                  "\"text\":\"",
+                  "{\"start\":%.3f,\"end\":%.3f,\"text_id\":%ld,\"speaker\":%d",
                   e.start, e.end, e.text_id, spk_idx);
-    out += std::string(buf) + JsonEscape(e.text) + "\"}";
+    out += buf;
+    // Spec 010: surface the resolved global voiceprint identity live (the UI
+    // would otherwise only see it in the final timeline). Looked up from the
+    // comprehensive timeline's label->id map passed by the caller.
+    if (label_ids) {
+      auto it = label_ids->find(e.speaker);
+      if (it != label_ids->end() && !it->second.empty())
+        out += ",\"speaker_id\":\"" + it->second + "\"";
+    }
+    out += ",\"text\":\"" + JsonEscape(e.text) + "\"}";
     if (i + 1 < r.entries.size()) out += ",";
   }
   out += "]}";

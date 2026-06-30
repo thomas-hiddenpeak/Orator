@@ -31,6 +31,13 @@ Dates in `YYYY-MM-DD` format.
   stream_rt 0.964×).
 
 ### Fixed
+- Live speaker identity: `revision` messages now carry the resolved global
+  `speaker_id` (`spk_N`, Spec 010) in addition to the diarizer-local `speaker`
+  index, so the Web UI shows global speaker identity during streaming instead of
+  only after the final `timeline`. `SerializeRevisionToJson` takes the
+  comprehensive timeline's label→id map (captured under `comp_mutex_` in the
+  diar/asr/align subscription handlers). Validated on a real `rate=1` run:
+  revisions emit `"speaker_id":"spk_0"` live.
 - ASR segment finalization / decoder crash: in the VAD-gated path the segment
   was bounded only by the ~115 s KV-cache token cap, because the silence-
   confirmed close rarely fires in steady real-time ingest (the ASR processing

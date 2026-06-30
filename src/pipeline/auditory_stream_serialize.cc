@@ -23,8 +23,9 @@ namespace orator {
 namespace pipeline {
 
 // Shared revision serializer defined in src/pipeline/json_util.cc.
-std::string SerializeRevisionToJson(const ComprehensiveTimeline::Revision& r,
-                                    const char* source);
+std::string SerializeRevisionToJson(
+    const ComprehensiveTimeline::Revision& r, const char* source,
+    const std::map<std::string, std::string>* label_ids = nullptr);
 
 // ---------------------------------------------------------------------------
 // Serialize one revision (Spec 004) to a {"type":"revision",...} message.
