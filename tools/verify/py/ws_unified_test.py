@@ -160,6 +160,7 @@ class Reader(threading.Thread):
         self.events = []           # incremental {"type":"asr"} events
         self.timeline = None       # final {"type":"timeline"} document
         self.ready = None          # {"type":"ready"} info
+        self.telemetry = []        # periodic {"type":"gpu_telemetry"/"cursor_progress"}
         self.timeline_event = threading.Event()
 
     def run(self):
@@ -197,6 +198,11 @@ class Reader(threading.Thread):
                 self.timeline_event.set()
             elif kind == "ready":
                 self.ready = raw
+            elif kind in ("gpu_telemetry", "cursor_progress"):
+                # Spec 011: capture the runtime's periodic telemetry samples so
+                # the offline rerun exporter has the per-pipeline RTF / cursor
+                # time series without a live connection.
+                self.telemetry.append(raw)
 
 
 def parse_audio_file(audio_path: str, duration_sec: float = None) -> bytes:
@@ -451,6 +457,7 @@ def main(args):
             "final": tegrastats_final.get('tegrastats_snapshot') if tegrastats_final else None,
         },
         "events": reader.events,
+        "telemetry": reader.telemetry,
         "timeline": tl,
     }
     

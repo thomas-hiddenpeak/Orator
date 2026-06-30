@@ -48,6 +48,15 @@ def _color(speaker: int) -> tuple[int, int, int]:
     return _SPEAKER_COLORS[speaker % len(_SPEAKER_COLORS)]
 
 
+def _ident(entry: dict) -> str:
+    """Stable identity key for a diar/comprehensive entry: the global voiceprint
+    id (spk_N, Spec 010) when present, else the diarizer-local label."""
+    sid = entry.get("speaker_id")
+    if sid:
+        return str(sid)
+    return f"L{int(entry.get('speaker', -1))}"
+
+
 def _at(seconds: float) -> None:
     """Place subsequent rr.log calls at `seconds` on the audio timeline."""
     rr.set_time("audio_time", duration=float(seconds))
@@ -55,27 +64,27 @@ def _at(seconds: float) -> None:
 
 def _log_diarization(track: dict) -> None:
     entries = track.get("entries", [])
-    # Baseline every speaker lane at 0 so the activity step series starts low.
-    for spk in sorted({int(e.get("speaker", -1)) for e in entries}):
+    # Baseline every identity lane at 0 so the activity step series starts low.
+    idents = sorted({_ident(e) for e in entries})
+    for key in idents:
         _at(0.0)
-        rr.log(f"activity/speaker_{spk}", rr.Scalars(0.0))
+        rr.log(f"activity/{key}", rr.Scalars(0.0))
     for e in entries:
-        spk = int(e.get("speaker", -1))
+        key = _ident(e)
         start, end = float(e["start"]), float(e["end"])
         _at(start)
         rr.log(
-            f"diarization/speaker_{spk}",
+            f"diarization/{key}",
             rr.TextLog(
-                f"speaker {spk}  [{start:.2f}-{end:.2f}]  ({end - start:.2f}s)",
+                f"{key}  [{start:.2f}-{end:.2f}]  ({end - start:.2f}s)",
                 level=rr.TextLogLevel.INFO,
             ),
         )
-        # Step series: 1 while the speaker is active, 0 otherwise -> a per-
-        # speaker activity bar lane that is scannable at a glance.
-        rr.log(f"activity/speaker_{spk}", rr.Scalars(1.0))
-        rr.log("metrics/active_speaker", rr.Scalars(float(spk)))
+        # Step series: 1 while the identity is active, 0 otherwise -> a per-
+        # identity activity bar lane that is scannable at a glance.
+        rr.log(f"activity/{key}", rr.Scalars(1.0))
         _at(end)
-        rr.log(f"activity/speaker_{spk}", rr.Scalars(0.0))
+        rr.log(f"activity/{key}", rr.Scalars(0.0))
 
 
 def _log_asr(track: dict) -> None:
@@ -116,14 +125,31 @@ def _log_align(track: dict) -> None:
 def _log_comprehensive(entries: list) -> None:
     for e in entries:
         start = float(e["start"])
-        spk = int(e.get("speaker", -1))
+        key = _ident(e)
         _at(start)
         rr.log(
             "comprehensive",
             rr.TextLog(
-                f"[{start:.2f}-{float(e['end']):.2f}] spk{spk}: {e.get('text', '')}"
+                f"[{start:.2f}-{float(e['end']):.2f}] {key}: {e.get('text', '')}"
             ),
         )
+
+
+def _log_gpu_telemetry(samples: list) -> None:
+    """Spec 011: per-pipeline real-time-factor + scheduling lanes from the
+    runtime's periodic gpu_telemetry samples (SerializeGpuTelemetry)."""
+    for s in samples:
+        if s.get("type") != "gpu_telemetry":
+            continue
+        t = float(s.get("time_sec", 0.0))
+        _at(t)
+        for p in s.get("pipelines", []):
+            name = p.get("name", "?")
+            rtf = p.get("real_time_factor")
+            if rtf is not None:
+                rr.log(f"gpu/{name}/rtf", rr.Scalars(float(rtf)))
+            rr.log(f"gpu/{name}/active",
+                   rr.Scalars(1.0 if p.get("stream_active") else 0.0))
 
 
 def _parse_tegra(line: str) -> dict:
@@ -194,12 +220,21 @@ def main() -> int:
         else:
             print(f"  (skipped unknown track kind: {track.get('kind')})",
                   file=sys.stderr)
+        # Per-track real-time factor summary marker (Spec 011 T2.3).
+        rtf = track.get("real_time_factor")
+        if rtf is not None:
+            _at(0.0)
+            rr.log(f"metrics/{track.get('kind', '?')}/rtf", rr.Scalars(float(rtf)))
     _log_comprehensive(timeline.get("comprehensive", []))
+
+    telemetry = data.get("telemetry", [])
+    _log_gpu_telemetry(telemetry)
 
     meta = data.get("meta", {})
     _log_tegrastats(data, float(meta.get("audio_sec", 0.0)))
     print(
-        f"exported {len(tracks)} tracks "
+        f"exported {len(tracks)} tracks, "
+        f"{sum(1 for s in telemetry if s.get('type') == 'gpu_telemetry')} gpu samples "
         f"(audio={meta.get('audio_sec', '?')}s, "
         f"stream_rt={meta.get('stream_rt_factor', '?')}x)"
         + (f" -> {args.out}" if args.out else " (spawned viewer)")

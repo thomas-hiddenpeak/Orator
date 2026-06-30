@@ -11,6 +11,19 @@ Dates in `YYYY-MM-DD` format.
 
 ## [Unreleased]
 
+### Added
+- Observability component integration (Spec 011) — offline
+  [rerun](https://rerun.io) visualization, kept entirely in `tools/` with **no**
+  runtime third-party dependency. `ws_unified_test.py` now captures the runtime's
+  periodic `gpu_telemetry` (and cursor) WS samples into a `telemetry` array in
+  the run JSON; `timeline_to_rerun.py` keys diarization/comprehensive lanes by
+  the global `speaker_id` (`spk_N`), adds per-pipeline RTF / scheduling lanes
+  (`gpu/<name>/rtf`, `gpu/<name>/active`) and per-track RTF summaries. New
+  `tools/observability/README.md` documents the one-command workflow; telemetry
+  intervals stay OFF by default and are enabled per-run via `[telemetry]` /
+  `[telemetry.cursor]` in `orator.toml`. Validated on a `rate=1` 120 s stream
+  (125 gpu_telemetry samples, stream_rt 0.964×, exported `.rrd`).
+
 ### Changed
 - Speaker identity (Spec 010) — cross-session GLOBAL identity finalized. The
   voiceprint stage now assigns a persistent global id to every diarization

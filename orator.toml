@@ -232,6 +232,8 @@ spkcache_refresh_rate = 100
 # ══════════════════════════════════════════════════════════════════════════════
 [telemetry]
 # GPU telemetry push interval (seconds). 0 = disabled.
+# For an offline observability run (tools/observability), set to e.g. 1.0 so the
+# runtime emits periodic per-pipeline RTF / scheduling samples. Keep 0 in prod.
 # gpu_interval_sec = 0.0
 
 # ══════════════════════════════════════════════════════════════════════════════
