@@ -1,3 +1,4 @@
+#include <algorithm>
 #include "model/asr_audio_tower.h"
 
 #include <cuda_runtime.h>
@@ -25,7 +26,7 @@ using ::orator::gpu::UnifiedBuffer;
 namespace {
 
 constexpr int kThreads = 256;
-inline int Blocks(int n) { return (n + kThreads - 1) / kThreads; }
+inline int Blocks(long n) { return static_cast<int>((n + kThreads - 1) / kThreads); }
 
 // BF16 (top 16 bits of FP32) -> FP32.
 __global__ void Bf16ToF32Kernel(const uint16_t* __restrict__ in,
@@ -42,24 +43,30 @@ __global__ void Bf16ToF32Kernel(const uint16_t* __restrict__ in,
 __global__ void Im2ColKernel(const float* __restrict__ in,
                              uint16_t* __restrict__ col, int B, int Cin, int H,
                              int W, int Hout, int Wout) {
-  const long r =
-      static_cast<long>(blockIdx.y) * blockDim.y + threadIdx.y;  // spatial row
   const int k = blockIdx.x * blockDim.x + threadIdx.x;           // 0..Cin*9-1
   const long rows = static_cast<long>(B) * Hout * Wout;
-  if (r >= rows || k >= Cin * 9) return;
-  const int wo = r % Wout;
-  const int ho = (r / Wout) % Hout;
-  const int b = r / (static_cast<long>(Wout) * Hout);
-  const int ci = k / 9;
-  const int kh = (k % 9) / 3;
-  const int kw = k % 3;
-  const int hi = ho * 2 - 1 + kh;
-  const int wi = wo * 2 - 1 + kw;
-  float v = 0.0f;
-  if (hi >= 0 && hi < H && wi >= 0 && wi < W)
-    v = in[((static_cast<long>(b) * Cin + ci) * H + hi) * W + wi];
-  col[r * (static_cast<long>(Cin) * 9) + k] =
-      __bfloat16_as_ushort(__float2bfloat16(v));
+  if (k >= Cin * 9) return;
+  // Grid-stride over the spatial rows so a grid capped at the CUDA 65535 y-dim
+  // limit still covers arbitrarily long inputs (long forced-alignment segments
+  // produce rows > 65535*blockDim.y). For short inputs the stride covers all
+  // rows in one pass — identical behaviour to a one-shot launch.
+  const long stride = static_cast<long>(gridDim.y) * blockDim.y;
+  for (long r = static_cast<long>(blockIdx.y) * blockDim.y + threadIdx.y;
+       r < rows; r += stride) {
+    const int wo = r % Wout;
+    const int ho = (r / Wout) % Hout;
+    const int b = r / (static_cast<long>(Wout) * Hout);
+    const int ci = k / 9;
+    const int kh = (k % 9) / 3;
+    const int kw = k % 3;
+    const int hi = ho * 2 - 1 + kh;
+    const int wi = wo * 2 - 1 + kw;
+    float v = 0.0f;
+    if (hi >= 0 && hi < H && wi >= 0 && wi < W)
+      v = in[((static_cast<long>(b) * Cin + ci) * H + hi) * W + wi];
+    col[r * (static_cast<long>(Cin) * 9) + k] =
+        __bfloat16_as_ushort(__float2bfloat16(v));
+  }
 }
 
 // Conv GEMM output is [rows=B*Ho*Wo, Cout]; rearrange to [B, Cout, Ho, Wo]
@@ -420,7 +427,8 @@ std::vector<float> AsrAudioTower::Forward(const float* mel, int n_frames,
     float* out = scratch_.GetT<float>(
         out_slot, static_cast<size_t>(chunks) * Cout * Ho * Wo);
     dim3 blk(32, 8);
-    dim3 grd((K + 31) / 32, static_cast<unsigned>((rows + 7) / 8));
+    dim3 grd((K + 31) / 32,
+             static_cast<unsigned>(std::min<long>((rows + 7) / 8, 65535)));
     Im2ColKernel<<<grd, blk, 0, stream>>>(in, col, chunks, Cin, Hh, Ww, Ho, Wo);
     CheckCudaError(cudaGetLastError(), __FILE__, __LINE__);
     // bf16 GEMM: rows x K @ (Cout x K)^T -> rows x Cout (no bias/act; fused

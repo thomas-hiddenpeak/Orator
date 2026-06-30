@@ -465,14 +465,19 @@ static __global__ void Bf16GemmGenericKernel(const uint16_t* __restrict__ in,
                                              float* __restrict__ out, int M,
                                              int K, int N, int act) {
   const int n = blockIdx.x * blockDim.x + threadIdx.x;
-  const int m = blockIdx.y;
-  if (m >= M || n >= N) return;
-  const uint16_t* a = in + size_t(m) * K;
-  const uint16_t* w = W + size_t(n) * K;
-  float acc = 0.0f;
-  for (int k = 0; k < K; ++k) acc += Bf2f(a[k]) * Bf2f(w[k]);
-  if (bias) acc += bias[n];
-  out[size_t(m) * N + n] = ApplyActAsr(acc, act);
+  if (n >= N) return;
+  // Grid-stride over rows so a grid capped at the CUDA 65535 y-dim limit covers
+  // arbitrarily large M (long forced-alignment segments yield M > 65535). For
+  // bounded M (ASR) gridDim.y >= M, so each block runs the body once — identical
+  // behaviour to a one-row-per-block launch.
+  for (int m = blockIdx.y; m < M; m += gridDim.y) {
+    const uint16_t* a = in + size_t(m) * K;
+    const uint16_t* w = W + size_t(n) * K;
+    float acc = 0.0f;
+    for (int k = 0; k < K; ++k) acc += Bf2f(a[k]) * Bf2f(w[k]);
+    if (bias) acc += bias[n];
+    out[size_t(m) * N + n] = ApplyActAsr(acc, act);
+  }
 }
 
 // out[M,N] = actAsr(bias + in[M,K] @ W[N,K]^T), bf16 operands, FP32 accumulate.
@@ -500,7 +505,7 @@ inline void LaunchBf16Gemm(const uint16_t* in, const uint16_t* W,
     }
   } else {
     dim3 block(256);
-    dim3 grid((N + 255) / 256, M);
+    dim3 grid((N + 255) / 256, static_cast<unsigned>(M < 65535 ? M : 65535));
     Bf16GemmGenericKernel<<<grid, block, 0, stream>>>(in, W, bias, out, M, K, N,
                                                       act);
   }
