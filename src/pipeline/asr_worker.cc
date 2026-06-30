@@ -204,6 +204,24 @@ void AsrWorker::EmitIncrementalChunk(const float* samples, int n,
       inc_live_text_ = asr_->StreamFinalize(stream_);
       inc_in_segment_ = false;
     }
+    // Time-based segment cap. The VAD-gated path otherwise relies on the
+    // silence-confirmed close (ProcessGateSubSpan), but in steady real-time
+    // ingest the ASR processing head stays ahead of the VAD progress horizon
+    // (which lags by the guard interval), so `end_sec <= horizon` rarely holds
+    // and segments are not closed on speech endpoints. Without a time bound a
+    // single segment then grows until the KV-cache token cap (~115 s), which
+    // (a) gives the UI no incremental finals and (b) approaches the decoder's
+    // ~1800-token illegal-access threshold once generated text is added. Bound
+    // each segment to `segment_sec` so finals arrive regularly and the KV-cache
+    // never nears the crash threshold. Splitting a long utterance here is safe:
+    // it is the intended sliding-window cadence and downstream forced alignment
+    // supplies the fine time codes.
+    if (inc_in_segment_ && params_.segment_sec > 0.0 &&
+        inc_seg_samples_ >=
+            static_cast<long>(params_.segment_sec * params_.sample_rate)) {
+      inc_live_text_ = asr_->StreamFinalize(stream_);
+      inc_in_segment_ = false;
+    }
     // KV-cache safety cap: force-finalize before GPU memory crash.
     // Root cause: GqaDecodeAttnKernel at layer 0 has an illegal memory access
     // when the KV-cache position exceeds ~1800 (verified empirically: crashes

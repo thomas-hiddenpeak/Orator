@@ -31,6 +31,17 @@ Dates in `YYYY-MM-DD` format.
   stream_rt 0.964×).
 
 ### Fixed
+- ASR segment finalization / decoder crash: in the VAD-gated path the segment
+  was bounded only by the ~115 s KV-cache token cap, because the silence-
+  confirmed close rarely fires in steady real-time ingest (the ASR processing
+  head stays ahead of the lagging VAD progress horizon). A single utterance then
+  grew until it approached the text decoder's ~1800-token illegal-access
+  threshold, aborting the server (`asr_text_decoder.cu` GqaDecodeAttnKernel,
+  illegal memory access) and dropping every WebSocket client. Re-introduced a
+  time-based segment cap (`segment_sec`, default 24 s) in `EmitIncrementalChunk`
+  so segments finalize regularly and the KV-cache never nears the crash
+  threshold. Validated on a real `rate=1` 150 s WS run: 7 finals at 24 s
+  cadence, 7 alignments, server stable (was: 0 finals, unbounded growth, crash).
 - Config: the nested `[telemetry.cursor]` table was never read — `config_reader`
   used `config["telemetry.cursor"]` (a literal-key lookup that cannot match a
   TOML sub-table), so cursor progress telemetry could never be enabled. Now
