@@ -93,8 +93,6 @@ class SpeakerIdentityStage {
   // unavoidable early-session duplicate (a returning speaker enrolled before its
   // centroid was strong enough to match) WITHOUT capping the speaker count.
   void MergeReconcile();
-  // Resolve a global id through the merge-alias chain to its canonical id.
-  std::string Canonical(std::string id) const;
   std::string NewGlobalId();
   // Embed the centre of a span (edge-trimmed, window-capped) with TitaNet;
   // returns empty if the audio has aged out of the retain window.
@@ -113,7 +111,6 @@ class SpeakerIdentityStage {
   std::map<int, double> local_last_embedded_end_;   // local -> last span end
   std::map<int, std::string> local_to_global_;      // local -> canonical global id
   std::map<std::string, std::vector<float>> global_centroid_;  // id -> centroid
-  std::map<std::string, std::string> alias_;        // merged id -> canonical id
   int next_global_id_ = 0;
 };
 

@@ -50,6 +50,30 @@ bool SpeakerDatabase::Update(const std::string& speaker_id,
   return true;
 }
 
+bool SpeakerDatabase::Remove(const std::string& speaker_id) {
+  const int index = IndexOf(speaker_id);
+  if (index < 0) return false;
+  const int last = size_ - 1;
+  if (index != last) {
+    // Swap the last row into the freed slot to keep the embedding buffer dense.
+    auto* base = static_cast<float*>(embeddings_.data());
+    std::memcpy(base + static_cast<size_t>(index) * embedding_dim_,
+                base + static_cast<size_t>(last) * embedding_dim_,
+                static_cast<size_t>(embedding_dim_) * sizeof(float));
+    speaker_ids_[static_cast<size_t>(index)] =
+        speaker_ids_[static_cast<size_t>(last)];
+    speaker_to_index_[speaker_ids_[static_cast<size_t>(index)]] = index;
+  }
+  speaker_to_index_.erase(speaker_id);
+  speaker_ids_.pop_back();
+  --size_;
+  {
+    std::lock_guard<std::mutex> lk(names_mutex_);
+    names_.erase(speaker_id);
+  }
+  return true;
+}
+
 bool SpeakerDatabase::Contains(const std::string& speaker_id) const {
   return speaker_to_index_.find(speaker_id) != speaker_to_index_.end();
 }

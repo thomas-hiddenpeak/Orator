@@ -40,6 +40,10 @@ class SpeakerDatabase final : public core::ISpeakerRegistry {
 
   // Additional management API.
   bool Update(const std::string& speaker_id, const float* embedding);
+  // Remove an enrolled speaker (used by the identity stage's de-duplication: a
+  // duplicate of an existing person is merged away so the registry holds one
+  // entry per real speaker). O(1): the last row is swapped into the freed slot.
+  bool Remove(const std::string& speaker_id);
   bool Contains(const std::string& speaker_id) const;
   int Capacity() const { return max_speakers_; }
   int IndexOf(const std::string& speaker_id) const;

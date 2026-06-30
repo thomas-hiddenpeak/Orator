@@ -71,6 +71,30 @@ int main() {
   std::remove((npath + ".names").c_str());
   std::cout << "Display-name hook + sidecar round-trip works" << std::endl;
 
+  // Remove (registry de-duplication): deleting one speaker keeps the others
+  // matchable and frees the id; the dense buffer stays correct.
+  {
+    model::SpeakerDatabase rdb(2000, dim);
+    auto a = OneHot(dim, 0), b = OneHot(dim, 1), c = OneHot(dim, 2);
+    rdb.Enroll("spk_0", a.data());
+    rdb.Enroll("spk_1", b.data());
+    rdb.Enroll("spk_2", c.data());
+    assert(rdb.Size() == 3);
+    assert(rdb.Remove("spk_1"));        // remove a middle entry
+    assert(rdb.Size() == 2);
+    assert(!rdb.Contains("spk_1"));
+    assert(rdb.Remove("spk_1") == false);  // already gone
+    // The survivors still match correctly after the swap-with-last compaction.
+    float s = 0.0f;
+    int i0 = rdb.Match(a.data(), 0.5f, &s);
+    assert(i0 >= 0 && rdb.SpeakerIdAt(i0) == "spk_0");
+    int i2 = rdb.Match(c.data(), 0.5f, &s);
+    assert(i2 >= 0 && rdb.SpeakerIdAt(i2) == "spk_2");
+    // The removed speaker no longer matches its embedding.
+    assert(rdb.Match(b.data(), 0.5f, &s) == -1);
+    std::cout << "Remove (dedup) works" << std::endl;
+  }
+
   std::cout << "\nAll speaker database tests passed!" << std::endl;
   return 0;
 }

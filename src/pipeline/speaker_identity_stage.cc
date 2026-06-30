@@ -101,7 +101,7 @@ void SpeakerIdentityStage::ResolveGlobal(int local) {
   std::string resolved;
   bool enrolled = false;
   if (idx >= 0) {
-    resolved = Canonical(db_->SpeakerIdAt(idx));  // returning speaker -> its id
+    resolved = db_->SpeakerIdAt(idx);  // returning speaker -> its registry id
   } else {
     // No registry speaker matches: enrol a genuinely new identity. E2: require
     // enough best spans first so a single noisy span cannot spawn a spurious
@@ -150,19 +150,12 @@ void SpeakerIdentityStage::RefreshGlobalCentroids() {
   }
 }
 
-std::string SpeakerIdentityStage::Canonical(std::string id) const {
-  auto it = alias_.find(id);
-  while (it != alias_.end()) {
-    id = it->second;
-    it = alias_.find(id);
-  }
-  return id;
-}
-
 void SpeakerIdentityStage::MergeReconcile() {
-  // Merge any two globals whose centroids are confidently the same person. This
-  // repairs the early-session duplicate (a returning speaker enrolled before its
-  // centroid was strong enough to match) without ever capping the speaker count.
+  // De-duplicate the registry: merge any two globals whose centroids are
+  // confidently the same person. This repairs the early-session duplicate (a
+  // returning speaker enrolled before its centroid was strong enough to match)
+  // by REMOVING the duplicate entry from the registry, so it holds exactly one
+  // id per real speaker -- without ever capping the total speaker count.
   auto id_num = [](const std::string& s) {
     const auto p = s.rfind('_');
     return p == std::string::npos ? 0 : std::atoi(s.c_str() + p + 1);
@@ -180,13 +173,14 @@ void SpeakerIdentityStage::MergeReconcile() {
         double cos = 0.0;
         for (int k = 0; k < config_.embedding_dim; ++k) cos += a[k] * b[k];
         if (cos <= config_.merge_threshold) continue;
-        // Keep the earlier-enrolled id (smaller number = original); alias the
-        // later one (the duplicate) to it and re-point its slots.
+        // Keep the earlier-enrolled id (smaller number = original); re-point the
+        // duplicate's slots to it and delete the duplicate from the registry.
         std::string keep = ids[i], drop = ids[j];
         if (id_num(drop) < id_num(keep)) std::swap(keep, drop);
         for (auto& kv : local_to_global_)
           if (kv.second == drop) kv.second = keep;
-        alias_[drop] = keep;
+        db_->Remove(drop);
+        global_centroid_.erase(drop);
         LOG_INFO("[speaker-id] merged %s -> %s (cosine=%.3f, same speaker)\n",
                  drop.c_str(), keep.c_str(), cos);
         merged = true;
@@ -287,7 +281,6 @@ void SpeakerIdentityStage::Reset() {
   local_last_embedded_end_.clear();
   local_to_global_.clear();
   global_centroid_.clear();
-  alias_.clear();
   next_global_id_ = db_ ? db_->Size() : 0;
 }
 
