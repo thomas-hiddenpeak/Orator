@@ -52,6 +52,11 @@ struct SpeakerIdConfig {
                                   // the SAME person and are merged (well above
                                   // match_threshold and the max distinct-speaker
                                   // similarity, so only confident duplicates fuse)
+  float cosession_merge_threshold = 0.85f;  // stricter threshold for two globals
+                                  // that ever co-occurred in one session: the
+                                  // diarizer judged them distinct, so only a
+                                  // very high cosine (a diarizer over-split of one
+                                  // person) may merge them
 };
 
 class SpeakerIdentityStage {

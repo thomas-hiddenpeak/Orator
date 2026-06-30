@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
+#include <set>
 
 #include "core/log.h"
 
@@ -160,9 +161,23 @@ void SpeakerIdentityStage::MergeReconcile() {
     const auto p = s.rfind('_');
     return p == std::string::npos ? 0 : std::atoi(s.c_str() + p + 1);
   };
+  const int spk = config_.speakers_per_session > 0
+                      ? config_.speakers_per_session
+                      : 4;
   bool merged = true;
   while (merged) {
     merged = false;
+    // Which globals ever co-occurred in one session: the diarizer separated them
+    // into distinct slots, so they are distinct people and must not merge unless
+    // the voiceprint is overwhelmingly identical (a diarizer over-split).
+    std::map<int, std::set<std::string>> session_globals;
+    for (const auto& kv : local_to_global_)
+      session_globals[kv.first / spk].insert(kv.second);
+    auto co_session = [&](const std::string& x, const std::string& y) {
+      for (const auto& sg : session_globals)
+        if (sg.second.count(x) && sg.second.count(y)) return true;
+      return false;
+    };
     std::vector<std::string> ids;
     ids.reserve(global_centroid_.size());
     for (const auto& kv : global_centroid_) ids.push_back(kv.first);
@@ -172,7 +187,10 @@ void SpeakerIdentityStage::MergeReconcile() {
         const auto& b = global_centroid_[ids[j]];
         double cos = 0.0;
         for (int k = 0; k < config_.embedding_dim; ++k) cos += a[k] * b[k];
-        if (cos <= config_.merge_threshold) continue;
+        const float thr = co_session(ids[i], ids[j])
+                              ? config_.cosession_merge_threshold
+                              : config_.merge_threshold;
+        if (cos <= thr) continue;
         // Keep the earlier-enrolled id (smaller number = original); re-point the
         // duplicate's slots to it and delete the duplicate from the registry.
         std::string keep = ids[i], drop = ids[j];
