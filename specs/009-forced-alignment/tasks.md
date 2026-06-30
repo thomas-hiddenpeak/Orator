@@ -96,3 +96,25 @@ Each task: build clean (`-Wall -Wextra`) + its stated check.
   system-prompt echo) appear identically in the asr and align tracks; the
   aligner faithfully aligns whatever ASR emits. Suppressing these belongs in the
   ASR decoding pipeline, not the aligner.
+
+## Phase 9 — Full-transcript coverage fix + closing acceptance (DONE)
+T8.3 validated with a `rate=0`, 120 s shortcut — which never exercised LONG
+segments, so a latent bug shipped as "DONE". The real `rate=1` full-hour
+all-features run exposed it.
+- [x] **T9.1** Diagnosed the 2% coverage: every LONG ASR final failed in the
+  shared audio tower with `CUDA Error ... invalid argument`; short segments
+  aligned. The bf16 GEMM generic fallback (K not a multiple of the WMMA K-tile —
+  the audio tower's first im2col conv has K = Cin*9 = 9) launched
+  `dim3 grid((N+255)/256, M)`; the aligner feeds a whole segment at once, so
+  M = chunks*Ho*Wo exceeds the CUDA grid y-dim limit 65535 (77 s → M = 147200).
+- [x] **T9.2** Fix (shared audio tower, zero behaviour change for bounded M):
+  `Bf16GemmGenericKernel` and `Im2ColKernel` grid-stride over rows, launches cap
+  grid.y at 65535; `asr_audio_tower` `Blocks()` takes `long`. Commit fa5f2ad.
+- [x] **T9.3** Closing acceptance on the real `rate=1` 60-min ALL-FEATURES stream
+  (diar+asr+vad+speaker+align): align coverage **2% → 100%** (119/119 segments,
+  3597 s of 3597 s, 13594 character units, **0 out-of-bounds / 0 non-monotonic**),
+  RTF ~35×, 0 CUDA errors; stream stays at 0.999× real-time, no crash; speaker
+  identity converges to 4 stable globals. ctest 47/47, no warnings.
+- **Verdict: forced alignment pipeline closes** — every finalized transcript
+  segment carries precise, in-bounds, monotonic character-level timestamps end to
+  end, validated by context-semantic review per the Test Review Protocol.

@@ -1,6 +1,11 @@
 # Spec 009 — ASR Forced Alignment Pipeline (Qwen3-ForcedAligner-0.6B)
 
-Status: Draft (2026-06-27)
+Status: Implemented (2026-06-30) — Qwen3ForcedAligner ported + registered, AlignWorker
+wired into AuditoryStream behind `[align]`, comprehensive-timeline align track. Full
+transcript coverage validated on the real `rate=1` 60-min all-features stream: 119/119
+ASR segments aligned (100%), 13594 character units, 0 out-of-bounds / 0 non-monotonic,
+RTF ~35x, no CUDA errors. A grid y-dim overflow that dropped every long segment was
+found and fixed (commit fa5f2ad).
 Owner: pipeline
 Depends on: Spec 003 (ASR), Spec 004 (comprehensive timeline + protocol)
 

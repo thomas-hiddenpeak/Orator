@@ -27,6 +27,15 @@ Dates in `YYYY-MM-DD` format.
 - `vad_min_silence_ms` default: 120 → 300
 
 ### Fixed
+- Forced alignment (Spec 009) now covers the FULL transcript. A bf16 GEMM generic
+  fallback launched `grid.y = M` (rows); the audio tower feeds a whole alignment
+  segment at once, so long segments (e.g. 77 s -> M = 147200) exceeded the CUDA
+  grid y-dimension limit of 65535 and every long segment failed with
+  `CUDA Error ... invalid argument` (the ASR never hit this — it streams bounded
+  windows). `Bf16GemmGenericKernel` and `Im2ColKernel` now grid-stride over rows
+  with grid.y capped at 65535 (zero behaviour change for bounded M). Real rate=1
+  60-min stream: alignment coverage 2% -> 100% (119/119 ASR segments, 13594
+  character units, 0 out-of-bounds / 0 non-monotonic).
 - Speaker registry de-duplication (Spec 010): `MergeReconcile` merges two global
   ids only when their centroids are confidently the same person (cosine > 0.70;
   stricter 0.85 for two ids that ever co-occurred in one session, since the
