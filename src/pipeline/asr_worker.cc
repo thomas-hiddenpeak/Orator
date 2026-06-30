@@ -123,6 +123,43 @@ void AsrWorker::ProcessGateSubSpan(const float* sub, int sub_n) {
     return;
   }
 
+  // VAD speech endpoint (horizon-independent). A silence sub-span whose distance
+  // from the last speech end has reached the trailing window is a real
+  // utterance endpoint -> close the open segment now. This is the fix that makes
+  // ASR honor VAD speech endpoints in real time: the confirmed/horizon test
+  // below gates only the GPU *skip* of silence, and must NOT gate the *close*.
+  // In steady real-time the ASR head runs in lockstep with VAD, so
+  // `end_sec <= horizon` (which needs ASR to lag VAD by the 0.3 s guard)
+  // essentially never holds; relying on it left segments to close only at the
+  // time cap, ignoring every VAD endpoint. Closing commits the KV cache and the
+  // trailing window has already been fed (the gap up to here was processed), so
+  // no audio is dropped -- the "never drop speech" rationale for horizon
+  // confirmation applies only to skipping, not to closing.
+  // VAD speech endpoint, driven by VAD's own confirmed state rather than the
+  // ASR processing position. Close the open segment once VAD has confirmed at
+  // least the trailing window of silence after its last published speech
+  // segment -- i.e. the VAD progress horizon has advanced `asr_vad_trail_sec`
+  // past that segment's end. This is what makes ASR honor VAD speech endpoints
+  // in real time: the earlier `end_sec <= horizon` test could not fire because
+  // the ASR head runs ahead of the lagging horizon, so segments closed only at
+  // the time cap. Using VAD's own signals avoids that race.
+  // `last_endpoint_vad_end_` makes it fire once per speech burst, not on every
+  // silence sub-span. Closing commits the KV cache and drops no audio (the
+  // trailing window was already fed); silence-only segments the leading-edge
+  // processing may open are dropped at emit time (no VAD speech overlap).
+  const double last_vad_end = vad_segs.empty() ? -1e9 : vad_segs.back().second;
+  const double vad_horizon = vad_cache_ ? vad_cache_->horizon() : -1e9;
+  if (inc_in_segment_ && last_vad_end > -1e8 &&
+      last_vad_end > last_endpoint_vad_end_ &&
+      (vad_horizon - last_vad_end) >= params_.asr_vad_trail_sec) {
+    ProcessIncremental(nullptr, 0, /*finalize=*/true);
+    last_endpoint_vad_end_ = last_vad_end;
+    inc_abs_pos_ += sub_n;  // skip the remaining tail of this gap
+    processed_samples_.fetch_add(sub_n);
+    vad_state_ = VadState::IDLE;
+    return;
+  }
+
   // Gap / silence sub-span. "Confirmed" means VAD has already labeled this far
   // (its end is within the published range), i.e. it is genuinely a gap between
   // known speech segments -- safe to skip. Beyond the horizon VAD may still
@@ -148,9 +185,11 @@ void AsrWorker::ProcessGateSubSpan(const float* sub, int sub_n) {
     return;
   }
 
-  // Unconfirmed: process rather than skip, so no speech is lost. Under burst
-  // this may spend some GPU on silence until VAD catches up; acceptable, since
-  // correctness (full coverage) outranks the GPU saving.
+  // Unconfirmed silence past the VAD horizon: the leading edge VAD has not
+  // labelled yet. Process it (never skip) so a real speech onset is not lost --
+  // VAD always lags the real-time head, so onsets are always first seen here.
+  // Spurious silence-only segments that this may open are discarded at emit
+  // time in EmitIncrementalChunk (no VAD speech overlap -> not emitted).
   ProcessIncremental(sub, sub_n, /*finalize=*/false);
   processed_samples_.fetch_add(sub_n);
   vad_state_ = VadState::PROCESSING;
@@ -243,27 +282,55 @@ void AsrWorker::EmitIncrementalChunk(const float* samples, int n,
 
   const bool segment_closed = !inc_in_segment_ && !inc_live_text_.empty();
   if (segment_closed) {
-    core::AsrToken tok;
-    tok.start_sec = tb_.SecondsAt(inc_seg_start_sample_);
-    tok.end_sec = tb_.SecondsAt(inc_seg_end_sample_);
-    tok.text = inc_live_text_;
-    // Text segment goes through ProtocolTimeline → comp_ via text_sink_.
-    // StreamTimeline was removed; raw text is read from
-    // comp_.SnapshotRawTexts().
-    if (text_sink_)
-      text_sink_(inc_text_id_, tok.start_sec, tok.end_sec, tok.text,
-                 /*is_final=*/true);
-    ++inc_text_id_;
-    inc_delivered_text_.clear();
-    if (emit_) {
-      char buf[160];
-      std::snprintf(buf, sizeof(buf),
-                    "{\"type\":\"asr\",\"source\":\"qwen3_asr\","
-                    "\"text_id\":%ld,\"start\":%.3f,\"end\":%.3f,\"text\":\"",
-                    inc_text_id_, tok.start_sec, tok.end_sec);
-      emit_(std::string(buf) + JsonEscape(tok.text) + "\"}");
+    const double seg_start = tb_.SecondsAt(inc_seg_start_sample_);
+    const double seg_end = tb_.SecondsAt(inc_seg_end_sample_);
+    // Discard a closed segment that overlaps no VAD speech. The leading-edge
+    // processing (unconfirmed branch) must feed audio VAD has not labelled yet
+    // so onsets are never lost, but that also opens segments over pure
+    // inter-utterance silence on which the engine hallucinates text. Such a
+    // segment overlaps no published VAD speech window, so drop it rather than
+    // emit garbage. Guard: only when the VAD gate is active and VAD has
+    // actually published segments (an empty cache means VAD is not ready --
+    // keep the text so nothing is lost before VAD warms up).
+    bool keep = true;
+    if (params_.asr_vad_gate && vad_cache_) {
+      const auto vsegs = vad_cache_->GetAll();
+      if (!vsegs.empty()) {
+        keep = false;
+        for (const auto& [s, e] : vsegs) {
+          if (seg_start < e && seg_end > s) {  // any overlap
+            keep = true;
+            break;
+          }
+        }
+      }
     }
-    inc_live_text_.clear();
+    if (!keep) {
+      inc_live_text_.clear();
+      inc_delivered_text_.clear();
+    } else {
+      core::AsrToken tok;
+      tok.start_sec = seg_start;
+      tok.end_sec = seg_end;
+      tok.text = inc_live_text_;
+      // Text segment goes through ProtocolTimeline → comp_ via text_sink_.
+      // StreamTimeline was removed; raw text is read from
+      // comp_.SnapshotRawTexts().
+      if (text_sink_)
+        text_sink_(inc_text_id_, tok.start_sec, tok.end_sec, tok.text,
+                   /*is_final=*/true);
+      ++inc_text_id_;
+      inc_delivered_text_.clear();
+      if (emit_) {
+        char buf[160];
+        std::snprintf(buf, sizeof(buf),
+                      "{\"type\":\"asr\",\"source\":\"qwen3_asr\","
+                      "\"text_id\":%ld,\"start\":%.3f,\"end\":%.3f,\"text\":\"",
+                      inc_text_id_, tok.start_sec, tok.end_sec);
+        emit_(std::string(buf) + JsonEscape(tok.text) + "\"}");
+      }
+      inc_live_text_.clear();
+    }
   } else if (inc_in_segment_) {
     if (text_sink_ && inc_live_text_ != inc_delivered_text_) {
       text_sink_(inc_text_id_, tb_.SecondsAt(inc_seg_start_sample_),
@@ -298,6 +365,7 @@ void AsrWorker::Reset() {
   vad_state_ = VadState::IDLE;
   vad_trail_start_sec_ = 0.0;
   last_speech_end_sec_ = -1e9;
+  last_endpoint_vad_end_ = -1e9;
   ring_write_pos_ = 0;
   ring_count_ = 0;
   ring_base_abs_pos_ = 0;

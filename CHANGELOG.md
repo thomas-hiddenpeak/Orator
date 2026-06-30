@@ -31,6 +31,21 @@ Dates in `YYYY-MM-DD` format.
   stream_rt 0.964×).
 
 ### Fixed
+- VAD speech endpoints now actually close ASR segments (root-cause fix). The
+  VAD-gate close fired only on "confirmed silence" (`end_sec <= horizon`), which
+  in steady real-time essentially never holds — the ASR head runs in lockstep
+  with VAD, so its position is always ahead of the guard-lagged progress
+  horizon. Segments therefore ignored every VAD endpoint and closed only at the
+  time cap. The close is now driven by VAD's own confirmed state: finalize once
+  the VAD progress horizon has advanced `asr_vad_trail_sec` past the end of the
+  last published speech segment (`last_endpoint_vad_end_` fires it once per
+  speech burst). Leading-edge audio is still processed so onsets are never lost;
+  any silence-only segment that opens is dropped at emit time when it overlaps no
+  VAD speech window (prevents engine hallucination on pure silence). Validated on
+  a real `rate=1` 60 s run: coherent segments split at VAD gaps
+  ([0–10],[10.4–22.4],[22.9–24.9],…) instead of one 24 s block; transcripts
+  clean, no garbage, server stable. The `segment_sec` time cap (added earlier in
+  this Unreleased cycle) remains only as a backstop for >24 s gapless speech.
 - Live speaker identity: `revision` messages now carry the resolved global
   `speaker_id` (`spk_N`, Spec 010) in addition to the diarizer-local `speaker`
   index, so the Web UI shows global speaker identity during streaming instead of

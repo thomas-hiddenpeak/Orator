@@ -149,6 +149,9 @@ class AsrWorker {
   // End (common clock, sec) of the most recently fed speech, for the trailing
   // window measurement at a confirmed silence gap.
   double last_speech_end_sec_ = -1e9;
+  // End of the last VAD speech segment we already closed a segment at, so the
+  // horizon-driven endpoint fires once per speech burst, not every sub-span.
+  double last_endpoint_vad_end_ = -1e9;
 };
 
 }  // namespace pipeline
