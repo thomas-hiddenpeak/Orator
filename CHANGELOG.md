@@ -12,10 +12,27 @@ Dates in `YYYY-MM-DD` format.
 ## [Unreleased]
 
 ### Changed
+- Speaker identity (Spec 010) — cross-session GLOBAL identity finalized. The
+  voiceprint stage now assigns a persistent global id to every diarization
+  segment, validated through the real `rate=1` WebSocket stream and judged by
+  context-aware per-segment semantic comparison vs `test.txt` (Test Review
+  Protocol). The diarizer's within-session separation is trusted (same-session
+  slots never collapse to one id, `SpeakerDatabase::MatchExcluding`); per-segment
+  re-matching was removed. Each global's centroid strengthens across sessions, so
+  returning speakers re-match reliably. Full 60-min run: 4 real speakers → exactly
+  4 stable global ids across all 6 reset sessions.
 - VAD-gated ASR: async-lag protection via segment-start confirmation check.
   ASR segments reduced from 43→18 in 120s real-time test. RTF improved 4.7→3.7.
 - `asr_vad_trail_sec` default: 1.5 → 1.0
 - `vad_min_silence_ms` default: 120 → 300
+
+### Fixed
+- Speaker registry de-duplication (Spec 010): `MergeReconcile` merges two global
+  ids only when their centroids are confidently the same person (cosine > 0.70;
+  stricter 0.85 for two ids that ever co-occurred in one session, since the
+  diarizer judged them distinct), and `SpeakerDatabase::Remove` deletes the
+  duplicate so the registry holds exactly one entry per real speaker. The registry
+  is never capped — designed to recognise many speakers (≥200) across sessions.
 
 ### Added
 - TOML config system (`orator.toml`). All ~35 runtime parameters consolidated into

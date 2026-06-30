@@ -136,3 +136,46 @@ Full 60 min real-WS run (after the embed-window OOM fix + `--timeline-timeout
   close.** ASR passes. The diar port is faithful to NeMo; the limit is the
   audio's overlapped late segments, not a fixable code bug. Closing on this
   60 min 4-speaker meeting is bounded by the model+audio, not the port.
+
+## Phase G — Cross-session GLOBAL identity (supersedes Phase F's script verdict)
+Phase F judged accuracy from a *script* metric (`speaker_attrib_eval.py`) that, on
+a run whose `speaker_id` fields were empty, silently fell back to the diarizer's
+per-window LOCAL slots with an optimal mapping — i.e. it never measured the
+voiceprint at all. Re-evaluated per the Test Review Protocol (context-aware
+per-segment semantic comparison vs `test.txt`), the speaker layer had two real
+defects, both fixed; accuracy is now judged by reading, not scripts.
+- [x] **G1** Trust the diarizer's within-session separation: each local slot
+  resolves to its own global id; same-session slots never collapse to one id
+  (`SpeakerDatabase::MatchExcluding`). Removed per-segment re-matching (it
+  collapses similar voices to the dominant centroid). Commit 38cdf51.
+- [x] **G2** Test-method fix: validate through the real `rate=1` stream. A
+  `rate=0` shortcut ingests audio far faster than diar segments are delivered, so
+  a clean span's audio ages out of the embed-retain window before delivery and
+  enrollment is starved (only 1–3 of 4 speakers enrolled). With `rate=1`, all 4
+  enroll. Commit 38cdf51. 600 s run: 4/4 speakers, every substantive turn
+  correctly attributed (~90% by context-semantic read).
+- [x] **G3** Cross-session strengthening: each global's centroid is the mean of
+  the best references of all slots mapped to it across sessions, so a returning
+  speaker re-matches reliably (match cosine ~0.55 → 0.7–0.87). Registry is
+  uncapped (≥200 speakers by design). Commit 9c02862.
+- [x] **G4** Registry-level de-duplication: `MergeReconcile` + `SpeakerDatabase::Remove`
+  merge a confident duplicate (cosine > 0.70) into the original and delete the
+  duplicate row, so the saved registry holds one entry per real speaker. Commits
+  17f8d92, 06875c3.
+- [x] **G5** Session-aware merge: two globals that ever co-occurred in one session
+  are distinct people (the diarizer separated them) and may merge only at a much
+  higher cosine (0.85), never at 0.70. Found by the independent-segment test
+  (a wrong 0.708 same-session merge). Commit 5f301ba.
+- [x] **G6** Full 60-min validation (`rate=1`): merged spk_4→spk_3, spk_5→spk_2 →
+  **exactly 4 stable global ids** across all 6 reset sessions
+  (spk_0=朱杰, spk_1=唐云峰, spk_2=徐子景, spk_3=石一). Context-semantic read: clear
+  turns correct (~90% on 0–600 s and 1800–2400 s). ctest 47/47, no warnings.
+- [x] **G7** Independent control test of the 2400–3600 s segment (fresh `rate=1`
+  run of just that span): the attribution difficulty persists when fresh, so it
+  is the **audio's inherent rapid-speaker-exchange difficulty** (the reference
+  changes speaker 6× in 56 s), not continuous-run degradation — consistent with
+  the NeMo oracle scoring 60–72% on the same window.
+- **Verdict (revised): speaker layer functions end-to-end** — a persistent,
+  uncapped GLOBAL identity per segment, stable across a full-hour multi-session
+  stream, judged by context-semantic comparison. Remaining limit is the audio's
+  hard overlapped late windows (model+audio bound), not the identity logic.

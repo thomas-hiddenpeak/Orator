@@ -1,7 +1,19 @@
 # Spec 010 — Speaker Identity (Voiceprint Enrollment / Re-identification)
 
 - **Feature**: `010-speaker-id`
-- **Status**: Implemented (Phases A–D landed; TitaNet embedder oracle-validated, speaker-identity stage in the diar pipeline, timeline injection + naming hook, persistence + cross-session re-id; τ tuning is an ongoing data-dependent refinement)
+- **Status**: Implemented (Phases A–E + cross-session identity finalized). TitaNet
+  embedder oracle-validated; speaker-identity stage in the diar pipeline assigns a
+  persistent GLOBAL id to every segment. Cross-session stitching: per-slot
+  voiceprint centroids strengthen across sessions; the diarizer's within-session
+  separation is trusted (same-session slots never collapse to one id, via
+  `SpeakerDatabase::MatchExcluding`); confident duplicates are de-duplicated at the
+  registry level (`MergeReconcile` + `SpeakerDatabase::Remove`), session-aware so two
+  co-session speakers never merge. The registry is uncapped (designed to recognise
+  many speakers, ≥200). Validated on the full 60-min real WebSocket stream (rate=1):
+  4 real speakers → exactly 4 stable global ids across all 6 reset sessions, judged
+  by context-aware per-segment semantic comparison vs `test.txt` (Test Review
+  Protocol — accuracy is NOT derived from script metrics). Commits 38cdf51, 9c02862,
+  17f8d92, 06875c3, 5f301ba.
 - **Created**: 2026-06-28
 - **Owner**: project owner
 - **Constitution**: v1.5.0
