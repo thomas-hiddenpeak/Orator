@@ -1,12 +1,26 @@
 # Spec 006 — Web UI Client for Real-Time Dual-Pipeline Transcription
 
-- **Status**: Implemented (16/16 tasks complete)
+- **Status**: Revised (2026-07-01) — MVP implemented (16/16, dual-pipeline era);
+  **Phase 2 rebuild implemented** (modular ES client: full WS coverage, global
+  speaker identity, forced-alignment lane, live observability panel). Data layer
+  validated on real captured telemetry; browser context review pending. See §4b.
 - **Created**: 2026-06-18
 - **Owner**: project owner
 
 ## 1. Summary
 
-A browser-based web UI that provides **live visualization and interaction** with the Orator WebSocket service. The client connects to a running `orator_ws` server, uploads or streams audio (microphone/file), and renders the dual-pipeline output (diarization + ASR) on a unified timeline in real time. The UI is launched as an HTTP server integrated into the main Orator binary (`orator_ws`), eliminating the need for separate client setup.
+A browser-based web UI for **live visualization and interaction** with the Orator
+WebSocket service. The client connects to a running `orator_ws` server, streams
+audio (microphone/file), and renders the output of **all five pipelines**
+(diarization, ASR, VAD, speaker identity, forced alignment) plus the derived
+comprehensive speaker-turn timeline, on one shared absolute time base, in real
+time. It also surfaces **live observability** — per-pipeline real-time factor,
+GPU scheduling class/priority/activity, and per-pipeline audio backlog — so the
+same run can be watched for both content and health. The browser renders CJK
+text natively, so the Web UI is the **home for readable transcript/speaker
+content** (the offline rerun dashboard, Spec 011, covers deep metric history).
+The UI is served by an HTTP endpoint built into `orator_ws`, with no external
+framework or build step.
 
 ---
 
@@ -90,6 +104,48 @@ A developer or operator views the real-time performance dashboard: wall-clock ti
 - Keyboard navigation (play/pause, export).
 - ARIA labels for screen reader support.
 - High contrast for readability on various displays.
+
+---
+
+## 4b. Functional requirements — Phase 2 rebuild (current project)
+
+The MVP (FR1–FR9) targeted the dual-pipeline (diarization + ASR) era and a final
+`timeline` render. The project has since added VAD, speaker identity (Spec 010),
+forced alignment (Spec 009), the protocol envelope (Spec 004) and observability
+telemetry (Spec 011). The rebuild adds:
+
+### FR10 — Complete WS message coverage (no dropped data)
+- A single envelope-aware router consumes **every** server message: `ready`,
+  `asr_partial`, `asr`, `revision`, `align`, `vad_state`, `timeline`,
+  `gpu_telemetry`, `cursor_progress`, `sessions`, `reset_ok`, `describe`,
+  `error`. (The MVP silently dropped `align` and `cursor_progress`.)
+- Spec 004 envelope (`{topic,pipeline,msg_id,data}`) is unwrapped for enveloped
+  events; raw RPC responses are handled directly. Unknown topics are logged, not
+  crashed.
+
+### FR11 — Global speaker identity (Spec 010)
+- Diarization and comprehensive entries render by **global** `speaker_id`
+  (`spk_N`) with `speaker_name` when present, falling back to the diarizer-local
+  `speaker` index. Stable per-identity color across transcript, comprehensive
+  view, and timeline.
+
+### FR12 — Forced alignment (Spec 009)
+- The `align` track and live `align` events are rendered: per-segment
+  character/word units with their timestamps, shown as an alignment lane on the
+  timeline and (optionally) karaoke-style highlighting in the transcript.
+
+### FR13 — Live observability panel
+- A dashboard fed by `gpu_telemetry` + `cursor_progress`, showing per pipeline
+  (diar/asr/vad): **real-time factor** (live value + recent sparkline),
+  scheduling **class** (foreground/background) + **cuda_priority** +
+  **stream_active**, and **backlog** (`pending_sec`). Backlog rising while
+  RTF < 1 is surfaced as a starvation warning (cross-dimension diagnosis,
+  consistent with Spec 011 methodology).
+
+### FR14 — Comprehensive live timeline
+- The comprehensive speaker-turn view updates **incrementally** from `revision`
+  events (not only the final `timeline`), each turn labelled by global identity
+  and carrying its text; the final `timeline` reconciles the full view.
 
 ---
 

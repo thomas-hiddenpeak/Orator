@@ -386,3 +386,50 @@ body {
   .container { padding: 12px; }
   .topbar { padding: 10px 12px; }
 }
+
+/* ── Spec 006 Phase 2: forced-alignment unit count in transcript rows ── */
+.t-align {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--accent, #5b8def);
+  opacity: 0.8;
+  white-space: nowrap;
+}
+
+/* ── Live observability panel (Spec 011 telemetry) ── */
+.obs-section { margin-top: 12px; }
+.obs-hint { font-size: 12px; color: #8b90a0; }
+.obs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+.obs-empty { color: #8b90a0; font-size: 13px; padding: 8px 0; }
+.obs-card {
+  background: #1c2029;
+  border: 1px solid var(--border, #2e3345);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.obs-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.obs-name { font-weight: 700; text-transform: capitalize; }
+.obs-badges { display: flex; gap: 4px; margin-left: auto; flex-wrap: wrap; }
+.obs-badge {
+  font-size: 10px; padding: 1px 6px; border-radius: 10px;
+  background: #2e3345; color: #c9cdd8;
+}
+.obs-badge.fg { background: #1d4ed8; color: #fff; }
+.obs-badge.bg { background: #374151; color: #cbd5e1; }
+.obs-badge.active { background: #047857; color: #fff; }
+.obs-badge.prio { background: #3f3f46; color: #e4e4e7; }
+.obs-metric { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+.obs-label { font-size: 11px; color: #8b90a0; width: 52px; }
+.obs-val { font-variant-numeric: tabular-nums; font-weight: 600; min-width: 56px; }
+.obs-val.warn { color: #ef4444; }
+.obs-spark { margin-left: auto; background: #15181f; border-radius: 4px; }
+.obs-warn {
+  margin-top: 6px; font-size: 11px; color: #f59e0b;
+  background: rgba(245, 158, 11, 0.1); border-radius: 4px; padding: 3px 6px;
+}
+.obs-warn.hidden { display: none; }
+

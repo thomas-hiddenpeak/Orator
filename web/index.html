@@ -95,10 +95,6 @@
               <span class="metric-label">VAD RTF</span>
               <span class="metric-value" id="mVadRtf" aria-live="polite">-</span>
             </div>
-            <div class="metric-card">
-              <span class="metric-label">GPU Status</span>
-              <span class="metric-value" id="mGpuStatus" aria-live="polite">-</span>
-            </div>
           </div>
           <button id="downloadBtn" class="btn btn-outline btn-full hidden" aria-label="Download timeline as JSON">
             <span class="btn-icon" aria-hidden="true">&#x1F4E5;</span> Download JSON
@@ -116,9 +112,18 @@
             <button id="zoomResetBtn" class="btn btn-sm btn-outline" title="Reset zoom" aria-label="Reset zoom">⟲</button>
           </div>
         </div>
-        <div class="timeline-canvas-wrap" role="img" aria-label="Interactive audio timeline with three tracks: diarization, ASR, and VAD">
+        <div class="timeline-canvas-wrap" role="img" aria-label="Interactive audio timeline with four tracks: diarization, ASR, VAD, and forced alignment">
           <canvas id="timelineCanvas" tabindex="0" role="img" aria-label="Timeline canvas"></canvas>
         </div>
+      </section>
+
+      <!-- Live Observability Panel (Spec 011 telemetry) -->
+      <section class="panel obs-section" aria-label="Live pipeline observability">
+        <div class="panel-header">
+          <h2 class="panel-title">Pipeline Observability</h2>
+          <span class="obs-hint">RTF · scheduling · backlog (live)</span>
+        </div>
+        <div id="obsPanel" class="obs-grid" role="group" aria-label="Per-pipeline live metrics"></div>
       </section>
 
       <!-- Session History Panel -->
@@ -133,6 +138,6 @@
       </section>
     </div>
 
-    <script src="/app.js"></script>
+    <script type="module" src="/js/app.js"></script>
   </body>
 </html>

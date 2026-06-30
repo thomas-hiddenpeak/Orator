@@ -368,3 +368,57 @@ The UI is a **visualization layer** and does not modify protocol semantics. New 
 - [ ] Build produces no new warnings.
 - [ ] Tested on Chrome 120+, Firefox 121+, Safari 17+.
 - [ ] UI is responsive on desktop (1920×1080, 1280×720) and tablet (768×1024).
+
+---
+
+## 14. Phase 2 rebuild — architecture (current project)
+
+The MVP was a single 1159-line `app.js` prototype that consumed only a subset of
+the protocol (no `align`, no `cursor_progress`, GPU telemetry reduced to one
+status string) and modelled only two pipelines. The rebuild restructures the
+client into small ES modules served as-is by the static server (no build step,
+no framework — consistent with the project's zero-dependency ethos):
+
+```
+web/
+  index.html              # layout shell, <script type="module" src="/js/app.js">
+  style.css               # styles incl. observability panel + speaker palette
+  js/
+    app.js                # bootstrap: wire modules, controls, lifecycle
+    ws.js                 # connection, reconnect, Spec 004 envelope decode,
+                          #   message router → typed callbacks
+    model.js              # normalized client state: segments per track,
+                          #   comprehensive turns (by text_id), speaker registry
+                          #   (id→color/name), telemetry ring buffers
+    audio.js              # mic capture + file decode → int16LE 16k framing
+    render/transcript.js  # live transcript + partial draft + per-unit (align)
+    render/timeline.js    # canvas: diar(by speaker_id)/asr/vad/align lanes
+    render/observability.js # per-pipeline RTF gauge+sparkline, class/priority,
+                          #   backlog (pending_sec), starvation warning
+    render/sessions.js    # list/load/download
+```
+
+### Data flow
+```
+WS frame ─ ws.js(envelope decode) ─ router ─ model.js(update) ─ render/*(rAF)
+```
+- `ws.js` is the single ingress; it unwraps the Spec 004 envelope, dispatches by
+  inner `type`, and never drops a known message. Unknown topics are logged.
+- `model.js` holds the authoritative client state; renderers are pure consumers
+  scheduled on `requestAnimationFrame` (viewport-clipped canvas, as in the MVP).
+- Speaker identity: a registry maps `speaker_id`→stable color + display name,
+  shared by transcript, comprehensive and timeline (FR11).
+- Observability: `gpu_telemetry`/`cursor_progress` feed per-pipeline ring buffers
+  (last N samples) → live value + sparkline; backlog↑ while RTF<1 → warning
+  (FR13, Spec 011 methodology).
+
+### Constraints
+- No runtime third-party JS dependency (no React/Vue/CDN); plain ES modules.
+- Same HTTP static server / ports; only `web/` content changes.
+- CJK renders natively in the browser — the Web UI is the readable-text home.
+
+### Validation (Phase 2)
+- Real `rate=1` WebSocket run with telemetry on: every message type is consumed
+  (logged inventory), align lane + speaker identity + observability panel
+  populate, comprehensive view updates live from `revision`, final `timeline`
+  reconciles. Streaming stays ~1.0× real-time. Context review, not a script.

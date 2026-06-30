@@ -354,3 +354,41 @@ If Spec 006 is not accepted or blocked, rollback steps:
 3. Remove HTTP server code from `orator_ws` (revert `ws_main.cc`).
 4. Revert CMakeLists.txt if modified.
 5. All pipeline code (Specs 001–005) remains unaffected; WebSocket protocol unchanged.
+
+---
+
+## Phase 2 rebuild — tasks (current project)
+
+`[ ]` todo · `[~]` in progress · `[x]` done. Gate: no runtime third-party JS dep;
+validate through the real `rate=1` WS path.
+
+### P2.1 — Data layer
+- [x] **W1** `js/ws.js`: connection + reconnect + Spec 004 envelope decode +
+  message router dispatching every type (FR10). Logs unknown topics.
+- [x] **W2** `js/model.js`: normalized state — per-track segments, comprehensive
+  turns keyed by `text_id`, speaker registry (id→color/name), telemetry ring
+  buffers. Validated on real captured data (125 gpu + 125 cursor + 4 tracks).
+
+### P2.2 — Content rendering
+- [x] **W3** `render/transcript.js`: live final + partial draft; global speaker
+  identity label/color (FR11); CJK text; per-segment align unit count.
+- [x] **W4** `render/timeline.js`: canvas lanes for diarization (by `speaker_id`),
+  ASR, VAD, and **align units** (FR12); shared time axis, zoom/pan retained.
+- [x] **W5** `render/observability.js`: per-pipeline RTF gauge + sparkline,
+  scheduling class/priority/active, backlog `pending_sec`, starvation warning
+  (FR13).
+- [x] **W6** comprehensive live view from `revision` + reconcile on `timeline`
+  (FR14) — in `model.js` (`applyRevision`/`applyTimeline`).
+
+### P2.3 — Input + sessions + shell
+- [x] **W7** `js/audio.js`: mic + file decode → int16LE 16k; `js/app.js`
+  bootstrap + controls (flush/end/clear/download); `render/sessions.js`.
+- [x] **W8** `index.html` + `style.css`: layout shell with observability panel +
+  speaker palette; module script tags.
+
+### P2.4 — Validation
+- [x] **W9** Module graph bundles cleanly (bun, 9 modules); data layer validated
+  on real captured run (per-pipeline RTF/backlog, 4 tracks, global identity);
+  all 30 DOM ids resolve; static server serves `/js/*` as
+  `application/javascript`. `web/README.md` updated. Browser context review +
+  PROJECT_STATE/commit pending live confirmation.

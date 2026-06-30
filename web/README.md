@@ -5,46 +5,58 @@ pipeline. Served as an integrated HTTP server by the `orator_ws` binary.
 
 ## Architecture
 
+Plain ES modules — no framework, no build step (served as-is by the static
+server). Spec 006 Phase 2 rebuild (replaces the MVP's single `app.js`).
+
 ```
 web/
-├── index.html    — SPA shell with ARIA labels, three panels (controls,
-│                   transcript/metrics, timeline canvas)
-├── style.css     — Dark theme, CSS Grid layout, responsive breakpoint
-│                   at 900px (collapses main grid to single column)
-├── app.js        — State machine, WebSocket client, Canvas renderer,
-│                   microphone capture, file upload, all UI event wiring
-└── README.md     — This file
+├── index.html            — SPA shell (controls, transcript/metrics, timeline,
+│                           observability, sessions); <script type="module">
+├── style.css             — dark theme, grid layout, observability panel styles
+├── js/
+│   ├── app.js            — bootstrap: wire model+ws+views+controls, render loop
+│   ├── ws.js             — connection, reconnect, Spec 004 envelope decode,
+│   │                       message router (every type), command helpers
+│   ├── model.js          — normalized client state (tracks, comprehensive
+│   │                       turns, align units, speaker registry, telemetry
+│   │                       ring buffers)
+│   ├── audio.js          — mic capture + file decode → int16LE 16k frames
+│   ├── format.js         — time/RTF formatters + speaker-identity color/label
+│   └── render/
+│       ├── transcript.js    — live transcript + partial draft + identity
+│       ├── timeline.js      — canvas: diar/asr/vad/align lanes, zoom/pan
+│       ├── observability.js — per-pipeline RTF/backlog sparklines + warnings
+│       └── sessions.js      — saved-session list + load
+└── README.md
 ```
-
-Three visual panels:
-
-| Panel | DOM element | Handler in app.js |
-|-------|-------------|-------------------|
-| Audio controls | `.input-panel` | `micBtn`, `fileInput`, `flushBtn`, `endBtn`, `clearBtn` |
-| Transcript + metrics | `.transcript-panel` / `.metrics-panel` | `handleAsrPartial`, `handleAsrFinal`, `handleGpuTelemetry` |
-| Timeline canvas | `#timelineCanvas` | `renderTimeline()`, `zoomTimeline()`, `fitTimeline()` |
 
 ## Data flow
 
 ```
 orator_ws (WebSocket)
-    ↓  Spec 004 protocol envelopes {topic, type, data, ...}
-app.js → unwrapEnvelope() → switch(msg.type)
-    ├── asr / asr_partial  → handleAsrFinal / handleAsrPartial → transcript DOM
-    ├── diar               → handled by handleTimeline → tracksData
-    ├── vad                → handled by handleTimeline + VAD LED
-    ├── timeline           → handleTimeline → tracksData → renderTimeline()
-    ├── gpu_telemetry      → handleGpuTelemetry → metrics panel
-    └── ready / reset_ok   → connection state management
+    ↓  Spec 004 envelope {topic, pipeline, data:"<inner json>"}
+ws.js → unwrapEnvelope() → router(type, msg)
+    ↓
+model.js (single source of truth: applyAsr/applyRevision/applyAlign/
+          applyGpuTelemetry/applyCursorProgress/applyTimeline)
+    ↓  requestAnimationFrame (coalesced)
+render/* (transcript · timeline canvas · observability · sessions)
 ```
+
+Every server message type is consumed (FR10): `ready`, `asr_partial`, `asr`,
+`revision`, `align`, `vad_state`, `timeline`, `gpu_telemetry`, `cursor_progress`,
+`sessions`, `reset_ok`, `describe`, `error`. Unknown topics are logged, not
+dropped.
 
 ## Canvas timeline
 
-The `#timelineCanvas` renders three horizontal tracks on a shared time axis:
+The `#timelineCanvas` renders four horizontal lanes on a shared time axis:
 
-- **Diarization** — speaker-colored blocks (S0–S5 palette)
+- **Diarization** — blocks colored by **global speaker identity** (`spk_N`,
+  Spec 010), labelled with the display name when present
 - **ASR** — transcript blocks with truncated text labels
-- **VAD** — speech-activity blocks (green = speech, dim = silence)
+- **VAD** — speech-activity blocks
+- **Align** — forced-alignment per-unit ticks (Spec 009)
 
 ### Interaction
 
