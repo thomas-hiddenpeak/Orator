@@ -88,6 +88,11 @@ session_dir = "/custom/sessions"
 [telemetry]
 gpu_interval_sec = 5.0
 
+[telemetry.cursor]
+interval_sec = 1.5
+lag_warn_samples = 16000
+lag_critical_samples = 48000
+
 [debug]
 log_level = 1
 timebase_check = true
@@ -144,6 +149,15 @@ gpu_scheduling = "concurrent"
     // [telemetry]
     CHECK(cfg.gpu_telemetry_interval_sec == 5.0,
           "cfg.gpu_telemetry_interval_sec == 5.0");
+
+    // [telemetry.cursor] — nested table (regression: toml++ operator[] is
+    // single-key, so config["telemetry.cursor"] never matched the section).
+    CHECK(cfg.cursor_telemetry_interval_sec == 1.5,
+          "cfg.cursor_telemetry_interval_sec == 1.5");
+    CHECK(cfg.cursor_lag_warn_samples == 16000,
+          "cfg.cursor_lag_warn_samples == 16000");
+    CHECK(cfg.cursor_lag_critical_samples == 48000,
+          "cfg.cursor_lag_critical_samples == 48000");
 
     // [debug]
     CHECK(cfg.log_level == 1, "cfg.log_level == 1");

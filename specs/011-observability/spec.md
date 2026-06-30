@@ -1,9 +1,12 @@
 # Spec 011 — Observability Component Integration (rerun)
 
 - **Feature**: `011-observability`
-- **Status**: Implemented (2026-06-30) — offline rerun export of timeline +
-  captured `gpu_telemetry`; validated on a `rate=1` 120 s run (125 samples,
-  exported `.rrd`). Live consumer + full-hour recording remain follow-ups.
+- **Status**: Implemented (2026-06-30) — Phase 1 (data flow + per-pipeline RTF)
+  and Phase 2 (comprehensive dashboard: continuous hardware telemetry, cursor
+  backlog, scheduler health, blueprint, methodology). Validated on a `rate=1`
+  120 s run (125 gpu + 125 cursor + 126 device samples; six dashboard
+  dimensions). Fixed a config bug: nested `[telemetry.cursor]` was never read.
+  Live consumer + full-hour recording remain follow-ups.
 - **Owner**: project owner
 - **Constitution**: v1.5.0
 - **Depends on**: Spec 002 (GPU-scheduling telemetry), Spec 004 (comprehensive
@@ -91,3 +94,55 @@ All already produced by the runtime; this feature captures and renders them.
   multimodal alignment against the known test audio (context review, not a
   script metric). No runtime third-party dependency; streaming stays real-time;
   ctest unaffected.
+
+---
+
+## 7. Phase 2 — Comprehensive observability dashboard
+
+Phase 1 wired the data flow and rendered the pipelines + per-pipeline RTF. Phase
+2 turns that into an **engineered observation surface**: every dimension of a run
+— pipelines, comprehensive timeline, hardware device, and pipeline/process health
+— presented as coherent time series on one scrubbable timeline, organized by a
+rerun **blueprint** dashboard rather than a flat entity tree.
+
+### 7.1 Observation dimensions (what a run must show)
+
+| Dimension | Entities | Source |
+|---|---|---|
+| **Pipelines** | `pipelines/diarization/<id>`, `pipelines/asr`, `pipelines/vad`, `pipelines/align/*` (text + activity step series) | timeline tracks |
+| **Comprehensive timeline** | `comprehensive/<id>` per-speaker swimlanes + merged turns | timeline `comprehensive` |
+| **Scheduler / process** | `scheduler/<pipeline>/{rtf,compute_sec,active,cuda_priority}` | `gpu_telemetry` |
+| **Pipeline backlog** | `cursors/<pipeline>/{position_sec,pending_sec}` | `cursor_progress` |
+| **Hardware device** | `device/mem/*`, `device/power/*`, `device/temp/*`, `device/cpu/util_pct`, `device/gpu/util_pct` (continuous) | continuous `tegrastats` |
+| **Session summary** | static run metadata document | timeline header + meta |
+
+### 7.2 Functional requirements (Phase 2)
+
+- **FR5 (continuous hardware telemetry)** The capture client samples `tegrastats`
+  continuously for the streamed duration (not three before/after/final
+  snapshots), timestamps each line by elapsed seconds since stream start (≈ audio
+  time at `rate=1`), and writes a `device_series` array to the run JSON. The
+  exporter parses RAM/SWAP, CPU utilization, per-rail power (VDD_GPU,
+  VDD_CPU_SOC, VIN total), and temperatures (gpu/cpu/tj/soc); `GR3D_FREQ` GPU%
+  is parsed when the device exposes it (Orin) and omitted gracefully when it does
+  not (Thor tegrastats has no GR3D_FREQ).
+- **FR6 (process / scheduler health)** The exporter renders the scheduler time
+  series (per-pipeline RTF, compute_sec, scheduling-active, cuda_priority) and
+  the per-pipeline cursor backlog (`pending_sec`) so scheduling contention and
+  pipeline lag are directly visible.
+- **FR7 (dashboard blueprint)** The exporter ships a rerun blueprint that lays out
+  the dimensions as a dashboard: a pipelines/comprehensive text-log row, a
+  scheduler + backlog time-series row, a device power/temperature/memory
+  time-series row, and a session-summary document.
+- **FR8 (methodology & best practices)** A documented system-observation method:
+  when to enable telemetry, recommended intervals, what each lane means, how to
+  read contention/backlog/thermal signals, and the cross-dimension diagnostic
+  workflow (e.g. backlog rising while RTF < 1 → pipeline starvation).
+
+### 7.3 Acceptance (Phase 2)
+
+- A real `rate=1` run with telemetry + continuous tegrastats on produces a run
+  JSON with non-empty `telemetry` and `device_series`; the exported `.rrd` opens
+  into the blueprint dashboard with all six dimensions populated and aligned on
+  `audio_time`. Streaming stays ~1.0× real-time. No runtime dependency. Method
+  doc present and consistent with the rendered lanes.

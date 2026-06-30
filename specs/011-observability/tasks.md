@@ -34,3 +34,41 @@ Gate each on: no runtime third-party dep, streaming stays real-time, ctest green
 ## Out of scope (follow-up)
 - Live rerun consumer (WS → rerun in real time).
 - Additional runtime metrics beyond what is already serialized.
+
+---
+
+# Phase 2 — Comprehensive dashboard
+
+## Phase 5 — Continuous hardware capture
+- [x] **T5.1** `ws_unified_test.py`: add `TegraSampler` thread (continuous
+  `tegrastats`, timestamped by elapsed seconds from the audio `t0`); write a
+  `device_series: [{t_sec, line}]` array to the run JSON. Keep the 3-point
+  snapshots. No streaming-timing change. (126 samples over 120 s validated.)
+
+## Phase 6 — Engineered rendering
+- [x] **T6.1** `timeline_to_rerun.py`: restructure entities under
+  `pipelines/`, `comprehensive/`, `scheduler/`, `cursors/`, `device/`,
+  `session/` namespaces.
+- [x] **T6.2** `_log_cursors`: per `cursor_progress` sample, log
+  `cursors/<pipe>/position_sec` + `cursors/<pipe>/pending_sec`. Required a
+  config_reader fix (the nested `[telemetry.cursor]` table was never read —
+  `config["telemetry.cursor"]` is a literal-key lookup; now
+  `config["telemetry"]["cursor"]`, with a regression test).
+- [x] **T6.3** Extend `_parse_tegra` (SWAP, CPU %, power rails, temps; GR3D
+  optional) and add `_log_device_series` → `device/*` scalar lanes.
+- [x] **T6.4** Extend `_log_gpu_telemetry` with `compute_sec` + `cuda_priority`;
+  add `_log_session_summary` text document.
+
+## Phase 7 — Dashboard + methodology
+- [x] **T7.1** Ship a `rerun.blueprint` dashboard (pipelines/comprehensive,
+  scheduler/cursors, device power/temp/mem, session summary); `--no-blueprint`
+  flag for the heuristic layout.
+- [x] **T7.2** Methodology + best-practices section in
+  `tools/observability/README.md` (lane meanings + cross-dimension diagnosis).
+
+## Phase 8 — Acceptance (Phase 2)
+- [x] **T8.1** Real `rate=1` 120 s run with telemetry + continuous tegrastats →
+  run JSON has 125 gpu + 125 cursor + 126 device samples → exported `.rrd`
+  opens into the blueprint dashboard with all six dimensions (pipelines/12,
+  comprehensive/5, scheduler/12, cursors/6, device/10, session/1) aligned on
+  `audio_time`; streaming 0.964× (~1.0×). ctest 47/47. No runtime dep.

@@ -12,7 +12,32 @@ Dates in `YYYY-MM-DD` format.
 ## [Unreleased]
 
 ### Added
-- Observability component integration (Spec 011) — offline
+- Observability dashboard (Spec 011 Phase 2) — the offline rerun module now
+  presents a full **engineered dashboard** across six dimensions on one
+  `audio_time` axis: pipelines (diar/asr/vad/align), comprehensive timeline
+  (per-speaker swimlanes by global `speaker_id`), scheduler health
+  (`scheduler/<pipe>/{rtf,compute_sec,active,cuda_priority}`), pipeline backlog
+  (`cursors/<pipe>/{position_sec,pending_sec}`), continuous hardware telemetry
+  (`device/{mem,cpu,gpu,temp,power}/*` from continuous `tegrastats`), and a
+  session-summary document — laid out by a `rerun.blueprint` (persisted in the
+  `.rrd`; `--no-blueprint` to opt out). `ws_unified_test.py` gained a
+  `TegraSampler` that records a continuous `device_series`; `timeline_to_rerun.py`
+  was restructured into namespaced entities with `_log_cursors`,
+  `_log_device_series` (extended tegrastats parsing: SWAP/CPU/power rails/temps;
+  Orin `GR3D_FREQ` optional, gracefully omitted on Thor), and
+  `_log_session_summary`. A system-observation methodology + best practices were
+  added to `tools/observability/README.md`. Validated on a `rate=1` 120 s run
+  (125 gpu + 125 cursor + 126 device samples; six dimensions populated;
+  stream_rt 0.964×).
+
+### Fixed
+- Config: the nested `[telemetry.cursor]` table was never read — `config_reader`
+  used `config["telemetry.cursor"]` (a literal-key lookup that cannot match a
+  TOML sub-table), so cursor progress telemetry could never be enabled. Now
+  reads `config["telemetry"]["cursor"]`, with a `test_config` regression
+  assertion.
+
+### Added (Phase 1)
   [rerun](https://rerun.io) visualization, kept entirely in `tools/` with **no**
   runtime third-party dependency. `ws_unified_test.py` now captures the runtime's
   periodic `gpu_telemetry` (and cursor) WS samples into a `telemetry` array in

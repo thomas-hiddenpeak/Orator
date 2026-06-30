@@ -78,3 +78,71 @@ lane together (the same time base the pipelines already share, Art. III).
   global speaker identity, and per-pipeline RTF lanes aligned on `audio_time`.
 - Context review of the recording against the known test audio (Test Review
   Protocol), not a script metric.
+
+---
+
+## 7. Phase 2 — Comprehensive dashboard (HOW)
+
+### 7.1 Continuous hardware capture (`ws_unified_test.py`)
+
+Add a `TegraSampler(threading.Thread)`: spawns `tegrastats --interval <ms>`,
+reads stdout line by line, tags each with `t_sec = monotonic() - t0` (the same
+`t0` as the audio producer loop, so device time aligns to audio time at
+`rate=1`), and accumulates `{"t_sec", "line"}`. Started right after `t0` is set,
+stopped (terminate subprocess + join) after the final timeline. The raw line is
+stored and parsed in the exporter (single parsing source of truth). Output JSON
+gains `device_series: [{t_sec, line}, ...]`. The 3-point `tegrastats` snapshots
+stay for backward compatibility.
+
+### 7.2 Engineered entity namespace (`timeline_to_rerun.py`)
+
+```
+pipelines/diarization/<id>     TextLog + .../active Scalars(0/1)
+pipelines/asr/utterance        TextLog
+pipelines/vad/speech           TextLog + pipelines/vad/active Scalars(0/1)
+pipelines/align/text_<id>      TextLog
+comprehensive/<id>             TextLog (per-speaker swimlane)
+scheduler/<pipe>/{rtf,compute_sec,active,cuda_priority}   Scalars
+cursors/<pipe>/{position_sec,pending_sec}                 Scalars
+device/mem/{ram_used_mb,swap_used_mb}                     Scalars
+device/power/{vdd_gpu_mw,vdd_cpu_soc_mw,vin_total_mw}     Scalars
+device/temp/{gpu_c,cpu_c,tj_c,soc_c}                      Scalars
+device/cpu/util_pct                                       Scalars
+device/gpu/util_pct        Scalars (only when GR3D_FREQ present)
+session/summary            TextDocument (static run metadata)
+```
+
+New loggers: `_log_cursors`, `_log_device_series` (parse via an extended
+`_parse_tegra`), `_log_session_summary`; `_log_gpu_telemetry` extended to emit
+compute_sec + cuda_priority. The `tegrastats` parser is extended to read SWAP,
+CPU avg %, per-rail power (`VDD_GPU`, `VDD_CPU_SOC*`, `VIN`), and temperatures
+(`gpu@`, `cpu@`, `tj@`, `soc*@`); `GR3D_FREQ` parsed only if present.
+
+### 7.3 Blueprint dashboard
+
+`rerun.blueprint` layout (sent via `rr.send_blueprint`, persisted in the `.rrd`):
+
+```
+Vertical(
+  Horizontal(TextLogView(pipelines), TextLogView(comprehensive)),
+  Horizontal(TimeSeriesView(scheduler), TimeSeriesView(cursors)),
+  Horizontal(TimeSeriesView(device/power), TimeSeriesView(device/temp),
+             TimeSeriesView(device/mem)),
+  TextDocumentView(session/summary),
+)
+```
+
+A `--no-blueprint` flag keeps the default heuristic layout for debugging.
+
+### 7.4 Methodology (`tools/observability/README.md`)
+
+Document: when to enable telemetry, recommended intervals (1 s), per-lane
+meaning, and the cross-dimension diagnostic workflow (backlog↑ while RTF<1 →
+starvation; power/temp trend vs RTF; speaker swimlane vs diarization activity).
+
+### 7.5 Validation (Phase 2)
+
+Real `rate=1` run with telemetry + continuous tegrastats → run JSON has
+non-empty `telemetry` AND `device_series` → export → `.rrd` opens into the
+blueprint dashboard with all six dimensions populated and aligned on
+`audio_time`; streaming stays ~1.0× real-time. Context review, not a script.

@@ -272,6 +272,7 @@ spkcache_refresh_rate = 100
 [telemetry.cursor]
 # Enable cursor progress telemetry. 0 = disabled, >0 = interval in seconds.
 # When enabled, periodic {"type":"cursor_progress",...} messages are sent.
+# For an offline observability run set to e.g. 1.0 (per-pipeline backlog lane).
 # interval_sec = 0.0
 
 # Maximum allowed lag in samples before warning. 0 = no limit.

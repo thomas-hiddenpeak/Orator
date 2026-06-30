@@ -288,6 +288,59 @@ def collect_tegrastats_snapshot():
     return metrics
 
 
+class TegraSampler(threading.Thread):
+    """Continuous device telemetry (Spec 011 Phase 2, FR5).
+
+    Spawns `tegrastats` for the streamed duration and records each raw line
+    tagged with elapsed seconds from a shared `t0` (the audio producer's t0), so
+    device samples align to the audio timeline at rate=1. Raw lines are stored
+    and parsed offline by the exporter (single parsing source of truth). This is
+    tools-side only; the C++/CUDA runtime gains no dependency (Constitution
+    Art. I). On Jetson the only continuous device source is `tegrastats`
+    (`nvidia-smi` is incomplete — Constitution Art. note).
+    """
+
+    def __init__(self, t0: float, interval_ms: int = 1000):
+        super().__init__(daemon=True)
+        self.t0 = t0
+        self.interval_ms = interval_ms
+        self.samples = []          # [{"t_sec": float, "line": str}]
+        self._proc = None
+        self._stop_event = threading.Event()
+
+    def run(self):
+        import subprocess
+        import shutil
+        if shutil.which("tegrastats") is None:
+            return
+        try:
+            self._proc = subprocess.Popen(
+                ["tegrastats", "--interval", str(self.interval_ms)],
+                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+        except (OSError, ValueError):
+            return
+        for line in self._proc.stdout:
+            if self._stop_event.is_set():
+                break
+            line = line.strip()
+            if line:
+                self.samples.append({"t_sec": round(time.monotonic() - self.t0, 3),
+                                     "line": line})
+
+    def stop(self):
+        self._stop_event.set()
+        if self._proc and self._proc.poll() is None:
+            self._proc.terminate()
+            try:
+                self._proc.wait(timeout=1)
+            except Exception:
+                try:
+                    self._proc.kill()
+                except Exception:
+                    pass
+        self.join(timeout=2.0)
+
+
 def main(args):
     # Parse audio file (handles MP3, WAV, FLAC, and PCM formats)
     pcm = parse_audio_file(args.pcm, args.duration)
@@ -385,6 +438,9 @@ def main(args):
     
     # Producer: push PCM frames through the socket
     t0 = time.monotonic()
+    # Continuous device telemetry for the streamed duration (Spec 011 Phase 2).
+    tegra_sampler = TegraSampler(t0, interval_ms=1000)
+    tegra_sampler.start()
     sent = 0
     for off in range(0, len(pcm), frame_bytes):
         sock.sendall(mask_frame(0x2, pcm[off:off + frame_bytes]))
@@ -435,6 +491,9 @@ def main(args):
     
     # Collect final tegrastats snapshot after timeline
     tegrastats_final = collect_tegrastats_snapshot()
+    # Stop the continuous device sampler and harvest its time series.
+    tegra_sampler.stop()
+    device_series = tegra_sampler.samples
     
     out = {
         "meta": {
@@ -456,6 +515,7 @@ def main(args):
             "after": tegrastats_after.get('tegrastats_snapshot') if tegrastats_after else None,
             "final": tegrastats_final.get('tegrastats_snapshot') if tegrastats_final else None,
         },
+        "device_series": device_series,
         "events": reader.events,
         "telemetry": reader.telemetry,
         "timeline": tl,

@@ -242,7 +242,10 @@ bool ApplyTomlConfig(const std::string& path,
   }
 
   // ── [telemetry.cursor] ────────────────────────────────────────────
-  if (auto* sec = config["telemetry.cursor"].as_table()) {
+  // Nested table: access via the parent table, not a literal dotted key
+  // (toml++ operator[] is single-key, so config["telemetry.cursor"] would
+  // never match the [telemetry.cursor] section).
+  if (auto* sec = config["telemetry"]["cursor"].as_table()) {
     if (auto v = sec->get("interval_sec")) {
       if (auto d = v->value<double>()) cfg.cursor_telemetry_interval_sec = *d;
     }
