@@ -364,6 +364,8 @@ void AuditoryStream::StartWorkers() {
       constexpr double kMinAdvanceSec = 0.25;
       double last_horizon = -1e9;
       long span_start_abs = 0;
+      bool vad_speech_emitted = false;
+      bool first_vad_state = true;
       while (vad_audio_->WaitAndRead(&chunk, &span_start_abs)) {
         vad_detector_->Push(chunk.data(), static_cast<int>(chunk.size()));
         drain(/*finalize=*/false);
@@ -375,12 +377,21 @@ void AuditoryStream::StartWorkers() {
             last_horizon = h;
           }
         }
+        // Emit vad_state only on a speech<->silence TRANSITION, not every frame.
+        // A per-frame emit (~10/s) is the dominant outbound-message source and
+        // was the root of the WS backpressure that dropped long connections;
+        // the UI only needs the transitions (it drives a speech LED).
         {
-          char buf[64];
-          std::snprintf(buf, sizeof(buf),
-                        "{\"type\":\"vad_state\",\"speech\":%s}",
-                        vad_detector_->is_in_speech() ? "true" : "false");
-          EmitLocked(buf);
+          const bool sp = vad_detector_->is_in_speech();
+          if (first_vad_state || sp != vad_speech_emitted) {
+            char buf[64];
+            std::snprintf(buf, sizeof(buf),
+                          "{\"type\":\"vad_state\",\"speech\":%s}",
+                          sp ? "true" : "false");
+            EmitLocked(buf);
+            vad_speech_emitted = sp;
+            first_vad_state = false;
+          }
         }
         progress_cv_.notify_all();
       }

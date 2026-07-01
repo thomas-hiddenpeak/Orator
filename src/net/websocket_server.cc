@@ -374,10 +374,22 @@ int ws_callback(struct lws* wsi, enum lws_callback_reasons reason, void* user,
 
 bool WebSocketConnection::SendText(const std::string& text) {
   if (closed_ || !wsi_) return false;
+  // Bound the outbound backlog. Under a slow/congested client the queue would
+  // otherwise grow without limit until libwebsockets buffers megabytes and
+  // drops the connection (the observed "WS drops after a while" that was not a
+  // server crash). At this cap the oldest queued messages are discarded,
+  // keeping memory bounded and the connection alive; the periodic telemetry and
+  // the next full timeline resynchronise the client after any congestion.
+  static constexpr size_t kMaxPendingText = 2048;
   bool should_wakeup = false;
   {
     std::lock_guard<std::mutex> lk(*mu_);
     pending_text_.push_back(text);
+    if (pending_text_.size() > kMaxPendingText) {
+      pending_text_.erase(
+          pending_text_.begin(),
+          pending_text_.begin() + (pending_text_.size() - kMaxPendingText));
+    }
     if (!wakeup_pending_) {
       wakeup_pending_ = true;
       should_wakeup = true;
@@ -418,7 +430,10 @@ bool WebSocketServer::Start() {
   info.protocols = protocols;
   info.options = LWS_SERVER_OPTION_DISABLE_IPV6;
   info.user = this;  // ws_callback retrieves server via lws_context_user()
-  lws_set_log_level(LLL_DEBUG, nullptr);
+  // Only errors and warnings. LLL_DEBUG logged every pollfd/partial-write event
+  // (hundreds of lines/second, ~640k lines over a 24-min run) -- pure I/O and
+  // formatting overhead that also buried real diagnostics.
+  lws_set_log_level(LLL_ERR | LLL_WARN, nullptr);
 
   context_ = lws_create_context(&info);
   if (!context_) {
