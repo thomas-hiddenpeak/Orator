@@ -211,29 +211,6 @@ body {
   50% { opacity: 0.3; }
 }
 
-/* Metrics */
-.metrics-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-.metric-card {
-  background: var(--surface2);
-  border-radius: 8px;
-  padding: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.metric-label { font-size: 11px; color: var(--text-dim); }
-.metric-value {
-  font-size: 18px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-
 /* Timeline */
 .timeline-panel { }
 
@@ -246,19 +223,83 @@ body {
 
 .timeline-controls { display: flex; gap: 4px; }
 
-.timeline-canvas-wrap {
+.timeline-view {
   width: 100%;
-  overflow-x: auto;
-  overflow-y: hidden;
   border-radius: 8px;
   background: var(--surface2);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 560px;
+  overflow-y: auto;
+}
+.tl-empty { color: #8b90a0; font-size: 13px; padding: 24px; text-align: center; }
+
+.tl-row { display: flex; gap: 8px; align-items: stretch; }
+.tl-gutter {
+  flex: 0 0 46px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  padding: 2px 6px 0 0;
+  text-align: right;
+  border-right: 2px solid rgba(255,255,255,0.06);
+}
+.tl-body { flex: 1; min-width: 0; position: relative; display: flex; flex-direction: column; gap: 3px; }
+
+.tl-ruler { position: relative; height: 12px; }
+.tl-tick { position: absolute; top: 0; bottom: 0; border-left: 1px solid rgba(255,255,255,0.10); }
+.tl-tick-lbl {
+  position: absolute; top: -1px; left: 3px;
+  font-size: 9px; color: #6b7280; white-space: nowrap; font-variant-numeric: tabular-nums;
 }
 
-#timelineCanvas {
-  display: block;
-  width: 100%;
-  min-height: 220px;
+.tl-strip { position: relative; height: 14px; border-radius: 3px; background: rgba(255,255,255,0.03); }
+.tl-strip-vad { height: 8px; }
+.tl-blk { position: absolute; top: 1px; bottom: 1px; border-radius: 2px; overflow: hidden; min-width: 2px; }
+.tl-blk-lbl {
+  font-size: 9px; color: #0b0d12; font-weight: 700; padding: 0 3px; line-height: 12px; white-space: nowrap;
 }
+
+.tl-turns { display: flex; flex-direction: column; gap: 3px; margin-top: 3px; }
+.tl-turn {
+  box-sizing: border-box;
+  border-left: 3px solid var(--spk, #8b90a0);
+  background: rgba(255,255,255,0.03);
+  border-radius: 0 6px 6px 0;
+  padding: 4px 8px;
+  font-size: 13px;
+  line-height: 1.55;
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+.tl-turn-time { font-size: 10px; color: var(--text-dim); font-variant-numeric: tabular-nums; flex: 0 0 auto; }
+.tl-turn-spk { font-size: 10px; font-weight: 700; color: #0b0d12; padding: 0 6px; border-radius: 4px; flex: 0 0 auto; }
+.tl-turn-text { flex: 1 1 auto; min-width: 0; word-break: break-word; }
+
+/* Observability — merged session metrics summary */
+.obs-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.obs-stat {
+  background: var(--surface2);
+  border-radius: 8px;
+  padding: 6px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 96px;
+}
+.obs-stat-label { font-size: 11px; color: var(--text-dim); }
+.obs-stat-val { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
 
 /* VAD LED */
 .vad-led-wrap {
@@ -398,7 +439,7 @@ body {
 
 /* ── Live observability panel (Spec 011 telemetry) ── */
 .obs-section { margin-top: 12px; }
-.obs-hint { font-size: 12px; color: #8b90a0; }
+.obs-hint { font-size: 12px; color: #8b90a0; margin-right: auto; }
 .obs-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));

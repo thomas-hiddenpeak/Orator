@@ -1,217 +1,212 @@
-// render/timeline.js — canvas timeline: diarization (by global identity),
-// ASR, VAD, and forced-alignment unit lanes on one shared time axis (FR12).
-// Reuses the MVP's zoom/pan/viewport-clipping math.
-import { fmtMMSS, identityKey, identityLabel, colorForKey } from "../format.js";
+// render/timeline.js — wrapping, row-based timeline (Spec 006).
+//
+// Replaces the horizontally-scrolling canvas. The session is split into fixed
+// time windows; each window is one full-width ROW that wraps to the next line,
+// so there is never a horizontal scrollbar. Every row carries its own time axis
+// (a ruler with mm:ss ticks) and the pipelines are aligned ON that axis:
+//   - a diarization strip (speaker-coloured blocks positioned by time),
+//   - a VAD strip (speech blocks positioned by time),
+//   - the transcript, shown as the ALIGNMENT-refined, speaker-attributed
+//     comprehensive turns (NOT the raw ASR blocks), each on its true timecode
+//     and fully readable (text flows/wraps normally).
+import { fmtMMSS, colorForKey, identityKey } from "../format.js";
 
-const TRACK_H = 38;
-const AXIS_H = 26;
-const PAD_TOP = 4;
-const PAD_BOTTOM = 4;
-const LANES = ["diarization", "asr", "vad", "align"];
-const MIN_ZOOM = 0.5;
-const MAX_ZOOM = 40;
+// Seconds per row (zoom levels: fewer sec = more horizontal detail per row).
+const WINDOWS = [10, 15, 20, 30, 45, 60, 90];
 
 export class TimelineView {
-  constructor(canvas) {
-    this.canvas = canvas;
-    this.ctx = canvas ? canvas.getContext("2d") : null;
+  constructor(containerEl) {
+    this.el = containerEl;
     this.model = null;
-    this.scale = 100;       // px/sec
-    this.pan = 0;
-    this.dragging = false;
-    this.dragX = 0;
-    this.dragPan = 0;
+    this.windowIdx = 3; // 30 s/row default
     this._pending = false;
-    if (canvas) this._wire();
   }
 
   setModel(m) { this.model = m; }
 
-  fit() {
-    if (!this.canvas) return;
-    const wrap = this.canvas.parentElement;
-    const availW = wrap ? wrap.clientWidth - 2 : 800;
-    const dur = (this.model && this.model.audioSec) || 30;
-    this.scale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, availW / dur));
-    this.pan = 0;
+  get windowSec() { return WINDOWS[this.windowIdx]; }
+
+  // factor > 1 → zoom in (fewer seconds per row); < 1 → zoom out.
+  zoom(factor) {
+    if (factor > 1) this.windowIdx = Math.max(0, this.windowIdx - 1);
+    else if (factor < 1) this.windowIdx = Math.min(WINDOWS.length - 1, this.windowIdx + 1);
     this.schedule();
   }
+
+  fit() { this.windowIdx = 3; this.schedule(); }
 
   schedule() {
     if (this._pending) return;
     this._pending = true;
-    requestAnimationFrame(() => { this._pending = false; this._draw(); });
+    requestAnimationFrame(() => { this._pending = false; this.render(this.model); });
   }
 
-  zoom(factor) {
-    const old = this.scale;
-    this.scale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, this.scale * factor));
-    const center = this.canvas.clientWidth / 2;
-    this.pan = this.pan * (this.scale / old) + center * (1 - this.scale / old);
-    this.schedule();
+  _diarSegs(m) {
+    const t = m.tracks && m.tracks.diarization;
+    return Array.isArray(t) ? t : [];
   }
 
-  _wire() {
-    this.canvas.addEventListener("wheel", (e) => {
-      e.preventDefault();
-      const old = this.scale;
-      const factor = e.deltaY < 0 ? 1.15 : 0.87;
-      this.scale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, this.scale * factor));
-      this.pan = this.pan * (this.scale / old) + e.offsetX * (1 - this.scale / old);
-      this.schedule();
-    }, { passive: false });
-    this.canvas.addEventListener("mousedown", (e) => {
-      if (e.button !== 0) return;
-      this.dragging = true; this.dragX = e.clientX; this.dragPan = this.pan;
-      this.canvas.style.cursor = "grabbing";
-    });
-    window.addEventListener("mousemove", (e) => {
-      if (!this.dragging) return;
-      this.pan = this.dragPan - (e.clientX - this.dragX);
-      this.schedule();
-    });
-    window.addEventListener("mouseup", () => {
-      if (this.dragging) { this.dragging = false; this.canvas.style.cursor = ""; }
-    });
-    this.canvas.addEventListener("keydown", (e) => {
-      const step = this.pan * 0.1 + 20;
-      switch (e.key) {
-        case "ArrowLeft":  this.pan = Math.max(0, this.pan - step); this.schedule(); e.preventDefault(); break;
-        case "ArrowRight": this.pan += step; this.schedule(); e.preventDefault(); break;
-        case "+": case "=": this.zoom(1.4); e.preventDefault(); break;
-        case "-": case "_": this.zoom(0.7); e.preventDefault(); break;
-        case "Home": this.fit(); e.preventDefault(); break;
+  _vadSegs(m) {
+    const t = m.tracks && m.tracks.vad;
+    return Array.isArray(t) ? t : [];
+  }
+
+  // Speaker-attributed, alignment-refined content for the transcript lane:
+  // the comprehensive turns (who-said-what on the common time base). Falls back
+  // to live ASR rows before the first comprehensive revision arrives.
+  _turns(m) {
+    const out = [];
+    if (m.turns && m.turns.size) {
+      for (const t of m.turns.values()) {
+        if (t.text && t.text.trim()) out.push(t);
       }
-    });
+    } else {
+      for (const id of m.asrOrder) {
+        const r = m.asr.get(id);
+        if (r && r.text) out.push(r);
+      }
+    }
+    out.sort((a, b) => (a.start || 0) - (b.start || 0));
+    return out;
   }
 
-  _tick(scale) {
-    if (scale < 10) return 60; if (scale < 30) return 30; if (scale < 60) return 10;
-    if (scale < 120) return 5; if (scale < 250) return 2; return 1;
-  }
-
-  _draw() {
-    const c = this.ctx; if (!c || !this.canvas) return;
-    const wrap = this.canvas.parentElement;
-    const w = wrap ? wrap.clientWidth - 2 : 800;
-    const h = PAD_TOP + LANES.length * TRACK_H + AXIS_H + PAD_BOTTOM;
-    const dpr = window.devicePixelRatio || 1;
-    this.canvas.style.width = w + "px";
-    this.canvas.style.height = h + "px";
-    this.canvas.width = w * dpr;
-    this.canvas.height = h * dpr;
-    c.setTransform(dpr, 0, 0, dpr, 0, 0);
-    c.clearRect(0, 0, w, h);
-    c.fillStyle = "#1c2029";
-    c.fillRect(0, 0, w, h);
-
+  render(model) {
+    if (model) this.model = model;
     const m = this.model;
-    if (!m || !m.timeline && m.tracks.diarization.length === 0) {
-      c.fillStyle = "#8b90a0";
-      c.font = "13px Inter, system-ui, sans-serif";
-      c.textAlign = "center"; c.textBaseline = "middle";
-      c.fillText("No timeline yet — stream audio, then Flush/End", w / 2, h / 2);
+    if (!this.el) return;
+    const dur = m && m.audioSec > 0 ? m.audioSec : 0;
+    if (!dur) {
+      this.el.innerHTML = '<div class="tl-empty">No timeline yet — stream audio, then Flush/End</div>';
       return;
     }
 
-    const dur = m.audioSec > 0 ? m.audioSec : 30;
-    const vStart = this.pan < 0 ? 0 : this.pan / this.scale;
-    const vEnd = Math.min(dur, (this.pan + w) / this.scale);
-    const vis = (arr) => arr.length > 200
-      ? arr.filter((e) => !(e.end <= vStart || e.start >= vEnd)) : arr;
-    const X = (t) => t * this.scale - this.pan;
+    const win = this.windowSec;
+    const diar = this._diarSegs(m);
+    const vad = this._vadSegs(m);
+    const turns = this._turns(m);
+    const nRows = Math.max(1, Math.ceil(dur / win));
 
-    // Lane labels + separators
-    LANES.forEach((name, i) => {
-      const y = PAD_TOP + i * TRACK_H;
-      c.fillStyle = "#8b90a0";
-      c.font = "bold 11px Inter, system-ui, sans-serif";
-      c.textAlign = "left"; c.textBaseline = "middle";
-      c.fillText(name === "diarization" ? "Diar" : name.toUpperCase(), 6, y + TRACK_H / 2);
-    });
-
-    // Diarization (by global identity)
-    (() => {
-      const y = PAD_TOP;
-      for (const e of vis(m.tracks.diarization)) {
-        const x = X(e.start), bw = (e.end - e.start) * this.scale;
-        if (bw < 1 || x + bw < 0 || x > w) continue;
-        const col = colorForKey(identityKey(e));
-        c.fillStyle = col + "cc"; c.fillRect(x, y + 4, bw, TRACK_H - 8);
-        c.strokeStyle = col; c.lineWidth = 0.5; c.strokeRect(x, y + 4, bw, TRACK_H - 8);
-        if (bw > 44) {
-          c.fillStyle = "#0b0d12"; c.font = "bold 10px Inter, system-ui, sans-serif";
-          c.textAlign = "left"; c.textBaseline = "middle";
-          c.fillText(m.labelFor(e), x + 4, y + TRACK_H / 2);
-        }
-      }
-    })();
-
-    // ASR
-    (() => {
-      const y = PAD_TOP + TRACK_H;
-      for (const e of vis(m.tracks.asr)) {
-        const x = X(e.start), bw = (e.end - e.start) * this.scale;
-        if (bw < 1 || x + bw < 0 || x > w) continue;
-        c.fillStyle = "rgba(91,141,239,0.14)"; c.fillRect(x, y + 4, bw, TRACK_H - 8);
-        c.strokeStyle = "rgba(91,141,239,0.4)"; c.lineWidth = 0.5; c.strokeRect(x, y + 4, bw, TRACK_H - 8);
-        if (bw > 30 && e.text) {
-          c.fillStyle = "#c9cdd8"; c.font = "10px Inter, system-ui, sans-serif";
-          c.textAlign = "left"; c.textBaseline = "middle";
-          let txt = e.text; const maxC = Math.floor(bw / 8);
-          if (txt.length > maxC) txt = txt.substring(0, maxC) + "…";
-          c.fillText(txt, x + 3, y + TRACK_H / 2);
-        }
-      }
-    })();
-
-    // VAD
-    (() => {
-      const y = PAD_TOP + 2 * TRACK_H;
-      for (const e of vis(m.tracks.vad)) {
-        const x = X(e.start), bw = (e.end - e.start) * this.scale;
-        if (bw < 1 || x + bw < 0 || x > w) continue;
-        c.fillStyle = "rgba(52,211,153,0.5)"; c.fillRect(x, y + 10, bw, TRACK_H - 20);
-      }
-    })();
-
-    // Align units (each unit a thin tick)
-    (() => {
-      const y = PAD_TOP + 3 * TRACK_H;
-      c.fillStyle = "rgba(245,158,11,0.85)";
-      for (const units of m.alignUnits.values()) {
-        for (const u of units) {
-          if (u.end <= vStart || u.start >= vEnd) continue;
-          const x = X(u.start), bw = Math.max(1, (u.end - u.start) * this.scale);
-          if (x + bw < 0 || x > w) continue;
-          c.fillRect(x, y + 8, bw, TRACK_H - 16);
-        }
-      }
-    })();
-
-    // Time axis
-    (() => {
-      const y = PAD_TOP + LANES.length * TRACK_H;
-      const tick = this._tick(this.scale);
-      const maxT = dur + w / this.scale;
-      c.strokeStyle = "#2e3345"; c.lineWidth = 1;
-      c.beginPath(); c.moveTo(0, y); c.lineTo(w, y); c.stroke();
-      c.fillStyle = "#8b90a0"; c.font = "10px Inter, system-ui, sans-serif";
-      c.textAlign = "center"; c.textBaseline = "top";
-      const first = Math.ceil((-this.pan / this.scale) / tick) * tick;
-      for (let t = first; t <= maxT; t += tick) {
-        const tx = X(t); if (tx < 0 || tx > w) continue;
-        c.strokeStyle = "#2e3345"; c.lineWidth = 0.5;
-        c.beginPath(); c.moveTo(tx, y); c.lineTo(tx, y + 5); c.stroke();
-        c.fillText(fmtMMSS(t), tx, y + 8);
-      }
-    })();
-
-    // Lane separators
-    c.strokeStyle = "#2e3345"; c.lineWidth = 0.5;
-    for (let i = 1; i <= LANES.length; i++) {
-      const ly = PAD_TOP + i * TRACK_H;
-      c.beginPath(); c.moveTo(0, ly); c.lineTo(w, ly); c.stroke();
+    // Bucket turns by row (by their start time) for O(n) placement.
+    const rowTurns = Array.from({ length: nRows }, () => []);
+    for (const t of turns) {
+      const r = Math.min(nRows - 1, Math.max(0, Math.floor((t.start || 0) / win)));
+      rowTurns[r].push(t);
     }
+
+    const frag = document.createDocumentFragment();
+    for (let r = 0; r < nRows; r++) {
+      const rowStart = r * win;
+      const rowEnd = Math.min(dur, rowStart + win);
+      frag.appendChild(this._row(m, rowStart, rowEnd, win, diar, vad, rowTurns[r]));
+    }
+    this.el.replaceChildren(frag);
+  }
+
+  _row(m, rowStart, rowEnd, win, diar, vad, turns) {
+    const row = document.createElement("div");
+    row.className = "tl-row";
+
+    const gutter = document.createElement("div");
+    gutter.className = "tl-gutter";
+    gutter.textContent = fmtMMSS(rowStart);
+    row.appendChild(gutter);
+
+    const body = document.createElement("div");
+    body.className = "tl-body";
+
+    // Per-row time axis (ruler with mm:ss ticks).
+    body.appendChild(this._ruler(rowStart, win));
+
+    // Diarization strip (who spoke when), aligned on the same axis.
+    body.appendChild(this._strip("diar", diar, rowStart, win, (s) => {
+      const key = identityKey(s);
+      return { color: colorForKey(key), label: m.labelFor(s),
+               title: `${m.labelFor(s)} ${fmtMMSS(s.start)}–${fmtMMSS(s.end)}` };
+    }));
+
+    // VAD strip (speech activity), aligned on the same axis.
+    body.appendChild(this._strip("vad", vad, rowStart, win,
+      () => ({ color: "#34d399", label: "", title: "speech" })));
+
+    // Transcript lane: alignment-refined, speaker-attributed turns, readable.
+    const lane = document.createElement("div");
+    lane.className = "tl-turns";
+    for (const t of turns) lane.appendChild(this._turn(m, t, rowStart, win));
+    body.appendChild(lane);
+
+    row.appendChild(body);
+    return row;
+  }
+
+  _ruler(rowStart, win) {
+    const ruler = document.createElement("div");
+    ruler.className = "tl-ruler";
+    const step = win <= 15 ? 5 : win <= 30 ? 10 : win <= 60 ? 15 : 30;
+    for (let t = 0; t <= win + 1e-6; t += step) {
+      const tick = document.createElement("span");
+      tick.className = "tl-tick";
+      tick.style.left = (t / win) * 100 + "%";
+      const lbl = document.createElement("span");
+      lbl.className = "tl-tick-lbl";
+      lbl.textContent = fmtMMSS(rowStart + t);
+      tick.appendChild(lbl);
+      ruler.appendChild(tick);
+    }
+    return ruler;
+  }
+
+  _strip(cls, segs, rowStart, win, styleFor) {
+    const strip = document.createElement("div");
+    strip.className = "tl-strip tl-strip-" + cls;
+    const rowEnd = rowStart + win;
+    for (const s of segs) {
+      const st = s.start || 0, en = s.end || 0;
+      if (en <= rowStart || st >= rowEnd) continue; // not in this window
+      const a = Math.max(st, rowStart), b = Math.min(en, rowEnd);
+      const left = ((a - rowStart) / win) * 100;
+      const width = Math.max(0.6, ((b - a) / win) * 100);
+      const sty = styleFor(s);
+      const blk = document.createElement("span");
+      blk.className = "tl-blk";
+      blk.style.left = left + "%";
+      blk.style.width = width + "%";
+      blk.style.background = sty.color;
+      if (sty.title) blk.title = sty.title;
+      if (sty.label && width > 6) {
+        const t = document.createElement("span");
+        t.className = "tl-blk-lbl";
+        t.textContent = sty.label;
+        blk.appendChild(t);
+      }
+      strip.appendChild(blk);
+    }
+    return strip;
+  }
+
+  _turn(m, t, rowStart, win) {
+    const el = document.createElement("div");
+    el.className = "tl-turn";
+    const key = identityKey(t);
+    const color = colorForKey(key);
+    el.style.setProperty("--spk", color);
+
+    const time = document.createElement("span");
+    time.className = "tl-turn-time";
+    time.textContent = fmtMMSS(t.start);
+    el.appendChild(time);
+
+    if (t.speaker != null || t.speaker_id) {
+      const spk = document.createElement("span");
+      spk.className = "tl-turn-spk";
+      spk.textContent = m.labelFor(t);
+      spk.style.background = color;
+      el.appendChild(spk);
+    }
+
+    const txt = document.createElement("span");
+    txt.className = "tl-turn-text";
+    txt.textContent = t.text || "";
+    el.appendChild(txt);
+    return el;
   }
 }

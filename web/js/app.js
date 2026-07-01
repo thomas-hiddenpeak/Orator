@@ -3,7 +3,7 @@
 import { OratorWs } from "./ws.js";
 import { Model } from "./model.js";
 import { MicCapture, streamFile } from "./audio.js";
-import { fmtTime, fmtSec, fmtRtf } from "./format.js";
+import { fmtTime, fmtSec } from "./format.js";
 import { TranscriptView } from "./render/transcript.js";
 import { TimelineView } from "./render/timeline.js";
 import { ObservabilityView } from "./render/observability.js";
@@ -20,12 +20,11 @@ const progressRow = $("progressRow"), progressFill = $("progressFill");
 const durationLabel = $("durationLabel"), statusLabel = $("statusLabel");
 const vadLed = $("vadLed");
 const mAudio = $("mAudio"), mSampleRate = $("mSampleRate");
-const mAsrRtf = $("mAsrRtf"), mDiarRtf = $("mDiarRtf"), mVadRtf = $("mVadRtf");
 const mAsrSeg = $("mAsrSeg"), mDiarSeg = $("mDiarSeg");
 
 const model = new Model();
 const transcript = new TranscriptView($("transcriptList"), $("liveDraft"), $("draftText"));
-const timeline = new TimelineView($("timelineCanvas"));
+const timeline = new TimelineView($("timelineView"));
 const observability = new ObservabilityView($("obsPanel"));
 const sessions = new SessionsView($("sessionList"), (id) => ws.loadSession(id));
 const speakers = new SpeakersView($("speakerList"), (id, name) => ws.renameSpeaker(id, name));
@@ -42,6 +41,7 @@ function scheduleRender() {
   requestAnimationFrame(() => {
     renderPending = false;
     transcript.render(model);
+    timeline.render(model);
     observability.render(model);
     speakers.render(model);
     updateMetrics();
@@ -51,13 +51,6 @@ function scheduleRender() {
 function updateMetrics() {
   mAudio.textContent = model.audioSec ? fmtSec(model.audioSec) : "-";
   mSampleRate.textContent = model.sampleRate || "-";
-  const diar = model.telemetry.get("diarization");
-  const asr = model.telemetry.get("asr");
-  const vad = model.telemetry.get("vad");
-  const live = (t, fallback) => (t && t.rtf.length ? fmtRtf(t.rtf[t.rtf.length - 1]) : fallback);
-  mDiarRtf.textContent = live(diar, model.trackRtf("diarization") != null ? fmtRtf(model.trackRtf("diarization")) : "-");
-  mAsrRtf.textContent = live(asr, model.trackRtf("asr") != null ? fmtRtf(model.trackRtf("asr")) : "-");
-  mVadRtf.textContent = live(vad, model.trackRtf("vad") != null ? fmtRtf(model.trackRtf("vad")) : "-");
   mAsrSeg.textContent = model.tracks.asr.length || model.asr.size || 0;
   mDiarSeg.textContent = model.tracks.diarization.length || 0;
   vadLed.classList.toggle("active", model.vadSpeech);

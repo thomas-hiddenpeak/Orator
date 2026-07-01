@@ -12,6 +12,16 @@ Dates in `YYYY-MM-DD` format.
 ## [Unreleased]
 
 ### Added
+- Web UI timeline redesign (Spec 006): the horizontally-scrolling canvas is
+  replaced by a wrapping, row-based timeline. The session is split into fixed
+  time windows; each is one full-width row that wraps to the next line (no
+  horizontal scroll). Every row carries its own time axis (mm:ss ruler) and the
+  pipelines are aligned on it — a diarization strip (speaker-coloured blocks) and
+  a VAD strip positioned by time, plus the transcript shown as the
+  alignment-refined, speaker-attributed comprehensive turns (NOT the raw ASR
+  blocks) on their true timecodes and fully readable. Layout reorg: Pipeline
+  Observability moved above the transcript with the Metrics summary merged into
+  it; the Speakers panel moved into the right column.
 - Speaker identity + naming UI (Spec 010 / Spec 006). New WS commands
   `{"speakers"}` (list the session's global identities + display names) and
   `{"rename_speaker":{"id","name"}}` (set + persist a display name), backed by

@@ -51,7 +51,25 @@
         </div>
       </section>
 
-      <!-- Main Content -->
+      <!-- Live Observability Panel (Spec 011 telemetry) + merged Metrics -->
+      <section class="panel obs-section" aria-label="Live pipeline observability">
+        <div class="panel-header">
+          <h2 class="panel-title">Pipeline Observability</h2>
+          <span class="obs-hint">RTF · scheduling · backlog (live)</span>
+          <button id="downloadBtn" class="btn btn-sm btn-outline hidden" aria-label="Download timeline as JSON">
+            <span class="btn-icon" aria-hidden="true">&#x1F4E5;</span> JSON
+          </button>
+        </div>
+        <div class="obs-summary" aria-label="Session metrics">
+          <div class="obs-stat"><span class="obs-stat-label">Audio</span><span class="obs-stat-val" id="mAudio" aria-live="polite">-</span></div>
+          <div class="obs-stat"><span class="obs-stat-label">Sample Rate</span><span class="obs-stat-val" id="mSampleRate" aria-live="polite">-</span></div>
+          <div class="obs-stat"><span class="obs-stat-label">ASR Segments</span><span class="obs-stat-val" id="mAsrSeg" aria-live="polite">0</span></div>
+          <div class="obs-stat"><span class="obs-stat-label">Diar Segments</span><span class="obs-stat-val" id="mDiarSeg" aria-live="polite">0</span></div>
+        </div>
+        <div id="obsPanel" class="obs-grid" role="group" aria-label="Per-pipeline live metrics"></div>
+      </section>
+
+      <!-- Main Content: transcript (left) + speakers (right) -->
       <div class="main-grid">
         <!-- Transcript Panel (Left) -->
         <section class="panel transcript-panel" aria-label="Transcript">
@@ -63,77 +81,30 @@
           </div>
         </section>
 
-        <!-- Metrics Panel (Right) -->
-        <section class="panel metrics-panel" aria-label="Performance metrics">
-          <h2 class="panel-title">Metrics</h2>
-          <div class="metrics-grid">
-            <div class="metric-card">
-              <span class="metric-label">Audio</span>
-              <span class="metric-value" id="mAudio" aria-live="polite">-</span>
-            </div>
-            <div class="metric-card">
-              <span class="metric-label">Sample Rate</span>
-              <span class="metric-value" id="mSampleRate" aria-live="polite">-</span>
-            </div>
-            <div class="metric-card">
-              <span class="metric-label">ASR RTF</span>
-              <span class="metric-value" id="mAsrRtf" aria-live="polite">-</span>
-            </div>
-            <div class="metric-card">
-              <span class="metric-label">Diar RTF</span>
-              <span class="metric-value" id="mDiarRtf" aria-live="polite">-</span>
-            </div>
-            <div class="metric-card">
-              <span class="metric-label">ASR Segments</span>
-              <span class="metric-value" id="mAsrSeg" aria-live="polite">0</span>
-            </div>
-            <div class="metric-card">
-              <span class="metric-label">Diar Segments</span>
-              <span class="metric-value" id="mDiarSeg" aria-live="polite">0</span>
-            </div>
-            <div class="metric-card">
-              <span class="metric-label">VAD RTF</span>
-              <span class="metric-value" id="mVadRtf" aria-live="polite">-</span>
-            </div>
+        <!-- Speaker Identity Panel (Spec 010) — right column -->
+        <section class="panel speaker-panel" aria-label="Speaker identities">
+          <div class="panel-header">
+            <h2 class="panel-title">Speakers</h2>
+            <button id="refreshSpeakersBtn" class="btn btn-sm btn-outline" title="Refresh speaker list" aria-label="Refresh speaker list">⟳</button>
           </div>
-          <button id="downloadBtn" class="btn btn-outline btn-full hidden" aria-label="Download timeline as JSON">
-            <span class="btn-icon" aria-hidden="true">&#x1F4E5;</span> Download JSON
-          </button>
+          <div id="speakerList" class="speaker-list" role="list" aria-label="Identified speakers (rename to label)">
+            <div class="spk-empty">No speakers identified yet</div>
+          </div>
         </section>
       </div>
 
-      <!-- Timeline Panel -->
+      <!-- Timeline Panel (wrapping, row-based; each row carries a time axis) -->
       <section class="panel timeline-panel" aria-label="Timeline visualization">
         <div class="timeline-header">
           <h2 class="panel-title">Timeline</h2>
           <div class="timeline-controls">
-            <button id="zoomInBtn" class="btn btn-sm btn-outline" title="Zoom in" aria-label="Zoom in">+</button>
-            <button id="zoomOutBtn" class="btn btn-sm btn-outline" title="Zoom out" aria-label="Zoom out">−</button>
-            <button id="zoomResetBtn" class="btn btn-sm btn-outline" title="Reset zoom" aria-label="Reset zoom">⟲</button>
+            <button id="zoomInBtn" class="btn btn-sm btn-outline" title="More detail per row" aria-label="More detail per row">+</button>
+            <button id="zoomOutBtn" class="btn btn-sm btn-outline" title="Less detail per row" aria-label="Less detail per row">−</button>
+            <button id="zoomResetBtn" class="btn btn-sm btn-outline" title="Reset" aria-label="Reset">⟲</button>
           </div>
         </div>
-        <div class="timeline-canvas-wrap" role="img" aria-label="Interactive audio timeline with four tracks: diarization, ASR, VAD, and forced alignment">
-          <canvas id="timelineCanvas" tabindex="0" role="img" aria-label="Timeline canvas"></canvas>
-        </div>
-      </section>
-
-      <!-- Live Observability Panel (Spec 011 telemetry) -->
-      <section class="panel obs-section" aria-label="Live pipeline observability">
-        <div class="panel-header">
-          <h2 class="panel-title">Pipeline Observability</h2>
-          <span class="obs-hint">RTF · scheduling · backlog (live)</span>
-        </div>
-        <div id="obsPanel" class="obs-grid" role="group" aria-label="Per-pipeline live metrics"></div>
-      </section>
-
-      <!-- Speaker Identity Panel (Spec 010) -->
-      <section class="panel speaker-panel" aria-label="Speaker identities">
-        <div class="panel-header">
-          <h2 class="panel-title">Speakers</h2>
-          <button id="refreshSpeakersBtn" class="btn btn-sm btn-outline" title="Refresh speaker list" aria-label="Refresh speaker list">⟳</button>
-        </div>
-        <div id="speakerList" class="speaker-list" role="list" aria-label="Identified speakers (rename to label)">
-          <div class="spk-empty">No speakers identified yet</div>
+        <div id="timelineView" class="timeline-view" role="group" aria-label="Row-based timeline: each row is a time window with diarization, VAD and the aligned transcript on a shared time axis">
+          <div class="tl-empty">No timeline yet — stream audio, then Flush/End</div>
         </div>
       </section>
 
