@@ -51,6 +51,16 @@ Dates in `YYYY-MM-DD` format.
   connection alive — telemetry + the next timeline resync the client); and the
   libwebsockets log level drops from `LLL_DEBUG` to `LLL_ERR|LLL_WARN`
   (the debug flood was ~640k lines / 24 min of pure I/O — now ~10 lines).
+  The decisive fix: `LWS_CALLBACK_SERVER_WRITEABLE` drained the whole queue
+  into `lws_write` every callback, but `lws_write` always accepts the payload
+  into its internal buflist, so a slow reader still let *that* buffer grow
+  unbounded until lws force-closed (client "Broken pipe"; earlier runs dropped
+  at 1474 s then 1981 s even with the queue cap). The drain loop now checks
+  `lws_send_pipe_choked(wsi)` before each write and stops when the pipe is
+  choked, re-queuing the unsent messages at the front of `pending_text_` (then
+  re-applying the 2048 bound) so lws' own buffer stays small. Validated on a
+  full-length real-time run: connection survived all 3615.12 s (`stream_rt=0.999x`),
+  the final timeline was delivered, no server errors, log stayed at ~10 lines.
 - VAD speech endpoints now actually close ASR segments (root-cause fix). The
   VAD-gate close fired only on "confirmed silence" (`end_sec <= horizon`), which
   in steady real-time essentially never holds — the ASR head runs in lockstep

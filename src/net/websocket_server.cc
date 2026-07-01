@@ -303,6 +303,16 @@ int ws_callback(struct lws* wsi, enum lws_callback_reasons reason, void* user,
         }
         size_t sent = 0;
         for (const auto& text : to_send) {
+          // Backpressure guard: if the outbound socket is choked, stop feeding
+          // lws.  lws_write() always accepts the whole payload into its
+          // internal buflist, so draining the entire queue every callback lets
+          // that buflist grow without bound when the client reads slowly —
+          // eventually lws force-closes the connection (observed as a client
+          // "Broken pipe" mid-stream).  Leaving the remaining messages queued
+          // (and re-applying the bound below) keeps the pipe healthy.
+          if (lws_send_pipe_choked(pss->conn.wsi_)) {
+            break;
+          }
           std::vector<uint8_t> buf(LWS_PRE + text.size());
           std::memcpy(buf.data() + LWS_PRE, text.data(), text.size());
           int ret = lws_write(pss->conn.wsi_, buf.data() + LWS_PRE, text.size(),
@@ -316,6 +326,24 @@ int ws_callback(struct lws* wsi, enum lws_callback_reasons reason, void* user,
             break;
           }
           ++sent;
+        }
+        // Re-queue whatever we could not send (pipe choked) at the front of the
+        // pending queue so ordering is preserved, then re-apply the outbound
+        // bound: a persistently slow client drops oldest intermediate messages
+        // instead of forcing an lws-side disconnect.
+        if (sent < to_send.size() && !pss->conn.closed()) {
+          std::lock_guard<std::mutex> lk(*pss->conn.mu_);
+          pss->conn.pending_text_.insert(
+              pss->conn.pending_text_.begin(),
+              std::make_move_iterator(to_send.begin() + sent),
+              std::make_move_iterator(to_send.end()));
+          static constexpr size_t kMaxPendingText = 2048;
+          if (pss->conn.pending_text_.size() > kMaxPendingText) {
+            pss->conn.pending_text_.erase(
+                pss->conn.pending_text_.begin(),
+                pss->conn.pending_text_.begin() +
+                    (pss->conn.pending_text_.size() - kMaxPendingText));
+          }
         }
         // Reset flow-control flags so the next SendText/lws_cancel_service
         // cycle can schedule a fresh writable callback.  This must happen
