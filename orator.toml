@@ -209,13 +209,17 @@ spkcache_refresh_rate = 100
 # Minimum gap to merge same-speaker segments (seconds). Larger = fewer fragments. (default 1.0)
 # min_dur_off = 1.0
 
-# Periodically reset the diarizer streaming state (seconds; 0 = never). The fixed
-# speaker cache degrades over a long continuous session (late-window accuracy
-# drops ~66% by 30 min); resetting keeps each window in the model's accurate
-# regime (~83%) and the voiceprint stage stitches the per-session speaker slots
-# back into stable global identities. Never triggers for sessions shorter than
-# the period. (default 600)
-# reset_period_sec = 600
+# Periodically reset the diarizer streaming state (seconds; 0 = never, DEFAULT).
+# The reset was a workaround for the SYNC path (fifo_len=0), whose fixed speaker
+# cache saturates over a long continuous session; it chopped the stream into
+# fixed windows and re-stitched speaker slots across them with the voiceprint
+# stage, which over-creates global ids (one real speaker fragments into several).
+# The ASYNC path (fifo_len=188 above) refreshes the spkcache continuously and
+# does NOT saturate, so the reset is disabled: the diarizer keeps stable speaker
+# slots for the whole meeting and each slot resolves to ONE global identity
+# (measured: 4 speakers -> exactly 4 stable ids). Leave at 0 unless you run the
+# sync path (fifo_len = 0).
+# reset_period_sec = 0
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Storage — protocol timeline persistence

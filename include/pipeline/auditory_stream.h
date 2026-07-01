@@ -118,8 +118,12 @@ class AuditoryStream {
     int diar_chunk_left_context = 1;        // left context chunks
     int diar_chunk_right_context = 40;      // right context chunks
     int diar_spkcache_sil_frames = 5;       // silent frames before cache reset
-    int diar_fifo_len = 0;  // FIFO length for async streaming (0=off)
-    int diar_spkcache_refresh_rate = 0;  // cache refresh cadence (0=drain all)
+    int diar_fifo_len = 188;  // FIFO length for async streaming (0=off). Async
+                              // (NeMo streaming_update_async) keeps the 188-frame
+                              // spkcache from saturating over a long continuous
+                              // session, so speaker slots stay stable for the
+                              // whole meeting and no periodic reset is needed.
+    int diar_spkcache_refresh_rate = 100;  // cache refresh cadence (0=drain all)
     bool diar_use_silence_profile =
         false;  // v2.1: use silence profile in cache
     // Onset/offset post-processing (NeMo-style double threshold)
@@ -132,12 +136,16 @@ class AuditoryStream {
     double diar_pad_offset = 0.0;  // extra time added after each segment end
     double diar_min_dur_on = 0.5;  // minimum segment duration (seconds)
     double diar_min_dur_off = 1.0;  // minimum gap to merge segments (seconds)
-    // Spec 010: periodically reset the diarizer streaming state (0 = never) so
-    // each window stays in the model's accurate regime; the voiceprint stage
-    // stitches the per-session slots into stable global identities. Default 600s
-    // recovers the late-session degradation (1800-2400s window 66% -> 83%); it
-    // never triggers for sessions shorter than the period.
-    double diar_reset_period_sec = 600.0;
+    // Periodically reset the diarizer streaming state (0 = never). This was a
+    // workaround for the SYNC streaming path (fifo_len=0), whose fixed spkcache
+    // saturates over a long continuous session (late-window ~66%), recovered by
+    // a fresh session (~83%) plus per-session voiceprint re-stitching. The ASYNC
+    // path (fifo_len>0, the default) refreshes the spkcache continuously and does
+    // NOT saturate, so the reset is unnecessary and OFF by default: the diarizer
+    // keeps stable speaker slots for the whole session and the voiceprint stage
+    // resolves each slot to one global identity (measured: 4 speakers -> 4 stable
+    // global ids, vs the reset path's per-session slot churn -> id over-creation).
+    double diar_reset_period_sec = 0.0;
 
     // ── Speaker identity (Spec 010, post-diarization stage) ──────────
     bool speaker_enable = false;  // master switch (also needs model dir)
