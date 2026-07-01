@@ -38,6 +38,12 @@
             <span class="btn-icon" aria-hidden="true">&#x1F5D1;</span> Clear
           </button>
         </div>
+        <div class="top-metrics" aria-label="Session metrics">
+          <div class="top-metric"><span class="top-metric-label">Audio</span><span class="top-metric-val" id="mAudio" aria-live="polite">-</span></div>
+          <div class="top-metric"><span class="top-metric-label">Sample Rate</span><span class="top-metric-val" id="mSampleRate" aria-live="polite">-</span></div>
+          <div class="top-metric"><span class="top-metric-label">ASR Segments</span><span class="top-metric-val" id="mAsrSeg" aria-live="polite">0</span></div>
+          <div class="top-metric"><span class="top-metric-label">Diar Segments</span><span class="top-metric-val" id="mDiarSeg" aria-live="polite">0</span></div>
+        </div>
         <div class="vad-led-wrap">
           <span id="vadLed" class="vad-led" role="status" aria-live="polite">●</span>
           <span class="vad-led-label">VAD</span>
@@ -60,21 +66,15 @@
             <span class="btn-icon" aria-hidden="true">&#x1F4E5;</span> JSON
           </button>
         </div>
-        <div class="obs-summary" aria-label="Session metrics">
-          <div class="obs-stat"><span class="obs-stat-label">Audio</span><span class="obs-stat-val" id="mAudio" aria-live="polite">-</span></div>
-          <div class="obs-stat"><span class="obs-stat-label">Sample Rate</span><span class="obs-stat-val" id="mSampleRate" aria-live="polite">-</span></div>
-          <div class="obs-stat"><span class="obs-stat-label">ASR Segments</span><span class="obs-stat-val" id="mAsrSeg" aria-live="polite">0</span></div>
-          <div class="obs-stat"><span class="obs-stat-label">Diar Segments</span><span class="obs-stat-val" id="mDiarSeg" aria-live="polite">0</span></div>
-        </div>
         <div id="obsPanel" class="obs-grid" role="group" aria-label="Per-pipeline live metrics"></div>
       </section>
 
       <!-- Main Content: transcript (left) + speakers (right) -->
       <div class="main-grid">
-        <!-- Transcript Panel (Left) -->
-        <section class="panel transcript-panel" aria-label="Transcript">
-          <h2 class="panel-title">Transcript</h2>
-          <div id="transcriptList" class="transcript-list" role="log" aria-live="polite" aria-label="Live transcript entries"></div>
+        <!-- Live Panel (comprehensive timeline visualization, speaker-grouped) -->
+        <section class="panel live-panel" aria-label="Live transcript">
+          <h2 class="panel-title">Live</h2>
+          <div id="transcriptList" class="live-list" role="log" aria-live="polite" aria-label="Live comprehensive turns grouped by speaker"></div>
           <div id="liveDraft" class="live-draft hidden" role="status" aria-live="assertive">
             <span class="draft-pulse" aria-hidden="true">&#x270F;</span>
             <span id="draftText"></span>
@@ -93,17 +93,12 @@
         </section>
       </div>
 
-      <!-- Timeline Panel (wrapping, row-based; each row carries a time axis) -->
-      <section class="panel timeline-panel" aria-label="Timeline visualization">
+      <!-- Timeline Panel — comprehensive timeline raw data -->
+      <section class="panel timeline-panel" aria-label="Timeline data">
         <div class="timeline-header">
-          <h2 class="panel-title">Timeline</h2>
-          <div class="timeline-controls">
-            <button id="zoomInBtn" class="btn btn-sm btn-outline" title="More detail per row" aria-label="More detail per row">+</button>
-            <button id="zoomOutBtn" class="btn btn-sm btn-outline" title="Less detail per row" aria-label="Less detail per row">−</button>
-            <button id="zoomResetBtn" class="btn btn-sm btn-outline" title="Reset" aria-label="Reset">⟲</button>
-          </div>
+          <h2 class="panel-title">Timeline Data</h2>
         </div>
-        <div id="timelineView" class="timeline-view" role="group" aria-label="Row-based timeline: each row is a time window with diarization, VAD and the aligned transcript on a shared time axis">
+        <div id="timelineView" class="timeline-view" role="group" aria-label="Comprehensive timeline entries as formatted table">
           <div class="tl-empty">No timeline yet — stream audio, then Flush/End</div>
         </div>
       </section>

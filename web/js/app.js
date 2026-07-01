@@ -195,9 +195,6 @@ const refreshBtn = $("refreshSessionsBtn");
 if (refreshBtn) refreshBtn.addEventListener("click", () => ws.sessions());
 const refreshSpk = $("refreshSpeakersBtn");
 if (refreshSpk) refreshSpk.addEventListener("click", () => ws.speakers());
-$("zoomInBtn").addEventListener("click", () => timeline.zoom(1.4));
-$("zoomOutBtn").addEventListener("click", () => timeline.zoom(0.7));
-$("zoomResetBtn").addEventListener("click", () => timeline.fit());
 
 /* ── mic progress timer ── */
 let timerStart = 0, timerHandle = null;
