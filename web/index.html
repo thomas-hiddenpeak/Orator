@@ -126,6 +126,17 @@
         <div id="obsPanel" class="obs-grid" role="group" aria-label="Per-pipeline live metrics"></div>
       </section>
 
+      <!-- Speaker Identity Panel (Spec 010) -->
+      <section class="panel speaker-panel" aria-label="Speaker identities">
+        <div class="panel-header">
+          <h2 class="panel-title">Speakers</h2>
+          <button id="refreshSpeakersBtn" class="btn btn-sm btn-outline" title="Refresh speaker list" aria-label="Refresh speaker list">⟳</button>
+        </div>
+        <div id="speakerList" class="speaker-list" role="list" aria-label="Identified speakers (rename to label)">
+          <div class="spk-empty">No speakers identified yet</div>
+        </div>
+      </section>
+
       <!-- Session History Panel -->
       <section class="panel session-panel" aria-label="Session history">
         <div class="panel-header">

@@ -30,6 +30,7 @@
 #include <functional>
 #include <map>
 #include <mutex>
+#include <set>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -114,6 +115,12 @@ class ComprehensiveTimeline {
   // voiceprint id (Spec 010), for serializing the global identity onto the
   // comprehensive view's speaker turns. Empty ids are omitted.
   std::map<std::string, std::string> SpeakerLabelIds() const;
+
+  // Every distinct global voiceprint id assigned to a speaker turn over the
+  // whole session (accumulated; not just the current diarizer window). This is
+  // what a management UI should list, since the transcript accumulates ids the
+  // same way while SpeakerLabelIds() only reflects the <=N current slots.
+  std::vector<std::string> AllSpeakerIds() const;
 
   // The forced-alignment groups (one per aligned text segment, ordered by
   // start), for the serialized align track. Each refines an ASR segment into
@@ -206,6 +213,7 @@ class ComprehensiveTimeline {
   void ReprojectText(const TextSeg& t, std::vector<Revision>* out);
 
   std::vector<SpeakerSeg> speakers_;  // diar track: who/when (overlaps allowed)
+  std::set<std::string> seen_speaker_ids_;  // every global id ever assigned
   std::vector<TextSeg> texts_;        // asr track: what/when, keyed by id
   std::vector<VadSeg> vad_;           // vad track: speech segments
   // align track: per-unit timestamps refining an ASR segment, keyed by text_id.

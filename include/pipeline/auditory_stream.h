@@ -222,6 +222,14 @@ class AuditoryStream {
   // Spec 004 Phase 13: access to session store for session list/load.
   protocol::SessionStore* session_store() const { return session_store_.get(); }
 
+  // Spec 006: speaker registry for the Web UI naming/management panel.
+  // SerializeSpeakers lists the global identities resolved in this session
+  // (id + display name) as {"type":"speakers","speakers":[{"id","name"}...]}.
+  // RenameSpeaker sets a display name and persists the registry; both are
+  // safe to call from the WS thread (comp_mutex_ + the database's name mutex).
+  std::string SerializeSpeakers() const;
+  bool RenameSpeaker(const std::string& speaker_id, const std::string& name);
+
  private:
   void StartWorkers();  // start diar + asr threads
   void StopWorkers();   // close buffer, join threads
@@ -332,7 +340,7 @@ class AuditoryStream {
   // serialize (frame->segment is global). Guarded by comp_mutex_ because the
   // ASR worker thread and the controller both touch it.
   ComprehensiveTimeline comp_;
-  std::mutex comp_mutex_;
+  mutable std::mutex comp_mutex_;
 
   // Spec 004 Phase 12: protocol timeline for pipeline registration and routing.
   // Bridges to ComprehensiveTimeline for the comprehensive view.

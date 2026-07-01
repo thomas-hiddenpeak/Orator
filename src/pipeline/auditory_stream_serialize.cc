@@ -15,6 +15,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <map>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -271,6 +272,48 @@ std::string AuditoryStream::Serialize() {
   }
   out += "]}";
   return out;
+}
+
+// ---------------------------------------------------------------------------
+// Spec 006: speaker registry list + rename for the Web UI naming panel.
+// ---------------------------------------------------------------------------
+std::string AuditoryStream::SerializeSpeakers() const {
+  // List every global identity resolved anywhere in this session (accumulated
+  // in the comprehensive timeline, read under comp_mutex_), joined with the
+  // display names from the speaker database (its own name mutex). Using the
+  // accumulated set — not the <=N current diarizer-slot mappings — keeps the
+  // speaker panel consistent with the transcript, which accumulates ids the
+  // same way. (This avoids racing the diarization thread on the database's
+  // embedding/id vectors.)
+  std::vector<std::string> id_list;
+  {
+    std::lock_guard<std::mutex> lk(comp_mutex_);
+    id_list = comp_.AllSpeakerIds();
+  }
+  std::string out = "{\"type\":\"speakers\",\"speakers\":[";
+  bool first = true;
+  for (const auto& id : id_list) {
+    if (id.empty()) continue;
+    if (!first) out += ",";
+    first = false;
+    const std::string nm =
+        speaker_db_ ? speaker_db_->DisplayName(id) : std::string();
+    out += "{\"id\":\"" + id + "\",\"name\":\"" + JsonEscape(nm) + "\"}";
+  }
+  out += "]}";
+  return out;
+}
+
+bool AuditoryStream::RenameSpeaker(const std::string& speaker_id,
+                                   const std::string& name) {
+  if (!speaker_db_ || speaker_id.empty()) return false;
+  speaker_db_->SetDisplayName(speaker_id, name);  // name-mutex protected
+  // Persist so the name survives a restart. The names sidecar is small; the
+  // rename is user-initiated and rare, so the brief overlap with enrollment is
+  // acceptable.
+  if (!config_.speaker_registry_path.empty())
+    speaker_db_->Save(config_.speaker_registry_path);
+  return true;
 }
 
 }  // namespace pipeline

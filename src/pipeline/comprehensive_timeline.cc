@@ -314,6 +314,7 @@ ComprehensiveTimeline::ReplaceSpeakers(const std::vector<SpeakerInput>& segs) {
     seg.speaker = s.speaker;
     seg.conf = s.conf;
     seg.speaker_id = s.speaker_id;
+    if (!s.speaker_id.empty()) seen_speaker_ids_.insert(s.speaker_id);
     auto pos = std::lower_bound(
         speakers_.begin(), speakers_.end(), s.start,
         [](const SpeakerSeg& a, double v) { return a.start < v; });
@@ -324,6 +325,10 @@ ComprehensiveTimeline::ReplaceSpeakers(const std::vector<SpeakerInput>& segs) {
   revs.reserve(texts_.size());  // Maximum possible revisions
   for (const auto& t : texts_) ReprojectText(t, &revs);
   return revs;
+}
+
+std::vector<std::string> ComprehensiveTimeline::AllSpeakerIds() const {
+  return {seen_speaker_ids_.begin(), seen_speaker_ids_.end()};
 }
 
 std::map<std::string, std::string> ComprehensiveTimeline::SpeakerLabelIds()

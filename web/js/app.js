@@ -8,6 +8,7 @@ import { TranscriptView } from "./render/transcript.js";
 import { TimelineView } from "./render/timeline.js";
 import { ObservabilityView } from "./render/observability.js";
 import { SessionsView } from "./render/sessions.js";
+import { SpeakersView } from "./render/speakers.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -27,6 +28,7 @@ const transcript = new TranscriptView($("transcriptList"), $("liveDraft"), $("dr
 const timeline = new TimelineView($("timelineCanvas"));
 const observability = new ObservabilityView($("obsPanel"));
 const sessions = new SessionsView($("sessionList"), (id) => ws.loadSession(id));
+const speakers = new SpeakersView($("speakerList"), (id, name) => ws.renameSpeaker(id, name));
 timeline.setModel(model);
 
 let micRunning = false, fileSending = false, lastError = "";
@@ -41,6 +43,7 @@ function scheduleRender() {
     renderPending = false;
     transcript.render(model);
     observability.render(model);
+    speakers.render(model);
     updateMetrics();
   });
 }
@@ -67,6 +70,7 @@ const ws = new OratorWs({
     setConn(true);
     ws.describe();
     setTimeout(() => ws.sessions(), 500);
+    setTimeout(() => ws.speakers(), 600);
   },
   onClose() { setConn(false); },
   onError() { showError("WebSocket connection error"); },
@@ -87,8 +91,10 @@ const ws = new OratorWs({
         model.applyTimeline(msg);
         downloadBtn.classList.remove("hidden");
         timeline.fit();
+        ws.speakers();
         break;
       case "sessions": sessions.render(msg); break;
+      case "speakers": model.applySpeakers(msg); break;
       case "reset_ok": flashBadge("✓ Reset"); setTimeout(() => ws.sessions(), 800); break;
       case "describe": console.log("[describe]", msg); break;
       case "error": showError(msg.error || "server error"); break;
@@ -176,7 +182,7 @@ flushBtn.addEventListener("click", () => ws.flush());
 endBtn.addEventListener("click", () => { if (micRunning) stopMic(); ws.end(); });
 clearBtn.addEventListener("click", () => {
   model.reset();
-  transcript.clear(); observability.clear();
+  transcript.clear(); observability.clear(); speakers.clear();
   timeline.setModel(model); timeline.schedule();
   downloadBtn.classList.add("hidden");
   progressRow.hidden = true; progressFill.style.width = "0%";
@@ -194,6 +200,8 @@ downloadBtn.addEventListener("click", () => {
 });
 const refreshBtn = $("refreshSessionsBtn");
 if (refreshBtn) refreshBtn.addEventListener("click", () => ws.sessions());
+const refreshSpk = $("refreshSpeakersBtn");
+if (refreshSpk) refreshSpk.addEventListener("click", () => ws.speakers());
 $("zoomInBtn").addEventListener("click", () => timeline.zoom(1.4));
 $("zoomOutBtn").addEventListener("click", () => timeline.zoom(0.7));
 $("zoomResetBtn").addEventListener("click", () => timeline.fit());

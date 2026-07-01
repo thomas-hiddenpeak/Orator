@@ -142,7 +142,7 @@ export class TimelineView {
         if (bw > 44) {
           c.fillStyle = "#0b0d12"; c.font = "bold 10px Inter, system-ui, sans-serif";
           c.textAlign = "left"; c.textBaseline = "middle";
-          c.fillText(identityLabel(e), x + 4, y + TRACK_H / 2);
+          c.fillText(m.labelFor(e), x + 4, y + TRACK_H / 2);
         }
       }
     })();

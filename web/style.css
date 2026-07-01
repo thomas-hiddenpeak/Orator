@@ -433,3 +433,25 @@ body {
 }
 .obs-warn.hidden { display: none; }
 
+/* ── Speaker identity + naming panel (Spec 010) ── */
+.speaker-list { display: flex; flex-direction: column; gap: 6px; }
+.spk-empty { color: #8b90a0; font-size: 13px; padding: 6px 0; }
+.spk-row { display: flex; align-items: center; gap: 8px; }
+.spk-swatch { width: 14px; height: 14px; border-radius: 4px; flex: 0 0 auto; }
+.spk-id {
+  font-variant-numeric: tabular-nums; font-size: 12px; color: #c9cdd8;
+  min-width: 54px;
+}
+.spk-name {
+  flex: 1 1 auto; min-width: 0; padding: 4px 8px; font-size: 13px;
+  background: #15181f; color: #e6e9ef;
+  border: 1px solid var(--border, #2e3345); border-radius: 6px;
+}
+.spk-name:focus { outline: none; border-color: var(--accent, #5b8def); }
+.spk-save {
+  font-size: 11px; padding: 4px 10px; border-radius: 6px; cursor: pointer;
+  border: 1px solid var(--border, #2e3345); background: transparent;
+  color: var(--accent, #5b8def);
+}
+.spk-save:hover { background: var(--accent, #5b8def); color: #fff; }
+

@@ -74,7 +74,7 @@ export class OratorWs {
     const known = new Set([
       "ready", "asr_partial", "asr", "revision", "align", "vad_state",
       "diar", "vad", "timeline", "gpu_telemetry", "cursor_progress",
-      "sessions", "reset_ok", "describe", "error",
+      "sessions", "speakers", "reset_ok", "describe", "error",
     ]);
     if (known.has(msg.type)) {
       if (this.h.onMessage) this.h.onMessage(msg.type, msg);
@@ -107,6 +107,8 @@ export class OratorWs {
   describe()        { this.send({ cmd: "describe" }); }
   sessions()        { this.send({ cmd: "sessions" }); }
   loadSession(id)   { this.send({ cmd: "load_session", session_id: id }); }
+  speakers()        { this.send({ cmd: "speakers" }); }
+  renameSpeaker(id, name) { this.send({ rename_speaker: { id, name } }); }
   flush()           { this.send({ flush: 1 }); }
   end()             { this.send({ end: 1 }); }
   reset()           { this.send({ reset: 1 }); }

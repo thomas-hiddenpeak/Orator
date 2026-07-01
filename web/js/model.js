@@ -35,6 +35,9 @@ export class Model {
 
     // Speaker registry: key -> {label, color}; filled lazily by renderers.
     this.speakers = new Map();
+    // Global identity display names: speaker_id -> name (from the `speakers`
+    // command and from speaker_name fields on revisions/timeline).
+    this.speakerNames = new Map();
 
     // Telemetry: per-pipeline ring buffers + latest scheduling state.
     // pipe -> { rtf:[], backlogSec:[], class, cudaPriority, active, computeSec }
@@ -137,6 +140,7 @@ export class Model {
     // Reconcile comprehensive turns + transcript identity from the final doc.
     for (const e of (msg.comprehensive || [])) {
       if (e.text_id == null) continue;
+      if (e.speaker_id && e.speaker_name) this.speakerNames.set(e.speaker_id, e.speaker_name);
       this.turns.set(e.text_id, {
         text_id: e.text_id, start: e.start, end: e.end,
         speaker: e.speaker, speaker_id: e.speaker_id, speaker_name: e.speaker_name,
@@ -154,6 +158,28 @@ export class Model {
   trackRtf(kind) {
     const t = this.timeline && (this.timeline.tracks || []).find((x) => x.kind === kind);
     return t ? t.real_time_factor : null;
+  }
+
+  // Speaker registry list from the `speakers` command: [{id,name}].
+  applySpeakers(msg) {
+    if (!Array.isArray(msg.speakers)) return;
+    for (const s of msg.speakers) {
+      if (s.id) this.speakerNames.set(s.id, s.name || "");
+    }
+  }
+
+  // Best display label for a diar/comprehensive entry: an explicit name field,
+  // else a renamed global id from the registry, else the global id, else local.
+  labelFor(entry) {
+    if (!entry) return "S?";
+    if (entry.speaker_name) return String(entry.speaker_name);
+    if (entry.speaker_id) {
+      const nm = this.speakerNames.get(entry.speaker_id);
+      if (nm) return nm;
+      return String(entry.speaker_id);
+    }
+    if (entry.speaker != null && entry.speaker >= 0) return "S" + entry.speaker;
+    return "S?";
   }
 
   _pipe(name) {

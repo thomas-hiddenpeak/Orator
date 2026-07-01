@@ -37,7 +37,7 @@ export class TranscriptView {
         this.list.appendChild(el);
         this._prune();
       }
-      this._update(el, row, model.alignUnits.get(id));
+      this._update(el, row, model.alignUnits.get(id), model);
     }
     this.list.scrollTop = this.list.scrollHeight;
   }
@@ -54,13 +54,13 @@ export class TranscriptView {
     return div;
   }
 
-  _update(el, row, units) {
+  _update(el, row, units, model) {
     el.className = "t-item " + (row.status || "");
-    el.querySelector(".t-time").textContent = fmtTime(row.start) + "–" + fmtTime(row.end);
+    el.querySelector(".t-time").textContent = fmtTime(row.start) + "\u2013" + fmtTime(row.end);
     const key = identityKey(row);
     const spk = el.querySelector(".t-speaker");
     if (row.speaker != null || row.speaker_id) {
-      spk.textContent = identityLabel(row);
+      spk.textContent = model ? model.labelFor(row) : identityLabel(row);
       spk.style.background = colorForKey(key);
       spk.style.color = "#0b0d12";
     } else {

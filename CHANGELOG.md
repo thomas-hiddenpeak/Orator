@@ -12,6 +12,16 @@ Dates in `YYYY-MM-DD` format.
 ## [Unreleased]
 
 ### Added
+- Speaker identity + naming UI (Spec 010 / Spec 006). New WS commands
+  `{"speakers"}` (list the session's global identities + display names) and
+  `{"rename_speaker":{"id","name"}}` (set + persist a display name), backed by
+  `AuditoryStream::SerializeSpeakers`/`RenameSpeaker` and
+  `ComprehensiveTimeline::AllSpeakerIds` (the accumulated distinct global ids,
+  so the panel matches the transcript rather than only the ≤N current diarizer
+  slots that `SpeakerLabelIds` exposes). The Web UI gains a Speakers panel
+  (`web/js/render/speakers.js`) listing each identity with a stable color and an
+  editable name; the transcript and timeline show the display name (via
+  `model.labelFor`) once set.
 - Observability dashboard (Spec 011 Phase 2) — the offline rerun module now
   presents a full **engineered dashboard** across six dimensions on one
   `audio_time` axis: pipelines (diar/asr/vad/align), comprehensive timeline
@@ -31,6 +41,16 @@ Dates in `YYYY-MM-DD` format.
   stream_rt 0.964×).
 
 ### Fixed
+- WebSocket backpressure drop ("WS drops after a while", server stays alive):
+  a slow/congested client let the per-connection outbound queue grow without
+  bound until libwebsockets buffered megabytes and closed the connection (seen
+  at ~24 min in a full-length run, ~600 KB buffered). Three fixes: `vad_state`
+  is emitted only on a speech↔silence transition instead of every frame
+  (~10/s → ~0.6/s; validated 42 vs ~600 over 60 s); the outbound `pending_text_`
+  queue is capped (oldest dropped past 2048, bounding memory and keeping the
+  connection alive — telemetry + the next timeline resync the client); and the
+  libwebsockets log level drops from `LLL_DEBUG` to `LLL_ERR|LLL_WARN`
+  (the debug flood was ~640k lines / 24 min of pure I/O — now ~10 lines).
 - VAD speech endpoints now actually close ASR segments (root-cause fix). The
   VAD-gate close fired only on "confirmed silence" (`end_sec <= horizon`), which
   in steady real-time essentially never holds — the ASR head runs in lockstep

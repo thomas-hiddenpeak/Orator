@@ -244,6 +244,38 @@ void AuditoryWsHandler::OnText(WebSocketConnection& conn,
     conn.SendText(resp);
     return;
   }
+  if (text.find("\"rename_speaker\"") != std::string::npos) {
+    // {"rename_speaker":{"id":"spk_0","name":"..."}} — set a display name for a
+    // global voiceprint identity (Spec 006 / Spec 010 naming hook).
+    auto extract = [&text](const char* key) -> std::string {
+      const std::string k = std::string("\"") + key + "\"";
+      size_t p = text.find(k);
+      if (p == std::string::npos) return std::string();
+      size_t vs = text.find('"', p + k.size() + 1);  // value opening quote
+      if (vs == std::string::npos) return std::string();
+      ++vs;
+      size_t ve = text.find('"', vs);
+      if (ve == std::string::npos) return std::string();
+      return text.substr(vs, ve - vs);
+    };
+    const std::string id = extract("id");
+    const std::string name = extract("name");
+    if (id.empty()) {
+      conn.SendText("{\"error\":\"missing speaker id\"}");
+      return;
+    }
+    const bool ok = stream_->RenameSpeaker(id, name);
+    if (!ok) {
+      conn.SendText("{\"error\":\"speaker registry not available\"}");
+      return;
+    }
+    conn.SendText(stream_->SerializeSpeakers());  // echo the updated list
+    return;
+  }
+  if (text.find("\"speakers\"") != std::string::npos) {
+    conn.SendText(stream_->SerializeSpeakers());
+    return;
+  }
   if (text.find("\"load_session\"") != std::string::npos) {
     auto* store = stream_->session_store();
     if (!store || !store->enabled()) {
