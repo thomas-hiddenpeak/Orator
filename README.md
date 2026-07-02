@@ -1,35 +1,46 @@
 # Orator
 
-Orator 是一个面向实时业务的本地化语音处理系统，提供：
+Orator 是一个面向 Jetson Orin / Thor 边缘设备的实时语音处理系统。它通过
+WebSocket 接收单声道 PCM 音频流，在一个公共时间基上运行多个独立流水线，
+并输出统一的 timeline JSON。
 
-- 实时 ASR（Qwen3-ASR）
-- 可选说话人分离（Sortformer）
-- WebSocket 服务输出统一时间线（timeline）
+当前核心能力：
 
-项目强调工程约束：纯 C++/CUDA、实时链路优先、可测量性能与精度。
+- ASR：Qwen3-ASR，流式 KV-cache 解码。
+- 说话人分离：Sortformer 流式 diarization。
+- VAD：Silero VAD，GPU 批处理。
+- 说话人身份：TitaNet-Large voiceprint，跨会话全局 `spk_N` 身份。
+- 强制对齐：Qwen3-ForcedAligner，可为最终 ASR 文本生成字/词级时间戳。
+- Web UI：由 `orator_ws` 内置 HTTP 静态服务器提供，无前端构建步骤。
 
-## 开源协议（强制开源传染）
+项目约束以 [.specify/memory/constitution.md](.specify/memory/constitution.md)
+为准。状态说明见 [specs/PROJECT_STATE.md](specs/PROJECT_STATE.md)，但代码是
+最高事实来源；发现文档和代码不一致时，应以代码为准并修正文档。
 
-本项目采用 **GNU Affero General Public License v3.0 or later（AGPL-3.0-or-later）**。
+## 许可证
 
-这意味着：
+本项目采用 **GNU Affero General Public License v3.0 or later
+AGPL-3.0-or-later**。
 
-- 你可以使用、修改、再发布。
-- 若你分发修改版，必须在同一许可证下开源源码。
-- 若你将修改版作为网络服务提供（SaaS/API），也必须向服务使用者提供对应源码。
-
-详见 [LICENSE](LICENSE) 与 [COPYRIGHT](COPYRIGHT)。
+如果你修改并分发本项目，或将修改版作为网络服务提供，必须按 AGPL-3.0-or-later
+向用户提供对应源码。详见 [LICENSE](LICENSE) 与 [COPYRIGHT](COPYRIGHT)。
 
 ## 环境要求
 
-- Linux（已在 Jetson/ARM64 场景使用）
-- CMake >= 3.20
-- CUDA 工具链（需可用 `cudart`、`cublas`）
-- C++20 / CUDA20
+- Linux，主要目标为 Jetson / ARM64。
+- CMake 3.20 或更高版本。
+- C++20 编译器。
+- CUDA 工具链，项目当前按 CUDA C++ 构建并链接 `cudart`。
+- 构建期通过 CMake `FetchContent` 获取：
+  - `tomlplusplus`，header-only 配置解析。
+  - `libwebsockets`，WebSocket 传输层。
 
-## 大文件管理（Git LFS）
+运行时产品约束是纯 C++20/CUDA，并且只允许宪法中列出的边界基础设施例外。
+Python、PyTorch、NeMo 等只允许作为 `tools/` 下的离线 oracle 或验证工具。
 
-仓库已配置 Git LFS 跟踪以下格式：
+## 大文件
+
+模型权重和参考数据通过 Git LFS 管理：
 
 - `*.safetensors`
 - `*.npz`
@@ -38,12 +49,20 @@ Orator 是一个面向实时业务的本地化语音处理系统，提供：
 - `*.i32`
 - `*.pcm`
 
-首次克隆建议执行：
+首次克隆后通常需要：
 
 ```bash
 git lfs install
 git lfs pull
 ```
+
+主要默认模型路径由 `orator.toml` 配置：
+
+- `models/asr/Qwen/Qwen3-ASR-1.7B`
+- `models/sortformer_4spk_v2.safetensors`
+- `models/vad/silero_vad.safetensors`
+- `models/speaker/titanet_large.safetensors`
+- `models/ForcedAligner`
 
 ## 构建
 
@@ -52,269 +71,288 @@ cmake -S . -B build
 cmake --build build -j
 ```
 
-## 运行实时 WebSocket 服务
+主目标：
 
-命令格式：
+- `orator_core`：核心静态库。
+- `orator_ws`：实时 WebSocket 服务和 Web UI 静态服务器。
+- `asr_testmp3`、`asr_stream_test`：ASR / 流式验证工具。
+- `asr_stream_window_probe`、`asr_encoder_chunk_probe`、
+  `asr_stream_incremental_probe`：ASR 流式策略探针。
+- `orator_eval`：手动评估工具，不作为 CTest 测试运行。
 
-```bash
-./build/orator_ws <port> <diarizer_weights_or_empty> <asr_model_dir>
-```
+## 运行
 
-示例（关闭 diarizer，仅启用 ASR）：
-
-```bash
-./build/orator_ws 8765 "" /path/to/models/asr/Qwen/Qwen3-ASR-1.7B
-```
-
-服务启动后，可向 `ws://<host>:<port>` 发送 `int16le mono 16k` PCM 二进制流，最后发送 `{"end"}` 或 `{"flush"}` 获取时间线结果。
-
-当前默认行为（便于联调）：
-
-- WebSocket：`<port>`（默认 `8765`）
-- Web UI：`<port+1>`（默认 `8766`）
-- 进程启动时默认预热全管线（diar + asr + vad）进入待命；若未显式传 `asr_model_dir`，默认使用 `models/asr/Qwen/Qwen3-ASR-1.7B`
-
-运行时配置通过 `orator.toml`（TOML 格式）管理，环境变量可覆盖配置文件中的值：
+推荐使用 `orator.toml` 固定运行参数：
 
 ```bash
-# 使用默认配置
-./build/orator_ws 8765 ""
-
-# 使用自定义配置文件
-ORATOR_CONFIG=/path/to/orator.toml ./build/orator_ws 8765 ""
+ORATOR_CONFIG=orator.toml ./build/orator_ws
 ```
 
-可选环境变量（覆盖 `orator.toml` 中的对应字段）：
+也可以显式指定端口和模型路径：
 
-| 变量 | 默认值 | 说明 |
-|------|--------|------|
-| `ORATOR_CONFIG` | `orator.toml` | 配置文件路径 |
-| `ORATOR_PORT` | `8765` | WebSocket 端口 |
-| `ORATOR_UI_PORT` | `port+1` | 覆盖 UI 端口 |
-| `ORATOR_UI_ROOT` | `web` | 覆盖静态页面目录 |
-| `ORATOR_ASR_MODEL_DIR` | `models/asr/Qwen/Qwen3-ASR-1.7B` | 覆盖 ASR 模型目录 |
-| `ORATOR_ASR_DISABLE` | `0` | `=1` 显式禁用 ASR |
-| `ORATOR_ASR_MAX_NEW_TOKENS` | `32` | 覆盖 ASR 最大解码 token 数 |
-| `ORATOR_ASR_SEGMENT_SEC` | `24.0` | 覆盖 ASR 硬分段阈值（秒） |
-| `ORATOR_ASR_LANGUAGE` | `Chinese` | 覆盖 ASR 语言提示 |
-| `ORATOR_ASR_BAN_STEPS` | `3` | 覆盖 ASR 去重步数 |
-| `ORATOR_ASR_DECODE_BATCH` | `4` | 覆盖 ASR 解码批量大小 |
-| `ORATOR_ASR_SYSTEM_PROMPT` | `` | 覆盖 ASR 系统提示词 |
-| `ORATOR_GPU_TELEMETRY_SEC` | `0` | GPU 遥测推送间隔（秒）；`0`=禁用 |
-| `ORATOR_GPU_SERIAL` | `0` | `=1` 强制 GPU 序列化模式（禁用并发流） |
-| `ORATOR_GPU_CONCURRENT` | `0` | `=1` 强制 GPU 全并发模式（实验性） |
-| `ORATOR_VAD_STREAM` | `1` | `=0` 禁用 VAD 流 |
-| `ORATOR_VAD_THRESHOLD` | `0.5` | VAD 敏感度 |
-| `ORATOR_VAD_MIN_SPEECH_MS` | `250` | VAD 最短语音 (ms) |
-| `ORATOR_VAD_MIN_SILENCE_MS` | `300` | VAD 最短静音 (ms) |
-| `ORATOR_VAD_MODEL` | `models/vad/silero_vad.safetensors` | 覆盖 VAD 模型路径 |
-| `ORATOR_LOG_LEVEL` | `2` | 日志级别：`0`=DEBUG, `1`=INFO, `2`=WARN, `3`=ERROR |
-| `ORATOR_ASR_PROFILE` | — | 设置即启用 ASR 每帧耗时日志 |
-| `ORATOR_STREAM_PROGRESS` | — | 设置即显示 diarizer 流式进度条 |
-| `ORATOR_TIMEBASE_CHECK` | — | `=1` 启用时间基一致性校验 |
-| `ORATOR_STORAGE_DISK_PATH` | `/tmp/orator/storage/` | 协议时间线持久化路径 |
-| `ORATOR_SESSION_DIR` | — | 会话持久化目录 |
+```bash
+./build/orator_ws 8765 models/sortformer_4spk_v2.safetensors models/asr/Qwen/Qwen3-ASR-1.7B
+```
 
-完整参数列表见 `orator.toml` 文件。加载顺序：编译期默认值 → CLI 参数 → `orator.toml` → 环境变量。
+服务启动后：
 
-## 主要可执行目标
+- WebSocket 默认监听 `ws://0.0.0.0:8765`
+- Web UI 默认监听 `http://0.0.0.0:8766`
+- UI 端口为 `ui_port`，若为 `0` 则使用 `port + 1`
+- 静态页面目录默认为 `web`
 
-- `orator_ws`：实时 WebSocket 服务（主入口）
-- `asr_testmp3`：ASR 单段端到端测试
-- `asr_stream_test`：流式链路测试
-- `asr_stream_window_probe`：窗口策略探针工具
-- `asr_encoder_chunk_probe`：编码器分块等价性验证
-- `asr_stream_incremental_probe`：增量 KV-cache 流式探针
+客户端向 WebSocket 发送二进制音频帧：
+
+- 默认格式：`int16le`、mono、16 kHz。
+- 发送包含 `"f32"` 的文本控制消息后，后续二进制帧按 float32 PCM 解释。
+
+常用控制消息：
+
+```json
+{"flush": true}
+{"end": true}
+{"reset": true}
+{"describe": true}
+{"sessions": true}
+{"load_session": {"session_id": "..."}}
+{"speakers": true}
+{"rename_speaker": {"id": "spk_0", "name": "张三"}}
+```
+
+`flush` 输出当前 timeline 并继续流式处理；`end` 结束当前流、输出最终
+timeline，然后重置会话。
+
+## 配置
+
+配置文件入口是 `orator.toml`，解析代码在
+[include/io/config_reader.h](include/io/config_reader.h) 和
+[src/io/config_reader.cc](src/io/config_reader.cc)。
+
+当前代码路径中的有效加载顺序为：
+
+1. `AuditoryStream::Config` 编译期默认值。
+2. `orator_ws` 先读取 CLI 的 `port`、`diarizer_weights`、`asr_model_dir`。
+3. `ORATOR_CONFIG` 指定的 TOML 文件，默认 `orator.toml`。
+4. `ORATOR_*` 环境变量覆盖 TOML 和默认值。
+
+注意：宪法和 `orator.toml` 注释要求的顺序是“默认值 → `orator.toml` →
+环境变量 → CLI 参数”。当前实现中 CLI 参数在 TOML 之前写入，因此 TOML 可覆盖
+CLI 参数。改配置逻辑时必须同步代码、`orator.toml` 注释和文档。
+
+主要配置段：
+
+- `[server]`：WebSocket/UI 端口和 UI 静态目录。
+- `[asr]`：Qwen3-ASR 模型目录、VAD gate、segment cap、decode 参数。
+- `[align]`：强制对齐开关、模型目录、保留音频窗口。
+- `[speaker]`：说话人身份开关、TitaNet 模型目录、registry 持久化路径。
+- `[vad]`：VAD 模型路径、阈值、最短语音/静音、padding。
+- `[diarizer]`：Sortformer 权重、speaker cache、FIFO、后处理阈值。
+- `[storage]`：ProtocolTimeline 和 session persistence 路径。
+- `[buffer]`：音频缓存容量和 shrink 阈值。
+- `[telemetry]`、`[telemetry.cursor]`：GPU 和 cursor progress 遥测。
+- `[debug]`：日志级别、时间基检查、GPU 调度模式。
+- `[debug_model]`：ASR 模型开发环境变量说明，不由 `ConfigReader` 直接读取。
+
+常用环境变量：
+
+| 变量 | 作用 |
+|---|---|
+| `ORATOR_CONFIG` | 指定 TOML 配置文件路径 |
+| `ORATOR_PORT` | 覆盖 WebSocket 端口 |
+| `ORATOR_UI_PORT` | 覆盖 UI 端口 |
+| `ORATOR_UI_ROOT` | 覆盖 UI 静态目录 |
+| `ORATOR_ASR_MODEL_DIR` | 覆盖 ASR 模型目录 |
+| `ORATOR_ASR_DISABLE=1` | 禁用 ASR |
+| `ORATOR_ASR_MAX_NEW_TOKENS` | 覆盖 ASR 最大 decode token 数 |
+| `ORATOR_ASR_SEGMENT_SEC` | 覆盖 ASR segment cap |
+| `ORATOR_ASR_LANGUAGE` | 覆盖 ASR 语言提示 |
+| `ORATOR_ASR_SYSTEM_PROMPT` | 覆盖 ASR system prompt |
+| `ORATOR_VAD_STREAM` | 开关 VAD 流水线 |
+| `ORATOR_VAD_MODEL` | 覆盖 VAD 模型路径 |
+| `ORATOR_VAD_THRESHOLD` | 覆盖 VAD 阈值 |
+| `ORATOR_GPU_TELEMETRY_SEC` | GPU telemetry 推送间隔，`0` 为禁用 |
+| `ORATOR_CURSOR_TELEMETRY_SEC` | cursor progress 推送间隔 |
+| `ORATOR_STORAGE_DISK_PATH` | 协议 timeline 磁盘后端路径 |
+| `ORATOR_SESSION_DIR` | session 持久化目录 |
+| `ORATOR_LOG_LEVEL` | 日志级别：`0` DEBUG，`1` INFO，`2` WARN，`3` ERROR |
+| `ORATOR_TIMEBASE_CHECK` | 启用时间基一致性检查 |
+| `ORATOR_GPU_SERIAL` | 强制 GPU serial 调度模式 |
+| `ORATOR_GPU_CONCURRENT` | 强制 GPU concurrent 调度模式 |
+
+## 架构
+
+目录分层：
+
+```text
+include/        public headers
+src/            implementations
+  core/         base data types and model interfaces
+  gpu/          CUDA memory, kernels, scheduling
+  io/           safetensors, tokenizer, config, audio/reference I/O
+  feature/      mel and Whisper-style feature extraction
+  model/        Qwen3-ASR, Sortformer, VAD, aligner, speaker models
+  protocol/     topic registry, router, storage, replay, sessions
+  pipeline/     AuditoryStream controller and workers
+  net/          libwebsockets server and HTTP static server
+web/            browser UI, plain ES modules
+test/           CTest unit and integration tests
+tools/          probes, offline validation, observability
+specs/          SDD artifacts
+```
+
+核心运行路径：
+
+```text
+WebSocket PCM
+  -> AuditoryWsHandler
+  -> AuditoryStream::PushAudio
+  -> per-pipeline audio caches
+  -> DiarizationWorker / AsrWorker / VAD / AlignWorker / SpeakerIdentityStage
+  -> ProtocolTimeline topics
+  -> ComprehensiveTimeline
+  -> WebSocket JSON events and final timeline
+```
+
+关键设计约束：
+
+- 所有流水线使用同一个 `core::TimeBase`。
+- 时间码必须通过 `TimeBase::SecondsAt()`、`SampleAt()`、`Duration()` 等接口派生。
+- 流水线之间不直接共享结果，不通过回调、共享指针或原子标志交换业务数据。
+- 跨流水线数据通过 `ProtocolTimeline` / `ComprehensiveTimeline` 汇合。
+- ASR 输出文本和自身时间码；diarization 输出 speaker 和自身时间码；
+  comprehensive layer 只做时间对齐，不修改管线内容。
+- ASR 的 VAD gate 使用本地 `VadCache`，由 `ProtocolTimeline` 订阅更新，避免热路径
+  反复 `Replay()`。
+
+## WebSocket 输出
+
+服务端会发送两类 JSON：
+
+1. 连接建立时的 legacy `ready` 消息。
+2. 大多数运行时事件会被包装为 Spec 004 topic envelope：
+
+```json
+{
+  "topic": "asr/event",
+  "pipeline": "asr",
+  "pipeline_version": "1.0.0",
+  "msg_id": 1,
+  "ts": 0,
+  "qos": 0,
+  "schema_version": 1,
+  "data": "{\"type\":\"asr\",...}"
+}
+```
+
+`data` 当前是内层 JSON 字符串。客户端需要先解析 envelope，再解析 `data`。
+`ts` 当前固定为 `0`，业务时间应读取内层消息里的 `start`、`end`、`time_sec` 等字段。
+
+常见内层消息类型：
+
+- `ready`
+- `asr_partial`
+- `asr`
+- `diar`
+- `vad`
+- `align`
+- `revision`
+- `timeline`
+- `gpu_telemetry`
+- `cursor_progress`
+- `sessions`
+- `speakers`
+- `reset_ok`
+- `error`
+
+## Web UI
+
+`orator_ws` 同时启动 HTTP 静态服务器，直接托管 `web/`。当前 UI 是无框架、
+无构建步骤的 ES module SPA：
+
+- [web/index.html](web/index.html)
+- [web/style.css](web/style.css)
+- [web/js/app.js](web/js/app.js)
+- [web/js/ws.js](web/js/ws.js)
+- [web/js/model.js](web/js/model.js)
+- [web/js/render/](web/js/render/)
+
+UI 支持：
+
+- 麦克风输入和音频文件上传。
+- 实时 transcript 和 partial draft。
+- diar / ASR / VAD / align 四轨 canvas timeline。
+- GPU telemetry 和 cursor progress observability 面板。
+- speaker registry 显示和重命名。
+- session 列表和加载。
+
+更多前端说明见 [web/README.md](web/README.md)。
 
 ## 测试
+
+完整 CTest：
 
 ```bash
 cd build
 ctest --output-on-failure
 ```
 
-包含 39/39 测试通过（37 C++ 单元测试 + 2 C++ 集成测试 + Python 集成测试）：
-
-- C++ 单元测试覆盖：时间基、ComprehensiveTimeline、ASR 算子、GPU 核函数（Add/Multiply/Normalize/CosineSimilarity）、WebSocket、协议层等
-- CUDA kernel 测试（`test_kernels`）：13 个测试，验证 GPU 核函数与 CPU 参考实现的数值等价性
-- Python 集成测试（需 pytest）：测试真实 WebSocket 流式路径
+常用子集：
 
 ```bash
-# 单独运行 CUDA kernel 测试
-./build/test/test_kernels
-
-# Python 集成测试
-cd build && ctest -R py- --output-on-failure
+cd build
+ctest -R test_config --output-on-failure
+ctest -R test_protocol_timeline --output-on-failure
+ctest -R test_auditory_stream --output-on-failure
+ctest -R test_vad --output-on-failure
 ```
 
-### 统一测试脚本
-
-项目现在采用统一的测试脚本和测试原则，所有测试脚本遵循宪法级别的测试原则：
-
-1. **测试音频和参考标准**：除单元测试外的所有测试必须使用 `test.mp3` 作为音频源，`test.txt` 作为参考进行实际管线测试
-2. **测试级别和设备指标**：测试分为 120s、360s、600s 和全长度测试，过程中必须观察设备运行指标（功率、CPU、GPU、RAM 使用情况），通过 `tegrastats` 获取 Jetson 设备数据
-3. **说话人区分准确率统计**：提供说话人分割的时间块的总量对比的准确率，如有偏移量需标注偏移量，其他指标也要进行标注并说明含义
-4. **ASR准确率对比**：采用语义对比，不做字符级别的对比（例如：数字1和汉字"一"应该是等价的）
-5. **统一测试脚本要求**：用于测试的 ws 客户端脚本全局只能有一个 python 脚本，采用统一脚本进行测试，保证测试参数的语义一致性
-
-
-
-#### 统一 WebSocket 测试客户端
+统一 WebSocket 测试客户端：
 
 ```bash
-# 120s 测试:
 python3 tools/verify/py/ws_unified_test.py --duration 120 --port 8765 --out test_120s.json
-
-# 360s 测试:
-python3 tools/verify/py/ws_unified_test.py --duration 360 --port 8765 --out test_360s.json
-
-# 600s 测试:
 python3 tools/verify/py/ws_unified_test.py --duration 600 --port 8765 --out test_600s.json
-
-# 全长度测试:
-python3 tools/verify/py/ws_unified_test.py --duration 3615 --port 8765 --out test_full.json
-
-# 不同倍速测试 (2x 速度):
-python3 tools/verify/py/ws_unified_test.py --duration 3615 --port 8765 --rate 2.0 --out test_2x.json
+python3 tools/verify/py/ws_unified_test.py --duration 3615 --port 8765 --rate 1.0 --out test_full.json
 ```
 
-## 目录概览
+项目测试治理要求：
 
-- `include/`：头文件
-- `src/`：核心实现
-- `tools/`：工具与验证程序
-- `test/`：测试
-- `models/`：模型与参考数据（含 LFS 大文件）
-- `web/`：Web UI（SPA）
-- `specs/`：SDD 工件（spec、plan、tasks）
+- 除单元测试外，实际流水线测试使用 `test/data/audio/test.mp3` 和
+  `test/data/reference/test.txt`。
+- 流式行为必须通过真实 WebSocket 增量输入验证。
+- 性能结果只能来自真实流式路径。
+- Jetson 设备指标通过 `tegrastats` 观察。
+- ASR 准确性使用语义比较，不使用字符级脚本指标。
+- 说话人分离评估需要说明时间块、偏移和指标含义。
+- 全局只维护一个 WebSocket 测试客户端：
+  [tools/verify/py/ws_unified_test.py](tools/verify/py/ws_unified_test.py)。
 
-## 系统架构
+## 开发规则
 
-### 分层结构
+非平凡改动遵循 SDD：
 
-依赖方向由外向内指向 `core/`：
+1. 读取宪法和 `specs/PROJECT_STATE.md`。
+2. 检查 `.agents/skills/` 是否有相关 skill。
+3. 更新或创建 `spec.md`、`plan.md`、`tasks.md`。
+4. 实现代码。
+5. 验证 build、CTest、必要的真实 WebSocket 流式路径。
+6. 同步 `specs/PROJECT_STATE.md` 和相关 spec/task 状态。
 
-```
-protocol/  (主题路由、存储、WS 信封)
-    ↑
-  net/      (WebSocket 服务器、HTTP 静态服务器)
-    ↑
-pipeline/  (管道编排、工作者线程、时间线)
-    ↑
- model/    (Qwen3-ASR, Sortformer, Silero VAD 推理)
-    ↑
- gpu/ io/ feature/ → core/ (基础类型、模型接口、CUDA 调度器)
-```
+代码约束摘要：
 
-### 启动流程
+- Google C++ Style：2 空格缩进，类型/方法 `PascalCase`，局部变量
+  `lower_snake_case`，成员字段尾随 `_`。
+- 公共头文件用 `#pragma once`。
+- 性能路径禁止裸 `new`/`delete`/`cudaMalloc`，必须使用 RAII。
+- 每个 CUDA 调用必须检查错误。
+- 不添加未批准的运行时依赖。
+- 不做无关重构。
+- 文档使用标准工程术语，避免隐喻和未定义缩写。
 
-`orator_ws` 是唯一主入口（`src/net/ws_main.cc`）：
+## 当前注意事项
 
-1. **配置加载** — 解析 CLI 参数和 26 环境变量到 `AuditoryStream::Config`
-2. **单例管线创建** — `AuditoryStream` 只创建一次（GPU 模型仅加载一次），通过 `shared_ptr` 在所有 WebSocket 连接间共享。每个新连接调用 `Reset()`（清状态但不卸载模型），避免 Jetson OOM
-3. **服务器双端口** — 主端口提供 WebSocket 服务（libwebsockets），`port+1` 提供 HTTP 静态服务（零依赖原始 socket），托管 `web/` SPA
-4. **服务循环** — 新 WS 连接创建 `AuditoryWsHandler`，共享已有的 `AuditoryStream`
-
-### 三管道体系
-
-三个完全独立的管道在各自线程上运行，共享 **唯一**的东西是音频数据：
-
-```
-WS → PushAudio() → SharedAudioBuffer (单生产者)
-                          │
-              ┌───────────┼───────────┐
-              ▼           ▼           ▼
-        Diarization      ASR         VAD
-         (管线 0)       (管线 1)    (管线 2)
-```
-
-| 管道 | 模型 | 产出 | 优先级 |
-|------|------|------|--------|
-| 说话人分离 | Sortformer (17层 Conformer + 解码器) | `diar/speaker_segment` | 0 (最高) |
-| 语音识别 | Qwen3-ASR (KV-cache 流式解码) | `asr/transcript` | 1 |
-| 语音检测 | Silero VAD (GPU 批处理) | `vad/speech_segment` | 2 (最低) |
-
-**关键不变量**：
-- 管道间**绝不直接通信** — 无共享指针、无原子标志、无回调引用
-- 全部通过 `ProtocolTimeline`（主题消息总线）汇集到 `ComprehensiveTimeline`
-- ASR 通过 `ProtocolTimeline::Replay()` 读取 VAD 输出（VAD 门控机制），而非直接调用
-- 所有时间码从公共 `TimeBase` 派生
-
-### 数据流
-
-```
-[1] PCM 二进制入站 → OnBinary → PushAudio() → SharedAudioBuffer
-                       │
-[2] 三个工作者线程各自读取 → 推理 → ProtocolTimeline::Publish()
-                   │                     │
-                   │              ComprehensiveTimeline
-                   │              (说话人归属: SplitTextByDiar)
-                   │                     │
-[3] On Flush/End → EmitTimeline → Serialize() → WS 输出
-                       │
-[4] On Reset → SessionStore::Save() (持久化到磁盘)
-```
-
-`ComprehensiveTimeline` 的说话人归属逻辑（`SplitTextByDiar`）：
-由于 ASR 不输出字级时间戳，文本按时间比例分配给重叠的说话人段。在说话人边界切割文本区间，每个子区间归属到最大重叠的说话人。
-
-### 协议层 (Spec 004)
-
-主题消息总线，MQTT 风格 pub/sub：
-
-```
-ProtocolTimeline
-├── PipelineRegistry    (管线生命周期)
-├── TopicRouter         (主题路由, 支持 +/# 通配符)
-├── StorageManager      (MEMORY 128MB / DISK 文件双后端)
-├── TimeIndex           (排序时间索引, 支持 Replay)
-└── SchemaRegistry      (版本化模式)
-```
-
-- 管线注册返回 RAII `PipelineHandle`，析构自动注销
-- 发布流程：序列化 → 存储 → 索引 → 路由 → 锁外分发回调
-- WS 消息自动包裹 JSON 信封（topic, pipeline, msg_id, ts, qos, schema_version, data）
-- 旧版 `{"type":"vad",...}` 自动兼容
-
-### GPU 调度
-
-通过 `GpuScheduler` 为每个管道分配专用 CUDA 流，三层优先级：
-
-| 优先级 | 管道 | CUDA 优先级 |
-|--------|------|-------------|
-| 0 | Diarization | 最高 (foreground) |
-| 1 | ASR | 中 (foreground) |
-| 2 | VAD | 最低 (background) |
-
-在 Jetson (Tegra) 上，CUDA 优先级范围可能只有单值，此时降级为普通流并发。
-
-### Web UI
-
-SPA 架构（`web/app.js`），通过 WS 实时接收事件推送：
-
-| 消息类型 | 处理 |
-|----------|------|
-| `asr_partial` | 实时文本草稿 |
-| `asr` | 确认文本，渲染进 Transcript |
-| `timeline` | 三轨 canvas 时间线（说话人/ASR/VAD） |
-| `sessions` | 会话历史面板 |
-| `gpu_telemetry` | 实时 RTF 指标 |
-
-Canvas 时间线支持缩放、拖拽平移、缩放复位、键盘导航。
-
-### 调试环境变量（仅用于模型开发）
-
-以下环境变量用于 ASR 模型调试和性能分析，不纳入常规配置系统：
-
-| 变量 | 说明 |
-|---|---|
-| `ORATOR_ASR_PROFILE2` | 逐 token GPU 耗时分析 |
-| `ORATOR_ASR_BATCH` | 解码批量大小覆盖 |
-| `ORATOR_ASR_DECPROF` | 解码器性能分析 |
-| `ORATOR_ASR_NOGRAPH` | 禁用 CUDA Graph 捕获 |
-| `ORATOR_ASR_WINDOWED` | 分窗编码器模式 |
-| `ORATOR_ASR_CUBLAS_GEMV` | 强制使用 cuBLAS GEMV |
-
-## 贡献
-
-提交代码即表示你同意你的贡献在 AGPL-3.0-or-later 下发布。
+- 工作流和配置相关文档必须以代码核验为准。当前配置加载顺序的实现与
+  `orator.toml` 注释、宪法 Article IX 的文字不完全一致。
+- `specs/PROJECT_STATE.md` 的部分状态文字可能落后于代码；开始新任务前要定位
+  对应符号和测试确认。
+- `build/`、`build_debug/`、`.omo/`、`.pytest_cache/`、`models/` 内大文件不应作为
+  普通源码改动提交。
