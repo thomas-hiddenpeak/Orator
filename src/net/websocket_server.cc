@@ -4,6 +4,7 @@
 
 #include <array>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <mutex>
 #include <string>
@@ -168,6 +169,28 @@ std::string Sha1Base64(const std::string& combined) {
 
 }  // namespace detail
 
+// Transitional diagnostic logger for WebSocket text frames.
+// Enable only during local experiments with ORATOR_WS_LOG=/path/file.jsonl.
+// It records full protocol payloads, including transcript text, so production
+// runs should leave the variable unset.
+namespace {
+FILE* GetWsLogFile() {
+  static FILE* log_fp = nullptr;
+  if (!log_fp) {
+    const char* path = std::getenv("ORATOR_WS_LOG");
+    if (path) log_fp = std::fopen(path, "a");
+  }
+  return log_fp;
+}
+
+void LogWsMessage(const char* direction, const char* text) {
+  FILE* fp = GetWsLogFile();
+  if (!fp) return;
+  std::fprintf(fp, "%s %s\n", direction, text);
+  std::fflush(fp);
+}
+}  // namespace
+
 struct per_session_data {
   struct per_session_data* pss_list = nullptr;
   struct lws* wsi_ = nullptr;
@@ -266,6 +289,7 @@ int ws_callback(struct lws* wsi, enum lws_callback_reasons reason, void* user,
         } else {
           std::string text(pss->fragment_buf.begin(), pss->fragment_buf.end());
           pss->fragment_buf.clear();  // Clear before calling handler
+          LogWsMessage("<--", text.c_str());
           pss->handler->OnText(pss->conn, text);
         }
         // Flush any pending text messages (VAD/ASR responses) that worker
@@ -317,6 +341,7 @@ int ws_callback(struct lws* wsi, enum lws_callback_reasons reason, void* user,
           std::memcpy(buf.data() + LWS_PRE, text.data(), text.size());
           int ret = lws_write(pss->conn.wsi_, buf.data() + LWS_PRE, text.size(),
                               LWS_WRITE_TEXT);
+          LogWsMessage("-->", text.c_str());
           if (ret < 0) {
             LOG_DEBUG("SERVER_WRITEABLE: lws_write failed (ret=%d), closing\n",
                       ret);
