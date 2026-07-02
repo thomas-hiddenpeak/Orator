@@ -16,13 +16,13 @@
 # ══════════════════════════════════════════════════════════════════════════════
 [server]
 # WebSocket port (CLI arg overrides)
-# port = 8765
+port = 8765
 
 # UI HTTP port. 0 = auto (port + 1)
-# ui_port = 0
+ui_port = 0
 
 # Static file root for the web UI
-# ui_root = "web"
+ui_root = "web"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # ASR — speech recognition pipeline
@@ -32,40 +32,40 @@
 model_dir = "models/asr/Qwen/Qwen3-ASR-1.7B"
 
 # Master switch for VAD-gated processing
-# vad_gate = true
+vad_gate = true
 
 # Lead buffer (ms) extracted before VAD speech onset — avoids cutting first syllable
-# vad_lead_ms = 200
+vad_lead_ms = 200
 
 # Trailing window (seconds) after VAD silence before committing a segment
 # Smaller = less trailing silence but may cut early if VAD lags
 # We tested: 1.5 (v5/v6), 1.0 (v7) — 16~18 ASR segs / 38 VAD segs
-# vad_trail_sec = 1.0
+vad_trail_sec = 1.0
 
 # KV-cache safety cap — max audio tokens before force-finalize a segment
 # Crash at ~1768 tokens; 1500 leaves a comfortable margin (~115s audio)
-# max_audio_tokens = 1500
+max_audio_tokens = 1500
 
 # Max decode tokens per segment
-# max_new_tokens = 32
+max_new_tokens = 32
 
 # Hard segment cap (seconds) — only active when vad_gate=false
-# segment_sec = 24.0
+segment_sec = 24.0
 
 # Language hint ("" = auto-detect)
-# language = "Chinese"
+language = "Chinese"
 
 # Optional system prompt for ASR decoder
-# system_prompt = ""
+system_prompt = ""
 
 # Decoder beam ban steps (suppress repetitive n-grams)
-# ban_steps = 3
+ban_steps = 3
 
 # Decode batch size (parallel token candidates)
-# decode_batch = 4
+decode_batch = 4
 
 # Enable per-frame ASR timing profile (ORATOR_ASR_PROFILE)
-# profile = false
+profile = false
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Forced alignment — aligns each finalized ASR transcript segment to its audio,
@@ -75,20 +75,20 @@ model_dir = "models/asr/Qwen/Qwen3-ASR-1.7B"
 # ══════════════════════════════════════════════════════════════════════════════
 [align]
 # Enable the forced-alignment pipeline (also requires model_dir)
-# enable = false
+enable = false
 
 # Model directory (Qwen3-ForcedAligner-0.6B)
-# model_dir = "models/ForcedAligner"
+model_dir = "models/ForcedAligner"
 
 # Transcript language (full name, e.g. "Chinese", "English")
-# language = "Chinese"
+language = "Chinese"
 
 # Skip alignment for segments longer than this (seconds) — safety cap
-# max_segment_sec = 300.0
+max_segment_sec = 300.0
 
 # Retained audio window (seconds) for span readback. Must exceed the longest
 # segment plus the ASR-to-alignment lag, bounded to cap memory.
-# retain_sec = 180.0
+retain_sec = 180.0
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Speaker identity — voiceprint enrollment / re-identification (Spec 010)
@@ -98,53 +98,53 @@ model_dir = "models/asr/Qwen/Qwen3-ASR-1.7B"
 # ══════════════════════════════════════════════════════════════════════════════
 [speaker]
 # Enable speaker identity (also requires model_dir + the diarizer pipeline)
-# enable = false
+enable = true
 
 # Directory holding titanet_large.safetensors
-# model_dir = "models/speaker"
+model_dir = "models/speaker"
 
 # Registry persistence file (loaded at start, "" = in-memory only)
-# registry_path = ""
+registry_path = "/tmp/orator/speakers.json"
 
 # Cosine threshold for "same speaker" (re-identification). Higher = stricter.
 # Ground-truth meeting eval: same-speaker spans ~0.66/0.72 (1.5s/4s), different
 # ~0.45, EER ~0.55-0.60; 0.55 is the balanced point (NeMo's 0.7 = near-zero
 # false-merge but rejects ~13% genuine). Lower = more merging, higher = splits.
-# match_threshold = 0.55
+match_threshold = 0.55
 
 # Shortest clean single-speaker span worth embedding (seconds). Longer is
 # cleaner: 1.5s->4s halves the meeting EER (21%->13%).
-# min_embed_sec = 3.0
+min_embed_sec = 3.0
 
 # Minimum diarization mean-activity confidence for a span to be embedded
-# min_confidence = 0.5
+min_confidence = 0.5
 
 # Retained audio window (seconds) for span readback
-# retain_sec = 180.0
+retain_sec = 180.0
 
 # ══════════════════════════════════════════════════════════════════════════════
 # VAD — voice activity detection pipeline
 # ══════════════════════════════════════════════════════════════════════════════
 [vad]
 # Silero VAD model path
-# model = "models/vad/silero_vad.safetensors"
+model = "models/vad/silero_vad.safetensors"
 
 # Enable VAD streaming pipeline
-# stream = true
+stream = true
 
 # Speech probability threshold (0.0-1.0)
-# threshold = 0.5
+threshold = 0.5
 
 # Minimum speech duration (ms) — shorter noise bursts are rejected
-# min_speech_ms = 250
+min_speech_ms = 250
 
 # Minimum silence (ms) before VAD declares a segment end
 # Larger = fewer VAD segments but more trailing silence (async lag)
 # We tested: 300 (v7 default), 200 (more VAD splits)
-# min_silence_ms = 300
+min_silence_ms = 300
 
 # Speech segment padding (ms) on each side
-# speech_pad_ms = 60
+speech_pad_ms = 60
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Diarization — speaker separation pipeline
@@ -154,16 +154,16 @@ model_dir = "models/asr/Qwen/Qwen3-ASR-1.7B"
 model_weights = "models/sortformer_4spk_v2.safetensors"
 
 # Maximum number of speakers
-# max_speakers = 4
+max_speakers = 4
 
 # Per-speaker activity threshold (0.0-1.0).  Lower = assigns more frames to speakers. (default 0.4, tuned)
-# threshold = 0.4
+threshold = 0.4
 
 # Merge same-speaker segments closer than this (seconds).  Higher = fewer fragments. (default 0.8, tuned)
-# merge_gap_sec = 0.8
+merge_gap_sec = 0.8
 
 # Minimum audio interval between live speaker-view deliveries
-# deliver_interval_sec = 1.0
+deliver_interval_sec = 1.0
 
 # Sortformer streaming tuning — affects speaker segmentation quality
 # Speaker cache length (frames). Larger = more stable speaker identity, slower adaptation. (default 188)
@@ -175,13 +175,13 @@ model_weights = "models/sortformer_4spk_v2.safetensors"
 # and memory.
 spkcache_len = 188
 # Cache update interval (frames). (default 188)
-# spkcache_update_period = 188
+spkcache_update_period = 188
 # Left context chunks. Higher = better context, more compute. (default 1)
-# chunk_left_context = 1
+chunk_left_context = 1
 # Right context chunks. Higher = better context, more compute. (default 1)
-# chunk_right_context = 1
+chunk_right_context = 1
 # Silent frames before resetting speaker cache. Higher = fewer speaker splits. (default 3)
-# spkcache_sil_frames = 3
+spkcache_sil_frames = 3
 
 # FIFO buffer length for async streaming (NeMo streaming_update_async). 0=off (sync mode).
 fifo_len = 188
@@ -190,24 +190,24 @@ fifo_len = 188
 spkcache_refresh_rate = 100
 
 # Use silence profile in speaker cache compression (v2.1 model only).
-# use_silence_profile = false
+use_silence_profile = false
 
 # Onset/offset double-threshold post-processing (NeMo-style, default 0.45/0.35)
 # onset: probability to START a segment. Higher = fewer, more confident segments.
 # offset: probability to END a segment. Lower than onset creates "sticky" segments.
 #   offset < onset means an active segment persists through probability dips.
-# onset = 0.45
-# offset = 0.35
+onset = 0.45
+offset = 0.35
 
 # Extra time before/after each segment (seconds). (default 0.0)
-# pad_onset = 0.0
-# pad_offset = 0.0
+pad_onset = 0.0
+pad_offset = 0.0
 
 # Minimum segment duration (seconds). Shorter segments are removed. (default 0.5)
-# min_dur_on = 0.5
+min_dur_on = 0.5
 
 # Minimum gap to merge same-speaker segments (seconds). Larger = fewer fragments. (default 1.0)
-# min_dur_off = 1.0
+min_dur_off = 1.0
 
 # Periodically reset the diarizer streaming state (seconds; 0 = never, DEFAULT).
 # The reset was a workaround for the SYNC path (fifo_len=0), whose fixed speaker
@@ -219,17 +219,17 @@ spkcache_refresh_rate = 100
 # slots for the whole meeting and each slot resolves to ONE global identity
 # (measured: 4 speakers -> exactly 4 stable ids). Leave at 0 unless you run the
 # sync path (fifo_len = 0).
-# reset_period_sec = 0
+reset_period_sec = 0
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Storage — protocol timeline persistence
 # ══════════════════════════════════════════════════════════════════════════════
 [storage]
 # DISK backend path for protocol timeline
-# disk_path = "/tmp/orator/storage/"
+disk_path = "/tmp/orator/storage/"
 
 # Session persistence directory. Empty = defaults to <disk_path>/sessions/
-# session_dir = ""
+session_dir = ""
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Telemetry — GPU scheduling metrics
@@ -238,24 +238,24 @@ spkcache_refresh_rate = 100
 # GPU telemetry push interval (seconds). 0 = disabled.
 # For an offline observability run (tools/observability), set to e.g. 1.0 so the
 # runtime emits periodic per-pipeline RTF / scheduling samples. Keep 0 in prod.
-# gpu_interval_sec = 0.0
+gpu_interval_sec = 1.0
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Debug — diagnostics and profiling
 # ══════════════════════════════════════════════════════════════════════════════
 [debug]
 # Log level: 0=DEBUG, 1=INFO, 2=WARN, 3=ERROR
-# log_level = 2
+log_level = 2
 
 # Enable timebase consistency checks (ORATOR_TIMEBASE_CHECK)
-# timebase_check = false
+timebase_check = false
 
 # Show diarizer streaming progress bar (ORATOR_STREAM_PROGRESS)
-# stream_progress = false
+stream_progress = false
 
 # GPU scheduling mode: "auto" (default), "serial" (ORATOR_GPU_SERIAL),
 # or "concurrent" (ORATOR_GPU_CONCURRENT)
-# gpu_scheduling = "auto"
+gpu_scheduling = "auto"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Buffer — shared audio buffer configuration
@@ -264,11 +264,11 @@ spkcache_refresh_rate = 100
 # Maximum buffer size in samples. 0 = no limit (default).
 # Recommended: 32000000 (32M samples = 2s at 16kHz) for real-time streaming
 # or 64000000 (64M samples = 4s at 16kHz) for higher tolerance to pipeline delays.
-# max_samples = 0
+max_samples = 0
 
 # Shrink-to-fit threshold in samples. When buffer capacity exceeds this,
 # memory is reclaimed. Default: 10000000 (10M samples = ~40MB).
-# shrink_threshold = 10000000
+shrink_threshold = 10000000
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Telemetry — cursor progress and health monitoring
@@ -277,13 +277,13 @@ spkcache_refresh_rate = 100
 # Enable cursor progress telemetry. 0 = disabled, >0 = interval in seconds.
 # When enabled, periodic {"type":"cursor_progress",...} messages are sent.
 # For an offline observability run set to e.g. 1.0 (per-pipeline backlog lane).
-# interval_sec = 0.0
+interval_sec = 1.0
 
 # Maximum allowed lag in samples before warning. 0 = no limit.
-# lag_warn_samples = 0
+lag_warn_samples = 0
 
 # Maximum allowed lag in samples before critical. 0 = no limit.
-# lag_critical_samples = 0
+lag_critical_samples = 0
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Debug — ASR model development knobs (read via std::getenv, not via Config)

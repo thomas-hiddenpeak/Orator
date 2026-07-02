@@ -114,10 +114,10 @@ class AuditoryStream {
     // Sortformer streaming tuning (affects speaker segmentation quality)
     int diar_spkcache_len = 188;            // speaker cache length (frames)
     int diar_chunk_len = 340;               // processing chunk size (frames)
-    int diar_spkcache_update_period = 300;  // cache update interval (frames)
+    int diar_spkcache_update_period = 188;  // cache update interval (frames)
     int diar_chunk_left_context = 1;        // left context chunks
-    int diar_chunk_right_context = 40;      // right context chunks
-    int diar_spkcache_sil_frames = 5;       // silent frames before cache reset
+    int diar_chunk_right_context = 1;       // right context chunks
+    int diar_spkcache_sil_frames = 3;       // silent frames before cache reset
     int diar_fifo_len = 188;  // FIFO length for async streaming (0=off). Async
                               // (NeMo streaming_update_async) keeps the 188-frame
                               // spkcache from saturating over a long continuous
