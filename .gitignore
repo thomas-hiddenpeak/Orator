@@ -42,6 +42,9 @@ tools/tmp_*
 # AI session runtime files
 .omo/
 
+# Local Codex/runtime configuration and cache. May contain secrets.
+config/
+
 # CTest temporary files
 Testing/
 
