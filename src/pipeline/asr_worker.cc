@@ -131,10 +131,7 @@ void AsrWorker::ProcessGateSubSpan(const float* sub, int sub_n) {
   // In steady real-time the ASR head runs in lockstep with VAD, so
   // `end_sec <= horizon` (which needs ASR to lag VAD by the 0.3 s guard)
   // essentially never holds; relying on it left segments to close only at the
-  // time cap, ignoring every VAD endpoint. Closing commits the KV cache and the
-  // trailing window has already been fed (the gap up to here was processed), so
-  // no audio is dropped -- the "never drop speech" rationale for horizon
-  // confirmation applies only to skipping, not to closing.
+  // time cap, ignoring every VAD endpoint.
   // VAD speech endpoint, driven by VAD's own confirmed state rather than the
   // ASR processing position. Close the open segment once VAD has confirmed at
   // least the trailing window of silence after its last published speech
@@ -144,17 +141,26 @@ void AsrWorker::ProcessGateSubSpan(const float* sub, int sub_n) {
   // the ASR head runs ahead of the lagging horizon, so segments closed only at
   // the time cap. Using VAD's own signals avoids that race.
   // `last_endpoint_vad_end_` makes it fire once per speech burst, not on every
-  // silence sub-span. Closing commits the KV cache and drops no audio (the
-  // trailing window was already fed); silence-only segments the leading-edge
+  // silence sub-span. Feeding the trailing window before finalize retains
+  // acoustic context for the last word; silence-only segments the leading-edge
   // processing may open are dropped at emit time (no VAD speech overlap).
   const double last_vad_end = vad_segs.empty() ? -1e9 : vad_segs.back().second;
   const double vad_horizon = vad_cache_ ? vad_cache_->horizon() : -1e9;
   if (inc_in_segment_ && last_vad_end > -1e8 &&
       last_vad_end > last_endpoint_vad_end_ &&
       (vad_horizon - last_vad_end) >= params_.asr_vad_trail_sec) {
+    // Feed the trailing window (acoustic context for the last word), then
+    // commit and skip the remaining silence. This matches the confirmed-
+    // silence path (B) so both close paths retain the same trailing context.
+    const long trail_end =
+        tb_.SampleAt(last_speech_end_sec_ + params_.asr_vad_trail_sec);
+    const long feed_l =
+        std::min<long>(sub_n, std::max<long>(0, trail_end - base));
+    const int feed_n = static_cast<int>(feed_l);
+    if (feed_n > 0) ProcessIncremental(sub, feed_n, /*finalize=*/false);
     ProcessIncremental(nullptr, 0, /*finalize=*/true);
     last_endpoint_vad_end_ = last_vad_end;
-    inc_abs_pos_ += sub_n;  // skip the remaining tail of this gap
+    inc_abs_pos_ += (sub_n - feed_n);
     processed_samples_.fetch_add(sub_n);
     vad_state_ = VadState::IDLE;
     return;
