@@ -129,6 +129,7 @@ class AsrWorker {
   std::string inc_live_text_;
   long inc_text_id_ = 0;
   std::string inc_delivered_text_;
+  bool finalizing_ = false;
 
   // Push samples into the ring buffer (thread-safe within worker thread).
   void RingPush(const float* samples, int n, long abs_pos);

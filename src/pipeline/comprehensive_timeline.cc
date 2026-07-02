@@ -351,7 +351,9 @@ void ComprehensiveTimeline::AddVad(double start, double end) {
 std::vector<ComprehensiveTimeline::Entry> ComprehensiveTimeline::Snapshot()
     const {
   // The comprehensive view is the diarization-split projection of every text
-  // segment, time-ordered, with consecutive same-speaker entries coalesced.
+  // segment, time-ordered. Coalesce only pieces produced by the same ASR text
+  // segment; preserving text_id boundaries keeps Live/final transcript rows
+  // aligned with finalized ASR chunks instead of merging long same-speaker runs.
   std::vector<Entry> all;
   // Pre-allocate to avoid repeated reallocations
   all.reserve(texts_.size() * 2);  // Estimate maximum entries
@@ -363,7 +365,8 @@ std::vector<ComprehensiveTimeline::Entry> ComprehensiveTimeline::Snapshot()
 
   std::vector<Entry> out;
   for (const auto& e : all) {
-    if (!out.empty() && out.back().speaker == e.speaker) {
+    if (!out.empty() && out.back().speaker == e.speaker &&
+        out.back().text_id == e.text_id) {
       out.back().end = std::max(out.back().end, e.end);
       out.back().text += e.text;
     } else {

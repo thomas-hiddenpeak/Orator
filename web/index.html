@@ -3,16 +3,17 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Orator — Real-Time Transcription</title>
+    <title>Orator — Auditory Pipeline Console</title>
     <link rel="stylesheet" href="/style.css" />
   </head>
   <body>
     <header class="topbar" role="banner">
       <div class="brand">
         <h1>Orator</h1>
-        <span class="subtitle">Real-Time Transcription</span>
+        <span class="subtitle">Auditory Pipeline Console</span>
       </div>
       <div class="topbar-right">
+        <span id="wsUrlBadge" class="badge neutral" aria-label="WebSocket endpoint">ws://-</span>
         <span id="connBadge" class="badge offline" role="status" aria-live="polite">● Disconnected</span>
       </div>
     </header>
@@ -54,6 +55,21 @@
             <div class="progress-fill" id="progressFill"></div>
           </div>
           <span class="progress-label" id="statusLabel">Streaming...</span>
+        </div>
+      </section>
+
+      <!-- Developer Status Panel -->
+      <section class="panel dev-panel" aria-label="Developer project status">
+        <div class="panel-header">
+          <h2 class="panel-title">Developer Status</h2>
+          <span id="devUpdated" class="dev-updated">waiting for runtime</span>
+        </div>
+        <div class="dev-grid" id="devStatusGrid" role="group" aria-label="Runtime and project status"></div>
+        <div class="dev-tool-row" aria-label="Developer quick commands">
+          <button class="btn btn-sm btn-outline" id="copyRunBtn" type="button" aria-label="Copy run command">Run</button>
+          <button class="btn btn-sm btn-outline" id="copyTestBtn" type="button" aria-label="Copy test command">Test</button>
+          <button class="btn btn-sm btn-outline" id="copyWsBtn" type="button" aria-label="Copy WebSocket URL">WS URL</button>
+          <span id="copyHint" class="copy-hint" role="status" aria-live="polite"></span>
         </div>
       </section>
 

@@ -115,12 +115,15 @@ void HandleDiarSubscription(ComprehensiveTimeline& comp, std::mutex& comp_mutex,
 }
 
 // ---------------------------------------------------------------------------
-// ASR subscription: parse {"id":..., "start":..., "end":..., "text":"..."}
-// → comp_.UpsertText()
+// ASR subscription: parse final {"id":..., "start":..., "end":..., "text":"..."}
+// → comp_.UpsertText(). Partial transcripts are excluded from the final
+// comprehensive timeline.
 // ---------------------------------------------------------------------------
 void HandleAsrSubscription(ComprehensiveTimeline& comp, std::mutex& comp_mutex,
                            const protocol::Message& msg,
                            const RevisionEmitter& emit_rev) {
+  if (msg.topic != protocol::kAsrTranscript.to_string()) return;
+
   const std::string& data = msg.data;
 
   long id = JsonParseLong(data, "id");
@@ -265,9 +268,8 @@ void HandleTextSink(protocol::ProtocolTimeline* protocol_timeline,
                     protocol::PipelineHandle* asr_handle, long id, double start,
                     double end, const std::string& text, bool is_final) {
   // Finals go to asr/transcript, in-progress partials to
-  // asr/transcript_partial. The comprehensive timeline subscribes to asr/+
-  // (both, in-place revision by id); the forced aligner subscribes to
-  // asr/transcript only, so it aligns each segment exactly once against its
+  // asr/transcript_partial. The comprehensive timeline and forced aligner
+  // consume asr/transcript only, so each segment is recorded once against its
   // finalized text.
   const protocol::Topic& topic =
       is_final ? protocol::kAsrTranscript : protocol::kAsrTranscriptPartial;

@@ -30,7 +30,8 @@ export class Model {
     // Forced-alignment units keyed by text_id: [{start,end,text}]
     this.alignUnits = new Map();
 
-    // Comprehensive speaker turns keyed by text_id.
+    // Comprehensive speaker turns keyed by stable segment key. A single ASR
+    // text_id can be revised into multiple speaker/time spans.
     this.turns = new Map();
 
     // Speaker registry: key -> {label, color}; filled lazily by renderers.
@@ -42,6 +43,12 @@ export class Model {
     // Telemetry: per-pipeline ring buffers + latest scheduling state.
     // pipe -> { rtf:[], backlogSec:[], class, cudaPriority, active, computeSec }
     this.telemetry = new Map();
+    this.deviceTelemetry = {
+      gpuUtil: [],
+      gpuMemPct: [],
+      powerW: [],
+      latest: null,
+    };
     this.lastTelemetryTime = 0;
     this.vadSpeech = false;
 
@@ -68,9 +75,14 @@ export class Model {
   // ── live comprehensive revision (FR14) ──
   applyRevision(msg) {
     if (!Array.isArray(msg.entries)) return;
+    const textIds = new Set();
+    for (const e of msg.entries) {
+      if (e.text_id != null) textIds.add(e.text_id);
+    }
+    this._removeTurnsForTextIds(textIds);
     for (const e of msg.entries) {
       if (e.text_id == null) continue;
-      this.turns.set(e.text_id, {
+      this.turns.set(this._turnKey(e), {
         text_id: e.text_id, start: e.start, end: e.end,
         speaker: e.speaker, speaker_id: e.speaker_id, speaker_name: e.speaker_name,
         text: e.text || "",
@@ -98,6 +110,9 @@ export class Model {
   applyGpuTelemetry(msg) {
     if (!Array.isArray(msg.pipelines)) return;
     this.lastTelemetryTime = msg.time_sec || this.lastTelemetryTime;
+    if (msg.device && typeof msg.device === "object") {
+      this.applyDeviceTelemetry(msg.device);
+    }
     for (const p of msg.pipelines) {
       const t = this._pipe(p.name);
       if (p.real_time_factor != null) ring(true, t.rtf, p.real_time_factor, TELEMETRY_HISTORY);
@@ -106,6 +121,22 @@ export class Model {
       t.active = !!p.stream_active;
       t.computeSec = p.compute_sec;
       t.priorityIndex = p.priority_index;
+    }
+  }
+
+  applyDeviceTelemetry(device) {
+    this.deviceTelemetry.latest = device;
+    if (device.gpu_utilization_pct != null) {
+      ring(true, this.deviceTelemetry.gpuUtil,
+           Number(device.gpu_utilization_pct), TELEMETRY_HISTORY);
+    }
+    if (device.gpu_mem_used_pct != null) {
+      ring(true, this.deviceTelemetry.gpuMemPct,
+           Number(device.gpu_mem_used_pct), TELEMETRY_HISTORY);
+    }
+    if (device.system_power_w != null) {
+      ring(true, this.deviceTelemetry.powerW,
+           Number(device.system_power_w), TELEMETRY_HISTORY);
     }
   }
 
@@ -138,10 +169,11 @@ export class Model {
       }
     }
     // Reconcile comprehensive turns + transcript identity from the final doc.
+    this.turns.clear();
     for (const e of (msg.comprehensive || [])) {
       if (e.text_id == null) continue;
       if (e.speaker_id && e.speaker_name) this.speakerNames.set(e.speaker_id, e.speaker_name);
-      this.turns.set(e.text_id, {
+      this.turns.set(this._turnKey(e), {
         text_id: e.text_id, start: e.start, end: e.end,
         speaker: e.speaker, speaker_id: e.speaker_id, speaker_name: e.speaker_name,
         text: e.text || "",
@@ -195,5 +227,19 @@ export class Model {
   _cursorToPipe(id) {
     if (id === "diar") return "diarization";
     return id; // asr, vad
+  }
+
+  _turnKey(e) {
+    const s = Number.isFinite(e.start) ? e.start.toFixed(3) : "na";
+    const end = Number.isFinite(e.end) ? e.end.toFixed(3) : "na";
+    const speaker = e.speaker_id || e.speaker || "s";
+    return `${e.text_id}:${s}:${end}:${speaker}`;
+  }
+
+  _removeTurnsForTextIds(textIds) {
+    if (!textIds.size) return;
+    for (const [key, turn] of this.turns) {
+      if (turn && textIds.has(turn.text_id)) this.turns.delete(key);
+    }
   }
 }

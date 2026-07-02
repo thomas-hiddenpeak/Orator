@@ -49,8 +49,11 @@ max_audio_tokens = 1500
 # Max decode tokens per segment
 max_new_tokens = 32
 
-# Hard segment cap (seconds) — only active when vad_gate=false
-segment_sec = 24.0
+# Hard segment cap (seconds) for finalized ASR chunks. Lower values reduce
+# microphone/live UI latency and prevent long same-speaker transcript blocks.
+# 2026-07-03 WS validation: 24s produced 31–55s long chunks; 12s kept the
+# first 60s of test.mp3 stable while restoring readable Live segmentation.
+segment_sec = 12.0
 
 # Language hint ("" = auto-detect)
 language = "Chinese"

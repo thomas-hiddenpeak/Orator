@@ -11,6 +11,10 @@ export class TimelineView {
 
   setModel(m) { this.model = m; }
 
+  fit() {
+    // JSON timeline view has no viewport-dependent layout to recompute.
+  }
+
   schedule() {
     if (this._pending) return;
     this._pending = true;

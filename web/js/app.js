@@ -9,13 +9,17 @@ import { TimelineView } from "./render/timeline.js";
 import { ObservabilityView } from "./render/observability.js";
 import { SessionsView } from "./render/sessions.js";
 import { SpeakersView } from "./render/speakers.js";
+import { DevStatusView } from "./render/dev_status.js";
 
 const $ = (id) => document.getElementById(id);
 
 const connBadge = $("connBadge");
+const wsUrlBadge = $("wsUrlBadge");
 const micBtn = $("micBtn"), uploadBtn = $("uploadBtn"), fileInput = $("fileInput");
 const flushBtn = $("flushBtn"), endBtn = $("endBtn"), clearBtn = $("clearBtn");
 const downloadBtn = $("downloadBtn");
+const copyRunBtn = $("copyRunBtn"), copyTestBtn = $("copyTestBtn"), copyWsBtn = $("copyWsBtn");
+const copyHint = $("copyHint");
 const progressRow = $("progressRow"), progressFill = $("progressFill");
 const durationLabel = $("durationLabel"), statusLabel = $("statusLabel");
 const vadLed = $("vadLed");
@@ -28,10 +32,12 @@ const timeline = new TimelineView($("timelineView"));
 const observability = new ObservabilityView($("obsPanel"));
 const sessions = new SessionsView($("sessionList"), (id) => ws.loadSession(id));
 const speakers = new SpeakersView($("speakerList"), (id, name) => ws.renameSpeaker(id, name));
+const devStatus = new DevStatusView($("devStatusGrid"), $("devUpdated"));
 timeline.setModel(model);
 
 let micRunning = false, fileSending = false, lastError = "";
 let mic = null, fileHandle = null;
+const runtime = { online: false, wsUrl: "" };
 
 /* ── render scheduler (coalesced) ── */
 let renderPending = false;
@@ -44,6 +50,7 @@ function scheduleRender() {
     timeline.render(model);
     observability.render(model);
     speakers.render(model);
+    devStatus.render(model, runtime);
     updateMetrics();
   });
 }
@@ -100,8 +107,14 @@ const ws = new OratorWs({
 
 /* ── connection UI ── */
 function setConn(online) {
+  runtime.online = online;
+  runtime.wsUrl = ws.url;
   connBadge.textContent = online ? "● Connected" : "● Disconnected";
   connBadge.className = "badge " + (online ? "online" : "offline");
+  if (wsUrlBadge) {
+    wsUrlBadge.textContent = ws.url || "ws://-";
+    wsUrlBadge.title = ws.url || "";
+  }
   if (online) connBadge.title = "";
   const en = online && !fileSending;
   micBtn.disabled = !en;
@@ -110,6 +123,7 @@ function setConn(online) {
 }
 function showError(msg) {
   lastError = msg;
+  runtime.online = false;
   connBadge.textContent = "● Error";
   connBadge.className = "badge offline";
   connBadge.title = msg;
@@ -196,6 +210,28 @@ if (refreshBtn) refreshBtn.addEventListener("click", () => ws.sessions());
 const refreshSpk = $("refreshSpeakersBtn");
 if (refreshSpk) refreshSpk.addEventListener("click", () => ws.speakers());
 
+async function copyText(text, label) {
+  try {
+    await navigator.clipboard.writeText(text);
+    if (copyHint) copyHint.textContent = `${label} copied`;
+  } catch (_) {
+    if (copyHint) copyHint.textContent = "Copy failed";
+  }
+  if (copyHint) setTimeout(() => { copyHint.textContent = ""; }, 1800);
+}
+
+if (copyRunBtn) {
+  copyRunBtn.addEventListener("click", () =>
+    copyText("ORATOR_CONFIG=orator.toml ./build/orator_ws", "Run command"));
+}
+if (copyTestBtn) {
+  copyTestBtn.addEventListener("click", () =>
+    copyText("ctest --test-dir build --output-on-failure", "Test command"));
+}
+if (copyWsBtn) {
+  copyWsBtn.addEventListener("click", () => copyText(ws.url, "WebSocket URL"));
+}
+
 /* ── mic progress timer ── */
 let timerStart = 0, timerHandle = null;
 function startTimer() {
@@ -210,4 +246,5 @@ function stopTimer() { if (timerHandle) { clearInterval(timerHandle); timerHandl
 setConn(false);
 ws.connect();
 timeline.schedule();
+scheduleRender();
 window.addEventListener("resize", () => timeline.fit());

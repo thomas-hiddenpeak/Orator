@@ -10,17 +10,20 @@ export class ObservabilityView {
   constructor(containerEl) {
     this.el = containerEl;
     this.cards = new Map(); // pipe -> {root, rtfVal, rtfSpark, blVal, blSpark, badges, warn}
+    this.deviceCard = null;
   }
 
   clear() {
     if (this.el) this.el.innerHTML = "";
     this.cards.clear();
+    this.deviceCard = null;
   }
 
   render(model) {
     if (!this.el) return;
     const names = ORDER.filter((n) => model.telemetry.has(n));
-    if (names.length === 0) {
+    const hasDevice = !!model.deviceTelemetry?.latest;
+    if (names.length === 0 && !hasDevice) {
       if (!this.el.querySelector(".obs-empty")) {
         this.el.innerHTML = '<div class="obs-empty">Telemetry off — enable [telemetry] in orator.toml</div>';
       }
@@ -34,6 +37,13 @@ export class ObservabilityView {
       let card = this.cards.get(name);
       if (!card) { card = this._make(name); this.cards.set(name, card); this.el.appendChild(card.root); }
       this._update(card, t);
+    }
+    if (hasDevice) {
+      if (!this.deviceCard) {
+        this.deviceCard = this._makeDevice();
+        this.el.prepend(this.deviceCard.root);
+      }
+      this._updateDevice(this.deviceCard, model.deviceTelemetry);
     }
   }
 
@@ -81,6 +91,57 @@ export class ObservabilityView {
       t.backlogSec[t.backlogSec.length - 1] > t.backlogSec[t.backlogSec.length - 4] + 0.2;
     const starving = rising && rtf != null && rtf < 1;
     card.warn.classList.toggle("hidden", !starving);
+  }
+
+  _makeDevice() {
+    const root = document.createElement("div");
+    root.className = "obs-card obs-device";
+    root.innerHTML =
+      '<div class="obs-head"><span class="obs-name">device</span>' +
+      '<span class="obs-badges"><span class="obs-badge active source">telemetry</span></span></div>' +
+      '<div class="obs-metric"><span class="obs-label">GPU</span>' +
+      '<span class="obs-val gpu">-</span><canvas class="obs-spark gpu" width="120" height="22"></canvas></div>' +
+      '<div class="obs-metric"><span class="obs-label">VRAM</span>' +
+      '<span class="obs-val mem">-</span><canvas class="obs-spark mem" width="120" height="22"></canvas></div>' +
+      '<div class="obs-metric"><span class="obs-label">Power</span>' +
+      '<span class="obs-val power">-</span><canvas class="obs-spark power" width="120" height="22"></canvas></div>' +
+      '<div class="obs-warn hidden"></div>';
+    return {
+      root,
+      source: root.querySelector(".obs-badge.source"),
+      gpuVal: root.querySelector(".obs-val.gpu"),
+      gpuSpark: root.querySelector(".obs-spark.gpu"),
+      memVal: root.querySelector(".obs-val.mem"),
+      memSpark: root.querySelector(".obs-spark.mem"),
+      powerVal: root.querySelector(".obs-val.power"),
+      powerSpark: root.querySelector(".obs-spark.power"),
+      warn: root.querySelector(".obs-warn"),
+    };
+  }
+
+  _updateDevice(card, telemetry) {
+    const d = telemetry.latest || {};
+    card.source.textContent = d.gpu_utilization_source || "device";
+    card.gpuVal.textContent = d.gpu_utilization_pct == null
+      ? "n/a"
+      : Number(d.gpu_utilization_pct).toFixed(0) + "%";
+    card.memVal.textContent = d.gpu_mem_used_mb == null
+      ? "n/a"
+      : Number(d.gpu_mem_used_mb).toFixed(0) + " / " +
+        Number(d.gpu_mem_total_mb || 0).toFixed(0) + " MB";
+    card.powerVal.textContent = d.system_power_w == null
+      ? "n/a"
+      : Number(d.system_power_w).toFixed(1) + " W";
+
+    this._spark(card.gpuSpark, telemetry.gpuUtil, 100.0, "#22d3ee");
+    this._spark(card.memSpark, telemetry.gpuMemPct, 90.0, "#a78bfa");
+    this._spark(card.powerSpark, telemetry.powerW, null, "#34d399");
+
+    const missing = [];
+    if (d.gpu_utilization_pct == null) missing.push("GPU utilization");
+    if (d.system_power_w == null) missing.push("power rail");
+    card.warn.textContent = missing.length ? "unavailable: " + missing.join(", ") : "";
+    card.warn.classList.toggle("hidden", missing.length === 0);
   }
 
   _badge(parent, text, cls) {

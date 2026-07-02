@@ -1,13 +1,8 @@
-// render/transcript.js — Live view: diarization-driven chronological timeline.
+// render/transcript.js — Live view: ASR utterances first.
 //
-// The segment boundaries come from the diarization track (who spoke when),
-// not from ASR. Each diar segment is a row carrying its speaker identity
-// (coloured left bar + badge) and the text attributed to it from the
-// comprehensive timeline. This is the "test.txt" style view — linear,
-// time-ordered, with speaker attribution per row.
-//
-// Revisions to model.turns or model.tracks.diarization automatically sync
-// because we re-read on each render frame.
+// The comprehensive timeline may split a text segment at diarization
+// boundaries. That is correct for the final alignment view, but the live
+// microphone transcript must keep finalized ASR utterances readable.
 import { fmtTime, identityKey, identityLabel, colorForKey } from "../format.js";
 
 const MAX_ROWS = 600;
@@ -35,17 +30,18 @@ export class TranscriptView {
       this.draftWrap.classList.add("hidden");
     }
 
-    // Primary: diarization-driven view (segments from diar track, text from
-    // comprehensive turns). Fallback: live ASR rows (streaming before any
-    // comprehensive data arrives).
+    // Primary: finalized ASR utterances, enriched with speaker attribution when
+    // revisions arrive. Comprehensive rows remain a fallback for loaded sessions
+    // that do not have live ASR rows in memory.
     const diarSegs = model.tracks?.diarization || [];
     const hasTurns = model.turns && model.turns.size > 0;
 
-    if (diarSegs.length > 0 && hasTurns) {
-      this._renderDiarDriven(model, diarSegs);
+    if (model.asr && model.asr.size > 0) {
+      this._renderAsrRows(model);
     } else if (hasTurns) {
-      // Turns exist but no diar yet — fall back to turns sorted by time.
       this._renderComprehensiveFallback(model);
+    } else if (diarSegs.length > 0) {
+      this._renderDiarDriven(model, diarSegs);
     } else {
       this._renderFallbackASR(model);
     }
@@ -144,23 +140,18 @@ export class TranscriptView {
 
   // ── fallback: comprehensive turns sorted by time (no diar yet) ──
   _renderComprehensiveFallback(model) {
-    // Clear diar rows when falling back.
-    for (const [, el] of this.rows) {
-      if (el && el.parentNode) el.parentNode.removeChild(el);
-    }
-    this.rows.clear();
-
     const turns = [];
     const activeIds = new Set();
-    for (const t of model.turns.values()) {
+    for (const [key, t] of model.turns) {
       if (!t || t.text_id == null || !t.text?.trim()) continue;
-      turns.push(t);
-      activeIds.add(String(t.text_id));
+      const id = `turn:${key}`;
+      turns.push({ ...t, _row_id: id });
+      activeIds.add(id);
     }
     turns.sort((a, b) => (a.start || 0) - (b.start || 0));
 
     for (const t of turns) {
-      const id = String(t.text_id);
+      const id = t._row_id;
       let el = this.rows.get(id);
       if (!el) {
         el = this._makeEntry(id);
@@ -189,25 +180,36 @@ export class TranscriptView {
     }
   }
 
-  // ── fallback: live ASR rows (streaming before comprehensive arrives) ──
-  _renderFallbackASR(model) {
-    for (const [, el] of this.rows) {
-      if (el && el.parentNode) el.parentNode.removeChild(el);
-    }
-    this.rows.clear();
-
+  // ── primary live view: ASR rows, optionally speaker-enriched ──
+  _renderAsrRows(model) {
+    const activeIds = new Set();
     for (const id of model.asrOrder) {
       const row = model.asr.get(id);
       if (!row) continue;
-      let el = this.rows.get(id);
+      if (row.status === "partial") continue;
+      const rowId = `asr:${id}`;
+      activeIds.add(rowId);
+      let el = this.rows.get(rowId);
       if (!el) {
-        el = this._makeFallbackEntry(id);
-        this.rows.set(id, el);
+        el = this._makeFallbackEntry(rowId);
+        this.rows.set(rowId, el);
         this.list.appendChild(el);
         this._prune();
       }
       this._updateFallbackEntry(el, row, model.alignUnits.get(id), model);
     }
+
+    for (const [id, el] of this.rows) {
+      if (!activeIds.has(id)) {
+        if (el && el.parentNode) el.parentNode.removeChild(el);
+        this.rows.delete(id);
+      }
+    }
+  }
+
+  // ── fallback: live ASR rows (streaming before comprehensive arrives) ──
+  _renderFallbackASR(model) {
+    this._renderAsrRows(model);
   }
 
   _makeFallbackEntry(id) {
@@ -226,12 +228,15 @@ export class TranscriptView {
     el.className = "t-item " + (row.status || "");
     el.querySelector(".t-time").textContent =
       `${fmtTime(row.start)} – ${fmtTime(row.end)}`;
-    const key = identityKey(row);
+    const speakerEntry = this._dominantSpeakerForAsr(row, model) || row;
+    const key = identityKey(speakerEntry);
     const color = colorForKey(key);
     el.style.borderLeftColor = color;
     const spk = el.querySelector(".t-speaker");
-    if (row.speaker != null || row.speaker_id) {
-      spk.textContent = model ? model.labelFor(row) : identityLabel(row);
+    if (speakerEntry.speaker != null || speakerEntry.speaker_id) {
+      spk.textContent = model
+        ? model.labelFor(speakerEntry)
+        : identityLabel(speakerEntry);
       spk.style.background = color;
       spk.style.color = "#0b0d12";
     } else {
@@ -241,6 +246,23 @@ export class TranscriptView {
     el.querySelector(".t-text").textContent = row.text || "";
     const al = el.querySelector(".t-align");
     al.textContent = units && units.length ? `⏱ ${units.length}` : "";
+  }
+
+  _dominantSpeakerForAsr(row, model) {
+    if (!model?.turns || row?.start == null || row?.end == null) return null;
+    let best = null;
+    let bestOverlap = 0;
+    for (const t of model.turns.values()) {
+      if (!t || String(t.text_id) !== String(row.text_id)) continue;
+      const s = Math.max(row.start || 0, t.start || 0);
+      const e = Math.min(row.end || 0, t.end || 0);
+      const overlap = Math.max(0, e - s);
+      if (overlap > bestOverlap) {
+        bestOverlap = overlap;
+        best = t;
+      }
+    }
+    return best;
   }
 
   _prune() {

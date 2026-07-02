@@ -12,16 +12,286 @@
 #include "pipeline/comprehensive_timeline.h"
 #include "pipeline/json_util.h"
 
+#include <cuda_runtime.h>
+
 #include <cstdio>
 #include <cstdlib>
+#include <filesystem>
+#include <fstream>
 #include <map>
+#include <optional>
 #include <set>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
+#include <sys/wait.h>
+#include <unistd.h>
+
 namespace orator {
 namespace pipeline {
+namespace {
+
+std::optional<double> ReadDoubleFile(const std::filesystem::path& path) {
+  std::ifstream in(path);
+  double v = 0.0;
+  if (!(in >> v)) return std::nullopt;
+  return v;
+}
+
+std::optional<std::string> ReadFirstLine(const std::filesystem::path& path) {
+  std::ifstream in(path);
+  std::string s;
+  if (!std::getline(in, s)) return std::nullopt;
+  return s;
+}
+
+struct GpuUtilization {
+  double pct = 0.0;
+  std::string source;
+};
+
+std::string ReadCommandOutput(const std::vector<std::string>& args) {
+  if (args.empty()) return "";
+  int pipefd[2];
+  if (pipe(pipefd) != 0) return "";
+
+  const pid_t pid = fork();
+  if (pid < 0) {
+    close(pipefd[0]);
+    close(pipefd[1]);
+    return "";
+  }
+  if (pid == 0) {
+    dup2(pipefd[1], STDOUT_FILENO);
+    close(STDERR_FILENO);
+    const long max_fd = sysconf(_SC_OPEN_MAX);
+    const int limit = max_fd > 0 ? static_cast<int>(max_fd) : 1024;
+    for (int fd = 3; fd < limit; ++fd) {
+      if (fd != STDOUT_FILENO) close(fd);
+    }
+
+    std::vector<char*> argv;
+    argv.reserve(args.size() + 1);
+    for (const auto& arg : args) {
+      argv.push_back(const_cast<char*>(arg.c_str()));
+    }
+    argv.push_back(nullptr);
+    execvp(argv[0], argv.data());
+    _exit(127);
+  }
+
+  close(pipefd[1]);
+  std::string out;
+  char buf[512];
+  ssize_t n = 0;
+  while ((n = read(pipefd[0], buf, sizeof(buf))) > 0) {
+    out.append(buf, static_cast<size_t>(n));
+  }
+  close(pipefd[0]);
+  int status = 0;
+  waitpid(pid, &status, 0);
+  return out;
+}
+
+std::optional<double> ParseTegrastatsGpuUtilizationPct(
+    const std::string& line) {
+  const std::string keys[] = {"GR3D_FREQ", "GPU_FREQ"};
+  for (const auto& key : keys) {
+    const size_t key_pos = line.find(key);
+    if (key_pos == std::string::npos) continue;
+    const size_t pct_pos = line.find('%', key_pos + key.size());
+    if (pct_pos == std::string::npos) continue;
+
+    size_t value_start = pct_pos;
+    while (value_start > key_pos) {
+      const char c = line[value_start - 1];
+      if ((c < '0' || c > '9') && c != '.') break;
+      --value_start;
+    }
+    if (value_start == pct_pos) continue;
+    char* end = nullptr;
+    const double value = std::strtod(line.c_str() + value_start, &end);
+    if (end == line.c_str() + value_start || value < 0.0) continue;
+    return value > 100.0 ? 100.0 : value;
+  }
+  return std::nullopt;
+}
+
+std::optional<GpuUtilization> ReadTegrastatsGpuUtilizationPct() {
+  const std::string output = ReadCommandOutput(
+      {"timeout", "0.5s", "tegrastats", "--readall", "--interval", "100"});
+  size_t start = 0;
+  while (start < output.size()) {
+    const size_t end = output.find('\n', start);
+    const std::string line = output.substr(
+        start, end == std::string::npos ? std::string::npos : end - start);
+    const auto pct = ParseTegrastatsGpuUtilizationPct(line);
+    if (pct) return GpuUtilization{*pct, "tegrastats"};
+    if (end == std::string::npos) break;
+    start = end + 1;
+  }
+  return std::nullopt;
+}
+
+std::optional<GpuUtilization> ReadNvidiaSmiGpuUtilizationPct() {
+  const std::string output = ReadCommandOutput(
+      {"nvidia-smi", "--query-gpu=utilization.gpu",
+       "--format=csv,noheader,nounits"});
+  std::optional<double> best;
+  size_t start = 0;
+  while (start < output.size()) {
+    const size_t line_end = output.find('\n', start);
+    const std::string line = output.substr(
+        start, line_end == std::string::npos ? std::string::npos
+                                             : line_end - start);
+    char* end = nullptr;
+    const double value = std::strtod(line.c_str(), &end);
+    if (end != line.c_str() && value >= 0.0) {
+      if (!best || value > *best) best = value > 100.0 ? 100.0 : value;
+    }
+    if (line_end == std::string::npos) break;
+    start = line_end + 1;
+  }
+  if (!best) return std::nullopt;
+  return GpuUtilization{*best, "nvidia-smi"};
+}
+
+std::optional<GpuUtilization> ReadGpuUtilization() {
+  const std::filesystem::path known_paths[] = {
+      "/sys/devices/gpu.0/load",
+      "/sys/devices/platform/gpu.0/load",
+      "/sys/devices/platform/17000000.ga10b/load",
+      "/sys/kernel/debug/gpu.0/load",
+  };
+  for (const auto& path : known_paths) {
+    const auto load = ReadDoubleFile(path);
+    if (load) {
+      const double pct = *load > 100.0 ? *load / 10.0 : *load;
+      return GpuUtilization{pct, "sysfs"};
+    }
+  }
+
+  const std::filesystem::path root("/sys/class/devfreq");
+  std::error_code ec;
+  if (std::filesystem::exists(root, ec)) {
+    for (const auto& entry : std::filesystem::directory_iterator(root, ec)) {
+      if (ec) break;
+      const auto name = entry.path().filename().string();
+      if (name.find("gpu") == std::string::npos &&
+          name.find("nvd") == std::string::npos &&
+          name.find("gpc") == std::string::npos) {
+        continue;
+      }
+      const auto load = ReadDoubleFile(entry.path() / "load");
+      if (!load) continue;
+      // Jetson devfreq load is commonly reported as 0..1000.
+      const double pct = *load > 100.0 ? *load / 10.0 : *load;
+      return GpuUtilization{pct, "sysfs"};
+    }
+  }
+
+  const auto tegrastats = ReadTegrastatsGpuUtilizationPct();
+  if (tegrastats) return tegrastats;
+  return ReadNvidiaSmiGpuUtilizationPct();
+}
+
+std::optional<double> ReadGpuFreqMhz() {
+  const std::filesystem::path root("/sys/class/devfreq");
+  std::error_code ec;
+  if (!std::filesystem::exists(root, ec)) return std::nullopt;
+  for (const auto& entry : std::filesystem::directory_iterator(root, ec)) {
+    if (ec) break;
+    const auto name = entry.path().filename().string();
+    if (name.find("gpu") == std::string::npos &&
+        name.find("nvd") == std::string::npos &&
+        name.find("gpc") == std::string::npos) {
+      continue;
+    }
+    const auto hz = ReadDoubleFile(entry.path() / "cur_freq");
+    if (hz && *hz > 0.0) return *hz / 1000000.0;
+  }
+  return std::nullopt;
+}
+
+struct PowerRail {
+  std::string name;
+  double watts = 0.0;
+};
+
+std::vector<PowerRail> ReadPowerRails() {
+  std::vector<PowerRail> rails;
+  const std::filesystem::path root("/sys/class/hwmon");
+  std::error_code ec;
+  if (!std::filesystem::exists(root, ec)) return rails;
+  for (const auto& hwmon : std::filesystem::directory_iterator(root, ec)) {
+    if (ec) break;
+    const auto hwmon_name = ReadFirstLine(hwmon.path() / "name").value_or("");
+    std::error_code file_ec;
+    bool has_power_input = false;
+    for (const auto& f : std::filesystem::directory_iterator(hwmon.path(),
+                                                             file_ec)) {
+      if (file_ec) break;
+      const auto fn = f.path().filename().string();
+      if (fn.rfind("power", 0) != 0 ||
+          fn.find("_input") == std::string::npos) {
+        continue;
+      }
+      const auto microwatts = ReadDoubleFile(f.path());
+      if (!microwatts || *microwatts <= 0.0) continue;
+      PowerRail rail;
+      rail.name = hwmon_name.empty() ? hwmon.path().filename().string()
+                                     : hwmon_name;
+      rail.watts = *microwatts / 1000000.0;
+      rails.push_back(rail);
+      has_power_input = true;
+    }
+    if (!file_ec && !has_power_input) {
+      for (int i = 1; i <= 8; ++i) {
+        const auto mv = ReadDoubleFile(hwmon.path() /
+                                       ("in" + std::to_string(i) + "_input"));
+        const auto ma = ReadDoubleFile(hwmon.path() /
+                                       ("curr" + std::to_string(i) +
+                                        "_input"));
+        if (!mv || !ma || *mv <= 0.0 || *ma <= 0.0) continue;
+        PowerRail rail;
+        rail.name = ReadFirstLine(hwmon.path() /
+                                  ("in" + std::to_string(i) + "_label"))
+                        .value_or(hwmon_name.empty()
+                                      ? hwmon.path().filename().string()
+                                      : hwmon_name);
+        rail.watts = (*mv * *ma) / 1000000.0;
+        rails.push_back(rail);
+      }
+    }
+  }
+  return rails;
+}
+
+std::optional<double> SystemPowerWatts(const std::vector<PowerRail>& rails) {
+  for (const auto& rail : rails) {
+    if (rail.name == "VIN") return rail.watts;
+  }
+  for (const auto& rail : rails) {
+    if (rail.name.find("ina238") != std::string::npos) return rail.watts;
+  }
+  for (const auto& rail : rails) {
+    if (rail.name.find("VIN") != std::string::npos) return rail.watts;
+  }
+  if (rails.empty()) return std::nullopt;
+  double total = 0.0;
+  for (const auto& rail : rails) total += rail.watts;
+  return total;
+}
+
+std::string OptionalJson(double value, bool valid, int precision = 3) {
+  if (!valid) return "null";
+  char buf[64];
+  std::snprintf(buf, sizeof(buf), "%.*f", precision, value);
+  return buf;
+}
+
+}  // namespace
 
 // Shared revision serializer defined in src/pipeline/json_util.cc.
 std::string SerializeRevisionToJson(
@@ -70,7 +340,44 @@ std::string AuditoryStream::SerializeGpuTelemetry() const {
     out += buf;
     if (i + 1 < entries.size()) out += ",";
   }
-  out += "]}";
+  out += "]";
+
+  size_t free_bytes = 0;
+  size_t total_bytes = 0;
+  const cudaError_t mem_status = cudaMemGetInfo(&free_bytes, &total_bytes);
+  if (mem_status != cudaSuccess) {
+    cudaGetLastError();
+  }
+  const bool mem_ok = mem_status == cudaSuccess && total_bytes > 0;
+  const double total_mb = static_cast<double>(total_bytes) / (1024.0 * 1024.0);
+  const double used_mb =
+      static_cast<double>(total_bytes - free_bytes) / (1024.0 * 1024.0);
+  const double used_pct = mem_ok ? (used_mb / total_mb) * 100.0 : 0.0;
+  const auto gpu_util = ReadGpuUtilization();
+  const auto gpu_freq = ReadGpuFreqMhz();
+  const auto rails = ReadPowerRails();
+  const auto system_power_w = SystemPowerWatts(rails);
+
+  out += ",\"device\":{";
+  out += "\"gpu_utilization_pct\":" +
+         OptionalJson(gpu_util ? gpu_util->pct : 0.0, gpu_util.has_value(), 1);
+  out += ",\"gpu_utilization_source\":";
+  out += gpu_util ? ("\"" + JsonEscape(gpu_util->source) + "\"") : "null";
+  out += ",\"gpu_freq_mhz\":" +
+         OptionalJson(gpu_freq.value_or(0.0), gpu_freq.has_value(), 1);
+  out += ",\"gpu_mem_used_mb\":" + OptionalJson(used_mb, mem_ok, 1);
+  out += ",\"gpu_mem_total_mb\":" + OptionalJson(total_mb, mem_ok, 1);
+  out += ",\"gpu_mem_used_pct\":" + OptionalJson(used_pct, mem_ok, 1);
+  out += ",\"system_power_w\":" +
+         OptionalJson(system_power_w.value_or(0.0),
+                      system_power_w.has_value(), 2);
+  out += ",\"power_rails\":[";
+  for (size_t i = 0; i < rails.size(); ++i) {
+    if (i > 0) out += ",";
+    out += "{\"name\":\"" + JsonEscape(rails[i].name) + "\",\"watts\":";
+    out += OptionalJson(rails[i].watts, true, 2) + "}";
+  }
+  out += "]}}";
   return out;
 }
 

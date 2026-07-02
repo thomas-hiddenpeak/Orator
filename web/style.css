@@ -2,6 +2,7 @@
   --bg: #0f1117;
   --surface: #1a1d27;
   --surface2: #232733;
+  --surface3: #151821;
   --border: #2e3345;
   --text: #e4e6ed;
   --text-dim: #8b90a0;
@@ -41,6 +42,12 @@ body {
 
 .brand h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.5px; }
 .brand .subtitle { font-size: 12px; color: var(--text-dim); margin-left: 10px; }
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
 
 .badge {
   font-size: 12px;
@@ -50,6 +57,15 @@ body {
 }
 .badge.online { background: rgba(52,211,153,0.15); color: var(--green); }
 .badge.offline { background: rgba(239,68,68,0.15); color: var(--red); }
+.badge.neutral {
+  background: rgba(139,144,160,0.12);
+  color: var(--text-dim);
+  border: 1px solid rgba(139,144,160,0.16);
+  max-width: min(42vw, 360px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 /* Container */
 .container { max-width: 1400px; margin: 0 auto; padding: 16px 24px; }
@@ -158,6 +174,84 @@ body {
 .btn-full { width: 100%; justify-content: center; margin-top: 12px; }
 
 .btn-icon { font-size: 14px; }
+
+/* Developer status */
+.dev-panel {
+  margin-bottom: 16px;
+  padding: 14px 16px;
+}
+
+.dev-updated {
+  color: var(--text-dim);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.dev-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.dev-tile {
+  min-height: 76px;
+  background: var(--surface3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.dev-label {
+  color: var(--text-dim);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.dev-value {
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.dev-value.small {
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.dev-meta {
+  color: var(--text-dim);
+  font-size: 11px;
+  line-height: 1.25;
+  min-height: 14px;
+  overflow-wrap: anywhere;
+}
+
+.dev-tile.good { border-color: rgba(52,211,153,0.35); }
+.dev-tile.warn { border-color: rgba(245,158,11,0.45); }
+.dev-tile.bad { border-color: rgba(239,68,68,0.45); }
+
+.dev-tool-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.copy-hint {
+  min-height: 18px;
+  color: var(--green);
+  font-size: 12px;
+}
 
 /* Main Grid */
 .main-grid {
@@ -389,8 +483,19 @@ body {
 @media (max-width: 900px) {
   .main-grid { grid-template-columns: 1fr; }
   .container { padding: 12px; }
-  .topbar { padding: 10px 12px; }
+  .topbar {
+    padding: 10px 12px;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .topbar-right {
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+  }
+  .badge.neutral { max-width: 48vw; }
   .top-metrics { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
+  .dev-grid { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
 }
 
 /* ── Spec 006 Phase 2: forced-alignment unit count in transcript rows ── */
@@ -521,4 +626,3 @@ body {
   white-space: nowrap;
   padding-top: 2px;
 }
-

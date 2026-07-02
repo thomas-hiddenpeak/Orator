@@ -201,7 +201,9 @@ void AsrWorker::ProcessGateSubSpan(const float* sub, int sub_n) {
 
 void AsrWorker::Finalize() {
   vad_state_ = VadState::IDLE;
+  finalizing_ = true;
   ProcessIncremental(nullptr, 0, /*finalize=*/true);
+  finalizing_ = false;
 }
 
 // Incremental KV-cache path: continuous audio is fed into the engine's
@@ -299,7 +301,12 @@ void AsrWorker::EmitIncrementalChunk(const float* samples, int n,
     bool keep = true;
     if (params_.asr_vad_gate && vad_cache_) {
       const auto vsegs = vad_cache_->GetAll();
-      if (!vsegs.empty()) {
+      if (vsegs.empty()) {
+        const double horizon = vad_cache_->horizon();
+        if (finalizing_ || horizon >= seg_start + params_.asr_vad_trail_sec) {
+          keep = false;
+        }
+      } else {
         // Transitional VAD-lag experiment: treat any segment starting after the
         // latest VAD speech end as unconfirmed leading-edge audio.
         // If the ASR segment starts after the last VAD speech segment,
@@ -323,16 +330,6 @@ void AsrWorker::EmitIncrementalChunk(const float* samples, int n,
       }
     }
     if (!keep) {
-      // DEBUG: log discarded segment for R1 investigation
-      std::fprintf(stderr,
-          "[ASR-DROP] seg_id=%ld seg=[%.2f,%.2f) text='%s' vad_segs=%zu\n",
-          inc_text_id_, seg_start, seg_end, inc_live_text_.c_str(),
-          vad_cache_ ? vad_cache_->GetAll().size() : 0u);
-      if (vad_cache_) {
-        for (const auto& [s, e] : vad_cache_->GetAll()) {
-          std::fprintf(stderr, "[ASR-DROP]   vad=[%.2f,%.2f)\n", s, e);
-        }
-      }
       inc_live_text_.clear();
       inc_delivered_text_.clear();
     } else {
@@ -385,6 +382,7 @@ void AsrWorker::Reset() {
   inc_live_text_.clear();
   inc_text_id_ = 0;
   inc_delivered_text_.clear();
+  finalizing_ = false;
   processed_samples_.store(0);
   compute_sec_.store(0.0, std::memory_order_relaxed);
   asr_->Reset();
