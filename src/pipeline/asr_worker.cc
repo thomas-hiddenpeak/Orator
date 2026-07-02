@@ -300,11 +300,20 @@ void AsrWorker::EmitIncrementalChunk(const float* samples, int n,
     if (params_.asr_vad_gate && vad_cache_) {
       const auto vsegs = vad_cache_->GetAll();
       if (!vsegs.empty()) {
-        keep = false;
-        for (const auto& [s, e] : vsegs) {
-          if (seg_start < e && seg_end > s) {  // any overlap
-            keep = true;
-            break;
+        // If the ASR segment starts well after the last VAD speech segment,
+        // VAD has not caught up yet — this is the leading edge. Keep the text
+        // so real speech is not lost while VAD is lagging. Same rationale as
+        // the "empty cache" guard above.
+        const double last_vad_end = vsegs.back().second;
+        if (seg_start > last_vad_end + 0.5) {  // VAD hasn't reached here yet
+          keep = true;
+        } else {
+          keep = false;
+          for (const auto& [s, e] : vsegs) {
+            if (seg_start < e && seg_end > s) {  // any overlap
+              keep = true;
+              break;
+            }
           }
         }
       }
