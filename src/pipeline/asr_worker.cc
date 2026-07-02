@@ -149,18 +149,16 @@ void AsrWorker::ProcessGateSubSpan(const float* sub, int sub_n) {
   if (inc_in_segment_ && last_vad_end > -1e8 &&
       last_vad_end > last_endpoint_vad_end_ &&
       (vad_horizon - last_vad_end) >= params_.asr_vad_trail_sec) {
-    // Feed the trailing window (acoustic context for the last word), then
-    // commit and skip the remaining silence. This matches the confirmed-
-    // silence path (B) so both close paths retain the same trailing context.
-    const long trail_end =
-        tb_.SampleAt(last_speech_end_sec_ + params_.asr_vad_trail_sec);
-    const long feed_l =
-        std::min<long>(sub_n, std::max<long>(0, trail_end - base));
-    const int feed_n = static_cast<int>(feed_l);
-    if (feed_n > 0) ProcessIncremental(sub, feed_n, /*finalize=*/false);
+    // NOTE: do NOT feed the trailing window before finalize here.
+    // The silence sub-span contains no speech — feeding it causes the
+    // decoder to hallucinate on pure silence, overwriting inc_live_text_
+    // with garbage before StreamFinalize.  Path B (confirmed silence)
+    // feeds the trailing window only when ASR is lagging behind VAD;
+    // in steady real-time (path A) the speech audio has already been
+    // fully consumed by prior speech sub-spans, so finalize is clean.
     ProcessIncremental(nullptr, 0, /*finalize=*/true);
     last_endpoint_vad_end_ = last_vad_end;
-    inc_abs_pos_ += (sub_n - feed_n);
+    inc_abs_pos_ += sub_n;
     processed_samples_.fetch_add(sub_n);
     vad_state_ = VadState::IDLE;
     return;
@@ -312,6 +310,16 @@ void AsrWorker::EmitIncrementalChunk(const float* samples, int n,
       }
     }
     if (!keep) {
+      // DEBUG: log discarded segment for R1 investigation
+      std::fprintf(stderr,
+          "[ASR-DROP] seg_id=%ld seg=[%.2f,%.2f) text='%s' vad_segs=%zu\n",
+          inc_text_id_, seg_start, seg_end, inc_live_text_.c_str(),
+          vad_cache_ ? vad_cache_->GetAll().size() : 0u);
+      if (vad_cache_) {
+        for (const auto& [s, e] : vad_cache_->GetAll()) {
+          std::fprintf(stderr, "[ASR-DROP]   vad=[%.2f,%.2f)\n", s, e);
+        }
+      }
       inc_live_text_.clear();
       inc_delivered_text_.clear();
     } else {
