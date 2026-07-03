@@ -33,6 +33,8 @@ class AsrWorker {
     int asr_vad_lead_ms = 200;  // lead buffer (ms) before VAD speech onset
     double asr_vad_trail_sec =
         1.5;  // trailing window (sec) after VAD silence before commit
+    double asr_vad_min_overlap_sec =
+        0.12;  // minimum confirmed VAD speech overlap to keep an ASR final
   };
 
   using Emit = std::function<void(const std::string&)>;
@@ -104,6 +106,9 @@ class AsrWorker {
   // already published.
   void ProcessGateSubSpan(const float* sub, int sub_n);
   std::vector<long> VadCutSamples(long span_start, long span_end) const;
+  static double VadOverlapSec(
+      double start, double end,
+      const std::vector<std::pair<double, double>>& vad_segments);
 
   core::IAsr* asr_;
   Params params_;

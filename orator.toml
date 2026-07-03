@@ -42,6 +42,10 @@ vad_lead_ms = 200
 # We tested: 1.5 (v5/v6), 1.0 (v7) — 16~18 ASR segs / 38 VAD segs
 vad_trail_sec = 1.0
 
+# Minimum confirmed VAD speech overlap required to keep a finalized ASR chunk.
+# Drops weak tail/silence hallucinations after VAD has confirmed the span.
+vad_min_overlap_sec = 0.12
+
 # KV-cache safety cap — max audio tokens before force-finalize a segment
 # Crash at ~1768 tokens; 1500 leaves a comfortable margin (~115s audio)
 max_audio_tokens = 1500
@@ -49,11 +53,12 @@ max_audio_tokens = 1500
 # Max decode tokens per segment
 max_new_tokens = 32
 
-# Hard segment cap (seconds) for finalized ASR chunks. Lower values reduce
-# microphone/live UI latency and prevent long same-speaker transcript blocks.
-# 2026-07-03 WS validation: 24s produced 31–55s long chunks; 12s kept the
-# first 60s of test.mp3 stable while restoring readable Live segmentation.
-segment_sec = 12.0
+# Hard segment cap (seconds) for finalized ASR chunks. The final comprehensive
+# timeline and Web UI handle view segmentation separately; keep this value tuned
+# for ASR semantic stability.
+# 2026-07-03 600s WS A/B after VAD-overlap filtering: 24s kept 49 ASR finals
+# vs 67 at 12s, with the same comprehensive count and better To C wording.
+segment_sec = 24.0
 
 # Language hint ("" = auto-detect)
 language = "Chinese"

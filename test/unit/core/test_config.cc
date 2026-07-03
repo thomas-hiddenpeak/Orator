@@ -57,6 +57,7 @@ model_dir = "/models/my_asr"
 vad_gate = false
 vad_lead_ms = 150
 vad_trail_sec = 2.5
+vad_min_overlap_sec = 0.25
 max_new_tokens = 64
 max_audio_tokens = 2000
 segment_sec = 30.0
@@ -115,6 +116,8 @@ gpu_scheduling = "concurrent"
     CHECK(cfg.asr_vad_gate == false, "cfg.asr_vad_gate == false");
     CHECK(cfg.asr_vad_lead_ms == 150, "cfg.asr_vad_lead_ms == 150");
     CHECK(cfg.asr_vad_trail_sec == 2.5, "cfg.asr_vad_trail_sec == 2.5");
+    CHECK(cfg.asr_vad_min_overlap_sec == 0.25,
+          "cfg.asr_vad_min_overlap_sec == 0.25");
     CHECK(cfg.asr_max_new_tokens == 64, "cfg.asr_max_new_tokens == 64");
     CHECK(cfg.asr_max_audio_tokens == 2000, "cfg.asr_max_audio_tokens == 2000");
     CHECK(cfg.asr_segment_sec == 30.0, "cfg.asr_segment_sec == 30.0");

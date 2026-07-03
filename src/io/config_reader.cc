@@ -51,6 +51,9 @@ bool ApplyTomlConfig(const std::string& path,
     if (auto v = sec->get("vad_trail_sec")) {
       if (auto d = v->value<double>()) cfg.asr_vad_trail_sec = *d;
     }
+    if (auto v = sec->get("vad_min_overlap_sec")) {
+      if (auto d = v->value<double>()) cfg.asr_vad_min_overlap_sec = *d;
+    }
     if (auto v = sec->get("max_new_tokens")) {
       if (auto n = v->value<int>()) cfg.asr_max_new_tokens = *n;
     }

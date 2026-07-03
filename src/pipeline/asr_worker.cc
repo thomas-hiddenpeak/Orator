@@ -83,6 +83,18 @@ std::vector<long> AsrWorker::VadCutSamples(long span_start,
   return cuts;
 }
 
+double AsrWorker::VadOverlapSec(
+    double start, double end,
+    const std::vector<std::pair<double, double>>& vad_segments) {
+  double overlap = 0.0;
+  for (const auto& [s, e] : vad_segments) {
+    const double a = std::max(start, s);
+    const double b = std::min(end, e);
+    if (b > a) overlap += b - a;
+  }
+  return overlap;
+}
+
 // Act on one VAD-boundary-aligned sub-span [inc_abs_pos_, inc_abs_pos_+sub_n).
 // Policy (priority: never drop speech > save GPU on confirmed silence; exact
 // segmentation is irrelevant -- downstream alignment provides the time codes):
@@ -307,25 +319,13 @@ void AsrWorker::EmitIncrementalChunk(const float* samples, int n,
           keep = false;
         }
       } else {
-        // Transitional VAD-lag experiment: treat any segment starting after the
-        // latest VAD speech end as unconfirmed leading-edge audio.
-        // If the ASR segment starts after the last VAD speech segment,
-        // VAD has not caught up yet — this is the leading edge. Keep the text
-        // so real speech is not lost while VAD is lagging. Same rationale as
-        // the "empty cache" guard above.
-        // Only when ASR segment starts before/at the last VAD end do we need
-        // to check for overlap (the segment may fall in a silence gap).
-        const double last_vad_end = vsegs.back().second;
-        if (seg_start > last_vad_end) {
-          keep = true;  // VAD hasn't reached here yet
+        const double overlap = VadOverlapSec(seg_start, seg_end, vsegs);
+        if (overlap >= params_.asr_vad_min_overlap_sec) {
+          keep = true;
         } else {
-          keep = false;
-          for (const auto& [s, e] : vsegs) {
-            if (seg_start < e && seg_end > s) {  // any overlap
-              keep = true;
-              break;
-            }
-          }
+          const double horizon = vad_cache_->horizon();
+          const bool confirmed_by_vad = finalizing_ || seg_end <= horizon;
+          keep = !confirmed_by_vad;
         }
       }
     }

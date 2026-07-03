@@ -83,6 +83,7 @@ class AuditoryStream {
     bool asr_vad_gate = true;
     int asr_vad_lead_ms = 200;
     double asr_vad_trail_sec = 1.0;
+    double asr_vad_min_overlap_sec = 0.12;
     int asr_max_audio_tokens = 1500;
     int asr_max_new_tokens = 32;
     double asr_segment_sec = 24.0;
