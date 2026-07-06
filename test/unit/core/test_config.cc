@@ -67,6 +67,25 @@ ban_steps = 5
 decode_batch = 8
 profile = true
 
+[speaker]
+enable = true
+model_dir = "/models/speaker"
+registry_path = "/tmp/speakers.bin"
+match_threshold = 0.75
+min_embed_sec = 4.0
+min_confidence = 0.625
+retain_sec = 240.0
+overlap_eps_sec = 0.05
+max_ref_segs = 8
+edge_margin_sec = 0.4
+max_embed_window_sec = 12.0
+enroll_min_refs = 2
+speakers_per_session = 6
+merge_threshold = 0.875
+cosession_merge_threshold = 0.95
+cross_session_match_min_refs = 3
+defer_unmatched_cross_session = true
+
 [vad]
 model = "/models/vad/custom.safetensors"
 stream = false
@@ -127,6 +146,40 @@ gpu_scheduling = "concurrent"
     CHECK(cfg.asr_ban_steps == 5, "cfg.asr_ban_steps == 5");
     CHECK(cfg.asr_decode_batch == 8, "cfg.asr_decode_batch == 8");
     CHECK(cfg.asr_profile == true, "cfg.asr_profile == true");
+
+    // [speaker]
+    CHECK(cfg.speaker_enable == true, "cfg.speaker_enable == true");
+    CHECK(cfg.speaker_model_dir == "/models/speaker",
+          "cfg.speaker_model_dir");
+    CHECK(cfg.speaker_registry_path == "/tmp/speakers.bin",
+          "cfg.speaker_registry_path");
+    CHECK(cfg.speaker_match_threshold == 0.75f,
+          "cfg.speaker_match_threshold == 0.75");
+    CHECK(cfg.speaker_min_embed_sec == 4.0,
+          "cfg.speaker_min_embed_sec == 4.0");
+    CHECK(cfg.speaker_min_confidence == 0.625f,
+          "cfg.speaker_min_confidence == 0.625");
+    CHECK(cfg.speaker_retain_sec == 240.0,
+          "cfg.speaker_retain_sec == 240.0");
+    CHECK(cfg.speaker_overlap_eps_sec == 0.05,
+          "cfg.speaker_overlap_eps_sec == 0.05");
+    CHECK(cfg.speaker_max_ref_segs == 8, "cfg.speaker_max_ref_segs == 8");
+    CHECK(cfg.speaker_edge_margin_sec == 0.4,
+          "cfg.speaker_edge_margin_sec == 0.4");
+    CHECK(cfg.speaker_max_embed_window_sec == 12.0,
+          "cfg.speaker_max_embed_window_sec == 12.0");
+    CHECK(cfg.speaker_enroll_min_refs == 2,
+          "cfg.speaker_enroll_min_refs == 2");
+    CHECK(cfg.speaker_speakers_per_session == 6,
+          "cfg.speaker_speakers_per_session == 6");
+    CHECK(cfg.speaker_merge_threshold == 0.875f,
+          "cfg.speaker_merge_threshold == 0.875");
+    CHECK(cfg.speaker_cosession_merge_threshold == 0.95f,
+          "cfg.speaker_cosession_merge_threshold == 0.95");
+    CHECK(cfg.speaker_cross_session_match_min_refs == 3,
+          "cfg.speaker_cross_session_match_min_refs == 3");
+    CHECK(cfg.speaker_defer_unmatched_cross_session == true,
+          "cfg.speaker_defer_unmatched_cross_session == true");
 
     // [vad]
     CHECK(cfg.vad_model == "/models/vad/custom.safetensors", "cfg.vad_model");

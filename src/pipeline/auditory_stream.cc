@@ -198,6 +198,18 @@ void AuditoryStream::Start() {
     sc.min_embed_sec = config_.speaker_min_embed_sec;
     sc.min_confidence = config_.speaker_min_confidence;
     sc.retain_sec = config_.speaker_retain_sec;
+    sc.overlap_eps_sec = config_.speaker_overlap_eps_sec;
+    sc.max_ref_segs = config_.speaker_max_ref_segs;
+    sc.edge_margin_sec = config_.speaker_edge_margin_sec;
+    sc.max_embed_window_sec = config_.speaker_max_embed_window_sec;
+    sc.enroll_min_refs = config_.speaker_enroll_min_refs;
+    sc.speakers_per_session = config_.speaker_speakers_per_session;
+    sc.merge_threshold = config_.speaker_merge_threshold;
+    sc.cosession_merge_threshold = config_.speaker_cosession_merge_threshold;
+    sc.cross_session_match_min_refs =
+        config_.speaker_cross_session_match_min_refs;
+    sc.defer_unmatched_cross_session =
+        config_.speaker_defer_unmatched_cross_session;
     speaker_id_stage_ = std::make_unique<SpeakerIdentityStage>(
         speaker_embedder_.get(), speaker_db_.get(), common_time_base(), sc);
     LOG_INFO("[speaker-id] enabled: %s (registry %s)\n", wpath.c_str(),

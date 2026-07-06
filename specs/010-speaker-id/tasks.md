@@ -107,7 +107,10 @@ quality spans; TitaNet builds an accuracy-first centroid voiceprint; VAD dropped
 
 ## Config (orator.toml `[speaker]`, added in D10)
 - `enable`, `model_dir`, `registry_path`, `match_threshold`, `min_embed_sec`,
-  `embedding_dim` (192), `max_ref_segs`.
+  `min_confidence`, `retain_sec`, `overlap_eps_sec`, `max_ref_segs`,
+  `edge_margin_sec`, `max_embed_window_sec`, `enroll_min_refs`,
+  `speakers_per_session`, `merge_threshold`, `cosession_merge_threshold`,
+  `cross_session_match_min_refs`, `defer_unmatched_cross_session`.
 
 ## Phase F — Closing full-length review (test-review-protocol)
 Full 60 min real-WS run (after the embed-window OOM fix + `--timeline-timeout
@@ -179,3 +182,36 @@ defects, both fixed; accuracy is now judged by reading, not scripts.
   uncapped GLOBAL identity per segment, stable across a full-hour multi-session
   stream, judged by context-semantic comparison. Remaining limit is the audio's
   hard overlapped late windows (model+audio bound), not the identity logic.
+
+## Phase H — Conservative cross-session identity experiment
+Goal: avoid stable wrong global identities during reset-window experiments. The
+default remains open-set auto-register/re-identify; the conservative policy is
+TOML-gated and must be validated through the real WebSocket path before it can
+replace the current operating profile.
+- [x] **H1** Expose the remaining speaker-id thresholds and policy switches in
+  `orator.toml` and `ConfigReader`: clean-span overlap, reference count, edge
+  trim, max embed window, enroll refs, session slot count, merge thresholds,
+  cross-session match refs, and defer-unmatched policy.
+- [x] **H2** Add a conservative cross-session gate in `SpeakerIdentityStage`:
+  later-session slots can wait for multiple clean references before matching, and
+  unmatched later-session slots can stay local-only rather than enrolling a new
+  global id. Default values preserve the existing behaviour.
+- [x] **H3** Unit coverage: `test_config` verifies TOML mapping; deterministic
+  `test_speaker_id_stage` verifies delayed cross-session matching and
+  defer-unmatched behaviour. Verified 2026-07-06: `cmake --build build -j`,
+  no warning/error lines, `cd build && ctest --output-on-failure` → 47/47 pass.
+- [x] **H4** Full-length validation attempt (2026-07-06): ran `test.mp3` through
+  real WebSocket at `rate=1` with the conservative sync-reset candidate
+  (`fifo_len=0`, `reset_period_sec=600`, `match_threshold=0.70`,
+  `cross_session_match_min_refs=2`, `defer_unmatched_cross_session=true`).
+  Output: `/tmp/orator_phaseh_full.json`, 3615 s audio, 3618.185 s wall,
+  stream RT 0.999x, diar 752, ASR 288, VAD 972, device samples 3611
+  (`tegrastats`). Context-aware review result: **not accepted**. It reduced
+  spurious late new global ids into local-only labels, but did not restore
+  full-session diar attribution quality; 600-1800 had too many local-only /
+  missing globals, and 3000-3615 remained fragmented. Review artifact:
+  `local-diar-review-2026-07-06.md`.
+- [ ] **H5** Root-cause follow-up: separate diarizer local-slot segmentation
+  quality from global voiceprint stitching. The next candidate must preserve
+  local speaker separation in every reset window before tuning global identity;
+  changing voiceprint thresholds alone is insufficient.

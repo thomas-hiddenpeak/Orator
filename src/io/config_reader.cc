@@ -124,6 +124,41 @@ bool ApplyTomlConfig(const std::string& path,
     if (auto v = sec->get("retain_sec")) {
       if (auto d = v->value<double>()) cfg.speaker_retain_sec = *d;
     }
+    if (auto v = sec->get("overlap_eps_sec")) {
+      if (auto d = v->value<double>()) cfg.speaker_overlap_eps_sec = *d;
+    }
+    if (auto v = sec->get("max_ref_segs")) {
+      if (auto n = v->value<int>()) cfg.speaker_max_ref_segs = *n;
+    }
+    if (auto v = sec->get("edge_margin_sec")) {
+      if (auto d = v->value<double>()) cfg.speaker_edge_margin_sec = *d;
+    }
+    if (auto v = sec->get("max_embed_window_sec")) {
+      if (auto d = v->value<double>())
+        cfg.speaker_max_embed_window_sec = *d;
+    }
+    if (auto v = sec->get("enroll_min_refs")) {
+      if (auto n = v->value<int>()) cfg.speaker_enroll_min_refs = *n;
+    }
+    if (auto v = sec->get("speakers_per_session")) {
+      if (auto n = v->value<int>()) cfg.speaker_speakers_per_session = *n;
+    }
+    if (auto v = sec->get("merge_threshold")) {
+      if (auto d = v->value<double>())
+        cfg.speaker_merge_threshold = static_cast<float>(*d);
+    }
+    if (auto v = sec->get("cosession_merge_threshold")) {
+      if (auto d = v->value<double>())
+        cfg.speaker_cosession_merge_threshold = static_cast<float>(*d);
+    }
+    if (auto v = sec->get("cross_session_match_min_refs")) {
+      if (auto n = v->value<int>())
+        cfg.speaker_cross_session_match_min_refs = *n;
+    }
+    if (auto v = sec->get("defer_unmatched_cross_session")) {
+      if (auto b = v->value<bool>())
+        cfg.speaker_defer_unmatched_cross_session = *b;
+    }
   }
 
   // ── [vad] ─────────────────────────────────────────────────────────

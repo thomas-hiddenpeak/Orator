@@ -44,6 +44,12 @@ struct SpeakerIdConfig {
                                   // id; 1 is safe because the diarizer already
                                   // separates within-session speakers (no false
                                   // split) and same-session ids never merge
+  int cross_session_match_min_refs = 1;  // refs required before a reset-session
+                                  // slot may match an existing global id; >1
+                                  // reduces one-span false re-identification
+  bool defer_unmatched_cross_session = false;  // later-session slots that do not
+                                  // match a known global stay local-only instead
+                                  // of immediately enrolling a new global id
   double retain_sec = 180.0;      // audio retention window for span reads
   int speakers_per_session = 4;   // diarizer slots per session (Sortformer = 4);
                                   // two slots of one session are distinct
@@ -121,4 +127,3 @@ class SpeakerIdentityStage {
 
 }  // namespace pipeline
 }  // namespace orator
-

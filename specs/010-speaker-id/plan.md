@@ -19,6 +19,8 @@ audio ─► Sortformer ─► local speaker segments (spk0..3, times, conf)
               SpeakerDatabase 1:N cosine match (persistent)
                   match ≥ τ → known global id      (discover / identify)
                   match <  τ → Enroll new global id (auto-register)
+                  (Phase H option: later reset-session slots may remain
+                   local-only when the match is not strong enough)
                               │
                               ▼
               local-label → global-id map (revisable)
@@ -72,8 +74,16 @@ unaffected). GPU scheduling follows the diar pipeline's existing stream/lock.
   the comprehensive view (revisable). Naming hook (R6).
 - **Phase D — Persistence + tuning.** Save/Load wiring; threshold τ + min-dur
   tuning; 600 s real-WS validation (re-id across runs; auto-register).
+- **Phase H — Conservative cross-session experiment.** Keep the default open-set
+  behaviour, but expose all speaker-id policy thresholds in TOML and add an
+  opt-in mode where reset-session local slots need multiple clean references
+  before re-identification; unmatched later-session slots can remain local-only
+  instead of immediately creating a new global id.
 
 Each phase gates on build clean + ctest + (A) oracle + (D) real-WS 600 s.
+Phase H additionally gates on full-length real WebSocket validation and
+context-aware comparison under the Test Review Protocol before any accuracy
+claim is accepted.
 
 ## 5. Risks / open details (refined while building)
 
@@ -81,6 +91,10 @@ Each phase gates on build clean + ctest + (A) oracle + (D) real-WS 600 s.
   conf cutoff) tuned empirically in Phase B/D.
 - **Threshold τ + enroll policy**: false-merge (two people → one id) vs
   false-split (one person → two ids); tune on 600 s; moving-average update.
+- **Reset-session identity policy**: a conservative policy reduces stable wrong
+  identities by allowing local-only labels when evidence is weak, but may leave
+  real new speakers unresolved. It is therefore opt-in and must be evaluated on
+  the full 60 min stream before becoming a default.
 - **Cold start**: first speaker of a session has no prior — always auto-register.
 - **Overlapped speech**: excluded from embedding (R2) — may leave some turns
   with a tentative/low-confidence id.

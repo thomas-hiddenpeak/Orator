@@ -152,10 +152,20 @@ class AuditoryStream {
     bool speaker_enable = false;  // master switch (also needs model dir)
     std::string speaker_model_dir = "";  // dir holding titanet_large.safetensors
     std::string speaker_registry_path = "";  // persistence file ("" = none)
-  float speaker_match_threshold = 0.55f;   // cosine tau for re-identification
-  double speaker_min_embed_sec = 3.0;      // shortest clean span to embed
+    float speaker_match_threshold = 0.55f;   // cosine tau for re-identification
+    double speaker_min_embed_sec = 3.0;      // shortest clean span to embed
     float speaker_min_confidence = 0.5f;     // diar mean-activity gate
     double speaker_retain_sec = 180.0;       // audio retention window
+    double speaker_overlap_eps_sec = 0.1;    // overlap tolerance for clean spans
+    int speaker_max_ref_segs = 6;            // best clean refs kept per speaker
+    double speaker_edge_margin_sec = 0.3;    // edge trim before embedding
+    double speaker_max_embed_window_sec = 10.0;  // cap embedded voiceprint audio
+    int speaker_enroll_min_refs = 1;         // refs required for new global id
+    int speaker_speakers_per_session = 4;    // Sortformer local slots/session
+    float speaker_merge_threshold = 0.70f;   // global-id duplicate threshold
+    float speaker_cosession_merge_threshold = 0.85f;  // same-session merge gate
+    int speaker_cross_session_match_min_refs = 1;  // refs before reset re-id
+    bool speaker_defer_unmatched_cross_session = false;
 
     // ── Storage ──────────────────────────────────────────────────────
     std::string storage_disk_path = "/tmp/orator/storage/";

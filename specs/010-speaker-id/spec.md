@@ -1,7 +1,11 @@
 # Spec 010 — Speaker Identity (Voiceprint Enrollment / Re-identification)
 
 - **Feature**: `010-speaker-id`
-- **Status**: Implemented (Phases A–E + cross-session identity finalized). TitaNet
+- **Status**: Implemented (Phases A–E + cross-session identity finalized).
+  Phase H added a TOML-gated conservative identity policy, but the 2026-07-06
+  full-length real WebSocket candidate was NOT accepted as an accuracy fix: it
+  reduced spurious new global ids into local-only labels, but did not restore
+  full-session diar attribution quality. TitaNet
   embedder oracle-validated; speaker-identity stage in the diar pipeline assigns a
   persistent GLOBAL id to every segment. Cross-session stitching: per-slot
   voiceprint centroids strengthen across sessions; the diarizer's within-session
@@ -73,6 +77,11 @@ global id is injected into the comprehensive timeline (revisably), so the
   post-diarization stage (Art. III): ASR/diar/VAD remain the three independent
   pipelines; speaker-id is an internal enrichment of the diar pipeline, not a
   4th pipeline.
+- **R9 Conservative cross-session policy**: reset-session local slots MAY be
+  configured to require multiple clean references before matching a global id,
+  and unmatched later-session slots MAY stay local-only instead of auto-enrolling
+  a new global id. This is a TOML-controlled accuracy experiment: unresolved
+  local labels are preferable to stable but wrong global speaker ids.
 
 ## 4. Non-goals (this spec)
 
@@ -89,3 +98,7 @@ global id is injected into the comprehensive timeline (revisably), so the
   server stable; ASR critical path unaffected (diar headroom absorbs the model).
 - Persistence: a registry saved in one run is loaded and re-matched in the next.
 - Build clean `-Wall -Wextra`; `ctest` green.
+- Phase H acceptance requires a full-length real WebSocket run with `test.mp3`,
+  `tegrastats` observation, and context-aware per-segment comparison against
+  `test.txt`. Script-derived speaker percentages are diagnostic only and cannot
+  be used as the acceptance conclusion.

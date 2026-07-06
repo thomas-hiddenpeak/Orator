@@ -82,6 +82,8 @@ void SpeakerIdentityStage::ResolveGlobal(int local) {
   // is strengthened later in RefreshGlobalCentroids.
   auto mapped = local_to_global_.find(local);
   if (mapped != local_to_global_.end()) return;
+  auto centroid = local_centroid_.find(local);
+  if (centroid == local_centroid_.end()) return;
 
   // Trust the diarizer's within-session separation: two local slots of the SAME
   // session are distinct speakers, so a slot must not resolve to a global id
@@ -91,13 +93,19 @@ void SpeakerIdentityStage::ResolveGlobal(int local) {
                       ? config_.speakers_per_session
                       : 4;
   const int session = local / spk;
+  const int ref_count = static_cast<int>(local_refs_[local].size());
+  if (session > 0 && ref_count < config_.cross_session_match_min_refs) {
+    LOG_INFO("[speaker-id] local %d deferred (%d/%d refs for cross-session)\n",
+             local, ref_count, config_.cross_session_match_min_refs);
+    return;
+  }
   std::vector<std::string> exclude;
   for (const auto& kv : local_to_global_) {
     if (kv.first != local && kv.first / spk == session)
       exclude.push_back(kv.second);
   }
   float score = 0.0f;
-  const int idx = db_->MatchExcluding(local_centroid_[local].data(),
+  const int idx = db_->MatchExcluding(centroid->second.data(),
                                       config_.match_threshold, exclude, &score);
   std::string resolved;
   bool enrolled = false;
@@ -107,10 +115,17 @@ void SpeakerIdentityStage::ResolveGlobal(int local) {
     // No registry speaker matches: enrol a genuinely new identity. E2: require
     // enough best spans first so a single noisy span cannot spawn a spurious
     // speaker. The registry is never capped -- it grows to recognise everyone.
-    if (static_cast<int>(local_refs_[local].size()) < config_.enroll_min_refs)
+    if (ref_count < config_.enroll_min_refs)
       return;
+    if (session > 0 && config_.defer_unmatched_cross_session) {
+      LOG_INFO(
+          "[speaker-id] local %d stays local-only (no cross-session match, "
+          "%d refs)\n",
+          local, ref_count);
+      return;
+    }
     resolved = NewGlobalId();
-    db_->Enroll(resolved, local_centroid_[local].data());
+    db_->Enroll(resolved, centroid->second.data());
     enrolled = true;
   }
   local_to_global_[local] = resolved;

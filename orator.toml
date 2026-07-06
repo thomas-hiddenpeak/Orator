@@ -116,8 +116,8 @@ registry_path = "/tmp/orator/speakers.json"
 
 # Cosine threshold for "same speaker" (re-identification). Higher = stricter.
 # Ground-truth meeting eval: same-speaker spans ~0.66/0.72 (1.5s/4s), different
-# ~0.45, EER ~0.55-0.60; 0.55 is the balanced point (NeMo's 0.7 = near-zero
-# false-merge but rejects ~13% genuine). Lower = more merging, higher = splits.
+# ~0.45, EER ~0.55-0.60; 0.55 is the balanced point. Raise this in a dedicated
+# TOML experiment when false global merges are more harmful than local-only ids.
 match_threshold = 0.55
 
 # Shortest clean single-speaker span worth embedding (seconds). Longer is
@@ -129,6 +129,22 @@ min_confidence = 0.5
 
 # Retained audio window (seconds) for span readback
 retain_sec = 180.0
+
+# Speaker-id decision policy. Defaults preserve the current open-set behaviour:
+# a clean span can match or enroll immediately. For reset-window experiments,
+# raise cross_session_match_min_refs and set defer_unmatched_cross_session=true
+# so uncertain later-session slots stay local-only instead of creating or
+# stealing a global identity.
+overlap_eps_sec = 0.1
+max_ref_segs = 6
+edge_margin_sec = 0.3
+max_embed_window_sec = 10.0
+enroll_min_refs = 1
+speakers_per_session = 4
+merge_threshold = 0.70
+cosession_merge_threshold = 0.85
+cross_session_match_min_refs = 1
+defer_unmatched_cross_session = false
 
 # ══════════════════════════════════════════════════════════════════════════════
 # VAD — voice activity detection pipeline
