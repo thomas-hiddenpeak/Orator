@@ -738,7 +738,7 @@ if __name__ == "__main__":
                 metrics['config'] = {
                     'diar_threshold': overrides.get('diar_threshold', 0.4) if overrides else 0.4,
                     'diar_merge_gap_sec': overrides.get('diar_merge_gap_sec', 0.8) if overrides else 0.8,
-                    'diar_spkcache_sil_frames': overrides.get('diar_spkcache_sil_frames', 5) if overrides else 5,
+                    'diar_spkcache_sil_frames': overrides.get('diar_spkcache_sil_frames', 3) if overrides else 3,
                 }
 
                 # ASR transcript sample

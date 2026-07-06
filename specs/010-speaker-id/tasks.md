@@ -211,7 +211,19 @@ replace the current operating profile.
   full-session diar attribution quality; 600-1800 had too many local-only /
   missing globals, and 3000-3615 remained fragmented. Review artifact:
   `local-diar-review-2026-07-06.md`.
-- [ ] **H5** Root-cause follow-up: separate diarizer local-slot segmentation
-  quality from global voiceprint stitching. The next candidate must preserve
-  local speaker separation in every reset window before tuning global identity;
-  changing voiceprint thresholds alone is insufficient.
+- [x] **H5** Root-cause follow-up: separated diarizer local-slot segmentation
+  quality from global voiceprint stitching. The accepted operating profile is
+  the async/no-reset path with the model-trained Sortformer tuning
+  (`spkcache_update_period=188`, `chunk_right_context=1`,
+  `spkcache_sil_frames=3`) set explicitly in `orator.toml`. The lower-level
+  `SortformerConfig` defaults remain tied to the NeMo oracle fixture and are
+  not used as the runtime operating profile. Full-length real WebSocket validation
+  `/tmp/orator_full_async_default_20260706.json`: 3615 s audio, 3618.487 s
+  wall, stream RT 0.999x, diar 773, ASR 288, VAD 972, 3611 tegrastats samples,
+  stable 4 global ids with no local-only gaps. Context review:
+  `local-diar-default-188-review-2026-07-06.md`. Result: restores the stable
+  4-id operating profile after the conservative Phase H experiment. A direct
+  attempt to change `SortformerConfig` defaults was rejected because it broke
+  `test_diar_stream` oracle equivalence; runtime tuning must stay in TOML. This
+  does not eliminate the inherent rapid-turn fragmentation in 3000-3615 s or
+  the ASR repeat burst at 1927-1944 s.

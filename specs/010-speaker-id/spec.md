@@ -2,10 +2,16 @@
 
 - **Feature**: `010-speaker-id`
 - **Status**: Implemented (Phases A–E + cross-session identity finalized).
-  Phase H added a TOML-gated conservative identity policy, but the 2026-07-06
-  full-length real WebSocket candidate was NOT accepted as an accuracy fix: it
-  reduced spurious new global ids into local-only labels, but did not restore
-  full-session diar attribution quality. TitaNet
+  Phase H added a TOML-gated conservative identity policy, but the first
+  2026-07-06 full-length real WebSocket candidate was NOT accepted as an
+  accuracy fix: it reduced spurious new global ids into local-only labels, but
+  did not restore full-session diar attribution quality. The follow-up
+  2026-07-06 local-diar review restored the accepted async/no-reset operating
+  profile to Sortformer runtime tuning (`188/1/3`) in TOML; the full run
+  produced four stable global ids with no local-only gaps, while leaving
+  rapid-turn tail fragmentation and one ASR repeat burst as residual issues.
+  Lower-level `SortformerConfig` defaults stay tied to the existing NeMo oracle
+  fixture and are not the runtime operating profile. TitaNet
   embedder oracle-validated; speaker-identity stage in the diar pipeline assigns a
   persistent GLOBAL id to every segment. Cross-session stitching: per-slot
   voiceprint centroids strengthen across sessions; the diarizer's within-session
@@ -102,3 +108,7 @@ global id is injected into the comprehensive timeline (revisably), so the
   `tegrastats` observation, and context-aware per-segment comparison against
   `test.txt`. Script-derived speaker percentages are diagnostic only and cannot
   be used as the acceptance conclusion.
+- Local-diar recovery acceptance requires the same full-length real WebSocket
+  path and must prove stable global identity coverage without sacrificing the
+  Test Review Protocol's context-aware speaker-turn judgment. Structural JQ
+  diagnostics are allowed only to select review windows.

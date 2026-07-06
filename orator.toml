@@ -198,20 +198,17 @@ deliver_interval_sec = 1.0
 # the stream. Keep at the model default unless you have measured both accuracy
 # and memory.
 spkcache_len = 188
-# Cache update interval (frames). (default 188)
-# Transitional experiment: restore the last known web UI redesign baseline
-# from 5330fe8 so the next real-stream validation can compare against it.
-spkcache_update_period = 300
+# Cache update interval (frames). Keep this at the model-trained default unless
+# a dedicated full-stream accuracy review accepts a different value.
+spkcache_update_period = 188
 # Left context chunks. Higher = better context, more compute. (default 1)
 chunk_left_context = 1
-# Right context chunks. Higher = better context, more compute. (default 1)
-# Transitional experiment: restore the last known web UI redesign baseline
-# from 5330fe8 so diarization quality and memory impact can be re-measured.
-chunk_right_context = 40
-# Silent frames before resetting speaker cache. Higher = fewer speaker splits. (default 3)
-# Transitional experiment: restore the last known web UI redesign baseline
-# from 5330fe8 for the same validation run as the context parameters above.
-spkcache_sil_frames = 5
+# Right context chunks. Keep at the model-trained default; high values were a
+# transitional experiment and degraded local diar review quality.
+chunk_right_context = 1
+# Silent frames before resetting speaker cache. Keep at the model-trained
+# default unless a full-stream review accepts a different value.
+spkcache_sil_frames = 3
 
 # FIFO buffer length for async streaming (NeMo streaming_update_async). 0=off (sync mode).
 fifo_len = 188
