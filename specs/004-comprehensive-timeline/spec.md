@@ -189,9 +189,11 @@ Every registered pipeline MUST satisfy:
   SHALL come from the DIARIZATION track. Each ASR text segment SHALL be placed
   onto the diarization speaker turns it overlaps, and a text segment crossing a
   diarization boundary SHALL be SPLIT at that boundary (its characters allocated
-  to each turn proportionally by time). The view SHALL NOT re-segment text by
-  ASR's own coarse segmentation. Diarization SHALL NOT map text; where no
-  diarization covers a span the speaker is honestly "unknown" (never borrowed).
+  to each turn proportionally by time unless forced alignment supplies finer
+  unit times). The terminal snapshot SHALL preserve ASR `text_id` boundaries;
+  presentation-level speaker-turn aggregation belongs in a consumer view.
+  Diarization SHALL NOT map text; where no diarization covers a span the speaker
+  is honestly "unknown" (never borrowed).
 - **FR2.4 — Revision events**: when an upsert changes a region already emitted,
   the controller SHALL emit a revision message identifying the changed time range
   and the new entries; committed-and-unchanged entries SHALL NOT be re-emitted.

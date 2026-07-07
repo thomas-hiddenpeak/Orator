@@ -111,9 +111,9 @@ int main() {
             "unknown revised to the covering speaker");
   }
 
-  // ---- 5. Snapshot coalesces consecutive same-speaker entries into
-  // speaker-oriented turns. The Web UI Live view preserves ASR utterance
-  // boundaries separately. ----
+  // ---- 5. Snapshot preserves ASR text_id/final boundaries even when
+  // consecutive entries have the same speaker. Speaker-turn aggregation is a
+  // presentation concern, not the terminal accuracy view. ----
   {
     TestComprehensiveTimeline tl;
     tl.UpsertSpeaker(0.0, 20.0, "speaker_0", 0.9f);
@@ -121,9 +121,22 @@ int main() {
     tl.UpsertText(1, 5.0, 10.0, "two");
     tl.UpsertText(2, 10.0, 15.0, "three");
     auto snap = tl.Snapshot();
-    CHECK(snap.size() == 1, "three same-speaker texts coalesce to one turn");
-    CHECK(snap[0].text == "onetwothree", "coalesced text joined in order");
-    CHECK(snap[0].start == 0.0 && snap[0].end == 15.0, "coalesced span");
+    CHECK(snap.size() == 3,
+          "three same-speaker texts remain three source text entries");
+    if (snap.size() == 3) {
+      CHECK(snap[0].text == "one" && snap[0].text_id == 0,
+            "first ASR text boundary preserved");
+      CHECK(snap[1].text == "two" && snap[1].text_id == 1,
+            "second ASR text boundary preserved");
+      CHECK(snap[2].text == "three" && snap[2].text_id == 2,
+            "third ASR text boundary preserved");
+      CHECK(snap[0].start == 0.0 && snap[0].end == 5.0,
+            "first source span preserved");
+      CHECK(snap[1].start == 5.0 && snap[1].end == 10.0,
+            "second source span preserved");
+      CHECK(snap[2].start == 10.0 && snap[2].end == 15.0,
+            "third source span preserved");
+    }
   }
 
   // ---- 6. ReplaceSpeakers: diarization's whole-view delivery re-projects text

@@ -85,8 +85,8 @@ ComprehensiveTimeline::SplitTextByDiar(const TextSeg& t) const {
   // The comprehensive VIEW's boundaries come from the DIARIZATION TRACK.
   // Collect the diarization boundary times that fall strictly inside this text
   // segment, partition [t.start,t.end) by them, attribute each sub-interval to
-  // its max-overlap speaker, merge consecutive same-speaker sub-intervals, then
-  // allocate the text's characters to each resulting turn proportionally by
+  // its max-overlap speaker, merge consecutive same-speaker sub-intervals within
+  // this source text_id, then allocate the text's characters to each piece by
   // time (the ASR model emits no per-word timestamps, so a time-proportional
   // split is the faithful approximation).
   std::vector<double> bounds;
@@ -350,10 +350,12 @@ void ComprehensiveTimeline::AddVad(double start, double end) {
 
 std::vector<ComprehensiveTimeline::Entry> ComprehensiveTimeline::Snapshot()
     const {
-  // The comprehensive view is the diarization-split projection of every text
-  // segment, time-ordered, with consecutive same-speaker entries coalesced.
-  // The Web UI's Live panel keeps ASR utterance boundaries separately; the
-  // final comprehensive snapshot stays speaker-turn oriented.
+  // The comprehensive view is the accuracy-first projection of every finalized
+  // ASR text segment through the current diarization view. It may coalesce
+  // adjacent pieces created by one source text segment, but it preserves
+  // text_id boundaries so ASR finalization evidence remains visible to the
+  // terminal timeline JSON. Presentation-level speaker-turn grouping belongs
+  // in a separate consumer view.
   std::vector<Entry> all;
   // Pre-allocate to avoid repeated reallocations
   all.reserve(texts_.size() * 2);  // Estimate maximum entries
@@ -365,7 +367,8 @@ std::vector<ComprehensiveTimeline::Entry> ComprehensiveTimeline::Snapshot()
 
   std::vector<Entry> out;
   for (const auto& e : all) {
-    if (!out.empty() && out.back().speaker == e.speaker) {
+    if (!out.empty() && out.back().speaker == e.speaker &&
+        out.back().text_id == e.text_id) {
       out.back().end = std::max(out.back().end, e.end);
       out.back().text += e.text;
     } else {

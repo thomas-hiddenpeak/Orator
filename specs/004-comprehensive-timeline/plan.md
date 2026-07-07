@@ -36,19 +36,20 @@ State:
 Diarization gives who/when; ASR gives what/when; correspondence is time overlap.
 
 `Project(text_seg)`:
-- Find the speaker segment with the greatest time overlap with `text_seg`.
-- Emit one comprehensive entry `{text_seg.start, text_seg.end, that_speaker,
-  text_seg.text}`. If no overlap, speaker = "unknown" (nearest by midpoint, as
-  today) until diarization covers it (then a revision fixes it).
-- Consecutive entries with the same speaker are coalesced for the snapshot view.
+- Place `text_seg` onto the speaker segments it overlaps.
+- Emit one or more comprehensive entries split at diarization boundaries. If no
+  speaker segment overlaps a span, speaker = "unknown" until diarization covers
+  it (then a revision fixes it).
+- Preserve ASR `text_id` boundaries in the terminal snapshot. Consecutive
+  same-speaker source text segments are not coalesced by this accuracy view;
+  speaker-turn grouping is a presentation-level derived view.
 
 Rationale: ASR text segments are produced at speech endpoints (Spec 003), so they
 are mostly single-speaker; attribution is by time and is **revisable**, so an
 early attribution against incomplete diarization is corrected when diarization
-covers the span. No per-word timestamps are needed (NG1). A text segment that
-genuinely spans multiple speakers is attributed to its max-overlap speaker
-(default, R1); a future time-split projection can replace this without changing
-the contract.
+covers the span. No per-word timestamps are needed (NG1) for the proportional
+split fallback; forced alignment can refine the internal text split when
+available.
 
 ## 3. Incremental update + revision (G2, G3, FR2, FR4)
 
@@ -107,8 +108,8 @@ Additive only (schema stays compatible, AC7):
   only the affected region, and a changed attribution yields one revision with
   the right dirty range; an unchanged update yields none.
 - **Multi-speaker (AC1)**: a scripted case where a text segment overlaps two
-  speaker segments asserts attribution to the max-overlap speaker, and a
-  later-arriving speaker update flips it with a revision.
+  speaker segments asserts a split at the diarization boundary, and a
+  later-arriving speaker update flips only the affected entries with a revision.
 - **WS (AC4)**: stream `test.mp3`; collect revisions; a client applying them in
   order reproduces the final comprehensive view.
 - **Endpoint (AC5)**: confirm the third thread emits endpoint markers and the

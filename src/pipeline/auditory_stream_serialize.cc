@@ -389,11 +389,9 @@ std::string AuditoryStream::Serialize() {
   // the timeline document. The document has a shared time axis and three parts:
   //   - "tracks": one independent track per pipeline (diarization, asr), each a
   //     list of that pipeline's time-ordered entries.
-  //   - "comprehensive": a derived view that attributes each ASR utterance to
-  //     the diarization speaker with the greatest temporal overlap and groups
-  //     consecutive same-speaker utterances. Its unit is the speaker turn: who
-  //     spoke, from when to when, and the text spoken. Attribution is at
-  //     utterance granularity (the ASR engine does not emit per-word times).
+  //   - "comprehensive": an accuracy-first derived view that projects each
+  //     finalized ASR text_id span through diarization ownership, preserving
+  //     ASR final boundaries while splitting text at diarization boundaries.
   // A consumer reads whichever part it needs. Adding a future pipeline adds a
   // track and, optionally, a contribution to the comprehensive view.
   // StreamTimeline removed — ASR track data now comes from
@@ -542,7 +540,8 @@ std::string AuditoryStream::Serialize() {
   }
   out += "]";  // close "tracks"
 
-  // Comprehensive view: speaker turns with their spoken text, ordered by time.
+  // Comprehensive view: diarization-attributed ASR text pieces, ordered by
+  // time, with source text_id boundaries preserved.
   out += ",\"comprehensive\":[";
   if (asr_) {
     for (size_t i = 0; i < comp_view.size(); ++i) {
@@ -563,8 +562,8 @@ std::string AuditoryStream::Serialize() {
                     "\"speaker\":%d",
                     e.start, e.end, e.text_id, spk_idx);
       out += buf;
-      // Spec 010: the comprehensive turn carries the resolved global voiceprint
-      // id (and optional display name) when diarization resolved one.
+      // Spec 010: the comprehensive entry carries the resolved global
+      // voiceprint id (and optional display name) when diarization resolved one.
       auto id_it = speaker_label_ids.find(e.speaker);
       if (id_it != speaker_label_ids.end() && !id_it->second.empty()) {
         out += ",\"speaker_id\":\"" + id_it->second + "\"";

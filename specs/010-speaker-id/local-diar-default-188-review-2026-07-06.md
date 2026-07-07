@@ -43,6 +43,11 @@ configuration rule.
 - Speaker-id coverage is restored: diar track counts are `spk_3` 280,
   `spk_0` 234, `spk_1` 140, `spk_2` 119; there are no empty `speaker_id`
   diar entries.
+- The recorded row-level comprehensive count was affected by final snapshot
+  aggregation that merged adjacent same-speaker ASR finals. That aggregation is
+  presentation-level behavior and should not be used as the accuracy object;
+  the accuracy view must preserve ASR `text_id` boundaries while applying
+  diarization ownership.
 - Window-level duration diagnostics show stable 4-id coverage:
   - 0-600: all four ids present (`spk_0` 141.9 s, `spk_1` 113.4 s,
     `spk_2` 96.8 s, `spk_3` 100.4 s).

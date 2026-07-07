@@ -10,17 +10,19 @@
 //   - ASR         -> UpsertText(id,start,end,text) (what / when)  [asr track]
 //   - VAD         -> AddVad(start,end)             (speech segs)  [vad track]
 //
-// The COMPREHENSIVE VIEW is a DERIVED PRODUCT of this container, for human
-// browsing -- it is not a fourth pipeline. The view answers "who said what
-// when" and its boundaries come from the DIARIZATION TRACK: each ASR text
-// segment is placed onto the diarization speaker turns it overlaps, and when a
-// text segment crosses a diarization boundary its text is split at that
-// boundary (proportional to time, since the ASR model emits no per-word
-// timestamps). The view never re-segments by ASR's own coarse segmentation.
-// Where diarization has not covered a span the speaker is honestly "unknown"
-// (never borrowed from a neighbour). The view is a faithful interactive form of
-// the container and carries the same characteristics (common time base, no
-// invented content).
+// The COMPREHENSIVE VIEW is a DERIVED PRODUCT of this container, for accurate
+// terminal output and human browsing -- it is not a fourth pipeline. The view
+// answers "who said what when" by applying available pipeline evidence on the
+// common time base: ASR supplies accepted finalized text_id spans, diarization
+// supplies speaker ownership, and forced-alignment deposits can refine internal
+// text boundaries. Each ASR text segment is placed onto the diarization speaker
+// turns it overlaps, and when a text segment crosses a diarization boundary its
+// text is split at that boundary (proportional to time, since the ASR model
+// emits no per-word timestamps unless forced alignment is present). Where
+// diarization has not covered a span the speaker is honestly "unknown" (never
+// borrowed from a neighbour). The view preserves source ASR text_id/final
+// boundaries in terminal snapshots; presentation-level speaker-turn grouping
+// belongs in a separate consumer view.
 //
 // Because the container is stateful and revisable, a text placed against
 // incomplete diarization is re-projected when diarization later covers the
@@ -104,8 +106,9 @@ class ComprehensiveTimeline {
     std::vector<AlignUnitSeg> units;
   };
 
-  // The comprehensive view: diarization-driven speaker turns with their text,
-  // time-ordered, consecutive same-speaker entries coalesced. Derived product.
+  // The comprehensive view: ASR text spans projected through diarization
+  // ownership, time-ordered, preserving ASR text_id/final boundaries while
+  // coalescing only adjacent pieces from the same source text segment.
   std::vector<Entry> Snapshot() const;
 
   // The recorded VAD speech segments (sorted), for the serialized vad track.
