@@ -56,6 +56,7 @@ class ComprehensiveTimeline {
     double start = 0.0;
     double end = 0.0;
     std::string speaker;  // "speaker_<n>" or resolved id, "unknown" if none yet
+    std::string speaker_id;  // resolved global voiceprint id for this interval
     std::string text;
     long text_id = -1;  // source text-segment id (for revision tracking)
   };
@@ -110,6 +111,12 @@ class ComprehensiveTimeline {
   // ownership, time-ordered, preserving ASR text_id/final boundaries while
   // coalescing only adjacent pieces from the same source text segment.
   std::vector<Entry> Snapshot() const;
+
+  // Maximum gap between adjacent forced-alignment units that is still treated as
+  // one coherent utterance run for speaker attribution. A lower value lets the
+  // view split at short but real turn-change pauses.
+  void set_align_snap_pause_sec(double sec);
+  void set_align_boundary_split_tolerance_sec(double sec);
 
   // The recorded VAD speech segments (sorted), for the serialized vad track.
   std::vector<VadSeg> SnapshotVad() const { return vad_; }
@@ -193,6 +200,10 @@ class ComprehensiveTimeline {
     float conf = 0.0f;
     std::string speaker_id;  // resolved global voiceprint id ("" if none)
   };
+  struct SpeakerAttr {
+    std::string speaker;
+    std::string speaker_id;
+  };
   struct TextSeg {
     long id = -1;
     double start = 0.0;
@@ -203,7 +214,7 @@ class ComprehensiveTimeline {
   // Attribute the interval [start,end) to the max-time-overlap speaker (tighter
   // span then higher confidence on ties), or "unknown" if no diarization covers
   // it. Used per sub-interval when splitting a text by diarization boundaries.
-  std::string AttributeInterval(double start, double end) const;
+  SpeakerAttr AttributeInterval(double start, double end) const;
   // Split one text segment at the diarization-track boundaries it crosses,
   // allocating the text to each speaker turn proportionally by time. Returns
   // the resulting view entries (>=1) for this text id.
@@ -219,6 +230,8 @@ class ComprehensiveTimeline {
   std::set<std::string> seen_speaker_ids_;  // every global id ever assigned
   std::vector<TextSeg> texts_;        // asr track: what/when, keyed by id
   std::vector<VadSeg> vad_;           // vad track: speech segments
+  double align_snap_pause_sec_ = 0.25;
+  double align_boundary_split_tolerance_sec_ = 0.08;
   // align track: per-unit timestamps refining an ASR segment, keyed by text_id.
   std::map<long, AlignGroup> align_;
   // Current diarization-split projection per text id (kept in sync).

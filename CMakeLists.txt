@@ -187,6 +187,15 @@ set_property(TARGET asr_stream_incremental_probe PROPERTY CUDA_ARCHITECTURES nat
 target_link_libraries(asr_stream_incremental_probe PRIVATE orator_core)
 
 # ---------------------------------------------------------------------------
+# speaker_embedding_probe: offline diagnostic for speaker-identity drift. It is
+# not on the runtime path; it embeds exported diarization spans with TitaNet and
+# prints local-slot time-bucket cosine values.
+# ---------------------------------------------------------------------------
+add_executable(speaker_embedding_probe tools/probes/speaker_embedding_probe.cc)
+set_property(TARGET speaker_embedding_probe PROPERTY CUDA_ARCHITECTURES native)
+target_link_libraries(speaker_embedding_probe PRIVATE orator_core)
+
+# ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
 enable_testing()

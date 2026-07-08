@@ -563,13 +563,18 @@ std::string AuditoryStream::Serialize() {
                     e.start, e.end, e.text_id, spk_idx);
       out += buf;
       // Spec 010: the comprehensive entry carries the resolved global
-      // voiceprint id (and optional display name) when diarization resolved one.
-      auto id_it = speaker_label_ids.find(e.speaker);
-      if (id_it != speaker_label_ids.end() && !id_it->second.empty()) {
-        out += ",\"speaker_id\":\"" + id_it->second + "\"";
+      // voiceprint id (and optional display name) for this exact interval. Do
+      // not remap by diarizer-local label here: local labels can drift to a new
+      // global identity later in the session.
+      std::string entry_speaker_id = e.speaker_id;
+      if (entry_speaker_id.empty()) {
+        auto id_it = speaker_label_ids.find(e.speaker);
+        if (id_it != speaker_label_ids.end()) entry_speaker_id = id_it->second;
+      }
+      if (!entry_speaker_id.empty()) {
+        out += ",\"speaker_id\":\"" + entry_speaker_id + "\"";
         const std::string nm =
-            speaker_db_ ? speaker_db_->DisplayName(id_it->second)
-                        : std::string();
+            speaker_db_ ? speaker_db_->DisplayName(entry_speaker_id) : std::string();
         if (!nm.empty()) out += ",\"speaker_name\":\"" + JsonEscape(nm) + "\"";
       }
       out += ",\"text\":\"" + JsonEscape(e.text) + "\"}";

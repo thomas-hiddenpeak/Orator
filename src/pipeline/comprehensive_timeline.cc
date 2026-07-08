@@ -38,7 +38,8 @@ bool EntriesEqual(const std::vector<ComprehensiveTimeline::Entry>& a,
                   const std::vector<ComprehensiveTimeline::Entry>& b) {
   if (a.size() != b.size()) return false;
   for (std::size_t i = 0; i < a.size(); ++i) {
-    if (a[i].speaker != b[i].speaker || a[i].text != b[i].text ||
+    if (a[i].speaker != b[i].speaker ||
+        a[i].speaker_id != b[i].speaker_id || a[i].text != b[i].text ||
         std::abs(a[i].start - b[i].start) > 1e-9 ||
         std::abs(a[i].end - b[i].end) > 1e-9) {
       return false;
@@ -48,8 +49,8 @@ bool EntriesEqual(const std::vector<ComprehensiveTimeline::Entry>& a,
 }
 }  // namespace
 
-std::string ComprehensiveTimeline::AttributeInterval(double start,
-                                                     double end) const {
+ComprehensiveTimeline::SpeakerAttr ComprehensiveTimeline::AttributeInterval(
+    double start, double end) const {
   double best_overlap = 0.0;
   double best_span = 0.0;
   float best_conf = -1.0f;
@@ -77,7 +78,16 @@ std::string ComprehensiveTimeline::AttributeInterval(double start,
   // No diarization covers this interval: honestly "unknown". The comprehensive
   // layer never borrows a neighbouring speaker (that would be guessing on
   // diarization's behalf).
-  return best != nullptr ? best->speaker : "unknown";
+  if (best == nullptr) return {"unknown", ""};
+  return {best->speaker, best->speaker_id};
+}
+
+void ComprehensiveTimeline::set_align_snap_pause_sec(double sec) {
+  align_snap_pause_sec_ = std::max(0.0, sec);
+}
+
+void ComprehensiveTimeline::set_align_boundary_split_tolerance_sec(double sec) {
+  align_boundary_split_tolerance_sec_ = std::max(0.0, sec);
 }
 
 std::vector<ComprehensiveTimeline::Entry>
@@ -109,6 +119,7 @@ ComprehensiveTimeline::SplitTextByDiar(const TextSeg& t) const {
     double start;
     double end;
     std::string speaker;
+    std::string speaker_id;
   };
   std::vector<Turn> turns;
   turns.reserve(bounds.size());  // Pre-allocate to avoid repeated reallocations
@@ -116,11 +127,12 @@ ComprehensiveTimeline::SplitTextByDiar(const TextSeg& t) const {
     const double s = bounds[i];
     const double e = bounds[i + 1];
     if (e - s <= 1e-9) continue;
-    const std::string spk = AttributeInterval(s, e);
-    if (!turns.empty() && turns.back().speaker == spk) {
+    const SpeakerAttr attr = AttributeInterval(s, e);
+    if (!turns.empty() && turns.back().speaker == attr.speaker &&
+        turns.back().speaker_id == attr.speaker_id) {
       turns.back().end = e;
     } else {
-      turns.push_back({s, e, spk});
+      turns.push_back({s, e, attr.speaker, attr.speaker_id});
     }
   }
 
@@ -144,14 +156,18 @@ ComprehensiveTimeline::SplitTextByDiar(const TextSeg& t) const {
         if (sp.start >= tn.end - 1e-9 && (!after || sp.start < after->start))
           after = &sp;
       }
-      if (before && after && before->speaker == after->speaker)
+      if (before && after && before->speaker == after->speaker &&
+          before->speaker_id == after->speaker_id) {
         tn.speaker = before->speaker;
+        tn.speaker_id = before->speaker_id;
+      }
     }
     // Re-coalesce consecutive same-speaker turns after the fill.
     std::vector<Turn> merged;
     merged.reserve(turns.size());
     for (const auto& tn : turns) {
-      if (!merged.empty() && merged.back().speaker == tn.speaker)
+      if (!merged.empty() && merged.back().speaker == tn.speaker &&
+          merged.back().speaker_id == tn.speaker_id)
         merged.back().end = tn.end;
       else
         merged.push_back(tn);
@@ -160,36 +176,52 @@ ComprehensiveTimeline::SplitTextByDiar(const TextSeg& t) const {
   }
 
   if (turns.empty()) {
-    return {Entry{t.start, t.end, "unknown", t.text, t.id}};
+    return {Entry{t.start, t.end, "unknown", "", t.text, t.id}};
   }
   if (turns.size() == 1) {
-    return {
-        Entry{turns[0].start, turns[0].end, turns[0].speaker, t.text, t.id}};
+    return {Entry{turns[0].start, turns[0].end, turns[0].speaker,
+                  turns[0].speaker_id, t.text, t.id}};
   }
 
   // Alignment-aware allocation (preferred): when per-unit timestamps exist for
-  // this text, attribute its characters by their real timing rather than by the
-  // time-proportional approximation below. Units are first grouped into RUNS
-  // separated by pauses (a gap > kPauseSec between consecutive units); each
-  // whole run is assigned to the diarization turn containing its MIDPOINT, so a
-  // continuous utterance is never split across speaker turns -- in effect the
-  // diarization boundary is snapped to the surrounding pause, where a real
-  // speaker change actually occurs. ORATOR_TIMELINE_NO_SNAP=1 falls back to
-  // per-unit midpoint assignment (A/B + safety).
+  // this text, attribute characters by their real timing. Adjacent units are
+  // grouped only across short gaps; a larger gap is evidence for a possible turn
+  // change inside one ASR segment. Each run is assigned to the diarization turn
+  // containing its midpoint, snapping noisy diar boundaries to nearby alignment
+  // pauses without letting long ASR segments swallow a real speaker change.
   if (auto ait = align_.find(t.id);
       ait != align_.end() && !ait->second.units.empty()) {
-    static const bool no_snap =
-        std::getenv("ORATOR_TIMELINE_NO_SNAP") != nullptr;
-    constexpr double kPauseSec = 0.25;
     const auto& units = ait->second.units;
     std::vector<std::string> slices(turns.size());
+    auto boundary_near_gap = [&](double gap_start, double gap_end) {
+      if (align_boundary_split_tolerance_sec_ <= 0.0) return false;
+      for (std::size_t k = 1; k < turns.size(); ++k) {
+        const Turn& left = turns[k - 1];
+        const Turn& right = turns[k];
+        if (left.speaker == right.speaker &&
+            left.speaker_id == right.speaker_id) {
+          continue;
+        }
+        const double boundary = right.start;
+        if (boundary >= gap_start - align_boundary_split_tolerance_sec_ &&
+            boundary <= gap_end + align_boundary_split_tolerance_sec_) {
+          return true;
+        }
+      }
+      return false;
+    };
     std::size_t i = 0;
     while (i < units.size()) {
       std::size_t j = i;  // extend the run while consecutive units are gapless
-      if (!no_snap) {
-        while (j + 1 < units.size() &&
-               units[j + 1].start - units[j].end <= kPauseSec)
+      if (align_snap_pause_sec_ > 0.0) {
+        while (j + 1 < units.size()) {
+          const double gap = units[j + 1].start - units[j].end;
+          if (gap > align_snap_pause_sec_ ||
+              boundary_near_gap(units[j].end, units[j + 1].start)) {
+            break;
+          }
           ++j;
+        }
       }
       const double mid = 0.5 * (units[i].start + units[j].end);
       std::size_t ti = 0;
@@ -202,7 +234,7 @@ ComprehensiveTimeline::SplitTextByDiar(const TextSeg& t) const {
     for (std::size_t k = 0; k < turns.size(); ++k) {
       if (slices[k].empty()) continue;
       out.push_back({turns[k].start, turns[k].end, turns[k].speaker,
-                     std::move(slices[k]), t.id});
+                     turns[k].speaker_id, std::move(slices[k]), t.id});
     }
     if (!out.empty()) return out;
   }
@@ -226,7 +258,7 @@ ComprehensiveTimeline::SplitTextByDiar(const TextSeg& t) const {
     std::string slice =
         t.text.substr(offs[cp_used], offs[cp_end] - offs[cp_used]);
     out.push_back({turns[k].start, turns[k].end, turns[k].speaker,
-                   std::move(slice), t.id});
+                   turns[k].speaker_id, std::move(slice), t.id});
     cp_used = cp_end;
   }
   return out;
@@ -368,7 +400,7 @@ std::vector<ComprehensiveTimeline::Entry> ComprehensiveTimeline::Snapshot()
   std::vector<Entry> out;
   for (const auto& e : all) {
     if (!out.empty() && out.back().speaker == e.speaker &&
-        out.back().text_id == e.text_id) {
+        out.back().speaker_id == e.speaker_id && out.back().text_id == e.text_id) {
       out.back().end = std::max(out.back().end, e.end);
       out.back().text += e.text;
     } else {

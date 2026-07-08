@@ -85,6 +85,17 @@ merge_threshold = 0.875
 cosession_merge_threshold = 0.95
 cross_session_match_min_refs = 3
 defer_unmatched_cross_session = true
+local_drift_threshold = 0.5
+local_drift_min_span_sec = 6.0
+local_drift_min_epoch_sec = 45.0
+local_drift_allow_same_session_match = false
+local_drift_competing_threshold = 0.72
+local_drift_competing_margin = 0.08
+local_drift_competing_min_span_sec = 3.0
+local_drift_competing_candidate_threshold = 0.58
+local_drift_competing_candidate_margin = 0.04
+local_drift_competing_backfill_sec = 120.0
+local_drift_competing_backfill_gap_sec = 4.0
 
 [vad]
 model = "/models/vad/custom.safetensors"
@@ -104,6 +115,10 @@ deliver_interval_sec = 2.0
 [storage]
 disk_path = "/custom/storage"
 session_dir = "/custom/sessions"
+
+[timeline]
+align_snap_pause_sec = 0.125
+align_boundary_split_tolerance_sec = 0.075
 
 [telemetry]
 gpu_interval_sec = 5.0
@@ -180,6 +195,28 @@ gpu_scheduling = "concurrent"
           "cfg.speaker_cross_session_match_min_refs == 3");
     CHECK(cfg.speaker_defer_unmatched_cross_session == true,
           "cfg.speaker_defer_unmatched_cross_session == true");
+    CHECK(cfg.speaker_local_drift_threshold == 0.5f,
+          "cfg.speaker_local_drift_threshold == 0.5");
+    CHECK(cfg.speaker_local_drift_min_span_sec == 6.0,
+          "cfg.speaker_local_drift_min_span_sec == 6.0");
+    CHECK(cfg.speaker_local_drift_min_epoch_sec == 45.0,
+          "cfg.speaker_local_drift_min_epoch_sec == 45.0");
+    CHECK(cfg.speaker_local_drift_allow_same_session_match == false,
+          "cfg.speaker_local_drift_allow_same_session_match == false");
+    CHECK(cfg.speaker_local_drift_competing_threshold == 0.72f,
+          "cfg.speaker_local_drift_competing_threshold == 0.72");
+    CHECK(cfg.speaker_local_drift_competing_margin == 0.08f,
+          "cfg.speaker_local_drift_competing_margin == 0.08");
+    CHECK(cfg.speaker_local_drift_competing_min_span_sec == 3.0,
+          "cfg.speaker_local_drift_competing_min_span_sec == 3.0");
+    CHECK(cfg.speaker_local_drift_competing_candidate_threshold == 0.58f,
+          "cfg.speaker_local_drift_competing_candidate_threshold == 0.58");
+    CHECK(cfg.speaker_local_drift_competing_candidate_margin == 0.04f,
+          "cfg.speaker_local_drift_competing_candidate_margin == 0.04");
+    CHECK(cfg.speaker_local_drift_competing_backfill_sec == 120.0,
+          "cfg.speaker_local_drift_competing_backfill_sec == 120.0");
+    CHECK(cfg.speaker_local_drift_competing_backfill_gap_sec == 4.0,
+          "cfg.speaker_local_drift_competing_backfill_gap_sec == 4.0");
 
     // [vad]
     CHECK(cfg.vad_model == "/models/vad/custom.safetensors", "cfg.vad_model");
@@ -201,6 +238,12 @@ gpu_scheduling = "concurrent"
     // [storage]
     CHECK(cfg.storage_disk_path == "/custom/storage", "cfg.storage_disk_path");
     CHECK(cfg.session_dir == "/custom/sessions", "cfg.session_dir");
+
+    // [timeline]
+    CHECK(cfg.timeline_align_snap_pause_sec == 0.125,
+          "cfg.timeline_align_snap_pause_sec == 0.125");
+    CHECK(cfg.timeline_align_boundary_split_tolerance_sec == 0.075,
+          "cfg.timeline_align_boundary_split_tolerance_sec == 0.075");
 
     // [telemetry]
     CHECK(cfg.gpu_telemetry_interval_sec == 5.0,

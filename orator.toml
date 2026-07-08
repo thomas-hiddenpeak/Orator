@@ -83,7 +83,7 @@ profile = false
 # ══════════════════════════════════════════════════════════════════════════════
 [align]
 # Enable the forced-alignment pipeline (also requires model_dir)
-enable = false
+enable = true
 
 # Model directory (Qwen3-ForcedAligner-0.6B)
 model_dir = "models/ForcedAligner"
@@ -97,6 +97,19 @@ max_segment_sec = 300.0
 # Retained audio window (seconds) for span readback. Must exceed the longest
 # segment plus the ASR-to-alignment lag, bounded to cap memory.
 retain_sec = 180.0
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Comprehensive timeline — derived who-said-what view on the common time base
+# ══════════════════════════════════════════════════════════════════════════════
+[timeline]
+# Maximum gap between adjacent forced-alignment units that is still treated as
+# one coherent utterance run for speaker attribution.
+align_snap_pause_sec = 0.25
+
+# Force a run split when a diarization speaker boundary sits this close to an
+# alignment-unit gap. This lets real turn changes cut inside one ASR segment
+# without splitting ordinary intra-sentence pauses.
+align_boundary_split_tolerance_sec = 0.08
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Speaker identity — voiceprint enrollment / re-identification (Spec 010)
@@ -145,6 +158,27 @@ merge_threshold = 0.70
 cosession_merge_threshold = 0.85
 cross_session_match_min_refs = 1
 defer_unmatched_cross_session = false
+
+# Long sessions can reuse one diarizer-local slot for different real speakers.
+# If a later clean voiceprint is inconsistent with the current local-slot
+# epoch, split only the speaker-id mapping from that time onward. This preserves
+# earlier timeline attribution while allowing the later epoch to match another
+# known global speaker when the voiceprint supports it.
+local_drift_threshold = 0.50
+local_drift_min_span_sec = 5.0
+local_drift_min_epoch_sec = 60.0
+local_drift_allow_same_session_match = true
+# Some local-slot drifts are still close to the original voiceprint, but are
+# clearly closer to another known global id. In that case, split to the
+# competing id if it beats the active epoch by this margin and does not overlap
+# that id's current speech.
+local_drift_competing_threshold = 0.72
+local_drift_competing_margin = 0.08
+local_drift_competing_min_span_sec = 3.0
+local_drift_competing_candidate_threshold = 0.58
+local_drift_competing_candidate_margin = 0.04
+local_drift_competing_backfill_sec = 120.0
+local_drift_competing_backfill_gap_sec = 4.0
 
 # ══════════════════════════════════════════════════════════════════════════════
 # VAD — voice activity detection pipeline

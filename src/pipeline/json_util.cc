@@ -89,10 +89,12 @@ std::string SerializeRevisionToJson(const ComprehensiveTimeline::Revision& r,
                   "{\"start\":%.3f,\"end\":%.3f,\"text_id\":%ld,\"speaker\":%d",
                   e.start, e.end, e.text_id, spk_idx);
     out += buf;
-    // Spec 010: surface the resolved global voiceprint identity live (the UI
-    // would otherwise only see it in the final timeline). Looked up from the
-    // comprehensive timeline's label->id map passed by the caller.
-    if (label_ids) {
+    // Spec 010: surface the resolved global voiceprint identity live. Prefer the
+    // per-entry id because one diarizer-local label can map to different global
+    // identities over time after local drift splitting.
+    if (!e.speaker_id.empty()) {
+      out += ",\"speaker_id\":\"" + e.speaker_id + "\"";
+    } else if (label_ids) {
       auto it = label_ids->find(e.speaker);
       if (it != label_ids->end() && !it->second.empty())
         out += ",\"speaker_id\":\"" + it->second + "\"";

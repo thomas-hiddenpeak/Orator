@@ -27,7 +27,11 @@ namespace orator {
 namespace pipeline {
 
 AuditoryStream::AuditoryStream(const Config& config, Emit emit)
-    : config_(config), emit_(std::move(emit)) {}
+    : config_(config), emit_(std::move(emit)) {
+  comp_.set_align_snap_pause_sec(config_.timeline_align_snap_pause_sec);
+  comp_.set_align_boundary_split_tolerance_sec(
+      config_.timeline_align_boundary_split_tolerance_sec);
+}
 
 AuditoryStream::~AuditoryStream() { StopWorkers(); }
 
@@ -210,6 +214,26 @@ void AuditoryStream::Start() {
         config_.speaker_cross_session_match_min_refs;
     sc.defer_unmatched_cross_session =
         config_.speaker_defer_unmatched_cross_session;
+    sc.local_drift_threshold = config_.speaker_local_drift_threshold;
+    sc.local_drift_min_span_sec = config_.speaker_local_drift_min_span_sec;
+    sc.local_drift_min_epoch_sec =
+        config_.speaker_local_drift_min_epoch_sec;
+    sc.local_drift_allow_same_session_match =
+        config_.speaker_local_drift_allow_same_session_match;
+    sc.local_drift_competing_threshold =
+        config_.speaker_local_drift_competing_threshold;
+    sc.local_drift_competing_margin =
+        config_.speaker_local_drift_competing_margin;
+    sc.local_drift_competing_min_span_sec =
+        config_.speaker_local_drift_competing_min_span_sec;
+    sc.local_drift_competing_candidate_threshold =
+        config_.speaker_local_drift_competing_candidate_threshold;
+    sc.local_drift_competing_candidate_margin =
+        config_.speaker_local_drift_competing_candidate_margin;
+    sc.local_drift_competing_backfill_sec =
+        config_.speaker_local_drift_competing_backfill_sec;
+    sc.local_drift_competing_backfill_gap_sec =
+        config_.speaker_local_drift_competing_backfill_gap_sec;
     speaker_id_stage_ = std::make_unique<SpeakerIdentityStage>(
         speaker_embedder_.get(), speaker_db_.get(), common_time_base(), sc);
     LOG_INFO("[speaker-id] enabled: %s (registry %s)\n", wpath.c_str(),

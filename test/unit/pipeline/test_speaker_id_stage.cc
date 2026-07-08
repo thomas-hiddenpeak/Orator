@@ -21,11 +21,12 @@ namespace {
 
 constexpr int kDim = 192;
 
-// Returns a one-hot 192-d embedding selected by the first audio sample:
+// Returns a controlled 192-d embedding selected by the first audio sample:
 // samples[0] <= 0.5 -> "speaker 0" (dim 0), <= 1.5 -> "speaker 1" (dim 1),
-// else "speaker 2" (dim 2). One-hot vectors are orthogonal, so cosine is 1
-// within a speaker and 0 across, giving a clean match/no-match around any
-// threshold in (0, 1).
+// <= 2.5 -> "speaker 2" (dim 2), else a weak candidate toward speaker 1 with
+// cosine 0.65. One-hot vectors are orthogonal, giving clean match/no-match
+// behaviour for the existing tests while allowing a deterministic weak-match
+// case for competing drift backfill.
 class StubEmbedder : public core::ISpeakerEmbedder {
  public:
   void LoadWeights(const std::string&) override {}
@@ -33,6 +34,11 @@ class StubEmbedder : public core::ISpeakerEmbedder {
   std::string name() const override { return "stub"; }
   std::vector<float> Embed(const core::AudioChunk& c) override {
     std::vector<float> e(kDim, 0.0f);
+    if (c.num_samples > 0 && c.samples[0] > 2.5f) {
+      e[1] = 0.65f;
+      e[3] = static_cast<float>(std::sqrt(1.0 - 0.65 * 0.65));
+      return e;
+    }
     int which = 0;
     if (c.num_samples > 0 && c.samples[0] > 1.5f) {
       which = 2;
@@ -124,6 +130,32 @@ int main() {
     Check(db.Size() == 2, "overlap must not enroll");
   }
 
+  // Long turns are embedded from their centre window. If a different local
+  // speaker overlaps only the discarded edge, the centre voiceprint is still
+  // clean evidence and should be used.
+  {
+    model::SpeakerDatabase db_edge(/*max_speakers=*/16, kDim);
+    pipeline::SpeakerIdConfig cfg_edge = cfg;
+    cfg_edge.max_embed_window_sec = 4.0;
+    pipeline::SpeakerIdentityStage stage_edge(&embedder, &db_edge, tb,
+                                              cfg_edge);
+    std::vector<float> audio_edge(14 * sr, 0.0f);
+    stage_edge.AppendAudio(audio_edge.data(),
+                           static_cast<int>(audio_edge.size()));
+
+    std::vector<core::DiarSegment> segs = {
+        Seg(0, 0.0, 12.0, 0.9f),  // centre window [4,8] is single-speaker
+        Seg(1, 0.5, 2.0, 0.9f),   // boundary overlap only
+    };
+    stage_edge.Process(segs);
+    Check(segs[0].speaker_id == "spk_0",
+          "edge-overlapped long span should still enroll from centre window");
+    Check(segs[1].speaker_id.empty(),
+          "short overlapped edge span must stay unidentified");
+    Check(db_edge.Size() == 1,
+          "edge overlap should enroll only the clean centre speaker");
+  }
+
   // Low-confidence spans are gated out.
   {
     std::vector<core::DiarSegment> segs = {Seg(12, 1.0, 4.0, 0.2f)};
@@ -184,6 +216,157 @@ int main() {
     Check(unknown[0].speaker_id.empty(),
           "unmatched cross-session slot stays local-only");
     Check(db3.Size() == 1, "unmatched cross-session slot must not enroll");
+  }
+
+  // A long-session diarizer-local slot can drift to another real speaker. With
+  // local drift epochs enabled, the later epoch can match an existing
+  // same-session global speaker while the earlier epoch keeps its original id.
+  {
+    model::SpeakerDatabase db4(/*max_speakers=*/16, kDim);
+    pipeline::SpeakerIdConfig cfg4 = cfg;
+    cfg4.local_drift_threshold = 0.25f;
+    cfg4.local_drift_min_span_sec = 5.0;
+    cfg4.local_drift_min_epoch_sec = 0.0;
+    cfg4.local_drift_allow_same_session_match = true;
+    pipeline::SpeakerIdentityStage stage4(&embedder, &db4, tb, cfg4);
+
+    std::vector<float> audio4(24 * sr, 0.0f);
+    for (int i = 8 * sr; i < 24 * sr; ++i) audio4[i] = 1.0f;
+    stage4.AppendAudio(audio4.data(), static_cast<int>(audio4.size()));
+
+    std::vector<core::DiarSegment> initial = {
+        Seg(0, 1.0, 4.0, 0.9f),   // local 0 -> speaker 0 -> spk_0
+        Seg(1, 9.0, 12.0, 0.9f),  // local 1 -> speaker 1 -> spk_1
+    };
+    stage4.Process(initial);
+    Check(initial[0].speaker_id == "spk_0", "drift setup local0 -> spk_0");
+    Check(initial[1].speaker_id == "spk_1", "drift setup local1 -> spk_1");
+
+    std::vector<core::DiarSegment> drift = {
+        Seg(0, 1.0, 4.0, 0.9f),
+        Seg(1, 9.0, 12.0, 0.9f),
+        Seg(0, 17.0, 23.0, 0.9f),  // local 0 now carries speaker 1 audio
+    };
+    stage4.Process(drift);
+    Check(drift[0].speaker_id == "spk_0",
+          "early local0 epoch must keep spk_0");
+    Check(drift[1].speaker_id == "spk_1",
+          "local1 epoch must keep spk_1");
+    Check(drift[2].speaker_id == "spk_1",
+          "drifted local0 epoch should match existing spk_1");
+    Check(db4.Size() == 2, "drift match must not enroll a duplicate speaker");
+  }
+
+  // Similar voices may still exceed the simple "unlike current epoch" drift
+  // threshold. A cleaner signal is a competing known global id that scores
+  // better than the active epoch; in that case the local slot starts a new epoch
+  // bound to the competing identity.
+  {
+    model::SpeakerDatabase db5(/*max_speakers=*/16, kDim);
+    pipeline::SpeakerIdConfig cfg5 = cfg;
+    cfg5.local_drift_threshold = 0.0f;  // disable dissimilarity split
+    cfg5.local_drift_min_span_sec = 5.0;
+    cfg5.local_drift_min_epoch_sec = 0.0;
+    cfg5.local_drift_allow_same_session_match = true;
+    cfg5.local_drift_competing_threshold = 0.8f;
+    cfg5.local_drift_competing_margin = 0.1f;
+    pipeline::SpeakerIdentityStage stage5(&embedder, &db5, tb, cfg5);
+
+    std::vector<float> audio5(24 * sr, 0.0f);
+    for (int i = 8 * sr; i < 24 * sr; ++i) audio5[i] = 1.0f;
+    stage5.AppendAudio(audio5.data(), static_cast<int>(audio5.size()));
+
+    std::vector<core::DiarSegment> initial = {
+        Seg(0, 1.0, 4.0, 0.9f),   // local 0 -> speaker 0 -> spk_0
+        Seg(1, 9.0, 12.0, 0.9f),  // local 1 -> speaker 1 -> spk_1
+    };
+    stage5.Process(initial);
+    Check(initial[0].speaker_id == "spk_0",
+          "competing setup local0 -> spk_0");
+    Check(initial[1].speaker_id == "spk_1",
+          "competing setup local1 -> spk_1");
+
+    std::vector<core::DiarSegment> competing = {
+        Seg(0, 1.0, 4.0, 0.9f),
+        Seg(1, 9.0, 12.0, 0.9f),
+        Seg(0, 15.0, 15.8, 0.9f),
+        Seg(0, 17.0, 23.0, 0.9f),  // local 0 now matches spk_1
+    };
+    stage5.Process(competing);
+    Check(competing[0].speaker_id == "spk_0",
+          "competing split keeps early epoch spk_0");
+    Check(competing[2].speaker_id == "spk_1",
+          "competing split should backfill short same-local lead-in");
+    Check(competing[3].speaker_id == "spk_1",
+          "competing split should bind later local0 to spk_1");
+    Check(db5.Size() == 2, "competing split must reuse existing speaker id");
+  }
+
+  // A weak competing span should not immediately rewrite attribution. If a
+  // later strong span confirms the same competing global id, the new epoch is
+  // backfilled to the start of the short same-local run that introduced the
+  // weak evidence.
+  {
+    model::SpeakerDatabase db6(/*max_speakers=*/16, kDim);
+    pipeline::SpeakerIdConfig cfg6 = cfg;
+    cfg6.min_embed_sec = 2.0;
+    cfg6.local_drift_threshold = 0.0f;
+    cfg6.local_drift_min_epoch_sec = 0.0;
+    cfg6.local_drift_allow_same_session_match = true;
+    cfg6.local_drift_competing_min_span_sec = 2.0;
+    cfg6.local_drift_competing_threshold = 0.8f;
+    cfg6.local_drift_competing_margin = 0.1f;
+    cfg6.local_drift_competing_candidate_threshold = 0.6f;
+    cfg6.local_drift_competing_candidate_margin = 0.05f;
+    cfg6.local_drift_competing_backfill_sec = 20.0;
+    cfg6.local_drift_competing_backfill_gap_sec = 4.0;
+    pipeline::SpeakerIdentityStage stage6(&embedder, &db6, tb, cfg6);
+
+    std::vector<float> audio6(32 * sr, 0.0f);
+    for (int i = 8 * sr; i < 13 * sr; ++i) audio6[i] = 1.0f;
+    for (int i = 16 * sr; i < 21 * sr; ++i) audio6[i] = 3.0f;
+    for (int i = 24 * sr; i < 32 * sr; ++i) audio6[i] = 1.0f;
+    stage6.AppendAudio(audio6.data(), static_cast<int>(audio6.size()));
+
+    std::vector<core::DiarSegment> initial = {
+        Seg(0, 1.0, 4.0, 0.9f),
+        Seg(1, 9.0, 12.0, 0.9f),
+    };
+    stage6.Process(initial);
+    Check(initial[0].speaker_id == "spk_0",
+          "backfill setup local0 -> spk_0");
+    Check(initial[1].speaker_id == "spk_1",
+          "backfill setup local1 -> spk_1");
+
+    std::vector<core::DiarSegment> weak_only = {
+        Seg(0, 1.0, 4.0, 0.9f),
+        Seg(1, 9.0, 12.0, 0.9f),
+        Seg(0, 15.0, 15.8, 0.9f),
+        Seg(0, 17.0, 20.0, 0.9f),
+    };
+    stage6.Process(weak_only);
+    Check(weak_only[2].speaker_id == "spk_0",
+          "weak competing evidence alone must not rewrite the short run");
+    Check(weak_only[3].speaker_id == "spk_0",
+          "weak competing evidence alone must stay on the active epoch");
+
+    std::vector<core::DiarSegment> confirmed = {
+        Seg(0, 1.0, 4.0, 0.9f),
+        Seg(1, 9.0, 12.0, 0.9f),
+        Seg(0, 15.0, 15.8, 0.9f),
+        Seg(0, 17.0, 20.0, 0.9f),
+        Seg(0, 24.0, 30.0, 0.9f),
+    };
+    stage6.Process(confirmed);
+    Check(confirmed[0].speaker_id == "spk_0",
+          "backfilled split must preserve early local0 epoch");
+    Check(confirmed[2].speaker_id == "spk_1",
+          "confirmed competing split backfills the short same-local run");
+    Check(confirmed[3].speaker_id == "spk_1",
+          "confirmed competing split backfills the weak clean span");
+    Check(confirmed[4].speaker_id == "spk_1",
+          "confirmed competing split binds the strong span");
+    Check(db6.Size() == 2, "backfilled competing split must reuse speaker id");
   }
 
   if (fails) {

@@ -100,6 +100,10 @@ class AuditoryStream {
     double align_max_segment_sec = 300.0;  // skip absurdly long spans
     double align_retain_sec = 180.0;       // retained audio window for readback
 
+    // ── Comprehensive timeline view ──────────────────────────────────
+    double timeline_align_snap_pause_sec = 0.25;
+    double timeline_align_boundary_split_tolerance_sec = 0.08;
+
     // ── VAD pipeline ─────────────────────────────────────────────────
     bool vad_stream = true;
     float vad_threshold = 0.5f;
@@ -166,6 +170,17 @@ class AuditoryStream {
     float speaker_cosession_merge_threshold = 0.85f;  // same-session merge gate
     int speaker_cross_session_match_min_refs = 1;  // refs before reset re-id
     bool speaker_defer_unmatched_cross_session = false;
+    float speaker_local_drift_threshold = 0.0f;  // <=0 disables local epoch split
+    double speaker_local_drift_min_span_sec = 5.0;
+    double speaker_local_drift_min_epoch_sec = 60.0;
+    bool speaker_local_drift_allow_same_session_match = true;
+    float speaker_local_drift_competing_threshold = 0.0f;
+    float speaker_local_drift_competing_margin = 0.05f;
+    double speaker_local_drift_competing_min_span_sec = 5.0;
+    float speaker_local_drift_competing_candidate_threshold = 0.0f;
+    float speaker_local_drift_competing_candidate_margin = 0.05f;
+    double speaker_local_drift_competing_backfill_sec = 0.0;
+    double speaker_local_drift_competing_backfill_gap_sec = 3.0;
 
     // ── Storage ──────────────────────────────────────────────────────
     std::string storage_disk_path = "/tmp/orator/storage/";

@@ -15,6 +15,7 @@
 
 #include <map>
 #include <mutex>
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -63,6 +64,40 @@ struct SpeakerIdConfig {
                                   // diarizer judged them distinct, so only a
                                   // very high cosine (a diarizer over-split of one
                                   // person) may merge them
+  float local_drift_threshold = 0.0f;  // disabled when <= 0. If a later clean
+                                  // span from the same diarizer-local slot has
+                                  // cosine below this value against the current
+                                  // local epoch centroid, start a new identity
+                                  // epoch for that slot instead of rewriting
+                                  // the previous epoch.
+  double local_drift_min_span_sec = 5.0;  // shortest clean span allowed to
+                                  // trigger an epoch split; shorter spans still
+                                  // refine the current epoch if accepted by the
+                                  // regular clean-span gate.
+  double local_drift_min_epoch_sec = 60.0;  // minimum age before a local epoch
+                                  // may split; prevents early noisy spans from
+                                  // fragmenting a speaker.
+  bool local_drift_allow_same_session_match = true;  // a drifted epoch may
+                                  // match a global id owned by another local
+                                  // slot from the same diarizer session.
+  float local_drift_competing_threshold = 0.0f;  // disabled when <= 0. If a
+                                  // later clean span is closer to another
+                                  // existing global id than the current epoch
+                                  // by local_drift_competing_margin, start a
+                                  // new epoch bound to that competing id.
+  float local_drift_competing_margin = 0.05f;
+  double local_drift_competing_min_span_sec = 5.0;
+  float local_drift_competing_candidate_threshold = 0.0f;  // disabled when <=0.
+                                  // Weak competing evidence below the strong
+                                  // threshold is held pending and only applied
+                                  // if a later strong competing span confirms
+                                  // the same global id.
+  float local_drift_competing_candidate_margin = 0.05f;
+  double local_drift_competing_backfill_sec = 0.0;  // max pending age to
+                                  // backfill from a later confirmed split.
+  double local_drift_competing_backfill_gap_sec = 3.0;  // same-local gap used
+                                  // to extend the pending start to the short
+                                  // local run preceding the clean span.
 };
 
 class SpeakerIdentityStage {
@@ -90,9 +125,58 @@ class SpeakerIdentityStage {
                const std::vector<core::DiarSegment>& all) const;
   // Add a high-quality span's embedding to a local speaker's reference set
   // (keeps the best `max_ref_segs` by quality) and recompute the centroid.
-  void AddReference(int local, double quality, const std::vector<float>& emb);
+  struct LocalEpoch {
+    double start_sec = 0.0;
+    std::string global_id;
+    std::vector<std::pair<double, std::vector<float>>> refs;
+    std::vector<float> centroid;
+    double last_embedded_end = 0.0;
+    bool allow_same_session_match = false;
+  };
+  struct PendingCompetingEpoch {
+    bool valid = false;
+    double start_sec = 0.0;
+    double clean_start_sec = 0.0;
+    double end_sec = 0.0;
+    double quality = 0.0;
+    std::string global_id;
+    float own_score = 0.0f;
+    float competing_score = 0.0f;
+    std::vector<float> emb;
+  };
+
+  LocalEpoch& EnsureEpoch(int local, double start_sec);
+  LocalEpoch& StartEpoch(int local, double start_sec,
+                         bool allow_same_session_match);
+  LocalEpoch* ActiveEpoch(int local, double at_sec);
+  const LocalEpoch* ActiveEpoch(int local, double at_sec) const;
+  void AddReference(LocalEpoch* epoch, double quality,
+                    const std::vector<float>& emb);
+  float Cosine(const std::vector<float>& a, const std::vector<float>& b) const;
+  bool ShouldSplitEpoch(const LocalEpoch& epoch, double start_sec,
+                        double end_sec,
+                        const std::vector<float>& emb) const;
+  double BackfillStartForLocal(const core::DiarSegment& s,
+                               const std::vector<core::DiarSegment>& all,
+                               int local) const;
+  std::pair<double, double> EmbeddingWindow(double start_sec,
+                                            double end_sec) const;
+  std::set<std::string> OverlappingGlobalIds(
+      const core::DiarSegment& s, const std::vector<core::DiarSegment>& all,
+      int local) const;
+  std::string BestCompetingGlobal(const LocalEpoch& epoch,
+                                  const std::vector<float>& emb,
+                                  const std::set<std::string>& blocked_ids,
+                                  float threshold, float margin,
+                                  float* own_score,
+                                  float* best_score) const;
+  void RecordPendingCompeting(int local, const core::DiarSegment& s,
+                              double backfill_start, double quality,
+                              const std::vector<float>& emb,
+                              const std::string& global_id, float own_score,
+                              float competing_score);
   // Match the local centroid voiceprint against the registry; enroll if unseen.
-  void ResolveGlobal(int local);
+  void ResolveGlobal(int local, LocalEpoch* epoch);
   // Rebuild every global speaker's registry centroid from the best references
   // of all local slots currently mapped to it (cross-session accumulation): a
   // returning speaker's voiceprint strengthens over sessions, so it reliably
@@ -117,10 +201,8 @@ class SpeakerIdentityStage {
 
   // Diarization-thread-only state (no lock needed). Per local speaker: the best
   // reference embeddings (quality = confidence x duration) + their centroid.
-  std::map<int, std::vector<std::pair<double, std::vector<float>>>> local_refs_;
-  std::map<int, std::vector<float>> local_centroid_;
-  std::map<int, double> local_last_embedded_end_;   // local -> last span end
-  std::map<int, std::string> local_to_global_;      // local -> canonical global id
+  std::map<int, std::vector<LocalEpoch>> local_epochs_;
+  std::map<int, PendingCompetingEpoch> pending_competing_;
   std::map<std::string, std::vector<float>> global_centroid_;  // id -> centroid
   int next_global_id_ = 0;
 };

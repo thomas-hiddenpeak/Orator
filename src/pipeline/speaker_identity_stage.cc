@@ -39,20 +39,217 @@ bool SpeakerIdentityStage::IsClean(
     const std::vector<core::DiarSegment>& all) const {
   if (s.end_sec - s.start_sec < config_.min_embed_sec) return false;
   if (s.confidence < config_.min_confidence) return false;
-  // Single speaker: no other-speaker segment overlaps this span.
+  const auto window = EmbeddingWindow(s.start_sec, s.end_sec);
+  if (window.second <= window.first) return false;
+  // Single speaker: no other-speaker segment overlaps the audio window that
+  // TitaNet will actually embed. A long turn can have brief boundary crosstalk,
+  // but if the centre voiceprint window is clean it is useful evidence.
   for (const auto& o : all) {
     if (&o == &s) continue;
     if (o.local_speaker == s.local_speaker) continue;
-    const double a = std::max(s.start_sec, o.start_sec);
-    const double b = std::min(s.end_sec, o.end_sec);
+    const double a = std::max(window.first, o.start_sec);
+    const double b = std::min(window.second, o.end_sec);
     if (b - a > config_.overlap_eps_sec) return false;
   }
   return true;
 }
 
-void SpeakerIdentityStage::AddReference(int local, double quality,
+SpeakerIdentityStage::LocalEpoch& SpeakerIdentityStage::EnsureEpoch(
+    int local, double start_sec) {
+  auto& epochs = local_epochs_[local];
+  if (epochs.empty()) {
+    LocalEpoch e;
+    // The first clean span validates the slot; earlier segments from the same
+    // local slot should use the same identity when the full view is reprojected.
+    e.start_sec = 0.0;
+    epochs.push_back(std::move(e));
+  }
+  (void)start_sec;
+  return epochs.back();
+}
+
+SpeakerIdentityStage::LocalEpoch& SpeakerIdentityStage::StartEpoch(
+    int local, double start_sec, bool allow_same_session_match) {
+  auto& epochs = local_epochs_[local];
+  LocalEpoch e;
+  e.start_sec = start_sec;
+  e.allow_same_session_match = allow_same_session_match;
+  epochs.push_back(std::move(e));
+  return epochs.back();
+}
+
+SpeakerIdentityStage::LocalEpoch* SpeakerIdentityStage::ActiveEpoch(
+    int local, double at_sec) {
+  auto it = local_epochs_.find(local);
+  if (it == local_epochs_.end() || it->second.empty()) return nullptr;
+  LocalEpoch* out = &it->second.front();
+  for (auto& epoch : it->second) {
+    if (epoch.start_sec <= at_sec + 1e-6) out = &epoch;
+  }
+  return out;
+}
+
+const SpeakerIdentityStage::LocalEpoch* SpeakerIdentityStage::ActiveEpoch(
+    int local, double at_sec) const {
+  auto it = local_epochs_.find(local);
+  if (it == local_epochs_.end() || it->second.empty()) return nullptr;
+  const LocalEpoch* out = &it->second.front();
+  for (const auto& epoch : it->second) {
+    if (epoch.start_sec <= at_sec + 1e-6) out = &epoch;
+  }
+  return out;
+}
+
+float SpeakerIdentityStage::Cosine(const std::vector<float>& a,
+                                   const std::vector<float>& b) const {
+  if (static_cast<int>(a.size()) != config_.embedding_dim ||
+      static_cast<int>(b.size()) != config_.embedding_dim) {
+    return 0.0f;
+  }
+  double cos = 0.0;
+  for (int i = 0; i < config_.embedding_dim; ++i) cos += a[i] * b[i];
+  return static_cast<float>(cos);
+}
+
+bool SpeakerIdentityStage::ShouldSplitEpoch(
+    const LocalEpoch& epoch, double start_sec, double end_sec,
+    const std::vector<float>& emb) const {
+  if (config_.local_drift_threshold <= 0.0f) return false;
+  if (epoch.global_id.empty() || epoch.centroid.empty()) return false;
+  if (end_sec - start_sec < config_.local_drift_min_span_sec) return false;
+  if (start_sec - epoch.start_sec < config_.local_drift_min_epoch_sec) {
+    return false;
+  }
+  return Cosine(epoch.centroid, emb) < config_.local_drift_threshold;
+}
+
+double SpeakerIdentityStage::BackfillStartForLocal(
+    const core::DiarSegment& s, const std::vector<core::DiarSegment>& all,
+    int local) const {
+  if (config_.local_drift_competing_backfill_gap_sec <= 0.0) {
+    return s.start_sec;
+  }
+  std::vector<const core::DiarSegment*> same_local;
+  for (const auto& o : all) {
+    if (o.local_speaker == local && o.end_sec <= s.start_sec + 1e-6) {
+      same_local.push_back(&o);
+    }
+  }
+  std::sort(same_local.begin(), same_local.end(),
+            [](const auto* a, const auto* b) {
+              if (a->start_sec != b->start_sec)
+                return a->start_sec < b->start_sec;
+              return a->end_sec < b->end_sec;
+            });
+  double start = s.start_sec;
+  double cursor = s.start_sec;
+  for (auto it = same_local.rbegin(); it != same_local.rend(); ++it) {
+    const core::DiarSegment& prev = **it;
+    if (cursor - prev.end_sec >
+        config_.local_drift_competing_backfill_gap_sec) {
+      break;
+    }
+    start = std::min(start, prev.start_sec);
+    cursor = prev.start_sec;
+  }
+  return start;
+}
+
+std::pair<double, double> SpeakerIdentityStage::EmbeddingWindow(
+    double start_sec, double end_sec) const {
+  double a = start_sec;
+  double b = end_sec;
+  if ((b - a) > 2 * config_.edge_margin_sec + 0.5) {
+    a += config_.edge_margin_sec;
+    b -= config_.edge_margin_sec;
+  }
+  if (b - a > config_.max_embed_window_sec) {
+    const double mid = 0.5 * (a + b);
+    a = mid - 0.5 * config_.max_embed_window_sec;
+    b = mid + 0.5 * config_.max_embed_window_sec;
+  }
+  return {a, b};
+}
+
+std::set<std::string> SpeakerIdentityStage::OverlappingGlobalIds(
+    const core::DiarSegment& s, const std::vector<core::DiarSegment>& all,
+    int local) const {
+  std::set<std::string> blocked;
+  const auto window = EmbeddingWindow(s.start_sec, s.end_sec);
+  if (window.second <= window.first) return blocked;
+  for (const auto& o : all) {
+    if (&o == &s) continue;
+    if (o.local_speaker == local) continue;
+    const double a = std::max(window.first, o.start_sec);
+    const double b = std::min(window.second, o.end_sec);
+    if (b - a <= config_.overlap_eps_sec) continue;
+    const LocalEpoch* other = ActiveEpoch(o.local_speaker, o.start_sec);
+    if (other != nullptr && !other->global_id.empty())
+      blocked.insert(other->global_id);
+  }
+  return blocked;
+}
+
+std::string SpeakerIdentityStage::BestCompetingGlobal(
+    const LocalEpoch& epoch, const std::vector<float>& emb,
+    const std::set<std::string>& blocked_ids, float threshold, float margin,
+    float* own_score, float* best_score) const {
+  if (own_score != nullptr) *own_score = 0.0f;
+  if (best_score != nullptr) *best_score = 0.0f;
+  if (threshold <= 0.0f) return {};
+  if (epoch.global_id.empty() || epoch.centroid.empty()) return {};
+
+  const float own = Cosine(epoch.centroid, emb);
+  if (own_score != nullptr) *own_score = own;
+
+  std::string best_id;
+  float best = threshold;
+  for (const auto& kv : global_centroid_) {
+    if (kv.first == epoch.global_id) continue;
+    if (blocked_ids.count(kv.first) > 0) continue;
+    const float score = Cosine(kv.second, emb);
+    if (score > best) {
+      best = score;
+      best_id = kv.first;
+    }
+  }
+  if (best_score != nullptr) *best_score = best_id.empty() ? 0.0f : best;
+  if (best_id.empty()) return {};
+  if (best < own + margin) return {};
+  return best_id;
+}
+
+void SpeakerIdentityStage::RecordPendingCompeting(
+    int local, const core::DiarSegment& s, double backfill_start,
+    double quality, const std::vector<float>& emb,
+    const std::string& global_id, float own_score, float competing_score) {
+  PendingCompetingEpoch& pending = pending_competing_[local];
+  if (pending.valid && pending.global_id == global_id &&
+      s.start_sec - pending.clean_start_sec <=
+          config_.local_drift_competing_backfill_sec) {
+    pending.start_sec = std::min(pending.start_sec, backfill_start);
+    return;
+  }
+  pending.valid = true;
+  pending.start_sec = backfill_start;
+  pending.clean_start_sec = s.start_sec;
+  pending.end_sec = s.end_sec;
+  pending.quality = quality;
+  pending.global_id = global_id;
+  pending.own_score = own_score;
+  pending.competing_score = competing_score;
+  pending.emb = emb;
+  LOG_INFO(
+      "[speaker-id] local %d pending competing drift at %.3f -> %s "
+      "(score=%.3f, own=%.3f, backfill=%.3f)\n",
+      local, s.start_sec, global_id.c_str(), competing_score, own_score,
+      backfill_start);
+}
+
+void SpeakerIdentityStage::AddReference(LocalEpoch* epoch, double quality,
                                         const std::vector<float>& emb) {
-  auto& refs = local_refs_[local];
+  if (epoch == nullptr) return;
+  auto& refs = epoch->refs;
   refs.emplace_back(quality, emb);
   // Keep the best `max_ref_segs` spans by quality (confidence x duration).
   std::sort(refs.begin(), refs.end(),
@@ -67,7 +264,7 @@ void SpeakerIdentityStage::AddReference(int local, double quality,
   for (float v : c) nrm += static_cast<double>(v) * v;
   nrm = std::sqrt(nrm) + 1e-12;
   for (float& v : c) v = static_cast<float>(v / nrm);
-  local_centroid_[local] = std::move(c);
+  epoch->centroid = std::move(c);
 }
 
 std::string SpeakerIdentityStage::NewGlobalId() {
@@ -77,35 +274,43 @@ std::string SpeakerIdentityStage::NewGlobalId() {
   }
 }
 
-void SpeakerIdentityStage::ResolveGlobal(int local) {
-  // A slot that already has a global id keeps it (stable identity); its centroid
-  // is strengthened later in RefreshGlobalCentroids.
-  auto mapped = local_to_global_.find(local);
-  if (mapped != local_to_global_.end()) return;
-  auto centroid = local_centroid_.find(local);
-  if (centroid == local_centroid_.end()) return;
+void SpeakerIdentityStage::ResolveGlobal(int local, LocalEpoch* epoch) {
+  if (epoch == nullptr) return;
+  // An epoch that already has a global id keeps it; its centroid is strengthened
+  // later in RefreshGlobalCentroids. A later drift starts a new epoch instead of
+  // replacing this mapping.
+  if (!epoch->global_id.empty()) return;
+  if (epoch->centroid.empty()) return;
 
   // Trust the diarizer's within-session separation: two local slots of the SAME
   // session are distinct speakers, so a slot must not resolve to a global id
   // already taken by another slot of its session. Matching IS allowed across
-  // sessions (cross-session voiceprint stitching after a reset).
+  // sessions (cross-session voiceprint stitching after a reset). A drifted epoch
+  // is the exception: it represents evidence that the local slot changed speaker
+  // over time, so it may match a global id already owned by another local slot.
   const int spk = config_.speakers_per_session > 0
                       ? config_.speakers_per_session
                       : 4;
   const int session = local / spk;
-  const int ref_count = static_cast<int>(local_refs_[local].size());
+  const int ref_count = static_cast<int>(epoch->refs.size());
   if (session > 0 && ref_count < config_.cross_session_match_min_refs) {
     LOG_INFO("[speaker-id] local %d deferred (%d/%d refs for cross-session)\n",
              local, ref_count, config_.cross_session_match_min_refs);
     return;
   }
   std::vector<std::string> exclude;
-  for (const auto& kv : local_to_global_) {
-    if (kv.first != local && kv.first / spk == session)
-      exclude.push_back(kv.second);
+  if (!epoch->allow_same_session_match ||
+      !config_.local_drift_allow_same_session_match) {
+    for (const auto& kv : local_epochs_) {
+      if (kv.first == local || kv.first / spk != session) continue;
+      for (const auto& other_epoch : kv.second) {
+        if (!other_epoch.global_id.empty())
+          exclude.push_back(other_epoch.global_id);
+      }
+    }
   }
   float score = 0.0f;
-  const int idx = db_->MatchExcluding(centroid->second.data(),
+  const int idx = db_->MatchExcluding(epoch->centroid.data(),
                                       config_.match_threshold, exclude, &score);
   std::string resolved;
   bool enrolled = false;
@@ -125,13 +330,13 @@ void SpeakerIdentityStage::ResolveGlobal(int local) {
       return;
     }
     resolved = NewGlobalId();
-    db_->Enroll(resolved, centroid->second.data());
+    db_->Enroll(resolved, epoch->centroid.data());
     enrolled = true;
   }
-  local_to_global_[local] = resolved;
-  LOG_INFO("[speaker-id] local %d -> %s (%s cosine=%.3f, %zu refs)\n", local,
-           resolved.c_str(), enrolled ? "enrolled" : "match", score,
-           local_refs_[local].size());
+  epoch->global_id = resolved;
+  LOG_INFO("[speaker-id] local %d epoch %.3f -> %s (%s cosine=%.3f, %zu refs)\n",
+           local, epoch->start_sec, resolved.c_str(),
+           enrolled ? "enrolled" : "match", score, epoch->refs.size());
 }
 
 void SpeakerIdentityStage::RefreshGlobalCentroids() {
@@ -141,11 +346,12 @@ void SpeakerIdentityStage::RefreshGlobalCentroids() {
   // robust its voiceprint, so the speaker reliably re-matches next session
   // instead of fragmenting into a duplicate id.
   std::map<std::string, std::vector<std::pair<double, std::vector<float>>>> g;
-  for (const auto& kv : local_to_global_) {
-    auto it = local_refs_.find(kv.first);
-    if (it == local_refs_.end()) continue;
-    auto& refs = g[kv.second];
-    refs.insert(refs.end(), it->second.begin(), it->second.end());
+  for (const auto& kv : local_epochs_) {
+    for (const auto& epoch : kv.second) {
+      if (epoch.global_id.empty()) continue;
+      auto& refs = g[epoch.global_id];
+      refs.insert(refs.end(), epoch.refs.begin(), epoch.refs.end());
+    }
   }
   global_centroid_.clear();
   for (auto& kv : g) {
@@ -186,8 +392,12 @@ void SpeakerIdentityStage::MergeReconcile() {
     // into distinct slots, so they are distinct people and must not merge unless
     // the voiceprint is overwhelmingly identical (a diarizer over-split).
     std::map<int, std::set<std::string>> session_globals;
-    for (const auto& kv : local_to_global_)
-      session_globals[kv.first / spk].insert(kv.second);
+    for (const auto& kv : local_epochs_) {
+      for (const auto& epoch : kv.second) {
+        if (!epoch.global_id.empty())
+          session_globals[kv.first / spk].insert(epoch.global_id);
+      }
+    }
     auto co_session = [&](const std::string& x, const std::string& y) {
       for (const auto& sg : session_globals)
         if (sg.second.count(x) && sg.second.count(y)) return true;
@@ -210,8 +420,9 @@ void SpeakerIdentityStage::MergeReconcile() {
         // duplicate's slots to it and delete the duplicate from the registry.
         std::string keep = ids[i], drop = ids[j];
         if (id_num(drop) < id_num(keep)) std::swap(keep, drop);
-        for (auto& kv : local_to_global_)
-          if (kv.second == drop) kv.second = keep;
+        for (auto& kv : local_epochs_)
+          for (auto& epoch : kv.second)
+            if (epoch.global_id == drop) epoch.global_id = keep;
         db_->Remove(drop);
         global_centroid_.erase(drop);
         LOG_INFO("[speaker-id] merged %s -> %s (cosine=%.3f, same speaker)\n",
@@ -227,19 +438,11 @@ std::vector<float> SpeakerIdentityStage::EmbedSpan(double start_sec,
                                                    double end_sec) {
   // E1: embed the centre of the span (skip an edge margin) to avoid the
   // onset/offset crosstalk that contaminates turn boundaries.
-  double a = start_sec, b = end_sec;
-  if ((b - a) > 2 * config_.edge_margin_sec + 0.5) {
-    a += config_.edge_margin_sec;
-    b -= config_.edge_margin_sec;
-  }
   // Cap the embedded window: a voiceprint needs only a few seconds, and a long
   // single-speaker turn would otherwise feed huge audio to TitaNet (mel/encoder
   // buffers grow with length) and exhaust GPU memory over a long session.
-  if (b - a > config_.max_embed_window_sec) {
-    const double mid = 0.5 * (a + b);
-    a = mid - 0.5 * config_.max_embed_window_sec;
-    b = mid + 0.5 * config_.max_embed_window_sec;
-  }
+  auto [a, b] = EmbeddingWindow(start_sec, end_sec);
+  if (b <= a) return {};
   std::vector<float> pcm = audio_.ReadSpan(tb_.SampleAt(a), tb_.SampleAt(b));
   if (pcm.empty()) return {};  // span aged out of the retain window
   core::AudioChunk chunk;
@@ -266,8 +469,8 @@ void SpeakerIdentityStage::Process(std::vector<core::DiarSegment>& segs) {
     if (s.local_speaker < 0) continue;
     if (tb_.SampleAt(s.start_sec) < audio_base) continue;  // audio aged out
     if (!IsClean(s, segs)) continue;
-    auto last = local_last_embedded_end_.find(s.local_speaker);
-    if (last != local_last_embedded_end_.end() && s.end_sec <= last->second) {
+    LocalEpoch& epoch = EnsureEpoch(s.local_speaker, s.start_sec);
+    if (s.end_sec <= epoch.last_embedded_end) {
       continue;  // already covered
     }
     const double q =
@@ -283,9 +486,76 @@ void SpeakerIdentityStage::Process(std::vector<core::DiarSegment>& segs) {
     const core::DiarSegment& s = *kv.second;
     std::vector<float> emb = EmbedSpan(s.start_sec, s.end_sec);
     if (emb.empty()) continue;
-    AddReference(local, best_q[local], emb);
-    local_last_embedded_end_[local] = s.end_sec;
-    ResolveGlobal(local);
+    LocalEpoch* epoch = ActiveEpoch(local, s.start_sec);
+    if (epoch == nullptr) epoch = &EnsureEpoch(local, s.start_sec);
+    float own_score = 0.0f;
+    float competing_score = 0.0f;
+    std::string competing_id;
+    if (s.end_sec - s.start_sec >=
+            config_.local_drift_competing_min_span_sec &&
+        s.start_sec - epoch->start_sec >= config_.local_drift_min_epoch_sec) {
+      const auto blocked = OverlappingGlobalIds(s, segs, local);
+      competing_id = BestCompetingGlobal(
+          *epoch, emb, blocked, config_.local_drift_competing_threshold,
+          config_.local_drift_competing_margin, &own_score,
+          &competing_score);
+      if (competing_id.empty() &&
+          config_.local_drift_competing_candidate_threshold > 0.0f &&
+          config_.local_drift_competing_backfill_sec > 0.0) {
+        float candidate_own_score = 0.0f;
+        float candidate_score = 0.0f;
+        std::string candidate_id = BestCompetingGlobal(
+            *epoch, emb, blocked,
+            config_.local_drift_competing_candidate_threshold,
+            config_.local_drift_competing_candidate_margin,
+            &candidate_own_score, &candidate_score);
+        if (!candidate_id.empty()) {
+          const double backfill_start = BackfillStartForLocal(s, segs, local);
+          RecordPendingCompeting(local, s, backfill_start, best_q[local], emb,
+                                 candidate_id, candidate_own_score,
+                                 candidate_score);
+          epoch->last_embedded_end = s.end_sec;
+          continue;
+        }
+      }
+    }
+    if (ShouldSplitEpoch(*epoch, s.start_sec, s.end_sec, emb)) {
+      const float cos = Cosine(epoch->centroid, emb);
+      LOG_INFO(
+          "[speaker-id] local %d drift at %.3f (cosine=%.3f < %.3f); "
+          "starting new epoch\n",
+          local, s.start_sec, cos, config_.local_drift_threshold);
+      epoch = &StartEpoch(local, s.start_sec,
+                          /*allow_same_session_match=*/true);
+      pending_competing_.erase(local);
+    } else if (!competing_id.empty()) {
+      double epoch_start = BackfillStartForLocal(s, segs, local);
+      auto pending_it = pending_competing_.find(local);
+      const bool use_pending =
+          pending_it != pending_competing_.end() && pending_it->second.valid &&
+          pending_it->second.global_id == competing_id &&
+          s.start_sec - pending_it->second.clean_start_sec <=
+              config_.local_drift_competing_backfill_sec;
+      if (use_pending)
+        epoch_start = std::min(epoch_start, pending_it->second.start_sec);
+      LOG_INFO(
+          "[speaker-id] local %d competing drift at %.3f (%s %.3f > "
+          "%s %.3f + %.3f); starting new epoch at %.3f\n",
+          local, s.start_sec, competing_id.c_str(), competing_score,
+          epoch->global_id.c_str(), own_score,
+          config_.local_drift_competing_margin, epoch_start);
+      epoch = &StartEpoch(local, epoch_start,
+                          /*allow_same_session_match=*/true);
+      epoch->global_id = competing_id;
+      if (use_pending) {
+        AddReference(epoch, pending_it->second.quality, pending_it->second.emb);
+        epoch->last_embedded_end = pending_it->second.end_sec;
+      }
+      pending_competing_.erase(local);
+    }
+    AddReference(epoch, best_q[local], emb);
+    epoch->last_embedded_end = std::max(epoch->last_embedded_end, s.end_sec);
+    ResolveGlobal(local, epoch);
   }
   // Strengthen every global speaker's centroid with all accumulated references
   // (cross-session), so returning speakers re-match reliably without capping the
@@ -299,20 +569,21 @@ void SpeakerIdentityStage::Process(std::vector<core::DiarSegment>& segs) {
   // centroid -> match/enrol against the registry, with cross-session stitching);
   // every segment then carries its local speaker's resolved global id. Matching
   // is done at the speaker level, not per-segment: a single short segment's
-  // voiceprint is too noisy to re-decide identity for these similar voices, and
-  // the diarizer has already grouped the segment under its speaker.
+  // voiceprint is too noisy to re-decide identity for these similar voices. A
+  // long-session local slot can still split into multiple time-ordered epochs
+  // when later clean evidence is inconsistent with its current voiceprint.
   for (auto& s : segs) {
-    auto it = local_to_global_.find(s.local_speaker);
-    if (it != local_to_global_.end()) s.speaker_id = it->second;
+    const LocalEpoch* epoch = ActiveEpoch(s.local_speaker, s.start_sec);
+    if (epoch != nullptr && !epoch->global_id.empty()) {
+      s.speaker_id = epoch->global_id;
+    }
   }
 }
 
 void SpeakerIdentityStage::Reset() {
   audio_.Reset();
-  local_refs_.clear();
-  local_centroid_.clear();
-  local_last_embedded_end_.clear();
-  local_to_global_.clear();
+  local_epochs_.clear();
+  pending_competing_.clear();
   global_centroid_.clear();
   next_global_id_ = db_ ? db_->Size() : 0;
 }

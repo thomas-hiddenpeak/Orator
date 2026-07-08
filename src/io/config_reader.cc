@@ -99,6 +99,18 @@ bool ApplyTomlConfig(const std::string& path,
     }
   }
 
+  // ── [timeline] ────────────────────────────────────────────────────
+  if (auto* sec = config["timeline"].as_table()) {
+    if (auto v = sec->get("align_snap_pause_sec")) {
+      if (auto d = v->value<double>()) cfg.timeline_align_snap_pause_sec = *d;
+    }
+    if (auto v = sec->get("align_boundary_split_tolerance_sec")) {
+      if (auto d = v->value<double>()) {
+        cfg.timeline_align_boundary_split_tolerance_sec = *d;
+      }
+    }
+  }
+
   // ── [speaker] ─────────────────────────────────────────────────────
   if (auto* sec = config["speaker"].as_table()) {
     if (auto v = sec->get("enable")) {
@@ -158,6 +170,52 @@ bool ApplyTomlConfig(const std::string& path,
     if (auto v = sec->get("defer_unmatched_cross_session")) {
       if (auto b = v->value<bool>())
         cfg.speaker_defer_unmatched_cross_session = *b;
+    }
+    if (auto v = sec->get("local_drift_threshold")) {
+      if (auto d = v->value<double>())
+        cfg.speaker_local_drift_threshold = static_cast<float>(*d);
+    }
+    if (auto v = sec->get("local_drift_min_span_sec")) {
+      if (auto d = v->value<double>())
+        cfg.speaker_local_drift_min_span_sec = *d;
+    }
+    if (auto v = sec->get("local_drift_min_epoch_sec")) {
+      if (auto d = v->value<double>())
+        cfg.speaker_local_drift_min_epoch_sec = *d;
+    }
+    if (auto v = sec->get("local_drift_allow_same_session_match")) {
+      if (auto b = v->value<bool>())
+        cfg.speaker_local_drift_allow_same_session_match = *b;
+    }
+    if (auto v = sec->get("local_drift_competing_threshold")) {
+      if (auto d = v->value<double>())
+        cfg.speaker_local_drift_competing_threshold = static_cast<float>(*d);
+    }
+    if (auto v = sec->get("local_drift_competing_margin")) {
+      if (auto d = v->value<double>())
+        cfg.speaker_local_drift_competing_margin = static_cast<float>(*d);
+    }
+    if (auto v = sec->get("local_drift_competing_min_span_sec")) {
+      if (auto d = v->value<double>())
+        cfg.speaker_local_drift_competing_min_span_sec = *d;
+    }
+    if (auto v = sec->get("local_drift_competing_candidate_threshold")) {
+      if (auto d = v->value<double>())
+        cfg.speaker_local_drift_competing_candidate_threshold =
+            static_cast<float>(*d);
+    }
+    if (auto v = sec->get("local_drift_competing_candidate_margin")) {
+      if (auto d = v->value<double>())
+        cfg.speaker_local_drift_competing_candidate_margin =
+            static_cast<float>(*d);
+    }
+    if (auto v = sec->get("local_drift_competing_backfill_sec")) {
+      if (auto d = v->value<double>())
+        cfg.speaker_local_drift_competing_backfill_sec = *d;
+    }
+    if (auto v = sec->get("local_drift_competing_backfill_gap_sec")) {
+      if (auto d = v->value<double>())
+        cfg.speaker_local_drift_competing_backfill_gap_sec = *d;
     }
   }
 

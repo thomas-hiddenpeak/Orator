@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Closing accuracy check: pipeline speaker attribution vs test.txt ground truth.
+"""Diagnostic speaker-attribution overlap report.
 
-Constitution Art. VI: compare attributed speakers to the named, timestamped
-reference (test/data/reference/test.txt) item-by-item. Reads a timeline JSON
-produced by ws_unified_test.py and reports, over the analysed window:
+Constitutional acceptance for Orator speaker quality is context-aware review
+against test/data/reference/test.txt, not this script's aggregate percentage.
+This utility only helps locate changed windows and quantify overlap drift. It
+reads a timeline JSON produced by ws_unified_test.py and reports:
   - mapping spk_<n> -> ground-truth name (by max overlap),
-  - duration-weighted speaker accuracy of the comprehensive view,
+  - duration-weighted attribution overlap of the comprehensive view,
   - per-reference-turn dominant speaker_id.
 
 Usage: python speaker_attrib_eval.py /tmp/out.json [--txt test/.../test.txt]
@@ -69,7 +70,7 @@ def main():
                 total += ov
                 if nm == gnm:
                     correct += ov
-    print("speaker accuracy (dur-weighted) = %.1f%%  (%.0f/%.0f s)"
+    print("diagnostic attribution overlap (dur-weighted) = %.1f%%  (%.0f/%.0f s)"
           % (100 * correct / max(total, 1), correct, total))
     names = set(mapping.values())
     print("distinct gt names covered: %d/%d" % (len(names), len({g[2] for g in gt})))

@@ -227,6 +227,57 @@ int main() {
     }
   }
 
+  // ---- 9. A diarizer-local speaker label can resolve to different global ids
+  // over time; the comprehensive entries must keep the per-interval id instead
+  // of serializing through the label's last mapping. ----
+  {
+    TestComprehensiveTimeline tl;
+    tl.UpsertText(0, 0.0, 4.0, "ABCD");
+    tl.ReplaceSpeakers({{0.0, 2.0, "speaker_0", 0.8f, "spk_a"},
+                        {2.0, 4.0, "speaker_0", 0.8f, "spk_b"}});
+    auto snap = tl.Snapshot();
+    CHECK(snap.size() == 2,
+          "same local speaker with different global ids stays split");
+    if (snap.size() == 2) {
+      CHECK(snap[0].speaker == "speaker_0" &&
+                snap[0].speaker_id == "spk_a",
+            "first interval keeps spk_a");
+      CHECK(snap[1].speaker == "speaker_0" &&
+                snap[1].speaker_id == "spk_b",
+            "second interval keeps spk_b");
+      CHECK(snap[0].text + snap[1].text == "ABCD",
+            "global-id split preserves text");
+    }
+  }
+
+  // ---- 10. Alignment snap keeps ordinary short pauses coherent, but a diar
+  // boundary near an alignment gap forces a split. A 0.16s gap is below the
+  // 0.25s run-coherence threshold, yet it still splits because the speaker
+  // boundary sits inside the gap. ----
+  {
+    TestComprehensiveTimeline tl;
+    tl.set_align_snap_pause_sec(0.25);
+    tl.set_align_boundary_split_tolerance_sec(0.08);
+    tl.UpsertText(0, 0.0, 4.0, "ABCDEF");
+    tl.ReplaceSpeakers({{0.0, 2.5, "speaker_3", 0.9f, "spk_3"},
+                        {2.5, 4.0, "speaker_0", 0.9f, "spk_0"}});
+    tl.UpsertAlign(0, 0.0, 4.0,
+                   {{0.0, 0.3, "A"},
+                    {0.3, 0.6, "B"},
+                    {2.0, 2.4, "C"},
+                    {2.56, 2.66, "D"},
+                    {2.66, 2.9, "E"},
+                    {2.9, 3.2, "F"}});
+    auto snap = tl.Snapshot();
+    CHECK(snap.size() == 2, "diar boundary near 0.16s gap splits speaker runs");
+    if (snap.size() == 2) {
+      CHECK(snap[0].speaker_id == "spk_3" && snap[0].text == "ABC",
+            "pre-gap text remains with first speaker");
+      CHECK(snap[1].speaker_id == "spk_0" && snap[1].text == "DEF",
+            "post-gap text moves to second speaker");
+    }
+  }
+
   if (g_fail == 0) {
     std::printf("ComprehensiveTimeline test PASSED\n");
     return 0;
