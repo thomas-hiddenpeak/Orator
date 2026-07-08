@@ -31,3 +31,7 @@
   validation; reject `histctx 300/40/5`, `spkcache_refresh_rate=0`, and naive
   context low-support inheritance as accepted fixes. See
   `refresh0-context-review-2026-07-08.md`.
+- [x] T016 Add a frame-level diar evidence probe and run tail-focused evidence
+  review; reject reset-period, silence-profile, low-coverage, and gap-fill
+  candidates as accepted fixes for 3270-3304 s. See
+  `tail-evidence-review-2026-07-09.md`.

@@ -196,6 +196,14 @@ set_property(TARGET speaker_embedding_probe PROPERTY CUDA_ARCHITECTURES native)
 target_link_libraries(speaker_embedding_probe PRIVATE orator_core)
 
 # ---------------------------------------------------------------------------
+# diar_evidence_probe: offline frame-level Sortformer evidence dump. It reads
+# orator.toml and writes CSV diagnostics outside the runtime path.
+# ---------------------------------------------------------------------------
+add_executable(diar_evidence_probe tools/probes/diar_evidence_probe.cc)
+set_property(TARGET diar_evidence_probe PROPERTY CUDA_ARCHITECTURES native)
+target_link_libraries(diar_evidence_probe PRIVATE orator_core)
+
+# ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
 enable_testing()
