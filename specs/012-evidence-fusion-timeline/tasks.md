@@ -50,3 +50,7 @@
   speaker-support diagnostics, preserving raw speaker attribution while making
   weak or unsupported ownership machine-readable. See
   `speaker-uncertain-business-view-2026-07-10.md`.
+- [x] T021 Run diar tail TOML experiments and NeMo full-length reference check
+  for late-session wrong-speaker evidence. Reject strict onset, longer
+  `min_dur_on`, left/right context variants, and their combination as accepted
+  fixes. See `diar-tail-toml-experiments-2026-07-10.md`.
