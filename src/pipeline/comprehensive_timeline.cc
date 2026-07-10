@@ -87,7 +87,8 @@ bool EntriesEqual(const std::vector<ComprehensiveTimeline::Entry>& a,
                    b[i].diar_total_coverage_ratio) ||
         !NearEqual(a[i].diar_max_gap_sec, b[i].diar_max_gap_sec) ||
         a[i].diar_island_count != b[i].diar_island_count ||
-        a[i].speaker_support != b[i].speaker_support) {
+        a[i].speaker_support != b[i].speaker_support ||
+        a[i].speaker_uncertain != b[i].speaker_uncertain) {
       return false;
     }
   }
@@ -214,6 +215,7 @@ ComprehensiveTimeline::Entry ComprehensiveTimeline::MakeEntry(
   e.diar_max_gap_sec = support.max_gap_sec;
   e.diar_island_count = support.island_count;
   e.speaker_support = support.level;
+  e.speaker_uncertain = e.speaker_support != "strong";
   return e;
 }
 
@@ -243,6 +245,7 @@ void ComprehensiveTimeline::MergeEntrySupport(Entry* dst,
   } else {
     dst->speaker_support = "strong";
   }
+  dst->speaker_uncertain = dst->speaker_support != "strong";
 }
 
 std::vector<ComprehensiveTimeline::Entry>

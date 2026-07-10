@@ -86,6 +86,7 @@ export class Model {
         text_id: e.text_id, start: e.start, end: e.end,
         speaker: e.speaker, speaker_id: e.speaker_id, speaker_name: e.speaker_name,
         speaker_support: e.speaker_support,
+        speaker_uncertain: e.speaker_uncertain,
         diar_overlap_sec: e.diar_overlap_sec,
         diar_total_overlap_sec: e.diar_total_overlap_sec,
         diar_coverage_ratio: e.diar_coverage_ratio,
@@ -101,6 +102,7 @@ export class Model {
         row.speaker_id = e.speaker_id;
         row.speaker_name = e.speaker_name;
         row.speaker_support = e.speaker_support;
+        row.speaker_uncertain = e.speaker_uncertain;
         row.diar_overlap_sec = e.diar_overlap_sec;
         row.diar_total_overlap_sec = e.diar_total_overlap_sec;
         row.diar_coverage_ratio = e.diar_coverage_ratio;
@@ -191,6 +193,7 @@ export class Model {
         text_id: e.text_id, start: e.start, end: e.end,
         speaker: e.speaker, speaker_id: e.speaker_id, speaker_name: e.speaker_name,
         speaker_support: e.speaker_support,
+        speaker_uncertain: e.speaker_uncertain,
         diar_overlap_sec: e.diar_overlap_sec,
         diar_total_overlap_sec: e.diar_total_overlap_sec,
         diar_coverage_ratio: e.diar_coverage_ratio,
@@ -205,6 +208,7 @@ export class Model {
         row.speaker_id = e.speaker_id;
         row.speaker_name = e.speaker_name;
         row.speaker_support = e.speaker_support;
+        row.speaker_uncertain = e.speaker_uncertain;
         row.diar_overlap_sec = e.diar_overlap_sec;
         row.diar_total_overlap_sec = e.diar_total_overlap_sec;
         row.diar_coverage_ratio = e.diar_coverage_ratio;

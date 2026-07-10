@@ -292,6 +292,8 @@ int main() {
             "gap-filled entry keeps the selected speaker");
       CHECK(snap[0].speaker_support == "weak",
             "sparse selected-speaker support is labelled weak");
+      CHECK(snap[0].speaker_uncertain,
+            "weak selected-speaker support is marked uncertain");
       CHECK(snap[0].diar_island_count == 2,
             "two selected-speaker islands are counted");
       CHECK(snap[0].diar_overlap_sec == 2.0,
@@ -311,6 +313,8 @@ int main() {
     if (snap.size() == 1) {
       CHECK(snap[0].speaker_support == "strong",
             "complete selected-speaker coverage is labelled strong");
+      CHECK(!snap[0].speaker_uncertain,
+            "strong selected-speaker support is not marked uncertain");
       CHECK(snap[0].diar_coverage_ratio == 1.0,
             "complete selected-speaker coverage ratio is 1.0");
       CHECK(snap[0].diar_island_count == 1,

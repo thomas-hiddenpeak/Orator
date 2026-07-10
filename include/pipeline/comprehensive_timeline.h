@@ -69,6 +69,7 @@ class ComprehensiveTimeline {
     double diar_max_gap_sec = 0.0;
     int diar_island_count = 0;
     std::string speaker_support = "none";  // none | weak | strong
+    bool speaker_uncertain = true;
   };
 
   // A revision: the consumer should replace its comprehensive entries whose

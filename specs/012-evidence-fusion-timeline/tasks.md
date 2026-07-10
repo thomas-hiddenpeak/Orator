@@ -46,3 +46,7 @@
   failures by pipeline layer, identify the first layer where speaker ownership
   becomes unreliable, and validate any candidate fix through full-session
   context-aware review. See `speaker-recovery-validation-plan-2026-07-10.md`.
+- [x] T020 Add an explicit `speaker_uncertain` business-view field derived from
+  speaker-support diagnostics, preserving raw speaker attribution while making
+  weak or unsupported ownership machine-readable. See
+  `speaker-uncertain-business-view-2026-07-10.md`.

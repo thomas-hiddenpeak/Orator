@@ -47,6 +47,7 @@ export class TimelineView {
             speaker_id: t.speaker_id,
             speaker_name: t.speaker_name,
             speaker_support: t.speaker_support,
+            speaker_uncertain: t.speaker_uncertain,
             diar_overlap_sec: t.diar_overlap_sec,
             diar_total_overlap_sec: t.diar_total_overlap_sec,
             diar_coverage_ratio: t.diar_coverage_ratio,

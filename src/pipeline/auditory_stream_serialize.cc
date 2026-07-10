@@ -576,16 +576,18 @@ std::string AuditoryStream::Serialize() {
       }
       std::snprintf(buf, sizeof(buf),
                     ",\"speaker_support\":\"%s\","
+                    "\"speaker_uncertain\":%s,"
                     "\"diar_overlap_sec\":%.3f,"
                     "\"diar_total_overlap_sec\":%.3f,"
                     "\"diar_coverage_ratio\":%.3f,"
                     "\"diar_total_coverage_ratio\":%.3f,"
                     "\"diar_max_gap_sec\":%.3f,"
                     "\"diar_island_count\":%d",
-                    e.speaker_support.c_str(), e.diar_overlap_sec,
-                    e.diar_total_overlap_sec, e.diar_coverage_ratio,
-                    e.diar_total_coverage_ratio, e.diar_max_gap_sec,
-                    e.diar_island_count);
+                    e.speaker_support.c_str(),
+                    e.speaker_uncertain ? "true" : "false",
+                    e.diar_overlap_sec, e.diar_total_overlap_sec,
+                    e.diar_coverage_ratio, e.diar_total_coverage_ratio,
+                    e.diar_max_gap_sec, e.diar_island_count);
       out += buf;
       out += ",\"text\":\"" + JsonEscape(e.text) + "\"}";
       if (i + 1 < comp_view.size()) out += ",";
