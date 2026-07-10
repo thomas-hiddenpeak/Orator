@@ -109,6 +109,21 @@ bool ApplyTomlConfig(const std::string& path,
         cfg.timeline_align_boundary_split_tolerance_sec = *d;
       }
     }
+    if (auto v = sec->get("speaker_support_min_coverage_ratio")) {
+      if (auto d = v->value<double>()) {
+        cfg.timeline_speaker_support_min_coverage_ratio = *d;
+      }
+    }
+    if (auto v = sec->get("speaker_support_max_gap_sec")) {
+      if (auto d = v->value<double>()) {
+        cfg.timeline_speaker_support_max_gap_sec = *d;
+      }
+    }
+    if (auto v = sec->get("speaker_support_max_islands")) {
+      if (auto n = v->value<int>()) {
+        cfg.timeline_speaker_support_max_islands = *n;
+      }
+    }
   }
 
   // ── [speaker] ─────────────────────────────────────────────────────
@@ -146,8 +161,7 @@ bool ApplyTomlConfig(const std::string& path,
       if (auto d = v->value<double>()) cfg.speaker_edge_margin_sec = *d;
     }
     if (auto v = sec->get("max_embed_window_sec")) {
-      if (auto d = v->value<double>())
-        cfg.speaker_max_embed_window_sec = *d;
+      if (auto d = v->value<double>()) cfg.speaker_max_embed_window_sec = *d;
     }
     if (auto v = sec->get("enroll_min_refs")) {
       if (auto n = v->value<int>()) cfg.speaker_enroll_min_refs = *n;

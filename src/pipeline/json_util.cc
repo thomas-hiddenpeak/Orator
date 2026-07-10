@@ -61,11 +61,10 @@ long JsonParseLong(const std::string& data, const char* key) {
   }
 }
 
-std::string SerializeRevisionToJson(const ComprehensiveTimeline::Revision& r,
-                                    const char* source,
-                                    const std::map<std::string, std::string>*
-                                        label_ids) {
-  char buf[160];
+std::string SerializeRevisionToJson(
+    const ComprehensiveTimeline::Revision& r, const char* source,
+    const std::map<std::string, std::string>* label_ids) {
+  char buf[256];
   std::string out = "{\"type\":\"revision\",\"source\":\"";
   out += source;
   out += "\",";
@@ -89,9 +88,9 @@ std::string SerializeRevisionToJson(const ComprehensiveTimeline::Revision& r,
                   "{\"start\":%.3f,\"end\":%.3f,\"text_id\":%ld,\"speaker\":%d",
                   e.start, e.end, e.text_id, spk_idx);
     out += buf;
-    // Spec 010: surface the resolved global voiceprint identity live. Prefer the
-    // per-entry id because one diarizer-local label can map to different global
-    // identities over time after local drift splitting.
+    // Spec 010: surface the resolved global voiceprint identity live. Prefer
+    // the per-entry id because one diarizer-local label can map to different
+    // global identities over time after local drift splitting.
     if (!e.speaker_id.empty()) {
       out += ",\"speaker_id\":\"" + e.speaker_id + "\"";
     } else if (label_ids) {
@@ -99,6 +98,19 @@ std::string SerializeRevisionToJson(const ComprehensiveTimeline::Revision& r,
       if (it != label_ids->end() && !it->second.empty())
         out += ",\"speaker_id\":\"" + it->second + "\"";
     }
+    std::snprintf(buf, sizeof(buf),
+                  ",\"speaker_support\":\"%s\","
+                  "\"diar_overlap_sec\":%.3f,"
+                  "\"diar_total_overlap_sec\":%.3f,"
+                  "\"diar_coverage_ratio\":%.3f,"
+                  "\"diar_total_coverage_ratio\":%.3f,"
+                  "\"diar_max_gap_sec\":%.3f,"
+                  "\"diar_island_count\":%d",
+                  e.speaker_support.c_str(), e.diar_overlap_sec,
+                  e.diar_total_overlap_sec, e.diar_coverage_ratio,
+                  e.diar_total_coverage_ratio, e.diar_max_gap_sec,
+                  e.diar_island_count);
+    out += buf;
     out += ",\"text\":\"" + JsonEscape(e.text) + "\"}";
     if (i + 1 < r.entries.size()) out += ",";
   }

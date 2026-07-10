@@ -135,16 +135,16 @@ std::optional<GpuUtilization> ReadTegrastatsGpuUtilizationPct() {
 }
 
 std::optional<GpuUtilization> ReadNvidiaSmiGpuUtilizationPct() {
-  const std::string output = ReadCommandOutput(
-      {"nvidia-smi", "--query-gpu=utilization.gpu",
-       "--format=csv,noheader,nounits"});
+  const std::string output =
+      ReadCommandOutput({"nvidia-smi", "--query-gpu=utilization.gpu",
+                         "--format=csv,noheader,nounits"});
   std::optional<double> best;
   size_t start = 0;
   while (start < output.size()) {
     const size_t line_end = output.find('\n', start);
-    const std::string line = output.substr(
-        start, line_end == std::string::npos ? std::string::npos
-                                             : line_end - start);
+    const std::string line =
+        output.substr(start, line_end == std::string::npos ? std::string::npos
+                                                           : line_end - start);
     char* end = nullptr;
     const double value = std::strtod(line.c_str(), &end);
     if (end != line.c_str() && value >= 0.0) {
@@ -229,19 +229,18 @@ std::vector<PowerRail> ReadPowerRails() {
     const auto hwmon_name = ReadFirstLine(hwmon.path() / "name").value_or("");
     std::error_code file_ec;
     bool has_power_input = false;
-    for (const auto& f : std::filesystem::directory_iterator(hwmon.path(),
-                                                             file_ec)) {
+    for (const auto& f :
+         std::filesystem::directory_iterator(hwmon.path(), file_ec)) {
       if (file_ec) break;
       const auto fn = f.path().filename().string();
-      if (fn.rfind("power", 0) != 0 ||
-          fn.find("_input") == std::string::npos) {
+      if (fn.rfind("power", 0) != 0 || fn.find("_input") == std::string::npos) {
         continue;
       }
       const auto microwatts = ReadDoubleFile(f.path());
       if (!microwatts || *microwatts <= 0.0) continue;
       PowerRail rail;
-      rail.name = hwmon_name.empty() ? hwmon.path().filename().string()
-                                     : hwmon_name;
+      rail.name =
+          hwmon_name.empty() ? hwmon.path().filename().string() : hwmon_name;
       rail.watts = *microwatts / 1000000.0;
       rails.push_back(rail);
       has_power_input = true;
@@ -251,15 +250,13 @@ std::vector<PowerRail> ReadPowerRails() {
         const auto mv = ReadDoubleFile(hwmon.path() /
                                        ("in" + std::to_string(i) + "_input"));
         const auto ma = ReadDoubleFile(hwmon.path() /
-                                       ("curr" + std::to_string(i) +
-                                        "_input"));
+                                       ("curr" + std::to_string(i) + "_input"));
         if (!mv || !ma || *mv <= 0.0 || *ma <= 0.0) continue;
         PowerRail rail;
-        rail.name = ReadFirstLine(hwmon.path() /
-                                  ("in" + std::to_string(i) + "_label"))
-                        .value_or(hwmon_name.empty()
-                                      ? hwmon.path().filename().string()
-                                      : hwmon_name);
+        rail.name =
+            ReadFirstLine(hwmon.path() / ("in" + std::to_string(i) + "_label"))
+                .value_or(hwmon_name.empty() ? hwmon.path().filename().string()
+                                             : hwmon_name);
         rail.watts = (*mv * *ma) / 1000000.0;
         rails.push_back(rail);
       }
@@ -368,9 +365,8 @@ std::string AuditoryStream::SerializeGpuTelemetry() const {
   out += ",\"gpu_mem_used_mb\":" + OptionalJson(used_mb, mem_ok, 1);
   out += ",\"gpu_mem_total_mb\":" + OptionalJson(total_mb, mem_ok, 1);
   out += ",\"gpu_mem_used_pct\":" + OptionalJson(used_pct, mem_ok, 1);
-  out += ",\"system_power_w\":" +
-         OptionalJson(system_power_w.value_or(0.0),
-                      system_power_w.has_value(), 2);
+  out += ",\"system_power_w\":" + OptionalJson(system_power_w.value_or(0.0),
+                                               system_power_w.has_value(), 2);
   out += ",\"power_rails\":[";
   for (size_t i = 0; i < rails.size(); ++i) {
     if (i > 0) out += ",";
@@ -453,8 +449,8 @@ std::string AuditoryStream::Serialize() {
   for (size_t i = 0; i < diar_view.size(); ++i) {
     const auto& s = diar_view[i];
     std::snprintf(buf, sizeof(buf),
-                  "{\"start\":%.3f,\"end\":%.3f,\"speaker\":%d",
-                  s.start_sec, s.end_sec, s.local_speaker);
+                  "{\"start\":%.3f,\"end\":%.3f,\"speaker\":%d", s.start_sec,
+                  s.end_sec, s.local_speaker);
     out += buf;
     // Spec 010: surface the resolved global voiceprint identity (and optional
     // display name) alongside the diarizer-local index (backward compatible:
@@ -573,10 +569,24 @@ std::string AuditoryStream::Serialize() {
       }
       if (!entry_speaker_id.empty()) {
         out += ",\"speaker_id\":\"" + entry_speaker_id + "\"";
-        const std::string nm =
-            speaker_db_ ? speaker_db_->DisplayName(entry_speaker_id) : std::string();
+        const std::string nm = speaker_db_
+                                   ? speaker_db_->DisplayName(entry_speaker_id)
+                                   : std::string();
         if (!nm.empty()) out += ",\"speaker_name\":\"" + JsonEscape(nm) + "\"";
       }
+      std::snprintf(buf, sizeof(buf),
+                    ",\"speaker_support\":\"%s\","
+                    "\"diar_overlap_sec\":%.3f,"
+                    "\"diar_total_overlap_sec\":%.3f,"
+                    "\"diar_coverage_ratio\":%.3f,"
+                    "\"diar_total_coverage_ratio\":%.3f,"
+                    "\"diar_max_gap_sec\":%.3f,"
+                    "\"diar_island_count\":%d",
+                    e.speaker_support.c_str(), e.diar_overlap_sec,
+                    e.diar_total_overlap_sec, e.diar_coverage_ratio,
+                    e.diar_total_coverage_ratio, e.diar_max_gap_sec,
+                    e.diar_island_count);
+      out += buf;
       out += ",\"text\":\"" + JsonEscape(e.text) + "\"}";
       if (i + 1 < comp_view.size()) out += ",";
     }

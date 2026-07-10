@@ -31,6 +31,12 @@ AuditoryStream::AuditoryStream(const Config& config, Emit emit)
   comp_.set_align_snap_pause_sec(config_.timeline_align_snap_pause_sec);
   comp_.set_align_boundary_split_tolerance_sec(
       config_.timeline_align_boundary_split_tolerance_sec);
+  comp_.set_speaker_support_min_coverage_ratio(
+      config_.timeline_speaker_support_min_coverage_ratio);
+  comp_.set_speaker_support_max_gap_sec(
+      config_.timeline_speaker_support_max_gap_sec);
+  comp_.set_speaker_support_max_islands(
+      config_.timeline_speaker_support_max_islands);
 }
 
 AuditoryStream::~AuditoryStream() { StopWorkers(); }
@@ -183,8 +189,8 @@ void AuditoryStream::Start() {
 
   // Spec 010: speaker identity (post-diarization stage inside the diar
   // pipeline). Gated on config; needs the diarizer and the TitaNet weights.
-  const bool speaker_on = config_.speaker_enable &&
-                          !config_.speaker_model_dir.empty() && diarizer_;
+  const bool speaker_on =
+      config_.speaker_enable && !config_.speaker_model_dir.empty() && diarizer_;
   if (speaker_on) {
     std::string wpath = config_.speaker_model_dir;
     if (!wpath.empty() && wpath.back() != '/') wpath += '/';
@@ -216,8 +222,7 @@ void AuditoryStream::Start() {
         config_.speaker_defer_unmatched_cross_session;
     sc.local_drift_threshold = config_.speaker_local_drift_threshold;
     sc.local_drift_min_span_sec = config_.speaker_local_drift_min_span_sec;
-    sc.local_drift_min_epoch_sec =
-        config_.speaker_local_drift_min_epoch_sec;
+    sc.local_drift_min_epoch_sec = config_.speaker_local_drift_min_epoch_sec;
     sc.local_drift_allow_same_session_match =
         config_.speaker_local_drift_allow_same_session_match;
     sc.local_drift_competing_threshold =
@@ -267,8 +272,8 @@ void AuditoryStream::StartWorkers() {
         });
     // Spec 010: resolve global voiceprint identities on the segment view before
     // it is delivered. The worker depends only on a std::function (Art. III);
-    // identity needs no VAD -- Sortformer's confidence + no-overlap already mark
-    // clean single-speaker spans.
+    // identity needs no VAD -- Sortformer's confidence + no-overlap already
+    // mark clean single-speaker spans.
     if (speaker_id_stage_) {
       diar_worker_->set_segment_processor(
           [this](std::vector<core::DiarSegment>& segs) {
@@ -414,10 +419,11 @@ void AuditoryStream::StartWorkers() {
             last_horizon = h;
           }
         }
-        // Emit vad_state only on a speech<->silence TRANSITION, not every frame.
-        // A per-frame emit (~10/s) is the dominant outbound-message source and
-        // was the root of the WS backpressure that dropped long connections;
-        // the UI only needs the transitions (it drives a speech LED).
+        // Emit vad_state only on a speech<->silence TRANSITION, not every
+        // frame. A per-frame emit (~10/s) is the dominant outbound-message
+        // source and was the root of the WS backpressure that dropped long
+        // connections; the UI only needs the transitions (it drives a speech
+        // LED).
         {
           const bool sp = vad_detector_->is_in_speech();
           if (first_vad_state || sp != vad_speech_emitted) {
@@ -510,7 +516,8 @@ void AuditoryStream::StopWorkers() {
   // Spec 010 D10: persist the speaker registry (+ name sidecar) once the diar
   // thread has joined, so no enrollment races the write. Skip an empty registry
   // so a session that enrolled nobody never clobbers a populated file on disk
-  // (every stream Loads the registry at start, so non-empty state is preserved).
+  // (every stream Loads the registry at start, so non-empty state is
+  // preserved).
   if (speaker_db_ && !config_.speaker_registry_path.empty() &&
       speaker_db_->Size() > 0) {
     if (speaker_db_->Save(config_.speaker_registry_path)) {

@@ -239,11 +239,9 @@ int main() {
     CHECK(snap.size() == 2,
           "same local speaker with different global ids stays split");
     if (snap.size() == 2) {
-      CHECK(snap[0].speaker == "speaker_0" &&
-                snap[0].speaker_id == "spk_a",
+      CHECK(snap[0].speaker == "speaker_0" && snap[0].speaker_id == "spk_a",
             "first interval keeps spk_a");
-      CHECK(snap[1].speaker == "speaker_0" &&
-                snap[1].speaker_id == "spk_b",
+      CHECK(snap[1].speaker == "speaker_0" && snap[1].speaker_id == "spk_b",
             "second interval keeps spk_b");
       CHECK(snap[0].text + snap[1].text == "ABCD",
             "global-id split preserves text");
@@ -275,6 +273,48 @@ int main() {
             "pre-gap text remains with first speaker");
       CHECK(snap[1].speaker_id == "spk_0" && snap[1].text == "DEF",
             "post-gap text moves to second speaker");
+    }
+  }
+
+  // ---- 11. Speaker-support diagnostics flag sparse diar evidence without
+  // changing the selected speaker. This exposes the tail failure mode where a
+  // long comprehensive entry is created from two short same-speaker islands.
+  {
+    TestComprehensiveTimeline tl;
+    tl.UpsertText(0, 0.0, 5.0, "ABCDE");
+    tl.ReplaceSpeakers({{0.0, 1.0, "speaker_0", 0.9f, "spk_0"},
+                        {4.0, 5.0, "speaker_0", 0.9f, "spk_0"}});
+    auto snap = tl.Snapshot();
+    CHECK(snap.size() == 1,
+          "same-speaker gap-fill still produces one comprehensive entry");
+    if (snap.size() == 1) {
+      CHECK(snap[0].speaker_id == "spk_0",
+            "gap-filled entry keeps the selected speaker");
+      CHECK(snap[0].speaker_support == "weak",
+            "sparse selected-speaker support is labelled weak");
+      CHECK(snap[0].diar_island_count == 2,
+            "two selected-speaker islands are counted");
+      CHECK(snap[0].diar_overlap_sec == 2.0,
+            "selected-speaker overlap is measured in seconds");
+      CHECK(snap[0].diar_max_gap_sec == 3.0,
+            "largest selected-speaker evidence gap is exposed");
+    }
+  }
+
+  // ---- 12. Fully covered speaker intervals are labelled strong. ----
+  {
+    TestComprehensiveTimeline tl;
+    tl.UpsertText(0, 0.0, 3.0, "ABC");
+    tl.ReplaceSpeakers({{0.0, 3.0, "speaker_1", 0.9f, "spk_1"}});
+    auto snap = tl.Snapshot();
+    CHECK(snap.size() == 1, "fully covered entry exists");
+    if (snap.size() == 1) {
+      CHECK(snap[0].speaker_support == "strong",
+            "complete selected-speaker coverage is labelled strong");
+      CHECK(snap[0].diar_coverage_ratio == 1.0,
+            "complete selected-speaker coverage ratio is 1.0");
+      CHECK(snap[0].diar_island_count == 1,
+            "complete coverage has one selected-speaker island");
     }
   }
 

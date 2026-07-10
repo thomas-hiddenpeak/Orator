@@ -85,6 +85,13 @@ export class Model {
       this.turns.set(this._turnKey(e), {
         text_id: e.text_id, start: e.start, end: e.end,
         speaker: e.speaker, speaker_id: e.speaker_id, speaker_name: e.speaker_name,
+        speaker_support: e.speaker_support,
+        diar_overlap_sec: e.diar_overlap_sec,
+        diar_total_overlap_sec: e.diar_total_overlap_sec,
+        diar_coverage_ratio: e.diar_coverage_ratio,
+        diar_total_coverage_ratio: e.diar_total_coverage_ratio,
+        diar_max_gap_sec: e.diar_max_gap_sec,
+        diar_island_count: e.diar_island_count,
         text: e.text || "",
       });
       // Reflect identity onto the matching transcript row if present.
@@ -93,6 +100,13 @@ export class Model {
         row.speaker = e.speaker;
         row.speaker_id = e.speaker_id;
         row.speaker_name = e.speaker_name;
+        row.speaker_support = e.speaker_support;
+        row.diar_overlap_sec = e.diar_overlap_sec;
+        row.diar_total_overlap_sec = e.diar_total_overlap_sec;
+        row.diar_coverage_ratio = e.diar_coverage_ratio;
+        row.diar_total_coverage_ratio = e.diar_total_coverage_ratio;
+        row.diar_max_gap_sec = e.diar_max_gap_sec;
+        row.diar_island_count = e.diar_island_count;
       }
     }
   }
@@ -176,6 +190,13 @@ export class Model {
       this.turns.set(this._turnKey(e), {
         text_id: e.text_id, start: e.start, end: e.end,
         speaker: e.speaker, speaker_id: e.speaker_id, speaker_name: e.speaker_name,
+        speaker_support: e.speaker_support,
+        diar_overlap_sec: e.diar_overlap_sec,
+        diar_total_overlap_sec: e.diar_total_overlap_sec,
+        diar_coverage_ratio: e.diar_coverage_ratio,
+        diar_total_coverage_ratio: e.diar_total_coverage_ratio,
+        diar_max_gap_sec: e.diar_max_gap_sec,
+        diar_island_count: e.diar_island_count,
         text: e.text || "",
       });
       const row = this.asr.get(e.text_id);
@@ -183,6 +204,13 @@ export class Model {
         row.speaker = e.speaker;
         row.speaker_id = e.speaker_id;
         row.speaker_name = e.speaker_name;
+        row.speaker_support = e.speaker_support;
+        row.diar_overlap_sec = e.diar_overlap_sec;
+        row.diar_total_overlap_sec = e.diar_total_overlap_sec;
+        row.diar_coverage_ratio = e.diar_coverage_ratio;
+        row.diar_total_coverage_ratio = e.diar_total_coverage_ratio;
+        row.diar_max_gap_sec = e.diar_max_gap_sec;
+        row.diar_island_count = e.diar_island_count;
       }
     }
   }

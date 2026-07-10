@@ -45,6 +45,13 @@ level. Serialization must prefer that per-entry id over the diarizer-local
 speaker label's latest map, because one local slot can legitimately map to
 different global identities at different epochs.
 
+The runtime comprehensive entry also exposes speaker-support diagnostics for
+the selected speaker over that exact interval. These diagnostics are derived
+from raw diarization coverage on the common time base and are used by JSON/Web UI
+consumers to mark weak ownership evidence. They must not mutate ASR text,
+diarization segments, VAD segments, forced-alignment units, or the selected
+speaker attribution by themselves.
+
 This is intentionally conservative: it does not edit ASR text, does not infer
 missing text, and does not rewrite pipeline tracks. It only derives a
 business-facing comprehensive view from immutable track evidence.

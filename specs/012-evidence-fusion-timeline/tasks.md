@@ -35,3 +35,10 @@
   review; reject reset-period, silence-profile, low-coverage, and gap-fill
   candidates as accepted fixes for 3270-3304 s. See
   `tail-evidence-review-2026-07-09.md`.
+- [x] T017 Add runtime speaker-support diagnostics to comprehensive entries and
+  the Web UI so weak diar evidence is visible without rewriting speaker
+  attribution. See `speaker-support-diagnostics-2026-07-09.md`.
+- [x] T018 Run a full-length real WebSocket support-diagnostics evaluation and
+  perform context-aware speaker-business review. Reject the diagnostics-only
+  change as an accepted speaker-accuracy recovery; keep it as uncertainty
+  visibility. See `speaker-support-full-review-2026-07-10.md`.

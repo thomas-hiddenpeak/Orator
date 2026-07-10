@@ -119,6 +119,9 @@ session_dir = "/custom/sessions"
 [timeline]
 align_snap_pause_sec = 0.125
 align_boundary_split_tolerance_sec = 0.075
+speaker_support_min_coverage_ratio = 0.625
+speaker_support_max_gap_sec = 1.25
+speaker_support_max_islands = 2
 
 [telemetry]
 gpu_interval_sec = 5.0
@@ -164,18 +167,15 @@ gpu_scheduling = "concurrent"
 
     // [speaker]
     CHECK(cfg.speaker_enable == true, "cfg.speaker_enable == true");
-    CHECK(cfg.speaker_model_dir == "/models/speaker",
-          "cfg.speaker_model_dir");
+    CHECK(cfg.speaker_model_dir == "/models/speaker", "cfg.speaker_model_dir");
     CHECK(cfg.speaker_registry_path == "/tmp/speakers.bin",
           "cfg.speaker_registry_path");
     CHECK(cfg.speaker_match_threshold == 0.75f,
           "cfg.speaker_match_threshold == 0.75");
-    CHECK(cfg.speaker_min_embed_sec == 4.0,
-          "cfg.speaker_min_embed_sec == 4.0");
+    CHECK(cfg.speaker_min_embed_sec == 4.0, "cfg.speaker_min_embed_sec == 4.0");
     CHECK(cfg.speaker_min_confidence == 0.625f,
           "cfg.speaker_min_confidence == 0.625");
-    CHECK(cfg.speaker_retain_sec == 240.0,
-          "cfg.speaker_retain_sec == 240.0");
+    CHECK(cfg.speaker_retain_sec == 240.0, "cfg.speaker_retain_sec == 240.0");
     CHECK(cfg.speaker_overlap_eps_sec == 0.05,
           "cfg.speaker_overlap_eps_sec == 0.05");
     CHECK(cfg.speaker_max_ref_segs == 8, "cfg.speaker_max_ref_segs == 8");
@@ -183,8 +183,7 @@ gpu_scheduling = "concurrent"
           "cfg.speaker_edge_margin_sec == 0.4");
     CHECK(cfg.speaker_max_embed_window_sec == 12.0,
           "cfg.speaker_max_embed_window_sec == 12.0");
-    CHECK(cfg.speaker_enroll_min_refs == 2,
-          "cfg.speaker_enroll_min_refs == 2");
+    CHECK(cfg.speaker_enroll_min_refs == 2, "cfg.speaker_enroll_min_refs == 2");
     CHECK(cfg.speaker_speakers_per_session == 6,
           "cfg.speaker_speakers_per_session == 6");
     CHECK(cfg.speaker_merge_threshold == 0.875f,
@@ -244,6 +243,12 @@ gpu_scheduling = "concurrent"
           "cfg.timeline_align_snap_pause_sec == 0.125");
     CHECK(cfg.timeline_align_boundary_split_tolerance_sec == 0.075,
           "cfg.timeline_align_boundary_split_tolerance_sec == 0.075");
+    CHECK(cfg.timeline_speaker_support_min_coverage_ratio == 0.625,
+          "cfg.timeline_speaker_support_min_coverage_ratio == 0.625");
+    CHECK(cfg.timeline_speaker_support_max_gap_sec == 1.25,
+          "cfg.timeline_speaker_support_max_gap_sec == 1.25");
+    CHECK(cfg.timeline_speaker_support_max_islands == 2,
+          "cfg.timeline_speaker_support_max_islands == 2");
 
     // [telemetry]
     CHECK(cfg.gpu_telemetry_interval_sec == 5.0,

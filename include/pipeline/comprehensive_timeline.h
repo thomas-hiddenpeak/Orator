@@ -59,6 +59,16 @@ class ComprehensiveTimeline {
     std::string speaker_id;  // resolved global voiceprint id for this interval
     std::string text;
     long text_id = -1;  // source text-segment id (for revision tracking)
+    // Speaker-evidence diagnostics for this exact comprehensive interval. These
+    // fields do not change attribution; they expose how much raw diar evidence
+    // supports the selected speaker so downstream views can flag weak regions.
+    double diar_overlap_sec = 0.0;
+    double diar_total_overlap_sec = 0.0;
+    double diar_coverage_ratio = 0.0;
+    double diar_total_coverage_ratio = 0.0;
+    double diar_max_gap_sec = 0.0;
+    int diar_island_count = 0;
+    std::string speaker_support = "none";  // none | weak | strong
   };
 
   // A revision: the consumer should replace its comprehensive entries whose
@@ -112,11 +122,14 @@ class ComprehensiveTimeline {
   // coalescing only adjacent pieces from the same source text segment.
   std::vector<Entry> Snapshot() const;
 
-  // Maximum gap between adjacent forced-alignment units that is still treated as
-  // one coherent utterance run for speaker attribution. A lower value lets the
-  // view split at short but real turn-change pauses.
+  // Maximum gap between adjacent forced-alignment units that is still treated
+  // as one coherent utterance run for speaker attribution. A lower value lets
+  // the view split at short but real turn-change pauses.
   void set_align_snap_pause_sec(double sec);
   void set_align_boundary_split_tolerance_sec(double sec);
+  void set_speaker_support_min_coverage_ratio(double ratio);
+  void set_speaker_support_max_gap_sec(double sec);
+  void set_speaker_support_max_islands(int count);
 
   // The recorded VAD speech segments (sorted), for the serialized vad track.
   std::vector<VadSeg> SnapshotVad() const { return vad_; }
@@ -204,6 +217,15 @@ class ComprehensiveTimeline {
     std::string speaker;
     std::string speaker_id;
   };
+  struct SpeakerSupport {
+    double overlap_sec = 0.0;
+    double total_overlap_sec = 0.0;
+    double coverage_ratio = 0.0;
+    double total_coverage_ratio = 0.0;
+    double max_gap_sec = 0.0;
+    int island_count = 0;
+    std::string level = "none";
+  };
   struct TextSeg {
     long id = -1;
     double start = 0.0;
@@ -215,6 +237,13 @@ class ComprehensiveTimeline {
   // span then higher confidence on ties), or "unknown" if no diarization covers
   // it. Used per sub-interval when splitting a text by diarization boundaries.
   SpeakerAttr AttributeInterval(double start, double end) const;
+  SpeakerSupport ComputeSpeakerSupport(double start, double end,
+                                       const std::string& speaker,
+                                       const std::string& speaker_id) const;
+  Entry MakeEntry(double start, double end, const std::string& speaker,
+                  const std::string& speaker_id, std::string text,
+                  long text_id) const;
+  void MergeEntrySupport(Entry* dst, const Entry& src) const;
   // Split one text segment at the diarization-track boundaries it crosses,
   // allocating the text to each speaker turn proportionally by time. Returns
   // the resulting view entries (>=1) for this text id.
@@ -228,10 +257,13 @@ class ComprehensiveTimeline {
 
   std::vector<SpeakerSeg> speakers_;  // diar track: who/when (overlaps allowed)
   std::set<std::string> seen_speaker_ids_;  // every global id ever assigned
-  std::vector<TextSeg> texts_;        // asr track: what/when, keyed by id
-  std::vector<VadSeg> vad_;           // vad track: speech segments
+  std::vector<TextSeg> texts_;              // asr track: what/when, keyed by id
+  std::vector<VadSeg> vad_;                 // vad track: speech segments
   double align_snap_pause_sec_ = 0.25;
   double align_boundary_split_tolerance_sec_ = 0.08;
+  double speaker_support_min_coverage_ratio_ = 0.50;
+  double speaker_support_max_gap_sec_ = 1.00;
+  int speaker_support_max_islands_ = 1;
   // align track: per-unit timestamps refining an ASR segment, keyed by text_id.
   std::map<long, AlignGroup> align_;
   // Current diarization-split projection per text id (kept in sync).

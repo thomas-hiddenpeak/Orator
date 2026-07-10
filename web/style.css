@@ -286,6 +286,7 @@ body {
 .t-item.confirmed { background: rgba(52,211,153,0.06); }
 .t-item.partial { background: rgba(91,141,239,0.06); opacity: 0.7; }
 .t-item.revised { background: rgba(245,158,11,0.06); }
+.t-item.speaker-weak { background: rgba(245,158,11,0.08); }
 
 .t-time {
   font-size: 11px;
@@ -302,6 +303,13 @@ body {
   padding: 1px 8px;
   border-radius: 4px;
   white-space: nowrap;
+}
+
+.t-item.speaker-weak .t-speaker::after,
+.live-row.speaker-weak .live-row-speaker::after {
+  content: "?";
+  margin-left: 4px;
+  font-weight: 900;
 }
 
 .t-text { flex: 1; word-break: break-word; }
@@ -593,6 +601,10 @@ body {
 
 .live-row:hover {
   background: rgba(255,255,255,0.03);
+}
+
+.live-row.speaker-weak {
+  background: rgba(245,158,11,0.07);
 }
 
 .live-row-time {

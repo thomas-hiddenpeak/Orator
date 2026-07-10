@@ -103,6 +103,9 @@ class AuditoryStream {
     // ── Comprehensive timeline view ──────────────────────────────────
     double timeline_align_snap_pause_sec = 0.25;
     double timeline_align_boundary_split_tolerance_sec = 0.08;
+    double timeline_speaker_support_min_coverage_ratio = 0.50;
+    double timeline_speaker_support_max_gap_sec = 1.00;
+    int timeline_speaker_support_max_islands = 1;
 
     // ── VAD pipeline ─────────────────────────────────────────────────
     bool vad_stream = true;
@@ -123,20 +126,23 @@ class AuditoryStream {
     int diar_chunk_left_context = 1;        // left context chunks
     int diar_chunk_right_context = 1;       // right context chunks
     int diar_spkcache_sil_frames = 3;       // silent frames before cache reset
-    int diar_fifo_len = 188;  // FIFO length for async streaming (0=off). Async
-                              // (NeMo streaming_update_async) keeps the 188-frame
-                              // spkcache from saturating over a long continuous
-                              // session, so speaker slots stay stable for the
-                              // whole meeting and no periodic reset is needed.
-    int diar_spkcache_refresh_rate = 100;  // cache refresh cadence (0=drain all)
+    int diar_fifo_len =
+        188;  // FIFO length for async streaming (0=off). Async
+              // (NeMo streaming_update_async) keeps the 188-frame
+              // spkcache from saturating over a long continuous
+              // session, so speaker slots stay stable for the
+              // whole meeting and no periodic reset is needed.
+    int diar_spkcache_refresh_rate =
+        100;  // cache refresh cadence (0=drain all)
     bool diar_use_silence_profile =
         false;  // v2.1: use silence profile in cache
     // Onset/offset post-processing (NeMo-style double threshold)
-    double diar_onset = 0.45;   // probability to START a segment
-    double diar_offset = 0.35;  // probability to END a segment (lower = stickier;
-                                // 0.35 keeps hysteresis but tracks the NeMo
-                                // reference's segment granularity, vs 0.25 which
-                                // over-merged across brief probability dips)
+    double diar_onset = 0.45;  // probability to START a segment
+    double diar_offset =
+        0.35;  // probability to END a segment (lower = stickier;
+               // 0.35 keeps hysteresis but tracks the NeMo
+               // reference's segment granularity, vs 0.25 which
+               // over-merged across brief probability dips)
     double diar_pad_onset = 0.0;   // extra time added before each segment start
     double diar_pad_offset = 0.0;  // extra time added after each segment end
     double diar_min_dur_on = 0.5;  // minimum segment duration (seconds)
@@ -144,33 +150,37 @@ class AuditoryStream {
     // Periodically reset the diarizer streaming state (0 = never). This was a
     // workaround for the SYNC streaming path (fifo_len=0), whose fixed spkcache
     // saturates over a long continuous session (late-window ~66%), recovered by
-    // a fresh session (~83%) plus per-session voiceprint re-stitching. The ASYNC
-    // path (fifo_len>0, the default) refreshes the spkcache continuously and does
-    // NOT saturate, so the reset is unnecessary and OFF by default: the diarizer
-    // keeps stable speaker slots for the whole session and the voiceprint stage
-    // resolves each slot to one global identity (measured: 4 speakers -> 4 stable
-    // global ids, vs the reset path's per-session slot churn -> id over-creation).
+    // a fresh session (~83%) plus per-session voiceprint re-stitching. The
+    // ASYNC path (fifo_len>0, the default) refreshes the spkcache continuously
+    // and does NOT saturate, so the reset is unnecessary and OFF by default:
+    // the diarizer keeps stable speaker slots for the whole session and the
+    // voiceprint stage resolves each slot to one global identity (measured: 4
+    // speakers -> 4 stable global ids, vs the reset path's per-session slot
+    // churn -> id over-creation).
     double diar_reset_period_sec = 0.0;
 
     // ── Speaker identity (Spec 010, post-diarization stage) ──────────
     bool speaker_enable = false;  // master switch (also needs model dir)
-    std::string speaker_model_dir = "";  // dir holding titanet_large.safetensors
+    std::string speaker_model_dir =
+        "";  // dir holding titanet_large.safetensors
     std::string speaker_registry_path = "";  // persistence file ("" = none)
     float speaker_match_threshold = 0.55f;   // cosine tau for re-identification
     double speaker_min_embed_sec = 3.0;      // shortest clean span to embed
     float speaker_min_confidence = 0.5f;     // diar mean-activity gate
     double speaker_retain_sec = 180.0;       // audio retention window
-    double speaker_overlap_eps_sec = 0.1;    // overlap tolerance for clean spans
-    int speaker_max_ref_segs = 6;            // best clean refs kept per speaker
-    double speaker_edge_margin_sec = 0.3;    // edge trim before embedding
-    double speaker_max_embed_window_sec = 10.0;  // cap embedded voiceprint audio
-    int speaker_enroll_min_refs = 1;         // refs required for new global id
-    int speaker_speakers_per_session = 4;    // Sortformer local slots/session
-    float speaker_merge_threshold = 0.70f;   // global-id duplicate threshold
+    double speaker_overlap_eps_sec = 0.1;  // overlap tolerance for clean spans
+    int speaker_max_ref_segs = 6;          // best clean refs kept per speaker
+    double speaker_edge_margin_sec = 0.3;  // edge trim before embedding
+    double speaker_max_embed_window_sec =
+        10.0;                               // cap embedded voiceprint audio
+    int speaker_enroll_min_refs = 1;        // refs required for new global id
+    int speaker_speakers_per_session = 4;   // Sortformer local slots/session
+    float speaker_merge_threshold = 0.70f;  // global-id duplicate threshold
     float speaker_cosession_merge_threshold = 0.85f;  // same-session merge gate
-    int speaker_cross_session_match_min_refs = 1;  // refs before reset re-id
+    int speaker_cross_session_match_min_refs = 1;     // refs before reset re-id
     bool speaker_defer_unmatched_cross_session = false;
-    float speaker_local_drift_threshold = 0.0f;  // <=0 disables local epoch split
+    float speaker_local_drift_threshold =
+        0.0f;  // <=0 disables local epoch split
     double speaker_local_drift_min_span_sec = 5.0;
     double speaker_local_drift_min_epoch_sec = 60.0;
     bool speaker_local_drift_allow_same_session_match = true;

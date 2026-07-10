@@ -7,6 +7,28 @@ import { fmtTime, identityKey, identityLabel, colorForKey } from "../format.js";
 
 const MAX_ROWS = 600;
 
+function supportTitle(entry) {
+  if (!entry || !entry.speaker_support) return "";
+  const pct = typeof entry.diar_coverage_ratio === "number"
+    ? `${Math.round(entry.diar_coverage_ratio * 100)}%`
+    : "-";
+  const gap = typeof entry.diar_max_gap_sec === "number"
+    ? `${entry.diar_max_gap_sec.toFixed(2)}s`
+    : "-";
+  const islands = entry.diar_island_count ?? "-";
+  return `speaker support: ${entry.speaker_support}; coverage ${pct}; max gap ${gap}; islands ${islands}`;
+}
+
+function applySpeakerSupport(el, speakerEl, entry) {
+  const level = entry?.speaker_support || "";
+  el.classList.toggle("speaker-weak", level === "weak");
+  el.classList.toggle("speaker-none", level === "none");
+  if (speakerEl) {
+    speakerEl.dataset.support = level;
+    speakerEl.title = supportTitle(entry);
+  }
+}
+
 export class TranscriptView {
   constructor(listEl, draftWrapEl, draftTextEl) {
     this.list = listEl;
@@ -79,8 +101,8 @@ export class TranscriptView {
       }
 
       // Find turns that overlap this diar segment.
-      const segText = this._textForDiarSegment(seg, turns, model);
-      this._updateEntry(el, seg, segText, model);
+      const segInfo = this._textForDiarSegment(seg, turns, model);
+      this._updateEntry(el, seg, segInfo.text, model, segInfo.supportEntry);
     }
 
     // Remove stale entries.
@@ -97,13 +119,21 @@ export class TranscriptView {
     const ds = seg.start_sec || 0;
     const de = seg.end_sec || 0;
     let text = "";
+    let supportEntry = null;
+    let weakestRank = -1;
     for (const t of turns) {
       // Overlap check: turn overlaps diar segment.
       if (t.start >= de || t.end <= ds) continue;
       if (text) text += " ";
       text += t.text;
+      const rank = t.speaker_support === "weak" ? 2 :
+        (t.speaker_support === "none" ? 1 : 0);
+      if (rank > weakestRank) {
+        weakestRank = rank;
+        supportEntry = t;
+      }
     }
-    return text;
+    return { text, supportEntry };
   }
 
   _makeEntry(idx) {
@@ -117,7 +147,7 @@ export class TranscriptView {
     return div;
   }
 
-  _updateEntry(el, seg, text, model) {
+  _updateEntry(el, seg, text, model, supportEntry = null) {
     // Speaker identity: use speaker_id (global) or local_speaker.
     const key = seg.speaker_id || `speaker_${seg.local_speaker}`;
     const color = colorForKey(key);
@@ -134,6 +164,7 @@ export class TranscriptView {
     spk.textContent = model.labelFor(entry);
     spk.style.background = color;
     spk.style.color = "#0b0d12";
+    applySpeakerSupport(el, spk, supportEntry);
 
     el.querySelector(".live-row-text").textContent = text || "";
   }
@@ -168,6 +199,7 @@ export class TranscriptView {
       spk.textContent = model.labelFor(t);
       spk.style.background = color;
       spk.style.color = "#0b0d12";
+      applySpeakerSupport(el, spk, t);
       el.querySelector(".live-row-text").textContent = t.text || "";
     }
 
@@ -243,6 +275,7 @@ export class TranscriptView {
       spk.textContent = "";
       spk.style.background = "transparent";
     }
+    applySpeakerSupport(el, spk, speakerEntry);
     el.querySelector(".t-text").textContent = row.text || "";
     const al = el.querySelector(".t-align");
     al.textContent = units && units.length ? `⏱ ${units.length}` : "";

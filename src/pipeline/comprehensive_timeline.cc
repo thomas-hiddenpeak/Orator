@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdlib>
+#include <utility>
 
 namespace orator {
 namespace pipeline {
@@ -11,6 +12,44 @@ namespace pipeline {
 namespace {
 double Overlap(double a0, double a1, double b0, double b1) {
   return std::max(0.0, std::min(a1, b1) - std::max(a0, b0));
+}
+
+bool NearEqual(double a, double b) { return std::abs(a - b) <= 1e-9; }
+
+std::vector<std::pair<double, double>> MergeIntervals(
+    std::vector<std::pair<double, double>> intervals) {
+  if (intervals.empty()) return {};
+  std::sort(intervals.begin(), intervals.end());
+  std::vector<std::pair<double, double>> merged;
+  merged.reserve(intervals.size());
+  for (const auto& iv : intervals) {
+    if (iv.second <= iv.first + 1e-9) continue;
+    if (!merged.empty() && iv.first <= merged.back().second + 1e-9) {
+      merged.back().second = std::max(merged.back().second, iv.second);
+    } else {
+      merged.push_back(iv);
+    }
+  }
+  return merged;
+}
+
+double CoveredDuration(
+    const std::vector<std::pair<double, double>>& intervals) {
+  double total = 0.0;
+  for (const auto& iv : intervals) total += iv.second - iv.first;
+  return total;
+}
+
+double MaxGap(double start, double end,
+              const std::vector<std::pair<double, double>>& intervals) {
+  if (end <= start + 1e-9) return 0.0;
+  if (intervals.empty()) return end - start;
+  double max_gap = std::max(0.0, intervals.front().first - start);
+  for (std::size_t i = 1; i < intervals.size(); ++i) {
+    max_gap = std::max(max_gap, intervals[i].first - intervals[i - 1].second);
+  }
+  max_gap = std::max(max_gap, end - intervals.back().second);
+  return max_gap;
 }
 
 // Byte offsets of each UTF-8 codepoint start in `s`, plus s.size() at the end.
@@ -38,10 +77,17 @@ bool EntriesEqual(const std::vector<ComprehensiveTimeline::Entry>& a,
                   const std::vector<ComprehensiveTimeline::Entry>& b) {
   if (a.size() != b.size()) return false;
   for (std::size_t i = 0; i < a.size(); ++i) {
-    if (a[i].speaker != b[i].speaker ||
-        a[i].speaker_id != b[i].speaker_id || a[i].text != b[i].text ||
-        std::abs(a[i].start - b[i].start) > 1e-9 ||
-        std::abs(a[i].end - b[i].end) > 1e-9) {
+    if (a[i].speaker != b[i].speaker || a[i].speaker_id != b[i].speaker_id ||
+        a[i].text != b[i].text || !NearEqual(a[i].start, b[i].start) ||
+        !NearEqual(a[i].end, b[i].end) ||
+        !NearEqual(a[i].diar_overlap_sec, b[i].diar_overlap_sec) ||
+        !NearEqual(a[i].diar_total_overlap_sec, b[i].diar_total_overlap_sec) ||
+        !NearEqual(a[i].diar_coverage_ratio, b[i].diar_coverage_ratio) ||
+        !NearEqual(a[i].diar_total_coverage_ratio,
+                   b[i].diar_total_coverage_ratio) ||
+        !NearEqual(a[i].diar_max_gap_sec, b[i].diar_max_gap_sec) ||
+        a[i].diar_island_count != b[i].diar_island_count ||
+        a[i].speaker_support != b[i].speaker_support) {
       return false;
     }
   }
@@ -90,15 +136,124 @@ void ComprehensiveTimeline::set_align_boundary_split_tolerance_sec(double sec) {
   align_boundary_split_tolerance_sec_ = std::max(0.0, sec);
 }
 
+void ComprehensiveTimeline::set_speaker_support_min_coverage_ratio(
+    double ratio) {
+  speaker_support_min_coverage_ratio_ = std::max(0.0, std::min(1.0, ratio));
+}
+
+void ComprehensiveTimeline::set_speaker_support_max_gap_sec(double sec) {
+  speaker_support_max_gap_sec_ = std::max(0.0, sec);
+}
+
+void ComprehensiveTimeline::set_speaker_support_max_islands(int count) {
+  speaker_support_max_islands_ = std::max(1, count);
+}
+
+ComprehensiveTimeline::SpeakerSupport
+ComprehensiveTimeline::ComputeSpeakerSupport(
+    double start, double end, const std::string& speaker,
+    const std::string& speaker_id) const {
+  SpeakerSupport support;
+  const double duration = std::max(0.0, end - start);
+  if (duration <= 1e-9) return support;
+
+  std::vector<std::pair<double, double>> selected;
+  std::vector<std::pair<double, double>> any_speaker;
+  selected.reserve(speakers_.size());
+  any_speaker.reserve(speakers_.size());
+  for (const auto& s : speakers_) {
+    const double ov = Overlap(start, end, s.start, s.end);
+    if (ov <= 0.0) continue;
+    any_speaker.push_back({std::max(start, s.start), std::min(end, s.end)});
+    const bool same_label = speaker != "unknown" && s.speaker == speaker;
+    const bool same_id = speaker_id.empty() || s.speaker_id == speaker_id;
+    if (same_label && same_id) {
+      selected.push_back({std::max(start, s.start), std::min(end, s.end)});
+    }
+  }
+
+  const auto selected_merged = MergeIntervals(std::move(selected));
+  const auto any_merged = MergeIntervals(std::move(any_speaker));
+  support.overlap_sec = CoveredDuration(selected_merged);
+  support.total_overlap_sec = CoveredDuration(any_merged);
+  support.coverage_ratio = std::min(1.0, support.overlap_sec / duration);
+  support.total_coverage_ratio =
+      std::min(1.0, support.total_overlap_sec / duration);
+  support.max_gap_sec = MaxGap(start, end, selected_merged);
+  support.island_count = static_cast<int>(selected_merged.size());
+
+  if (speaker == "unknown" || support.overlap_sec <= 1e-9) {
+    support.level = "none";
+  } else if (support.coverage_ratio + 1e-9 <
+                 speaker_support_min_coverage_ratio_ ||
+             support.max_gap_sec > speaker_support_max_gap_sec_ + 1e-9 ||
+             support.island_count > speaker_support_max_islands_) {
+    support.level = "weak";
+  } else {
+    support.level = "strong";
+  }
+  return support;
+}
+
+ComprehensiveTimeline::Entry ComprehensiveTimeline::MakeEntry(
+    double start, double end, const std::string& speaker,
+    const std::string& speaker_id, std::string text, long text_id) const {
+  Entry e;
+  e.start = start;
+  e.end = end;
+  e.speaker = speaker;
+  e.speaker_id = speaker_id;
+  e.text = std::move(text);
+  e.text_id = text_id;
+  const SpeakerSupport support =
+      ComputeSpeakerSupport(start, end, e.speaker, e.speaker_id);
+  e.diar_overlap_sec = support.overlap_sec;
+  e.diar_total_overlap_sec = support.total_overlap_sec;
+  e.diar_coverage_ratio = support.coverage_ratio;
+  e.diar_total_coverage_ratio = support.total_coverage_ratio;
+  e.diar_max_gap_sec = support.max_gap_sec;
+  e.diar_island_count = support.island_count;
+  e.speaker_support = support.level;
+  return e;
+}
+
+void ComprehensiveTimeline::MergeEntrySupport(Entry* dst,
+                                              const Entry& src) const {
+  if (!dst) return;
+  dst->diar_overlap_sec += src.diar_overlap_sec;
+  dst->diar_total_overlap_sec += src.diar_total_overlap_sec;
+  const double duration = std::max(0.0, dst->end - dst->start);
+  if (duration > 1e-9) {
+    dst->diar_coverage_ratio = std::min(1.0, dst->diar_overlap_sec / duration);
+    dst->diar_total_coverage_ratio =
+        std::min(1.0, dst->diar_total_overlap_sec / duration);
+  } else {
+    dst->diar_coverage_ratio = 0.0;
+    dst->diar_total_coverage_ratio = 0.0;
+  }
+  dst->diar_max_gap_sec = std::max(dst->diar_max_gap_sec, src.diar_max_gap_sec);
+  dst->diar_island_count += src.diar_island_count;
+  if (dst->speaker == "unknown" || dst->diar_overlap_sec <= 1e-9) {
+    dst->speaker_support = "none";
+  } else if (dst->diar_coverage_ratio + 1e-9 <
+                 speaker_support_min_coverage_ratio_ ||
+             dst->diar_max_gap_sec > speaker_support_max_gap_sec_ + 1e-9 ||
+             dst->diar_island_count > speaker_support_max_islands_) {
+    dst->speaker_support = "weak";
+  } else {
+    dst->speaker_support = "strong";
+  }
+}
+
 std::vector<ComprehensiveTimeline::Entry>
 ComprehensiveTimeline::SplitTextByDiar(const TextSeg& t) const {
   // The comprehensive VIEW's boundaries come from the DIARIZATION TRACK.
   // Collect the diarization boundary times that fall strictly inside this text
   // segment, partition [t.start,t.end) by them, attribute each sub-interval to
-  // its max-overlap speaker, merge consecutive same-speaker sub-intervals within
-  // this source text_id, then allocate the text's characters to each piece by
-  // time (the ASR model emits no per-word timestamps, so a time-proportional
-  // split is the faithful approximation).
+  // its max-overlap speaker, merge consecutive same-speaker sub-intervals
+  // within this source text_id, then allocate the text's characters to each
+  // piece by time (the ASR model emits no per-word timestamps, so a
+  // time-proportional split is the faithful approximation).
   std::vector<double> bounds;
   bounds.reserve(speakers_.size() * 2 +
                  2);  // Pre-allocate to avoid repeated reallocations
@@ -176,19 +331,20 @@ ComprehensiveTimeline::SplitTextByDiar(const TextSeg& t) const {
   }
 
   if (turns.empty()) {
-    return {Entry{t.start, t.end, "unknown", "", t.text, t.id}};
+    return {MakeEntry(t.start, t.end, "unknown", "", t.text, t.id)};
   }
   if (turns.size() == 1) {
-    return {Entry{turns[0].start, turns[0].end, turns[0].speaker,
-                  turns[0].speaker_id, t.text, t.id}};
+    return {MakeEntry(turns[0].start, turns[0].end, turns[0].speaker,
+                      turns[0].speaker_id, t.text, t.id)};
   }
 
   // Alignment-aware allocation (preferred): when per-unit timestamps exist for
   // this text, attribute characters by their real timing. Adjacent units are
-  // grouped only across short gaps; a larger gap is evidence for a possible turn
-  // change inside one ASR segment. Each run is assigned to the diarization turn
-  // containing its midpoint, snapping noisy diar boundaries to nearby alignment
-  // pauses without letting long ASR segments swallow a real speaker change.
+  // grouped only across short gaps; a larger gap is evidence for a possible
+  // turn change inside one ASR segment. Each run is assigned to the diarization
+  // turn containing its midpoint, snapping noisy diar boundaries to nearby
+  // alignment pauses without letting long ASR segments swallow a real speaker
+  // change.
   if (auto ait = align_.find(t.id);
       ait != align_.end() && !ait->second.units.empty()) {
     const auto& units = ait->second.units;
@@ -233,8 +389,8 @@ ComprehensiveTimeline::SplitTextByDiar(const TextSeg& t) const {
     out.reserve(turns.size());
     for (std::size_t k = 0; k < turns.size(); ++k) {
       if (slices[k].empty()) continue;
-      out.push_back({turns[k].start, turns[k].end, turns[k].speaker,
-                     turns[k].speaker_id, std::move(slices[k]), t.id});
+      out.push_back(MakeEntry(turns[k].start, turns[k].end, turns[k].speaker,
+                              turns[k].speaker_id, std::move(slices[k]), t.id));
     }
     if (!out.empty()) return out;
   }
@@ -257,8 +413,8 @@ ComprehensiveTimeline::SplitTextByDiar(const TextSeg& t) const {
     }
     std::string slice =
         t.text.substr(offs[cp_used], offs[cp_end] - offs[cp_used]);
-    out.push_back({turns[k].start, turns[k].end, turns[k].speaker,
-                   turns[k].speaker_id, std::move(slice), t.id});
+    out.push_back(MakeEntry(turns[k].start, turns[k].end, turns[k].speaker,
+                            turns[k].speaker_id, std::move(slice), t.id));
     cp_used = cp_end;
   }
   return out;
@@ -400,9 +556,11 @@ std::vector<ComprehensiveTimeline::Entry> ComprehensiveTimeline::Snapshot()
   std::vector<Entry> out;
   for (const auto& e : all) {
     if (!out.empty() && out.back().speaker == e.speaker &&
-        out.back().speaker_id == e.speaker_id && out.back().text_id == e.text_id) {
+        out.back().speaker_id == e.speaker_id &&
+        out.back().text_id == e.text_id) {
       out.back().end = std::max(out.back().end, e.end);
       out.back().text += e.text;
+      MergeEntrySupport(&out.back(), e);
     } else {
       out.push_back(e);
     }
