@@ -54,3 +54,7 @@
   for late-session wrong-speaker evidence. Reject strict onset, longer
   `min_dur_on`, left/right context variants, and their combination as accepted
   fixes. See `diar-tail-toml-experiments-2026-07-10.md`.
+- [x] T022 Test orthogonal TitaNet speaker-embedding evidence on the late tail.
+  Reject direct voiceprint override for 3270-3304 s because 600 s, 60 s, and
+  30 s bucket reviews all keep the target spans closest to historical L3. See
+  `titanet-tail-evidence-2026-07-10.md`.
