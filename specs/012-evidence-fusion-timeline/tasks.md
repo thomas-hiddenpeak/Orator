@@ -42,3 +42,7 @@
   perform context-aware speaker-business review. Reject the diagnostics-only
   change as an accepted speaker-accuracy recovery; keep it as uncertainty
   visibility. See `speaker-support-full-review-2026-07-10.md`.
+- [ ] T019 Execute the speaker-recovery validation plan: decompose tail
+  failures by pipeline layer, identify the first layer where speaker ownership
+  becomes unreliable, and validate any candidate fix through full-session
+  context-aware review. See `speaker-recovery-validation-plan-2026-07-10.md`.
