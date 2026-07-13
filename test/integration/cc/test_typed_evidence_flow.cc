@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "pipeline/auditory_stream_subscriptions.h"
+#include "pipeline/business_speaker_pipeline.h"
 #include "pipeline/comprehensive_timeline.h"
 #include "protocol/pipeline_registry.h"
 #include "protocol/protocol_timeline.h"
@@ -32,6 +33,10 @@ int main() {
 
   ComprehensiveTimeline evidence;
   ProtocolTimeline protocol;
+  std::vector<std::string> events;
+  const auto emit = [&events](const std::string& event) {
+    events.push_back(event);
+  };
 
   PipelineDescriptor asr_descriptor;
   asr_descriptor.name = "asr";
@@ -39,6 +44,32 @@ int main() {
   asr_descriptor.produces = {orator::protocol::kAsrTranscript,
                              orator::protocol::kAsrTranscriptPartial};
   auto asr_handle = protocol.RegisterPipeline(std::move(asr_descriptor));
+
+  PipelineDescriptor business_descriptor;
+  business_descriptor.name = "business_speaker";
+  business_descriptor.version = "1.0.0";
+  business_descriptor.produces = {orator::protocol::kBusinessSpeakerRevision};
+  auto business_handle =
+      protocol.RegisterPipeline(std::move(business_descriptor));
+
+  bool business_mirrored_after_commit = false;
+  protocol.SubscribeInternal(
+      TopicPattern{orator::protocol::kBusinessSpeakerRevision.to_string()},
+      [&evidence, &business_mirrored_after_commit](const Message&) {
+        const auto tracks = evidence.SnapshotTracks();
+        business_mirrored_after_commit =
+            tracks.asr.size() == 1 && tracks.business_speaker.size() == 1;
+      });
+
+  orator::pipeline::BusinessSpeakerPipeline business(
+      &evidence, orator::pipeline::BusinessSpeakerPipeline::Config{},
+      orator::core::TimeBase(16000),
+      [&evidence, &protocol, &business_handle,
+       &emit](const ComprehensiveTimeline::Revision& revision) {
+        orator::pipeline::HandleBusinessSpeakerRevision(
+            &protocol, business_handle.get(), emit, revision);
+      });
+  business.Start();
 
   bool typed_final_committed = false;
   ComprehensiveTimeline::RawTextSeg observed_final;
@@ -63,12 +94,8 @@ int main() {
         }
       });
 
-  std::vector<std::string> events;
-  const auto emit = [&events](const std::string& event) {
-    events.push_back(event);
-  };
   orator::pipeline::HandleTextSink(evidence, &protocol, asr_handle.get(), 4,
-                                   1.0, 2.0, "final", true, emit);
+                                   1.0, 2.0, "final", true);
 
   CHECK(typed_final_committed, "ASR final commits to typed evidence");
   CHECK(observed_final.id == 4 && observed_final.text == "final",
@@ -77,9 +104,11 @@ int main() {
         "protocol ASR final is mirrored after typed commit");
   CHECK(evidence.SnapshotTracks().asr.size() == 1,
         "typed ASR track contains one final");
+  CHECK(business_mirrored_after_commit,
+        "business revision mirrors only after its typed track commits");
 
   orator::pipeline::HandleTextSink(evidence, &protocol, asr_handle.get(), 5,
-                                   2.0, 2.5, "partial", false, emit);
+                                   2.0, 2.5, "partial", false);
   CHECK(partial_mirrors == 1, "ASR partial remains available on protocol");
   CHECK(evidence.SnapshotTracks().asr.size() == 1,
         "ASR partial does not enter the finalized typed track");

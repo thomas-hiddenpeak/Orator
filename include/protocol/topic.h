@@ -48,6 +48,7 @@ inline Topic kAsrTranscript{"asr/transcript"};
 inline Topic kAsrTranscriptPartial{"asr/transcript_partial"};
 inline Topic kDiarSpeakerSegment{"diar/speaker_segment"};
 inline Topic kAlignUnits{"align/units"};
+inline Topic kBusinessSpeakerRevision{"business/speaker_revision"};
 inline Topic kSystemPipelineOnline{"system/pipeline/online"};
 inline Topic kSystemPipelineOffline{"system/pipeline/offline"};
 inline Topic kSystemGpuTelemetry{"system/gpu_telemetry"};

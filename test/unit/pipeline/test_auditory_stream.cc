@@ -9,6 +9,7 @@
 #include "core/stages.h"
 #include "core/types.h"
 #include "pipeline/auditory_stream.h"
+#include "protocol/protocol_timeline.h"
 
 using orator::core::AsrConfig;
 using orator::core::AudioChunk;
@@ -217,6 +218,10 @@ int main() {
           "controller exposes canonical session sample rate");
     CHECK(stream.time_base().origin_sample() == 0,
           "controller exposes canonical session origin");
+    const std::string description = stream.protocol_timeline()->Describe();
+    CHECK(
+        description.find("\"name\": \"business_speaker\"") != std::string::npos,
+        "business_speaker is a registered pipeline");
     // Push 10 ms of silence at 16 kHz.
     std::vector<float> silence(160, 0.0f);
     stream.PushAudio(silence.data(), static_cast<int>(silence.size()));
@@ -226,6 +231,8 @@ int main() {
           "output is a timeline JSON");
     CHECK(last_emit.find("\"tracks\"") != std::string::npos,
           "timeline contains tracks array");
+    CHECK(last_emit.find("\"kind\":\"business_speaker\"") != std::string::npos,
+          "terminal document contains the business_speaker track");
     std::printf("\n");
   }
 
@@ -315,7 +322,7 @@ int main() {
     CHECK(!last_emit.empty(),
           "EmitTimeline with all pipelines disabled produced output");
     CHECK(last_emit.find("\"tracks\"") != std::string::npos,
-          "timeline contains tracks array (empty)");
+          "timeline contains tracks array");
     std::printf("\n");
   }
 

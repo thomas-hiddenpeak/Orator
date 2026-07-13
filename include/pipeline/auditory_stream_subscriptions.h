@@ -13,6 +13,7 @@
 #include "core/stages.h"
 #include "core/time_base.h"
 #include "core/types.h"
+#include "pipeline/comprehensive_timeline.h"
 
 namespace orator {
 
@@ -26,15 +27,13 @@ class ProtocolTimeline;
 
 namespace pipeline {
 
-class ComprehensiveTimeline;
-
 // Speaker sink callback: diarization worker → typed track deposit → protocol
-// mirror. Revisions are emitted after the typed deposit commits.
+// mirror. Business revisions are produced independently from the committed
+// evidence by BusinessSpeakerPipeline.
 void HandleSpeakerSink(ComprehensiveTimeline& comp, std::mutex& state_mutex,
                        std::vector<core::DiarSegment>& last_segments,
                        protocol::ProtocolTimeline* protocol_timeline,
                        protocol::PipelineHandle* diar_handle,
-                       const RevisionEmitter& emit_rev,
                        const std::vector<core::DiarSegment>& segs);
 
 // Text sink callback: ASR worker → typed final deposit → protocol mirror.
@@ -42,8 +41,7 @@ void HandleSpeakerSink(ComprehensiveTimeline& comp, std::mutex& state_mutex,
 void HandleTextSink(ComprehensiveTimeline& comp,
                     protocol::ProtocolTimeline* protocol_timeline,
                     protocol::PipelineHandle* asr_handle, long id, double start,
-                    double end, const std::string& text, bool is_final,
-                    const RevisionEmitter& emit_rev);
+                    double end, const std::string& text, bool is_final);
 
 // Align sink callback: forced-alignment worker → typed track deposit → protocol
 // mirror + WS event.
@@ -52,6 +50,13 @@ void HandleAlignSink(ComprehensiveTimeline& comp,
                      protocol::PipelineHandle* align_handle,
                      const RevisionEmitter& emit, long id, double seg_start,
                      double seg_end, const std::vector<core::AlignUnit>& units);
+
+// Mirror an already committed business-speaker revision to protocol and the
+// live WebSocket event stream.
+void HandleBusinessSpeakerRevision(
+    protocol::ProtocolTimeline* protocol_timeline,
+    protocol::PipelineHandle* business_handle, const RevisionEmitter& emit,
+    const ComprehensiveTimeline::Revision& revision);
 
 // VAD drain: extract segments, deposit typed evidence, then mirror to protocol.
 void HandleVadDrain(core::IVad* vad_detector, ComprehensiveTimeline& comp,

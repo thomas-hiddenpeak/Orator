@@ -26,22 +26,12 @@ namespace pipeline {
 AuditoryStream::AuditoryStream(const Config& config, Emit emit)
     : config_(config),
       time_base_(config.sample_rate, 0),
-      emit_(std::move(emit)) {
-  comp_.set_align_snap_pause_sec(config_.timeline_align_snap_pause_sec);
-  comp_.set_align_boundary_split_tolerance_sec(
-      config_.timeline_align_boundary_split_tolerance_sec);
-  comp_.set_speaker_support_min_coverage_ratio(
-      config_.timeline_speaker_support_min_coverage_ratio);
-  comp_.set_speaker_support_max_gap_sec(
-      config_.timeline_speaker_support_max_gap_sec);
-  comp_.set_speaker_support_max_islands(
-      config_.timeline_speaker_support_max_islands);
-  comp_.set_gap_fill_enabled(config_.timeline_gap_fill_enabled);
-}
+      emit_(std::move(emit)) {}
 
 AuditoryStream::~AuditoryStream() {
   StopWorkers();
   comp_.UnsubscribeAsrFinals(comp_asr_subscription_id_);
+  business_speaker_pipeline_.reset();
 }
 
 void AuditoryStream::Start() {
@@ -86,6 +76,36 @@ void AuditoryStream::Start() {
   diar_desc.produces = {protocol::kDiarSpeakerSegment};
   diar_desc.consumes = {protocol::TopicPattern{"audio/+"}};
   diar_handle_ = protocol_timeline_->RegisterPipeline(std::move(diar_desc));
+
+  protocol::PipelineDescriptor business_desc;
+  business_desc.name = "business_speaker";
+  business_desc.version = "1.0.0";
+  business_desc.produces = {protocol::kBusinessSpeakerRevision};
+  business_desc.consumes = {protocol::TopicPattern{"diar/+"},
+                            protocol::TopicPattern{"asr/transcript"},
+                            protocol::TopicPattern{"align/+"}};
+  business_speaker_handle_ =
+      protocol_timeline_->RegisterPipeline(std::move(business_desc));
+
+  BusinessSpeakerPipeline::Config business_config;
+  business_config.align_snap_pause_sec = config_.timeline_align_snap_pause_sec;
+  business_config.align_boundary_split_tolerance_sec =
+      config_.timeline_align_boundary_split_tolerance_sec;
+  business_config.speaker_support_min_coverage_ratio =
+      config_.timeline_speaker_support_min_coverage_ratio;
+  business_config.speaker_support_max_gap_sec =
+      config_.timeline_speaker_support_max_gap_sec;
+  business_config.speaker_support_max_islands =
+      config_.timeline_speaker_support_max_islands;
+  business_config.gap_fill_enabled = config_.timeline_gap_fill_enabled;
+  business_speaker_pipeline_ = std::make_unique<BusinessSpeakerPipeline>(
+      &comp_, business_config, common_time_base(),
+      [this](const ComprehensiveTimeline::Revision& revision) {
+        HandleBusinessSpeakerRevision(
+            protocol_timeline_.get(), business_speaker_handle_.get(),
+            [this](const std::string& json) { EmitLocked(json); }, revision);
+      });
+  business_speaker_pipeline_->Start();
 
   const bool align_on =
       config_.align_enable && !config_.align_model_dir.empty();
@@ -240,11 +260,8 @@ void AuditoryStream::StartWorkers() {
         diarizer_.get(), dp, common_time_base(), diar_stream_);
     diar_worker_->set_speaker_sink(
         [this](const std::vector<core::DiarSegment>& segs) {
-          HandleSpeakerSink(
-              comp_, comp_mutex_, last_segments_, protocol_timeline_.get(),
-              diar_handle_.get(),
-              [this](const std::string& revision) { EmitLocked(revision); },
-              segs);
+          HandleSpeakerSink(comp_, comp_mutex_, last_segments_,
+                            protocol_timeline_.get(), diar_handle_.get(), segs);
         });
     // Spec 010: resolve global voiceprint identities on the segment view before
     // it is delivered. The worker depends only on a std::function (Art. III);
@@ -287,10 +304,8 @@ void AuditoryStream::StartWorkers() {
         common_time_base(), asr_stream_, &comp_);
     asr_worker_->set_text_sink([this](long id, double start, double end,
                                       const std::string& text, bool is_final) {
-      HandleTextSink(
-          comp_, protocol_timeline_.get(), asr_handle_.get(), id, start, end,
-          text, is_final,
-          [this](const std::string& revision) { EmitLocked(revision); });
+      HandleTextSink(comp_, protocol_timeline_.get(), asr_handle_.get(), id,
+                     start, end, text, is_final);
     });
     asr_audio_ = MakeAudioCache();
     asr_thread_ = std::thread([this] {
@@ -464,10 +479,13 @@ void AuditoryStream::StopWorkers() {
   if (diar_thread_.joinable()) diar_thread_.join();
   if (asr_thread_.joinable()) asr_thread_.join();
   if (vad_thread_.joinable()) vad_thread_.join();
-  // Stop the aligner last: the ASR thread publishes its final transcript
-  // segments during Finalize(), which the align subscription enqueues, so the
-  // aligner must drain its queue after the ASR thread has joined.
+  // Stop the aligner last: ASR Finalize() deposits final typed records which
+  // the comprehensive-timeline subscription enqueues. The aligner must drain
+  // after the ASR thread has joined.
   if (align_worker_) align_worker_->Stop();
+  if (business_speaker_pipeline_) {
+    business_speaker_pipeline_->Finalize(total_samples_.load());
+  }
 
   // Spec 010 D10: persist the speaker registry (+ name sidecar) once the diar
   // thread has joined, so no enrollment races the write. Skip an empty registry

@@ -8,6 +8,8 @@
 #include <cstdio>
 #include <string>
 
+#include "pipeline/comprehensive_timeline.h"
+
 namespace orator {
 namespace pipeline {
 
@@ -45,6 +47,9 @@ inline std::string JsonEscape(const std::string& s) {
   }
   return o;
 }
+
+std::string SerializeRevisionToJson(
+    const ComprehensiveTimeline::Revision& revision, const char* source);
 
 }  // namespace pipeline
 }  // namespace orator

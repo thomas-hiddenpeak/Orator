@@ -3,16 +3,14 @@
 #include "pipeline/comprehensive_timeline.h"
 
 #include <cstdio>
-#include <map>
 #include <stdexcept>
 #include <string>
 
 namespace orator {
 namespace pipeline {
 
-std::string SerializeRevisionToJson(
-    const ComprehensiveTimeline::Revision& r, const char* source,
-    const std::map<std::string, std::string>* label_ids) {
+std::string SerializeRevisionToJson(const ComprehensiveTimeline::Revision& r,
+                                    const char* source) {
   char buf[256];
   std::string out = "{\"type\":\"revision\",\"source\":\"";
   out += source;
@@ -42,25 +40,20 @@ std::string SerializeRevisionToJson(
     // global identities over time after local drift splitting.
     if (!e.speaker_id.empty()) {
       out += ",\"speaker_id\":\"" + e.speaker_id + "\"";
-    } else if (label_ids) {
-      auto it = label_ids->find(e.speaker);
-      if (it != label_ids->end() && !it->second.empty())
-        out += ",\"speaker_id\":\"" + it->second + "\"";
     }
-    std::snprintf(buf, sizeof(buf),
-                  ",\"speaker_support\":\"%s\","
-                  "\"speaker_uncertain\":%s,"
-                  "\"diar_overlap_sec\":%.3f,"
-                  "\"diar_total_overlap_sec\":%.3f,"
-                  "\"diar_coverage_ratio\":%.3f,"
-                  "\"diar_total_coverage_ratio\":%.3f,"
-                  "\"diar_max_gap_sec\":%.3f,"
-                  "\"diar_island_count\":%d",
-                  e.speaker_support.c_str(),
-                  e.speaker_uncertain ? "true" : "false",
-                  e.diar_overlap_sec, e.diar_total_overlap_sec,
-                  e.diar_coverage_ratio, e.diar_total_coverage_ratio,
-                  e.diar_max_gap_sec, e.diar_island_count);
+    std::snprintf(
+        buf, sizeof(buf),
+        ",\"speaker_support\":\"%s\","
+        "\"speaker_uncertain\":%s,"
+        "\"diar_overlap_sec\":%.3f,"
+        "\"diar_total_overlap_sec\":%.3f,"
+        "\"diar_coverage_ratio\":%.3f,"
+        "\"diar_total_coverage_ratio\":%.3f,"
+        "\"diar_max_gap_sec\":%.3f,"
+        "\"diar_island_count\":%d",
+        e.speaker_support.c_str(), e.speaker_uncertain ? "true" : "false",
+        e.diar_overlap_sec, e.diar_total_overlap_sec, e.diar_coverage_ratio,
+        e.diar_total_coverage_ratio, e.diar_max_gap_sec, e.diar_island_count);
     out += buf;
     out += ",\"text\":\"" + JsonEscape(e.text) + "\"}";
     if (i + 1 < r.entries.size()) out += ",";

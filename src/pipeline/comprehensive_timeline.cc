@@ -2,135 +2,159 @@
 
 #include <algorithm>
 #include <cmath>
-#include <cstddef>
 #include <utility>
 
 namespace orator {
 namespace pipeline {
-
 namespace {
-double Overlap(double a0, double a1, double b0, double b1) {
-  return std::max(0.0, std::min(a1, b1) - std::max(a0, b0));
-}
 
 bool NearEqual(double a, double b) { return std::abs(a - b) <= 1e-9; }
 
-std::vector<std::pair<double, double>> MergeIntervals(
-    std::vector<std::pair<double, double>> intervals) {
-  if (intervals.empty()) return {};
-  std::sort(intervals.begin(), intervals.end());
-  std::vector<std::pair<double, double>> merged;
-  merged.reserve(intervals.size());
-  for (const auto& iv : intervals) {
-    if (iv.second <= iv.first + 1e-9) continue;
-    if (!merged.empty() && iv.first <= merged.back().second + 1e-9) {
-      merged.back().second = std::max(merged.back().second, iv.second);
-    } else {
-      merged.push_back(iv);
-    }
+}  // namespace
+
+bool ComprehensiveTimeline::ValidSpan(double start, double end) {
+  return std::isfinite(start) && std::isfinite(end) && start >= 0.0 &&
+         end > start;
+}
+
+bool ComprehensiveTimeline::SameText(const RawTextSeg& a, const RawTextSeg& b) {
+  return a.id == b.id && NearEqual(a.start, b.start) &&
+         NearEqual(a.end, b.end) && a.text == b.text;
+}
+
+bool ComprehensiveTimeline::SameAlignment(const AlignGroup& a,
+                                          const AlignGroup& b) {
+  if (a.text_id != b.text_id || !NearEqual(a.start, b.start) ||
+      !NearEqual(a.end, b.end) || a.units.size() != b.units.size()) {
+    return false;
   }
-  return merged;
-}
-
-double CoveredDuration(
-    const std::vector<std::pair<double, double>>& intervals) {
-  double total = 0.0;
-  for (const auto& iv : intervals) total += iv.second - iv.first;
-  return total;
-}
-
-double MaxGap(double start, double end,
-              const std::vector<std::pair<double, double>>& intervals) {
-  if (end <= start + 1e-9) return 0.0;
-  if (intervals.empty()) return end - start;
-  double max_gap = std::max(0.0, intervals.front().first - start);
-  for (std::size_t i = 1; i < intervals.size(); ++i) {
-    max_gap = std::max(max_gap, intervals[i].first - intervals[i - 1].second);
-  }
-  max_gap = std::max(max_gap, end - intervals.back().second);
-  return max_gap;
-}
-
-// Byte offsets of each UTF-8 codepoint start in `s`, plus s.size() at the end.
-// Used to split text on codepoint (character) boundaries, not bytes (Chinese).
-std::vector<std::size_t> Utf8Offsets(const std::string& s) {
-  std::vector<std::size_t> o;
-  o.reserve(s.size() + 1);  // Pre-allocate to avoid repeated reallocations
-  for (std::size_t i = 0; i < s.size();) {
-    o.push_back(i);
-    const unsigned char c = static_cast<unsigned char>(s[i]);
-    int adv = 1;
-    if (c >= 0xF0)
-      adv = 4;
-    else if (c >= 0xE0)
-      adv = 3;
-    else if (c >= 0xC0)
-      adv = 2;
-    i += adv;
-  }
-  o.push_back(s.size());
-  return o;
-}
-
-bool EntriesEqual(const std::vector<ComprehensiveTimeline::Entry>& a,
-                  const std::vector<ComprehensiveTimeline::Entry>& b) {
-  if (a.size() != b.size()) return false;
-  for (std::size_t i = 0; i < a.size(); ++i) {
-    if (a[i].speaker != b[i].speaker || a[i].speaker_id != b[i].speaker_id ||
-        a[i].text != b[i].text || !NearEqual(a[i].start, b[i].start) ||
-        !NearEqual(a[i].end, b[i].end) ||
-        !NearEqual(a[i].diar_overlap_sec, b[i].diar_overlap_sec) ||
-        !NearEqual(a[i].diar_total_overlap_sec, b[i].diar_total_overlap_sec) ||
-        !NearEqual(a[i].diar_coverage_ratio, b[i].diar_coverage_ratio) ||
-        !NearEqual(a[i].diar_total_coverage_ratio,
-                   b[i].diar_total_coverage_ratio) ||
-        !NearEqual(a[i].diar_max_gap_sec, b[i].diar_max_gap_sec) ||
-        a[i].diar_island_count != b[i].diar_island_count ||
-        a[i].speaker_support != b[i].speaker_support ||
-        a[i].speaker_uncertain != b[i].speaker_uncertain) {
+  for (std::size_t i = 0; i < a.units.size(); ++i) {
+    if (!NearEqual(a.units[i].start, b.units[i].start) ||
+        !NearEqual(a.units[i].end, b.units[i].end) ||
+        a.units[i].text != b.units[i].text) {
       return false;
     }
   }
   return true;
 }
-}  // namespace
 
-std::vector<ComprehensiveTimeline::Revision>
-ComprehensiveTimeline::DepositDiarization(
+std::vector<ComprehensiveTimeline::EvidenceSubscriber>
+ComprehensiveTimeline::CopyEvidenceSubscribersLocked() const {
+  std::vector<EvidenceSubscriber> subscribers;
+  subscribers.reserve(evidence_subscribers_.size());
+  for (const auto& [id, subscriber] : evidence_subscribers_) {
+    (void)id;
+    subscribers.push_back(subscriber);
+  }
+  return subscribers;
+}
+
+void ComprehensiveTimeline::DispatchEvidence(
+    const EvidenceUpdate& update,
+    const std::vector<EvidenceSubscriber>& subscribers) const {
+  for (const auto& subscriber : subscribers) subscriber(update);
+}
+
+void ComprehensiveTimeline::DepositDiarization(
     const std::vector<SpeakerInput>& segments) {
-  std::lock_guard<std::mutex> lock(mutex_);
-  return ReplaceSpeakers(segments);
-}
-
-std::vector<ComprehensiveTimeline::Revision>
-ComprehensiveTimeline::DepositDiarizationSegment(const SpeakerInput& segment) {
-  std::lock_guard<std::mutex> lock(mutex_);
-  return UpsertSpeaker(segment.start, segment.end, segment.speaker,
-                       segment.conf, segment.speaker_id);
-}
-
-std::vector<ComprehensiveTimeline::Revision>
-ComprehensiveTimeline::DepositAsrFinal(const RawTextSeg& segment) {
-  std::vector<Revision> revisions;
-  std::vector<AsrFinalSubscriber> subscribers;
+  std::vector<EvidenceSubscriber> subscribers;
   {
     std::lock_guard<std::mutex> lock(mutex_);
-    revisions =
-        UpsertText(segment.id, segment.start, segment.end, segment.text);
-    subscribers.reserve(asr_final_subscribers_.size());
+    diarization_ = segments;
+    std::stable_sort(diarization_.begin(), diarization_.end(),
+                     [](const SpeakerInput& a, const SpeakerInput& b) {
+                       if (!NearEqual(a.start, b.start))
+                         return a.start < b.start;
+                       return a.end < b.end;
+                     });
+    for (const auto& segment : diarization_) {
+      if (!segment.speaker_id.empty()) {
+        seen_speaker_ids_.insert(segment.speaker_id);
+      }
+    }
+    subscribers = CopyEvidenceSubscribersLocked();
+  }
+  DispatchEvidence({EvidenceTrack::kDiarization, -1}, subscribers);
+}
+
+void ComprehensiveTimeline::DepositDiarizationSegment(
+    const SpeakerInput& segment) {
+  if (!ValidSpan(segment.start, segment.end)) return;
+  std::vector<EvidenceSubscriber> subscribers;
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    auto pos = std::lower_bound(diarization_.begin(), diarization_.end(),
+                                segment.start,
+                                [](const SpeakerInput& current, double start) {
+                                  return current.start < start;
+                                });
+    diarization_.insert(pos, segment);
+    if (!segment.speaker_id.empty()) {
+      seen_speaker_ids_.insert(segment.speaker_id);
+    }
+    subscribers = CopyEvidenceSubscribersLocked();
+  }
+  DispatchEvidence({EvidenceTrack::kDiarization, -1}, subscribers);
+}
+
+ComprehensiveTimeline::DepositResult ComprehensiveTimeline::DepositAsrFinal(
+    const RawTextSeg& segment) {
+  if (segment.id < 0 || !ValidSpan(segment.start, segment.end)) {
+    return DepositResult::kInvalid;
+  }
+
+  std::vector<EvidenceSubscriber> evidence_subscribers;
+  std::vector<AsrFinalSubscriber> asr_subscribers;
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    const auto existing = std::find_if(
+        asr_.begin(), asr_.end(),
+        [&](const RawTextSeg& current) { return current.id == segment.id; });
+    if (existing != asr_.end()) {
+      return SameText(*existing, segment) ? DepositResult::kUnchanged
+                                          : DepositResult::kConflict;
+    }
+
+    const auto pos =
+        std::lower_bound(asr_.begin(), asr_.end(), segment.start,
+                         [](const RawTextSeg& current, double start) {
+                           return current.start < start;
+                         });
+    asr_.insert(pos, segment);
+    evidence_subscribers = CopyEvidenceSubscribersLocked();
+    asr_subscribers.reserve(asr_final_subscribers_.size());
     for (const auto& [id, subscriber] : asr_final_subscribers_) {
       (void)id;
-      subscribers.push_back(subscriber);
+      asr_subscribers.push_back(subscriber);
     }
   }
-  for (const auto& subscriber : subscribers) subscriber(segment);
-  return revisions;
+
+  DispatchEvidence({EvidenceTrack::kAsrFinal, segment.id},
+                   evidence_subscribers);
+  for (const auto& subscriber : asr_subscribers) subscriber(segment);
+  return DepositResult::kInserted;
 }
 
 void ComprehensiveTimeline::DepositVad(const VadSeg& segment) {
-  std::lock_guard<std::mutex> lock(mutex_);
-  AddVad(segment.start, segment.end);
-  vad_snapshot_ = std::make_shared<const std::vector<VadSeg>>(vad_);
+  if (!ValidSpan(segment.start, segment.end)) return;
+  std::vector<EvidenceSubscriber> subscribers;
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    const auto duplicate =
+        std::find_if(vad_.begin(), vad_.end(), [&](const VadSeg& current) {
+          return NearEqual(current.start, segment.start) &&
+                 NearEqual(current.end, segment.end);
+        });
+    if (duplicate != vad_.end()) return;
+    const auto pos = std::lower_bound(vad_.begin(), vad_.end(), segment.start,
+                                      [](const VadSeg& current, double start) {
+                                        return current.start < start;
+                                      });
+    vad_.insert(pos, segment);
+    vad_snapshot_ = std::make_shared<const std::vector<VadSeg>>(vad_);
+    subscribers = CopyEvidenceSubscribersLocked();
+  }
+  DispatchEvidence({EvidenceTrack::kVad, -1}, subscribers);
 }
 
 void ComprehensiveTimeline::AdvanceVadHorizon(double horizon_sec) {
@@ -139,48 +163,58 @@ void ComprehensiveTimeline::AdvanceVadHorizon(double horizon_sec) {
   vad_horizon_sec_ = std::max(vad_horizon_sec_, horizon_sec);
 }
 
-std::vector<ComprehensiveTimeline::Revision>
-ComprehensiveTimeline::DepositAlignment(const AlignGroup& group) {
-  std::lock_guard<std::mutex> lock(mutex_);
-  return UpsertAlign(group.text_id, group.start, group.end, group.units);
-}
-
-ComprehensiveTimeline::VadEvidence ComprehensiveTimeline::SnapshotVadEvidence()
-    const {
-  std::lock_guard<std::mutex> lock(mutex_);
-  return {vad_snapshot_, vad_horizon_sec_};
-}
-
-ComprehensiveTimeline::TrackSnapshot ComprehensiveTimeline::SnapshotTracks()
-    const {
-  std::lock_guard<std::mutex> lock(mutex_);
-  TrackSnapshot snapshot;
-  snapshot.diarization.reserve(speakers_.size());
-  for (const auto& speaker : speakers_) {
-    snapshot.diarization.push_back({speaker.start, speaker.end, speaker.speaker,
-                                    speaker.conf, speaker.speaker_id});
-    if (!speaker.speaker_id.empty()) {
-      snapshot.speaker_label_ids[speaker.speaker] = speaker.speaker_id;
+ComprehensiveTimeline::DepositResult ComprehensiveTimeline::DepositAlignment(
+    const AlignGroup& group) {
+  if (group.text_id < 0 || !ValidSpan(group.start, group.end)) {
+    return DepositResult::kInvalid;
+  }
+  for (const auto& unit : group.units) {
+    if (!std::isfinite(unit.start) || !std::isfinite(unit.end) ||
+        unit.start < 0.0 || unit.end + 1e-9 < unit.start ||
+        unit.start + 1e-9 < group.start || unit.end > group.end + 1e-9) {
+      return DepositResult::kInvalid;
     }
   }
-  snapshot.asr.reserve(texts_.size());
-  for (const auto& text : texts_) {
-    snapshot.asr.push_back({text.id, text.start, text.end, text.text});
+
+  std::vector<EvidenceSubscriber> subscribers;
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    const auto existing = align_.find(group.text_id);
+    if (existing != align_.end()) {
+      return SameAlignment(existing->second, group) ? DepositResult::kUnchanged
+                                                    : DepositResult::kConflict;
+    }
+    align_.emplace(group.text_id, group);
+    subscribers = CopyEvidenceSubscribersLocked();
   }
-  snapshot.vad = vad_;
-  snapshot.align.reserve(align_.size());
-  for (const auto& [text_id, group] : align_) {
-    (void)text_id;
-    snapshot.align.push_back(group);
+  DispatchEvidence({EvidenceTrack::kAlignment, group.text_id}, subscribers);
+  return DepositResult::kInserted;
+}
+
+void ComprehensiveTimeline::DepositBusinessSpeakerRevision(
+    const Revision& revision) {
+  if (revision.entries.empty()) return;
+  const long text_id = revision.entries.front().text_id;
+  if (text_id < 0) return;
+  for (const auto& entry : revision.entries) {
+    if (entry.text_id != text_id || !ValidSpan(entry.start, entry.end)) return;
   }
-  std::sort(snapshot.align.begin(), snapshot.align.end(),
-            [](const AlignGroup& a, const AlignGroup& b) {
-              return a.start < b.start;
-            });
-  snapshot.legacy_comprehensive = BuildLegacySnapshot();
-  snapshot.speaker_ids.assign(seen_speaker_ids_.begin(),
-                              seen_speaker_ids_.end());
-  return snapshot;
+  std::lock_guard<std::mutex> lock(mutex_);
+  business_speaker_[text_id] = revision.entries;
+}
+
+long ComprehensiveTimeline::SubscribeEvidence(EvidenceSubscriber subscriber) {
+  if (!subscriber) return 0;
+  std::lock_guard<std::mutex> lock(mutex_);
+  const long id = next_evidence_subscription_id_++;
+  evidence_subscribers_.emplace(id, std::move(subscriber));
+  return id;
+}
+
+void ComprehensiveTimeline::UnsubscribeEvidence(long subscription_id) {
+  if (subscription_id <= 0) return;
+  std::lock_guard<std::mutex> lock(mutex_);
+  evidence_subscribers_.erase(subscription_id);
 }
 
 long ComprehensiveTimeline::SubscribeAsrFinals(AsrFinalSubscriber subscriber) {
@@ -197,460 +231,65 @@ void ComprehensiveTimeline::UnsubscribeAsrFinals(long subscription_id) {
   asr_final_subscribers_.erase(subscription_id);
 }
 
-ComprehensiveTimeline::SpeakerAttr ComprehensiveTimeline::AttributeInterval(
-    double start, double end) const {
-  double best_overlap = 0.0;
-  double best_span = 0.0;
-  float best_conf = -1.0f;
-  const SpeakerSeg* best = nullptr;
-  for (const auto& s : speakers_) {
-    const double ov = Overlap(start, end, s.start, s.end);
-    if (ov <= 0.0) continue;
-    const double span = s.end - s.start;
-    bool better = ov > best_overlap + 1e-9;
-    if (!better && ov > best_overlap - 1e-9 && best != nullptr) {
-      // Near-equal overlap: prefer the more SPECIFIC (tighter) speaker turn,
-      // then higher confidence -- a short turn embedded in a longer one wins.
-      if (span < best_span - 1e-9 ||
-          (span < best_span + 1e-9 && s.conf > best_conf)) {
-        better = true;
-      }
-    }
-    if (better) {
-      best_overlap = ov;
-      best_span = span;
-      best_conf = s.conf;
-      best = &s;
-    }
-  }
-  // No diarization covers this interval: honestly "unknown". The comprehensive
-  // layer never borrows a neighbouring speaker (that would be guessing on
-  // diarization's behalf).
-  if (best == nullptr) return {"unknown", ""};
-  return {best->speaker, best->speaker_id};
-}
-
-void ComprehensiveTimeline::set_align_snap_pause_sec(double sec) {
-  std::lock_guard<std::mutex> lock(mutex_);
-  align_snap_pause_sec_ = std::max(0.0, sec);
-}
-
-void ComprehensiveTimeline::set_align_boundary_split_tolerance_sec(double sec) {
-  std::lock_guard<std::mutex> lock(mutex_);
-  align_boundary_split_tolerance_sec_ = std::max(0.0, sec);
-}
-
-void ComprehensiveTimeline::set_speaker_support_min_coverage_ratio(
-    double ratio) {
-  std::lock_guard<std::mutex> lock(mutex_);
-  speaker_support_min_coverage_ratio_ = std::max(0.0, std::min(1.0, ratio));
-}
-
-void ComprehensiveTimeline::set_speaker_support_max_gap_sec(double sec) {
-  std::lock_guard<std::mutex> lock(mutex_);
-  speaker_support_max_gap_sec_ = std::max(0.0, sec);
-}
-
-void ComprehensiveTimeline::set_speaker_support_max_islands(int count) {
-  std::lock_guard<std::mutex> lock(mutex_);
-  speaker_support_max_islands_ = std::max(1, count);
-}
-
-void ComprehensiveTimeline::set_gap_fill_enabled(bool enabled) {
-  std::lock_guard<std::mutex> lock(mutex_);
-  gap_fill_enabled_ = enabled;
-}
-
-ComprehensiveTimeline::SpeakerSupport
-ComprehensiveTimeline::ComputeSpeakerSupport(
-    double start, double end, const std::string& speaker,
-    const std::string& speaker_id) const {
-  SpeakerSupport support;
-  const double duration = std::max(0.0, end - start);
-  if (duration <= 1e-9) return support;
-
-  std::vector<std::pair<double, double>> selected;
-  std::vector<std::pair<double, double>> any_speaker;
-  selected.reserve(speakers_.size());
-  any_speaker.reserve(speakers_.size());
-  for (const auto& s : speakers_) {
-    const double ov = Overlap(start, end, s.start, s.end);
-    if (ov <= 0.0) continue;
-    any_speaker.push_back({std::max(start, s.start), std::min(end, s.end)});
-    const bool same_label = speaker != "unknown" && s.speaker == speaker;
-    const bool same_id = speaker_id.empty() || s.speaker_id == speaker_id;
-    if (same_label && same_id) {
-      selected.push_back({std::max(start, s.start), std::min(end, s.end)});
-    }
-  }
-
-  const auto selected_merged = MergeIntervals(std::move(selected));
-  const auto any_merged = MergeIntervals(std::move(any_speaker));
-  support.overlap_sec = CoveredDuration(selected_merged);
-  support.total_overlap_sec = CoveredDuration(any_merged);
-  support.coverage_ratio = std::min(1.0, support.overlap_sec / duration);
-  support.total_coverage_ratio =
-      std::min(1.0, support.total_overlap_sec / duration);
-  support.max_gap_sec = MaxGap(start, end, selected_merged);
-  support.island_count = static_cast<int>(selected_merged.size());
-
-  if (speaker == "unknown" || support.overlap_sec <= 1e-9) {
-    support.level = "none";
-  } else if (support.coverage_ratio + 1e-9 <
-                 speaker_support_min_coverage_ratio_ ||
-             support.max_gap_sec > speaker_support_max_gap_sec_ + 1e-9 ||
-             support.island_count > speaker_support_max_islands_) {
-    support.level = "weak";
-  } else {
-    support.level = "strong";
-  }
-  return support;
-}
-
-ComprehensiveTimeline::Entry ComprehensiveTimeline::MakeEntry(
-    double start, double end, const std::string& speaker,
-    const std::string& speaker_id, std::string text, long text_id) const {
-  Entry e;
-  e.start = start;
-  e.end = end;
-  e.speaker = speaker;
-  e.speaker_id = speaker_id;
-  e.text = std::move(text);
-  e.text_id = text_id;
-  const SpeakerSupport support =
-      ComputeSpeakerSupport(start, end, e.speaker, e.speaker_id);
-  e.diar_overlap_sec = support.overlap_sec;
-  e.diar_total_overlap_sec = support.total_overlap_sec;
-  e.diar_coverage_ratio = support.coverage_ratio;
-  e.diar_total_coverage_ratio = support.total_coverage_ratio;
-  e.diar_max_gap_sec = support.max_gap_sec;
-  e.diar_island_count = support.island_count;
-  e.speaker_support = support.level;
-  e.speaker_uncertain = e.speaker_support != "strong";
-  return e;
-}
-
-void ComprehensiveTimeline::MergeEntrySupport(Entry* dst,
-                                              const Entry& src) const {
-  if (!dst) return;
-  dst->diar_overlap_sec += src.diar_overlap_sec;
-  dst->diar_total_overlap_sec += src.diar_total_overlap_sec;
-  const double duration = std::max(0.0, dst->end - dst->start);
-  if (duration > 1e-9) {
-    dst->diar_coverage_ratio = std::min(1.0, dst->diar_overlap_sec / duration);
-    dst->diar_total_coverage_ratio =
-        std::min(1.0, dst->diar_total_overlap_sec / duration);
-  } else {
-    dst->diar_coverage_ratio = 0.0;
-    dst->diar_total_coverage_ratio = 0.0;
-  }
-  dst->diar_max_gap_sec = std::max(dst->diar_max_gap_sec, src.diar_max_gap_sec);
-  dst->diar_island_count += src.diar_island_count;
-  if (dst->speaker == "unknown" || dst->diar_overlap_sec <= 1e-9) {
-    dst->speaker_support = "none";
-  } else if (dst->diar_coverage_ratio + 1e-9 <
-                 speaker_support_min_coverage_ratio_ ||
-             dst->diar_max_gap_sec > speaker_support_max_gap_sec_ + 1e-9 ||
-             dst->diar_island_count > speaker_support_max_islands_) {
-    dst->speaker_support = "weak";
-  } else {
-    dst->speaker_support = "strong";
-  }
-  dst->speaker_uncertain = dst->speaker_support != "strong";
-}
-
 std::vector<ComprehensiveTimeline::Entry>
-ComprehensiveTimeline::SplitTextByDiar(const TextSeg& t) const {
-  // The comprehensive VIEW's boundaries come from the DIARIZATION TRACK.
-  // Collect the diarization boundary times that fall strictly inside this text
-  // segment, partition [t.start,t.end) by them, attribute each sub-interval to
-  // its max-overlap speaker, merge consecutive same-speaker sub-intervals
-  // within this source text_id, then allocate the text's characters to each
-  // piece by time (the ASR model emits no per-word timestamps, so a
-  // time-proportional split is the faithful approximation).
-  std::vector<double> bounds;
-  bounds.reserve(speakers_.size() * 2 +
-                 2);  // Pre-allocate to avoid repeated reallocations
-  bounds.push_back(t.start);
-  bounds.push_back(t.end);
-  for (const auto& s : speakers_) {
-    if (s.start > t.start + 1e-9 && s.start < t.end - 1e-9)
-      bounds.push_back(s.start);
-    if (s.end > t.start + 1e-9 && s.end < t.end - 1e-9) bounds.push_back(s.end);
+ComprehensiveTimeline::BuildBusinessSnapshotLocked() const {
+  std::vector<Entry> entries;
+  for (const auto& [text_id, pieces] : business_speaker_) {
+    (void)text_id;
+    entries.insert(entries.end(), pieces.begin(), pieces.end());
   }
-  std::sort(bounds.begin(), bounds.end());
-  bounds.erase(
-      std::unique(bounds.begin(), bounds.end(),
-                  [](double a, double b) { return std::abs(a - b) < 1e-9; }),
-      bounds.end());
+  std::stable_sort(entries.begin(), entries.end(),
+                   [](const Entry& a, const Entry& b) {
+                     if (!NearEqual(a.start, b.start)) return a.start < b.start;
+                     return a.text_id < b.text_id;
+                   });
+  return entries;
+}
 
-  struct Turn {
-    double start;
-    double end;
-    std::string speaker;
-    std::string speaker_id;
-  };
-  std::vector<Turn> turns;
-  turns.reserve(bounds.size());  // Pre-allocate to avoid repeated reallocations
-  for (std::size_t i = 0; i + 1 < bounds.size(); ++i) {
-    const double s = bounds[i];
-    const double e = bounds[i + 1];
-    if (e - s <= 1e-9) continue;
-    const SpeakerAttr attr = AttributeInterval(s, e);
-    if (!turns.empty() && turns.back().speaker == attr.speaker &&
-        turns.back().speaker_id == attr.speaker_id) {
-      turns.back().end = e;
-    } else {
-      turns.push_back({s, e, attr.speaker, attr.speaker_id});
+std::map<std::string, std::string>
+ComprehensiveTimeline::BuildSpeakerLabelIdsLocked() const {
+  std::map<std::string, std::string> ids;
+  for (const auto& segment : diarization_) {
+    if (!segment.speaker_id.empty()) {
+      ids[segment.speaker] = segment.speaker_id;
     }
   }
-
-  // Low-risk gap fill: a sub-interval with no diarization coverage ("unknown")
-  // is attributed to the surrounding speaker ONLY when the diarization segments
-  // bounding the gap on BOTH sides are the SAME speaker -- a brief pause inside
-  // one speaker's turn. A gap at a speaker transition (different speakers on
-  // each side), or with no segment on one side, stays "unknown": the layer
-  // never guesses across a speaker change. The policy is explicit in TOML so
-  // every run records whether this view-level behavior is enabled.
-  if (gap_fill_enabled_) {
-    for (auto& tn : turns) {
-      if (tn.speaker != "unknown") continue;
-      const SpeakerSeg* before = nullptr;  // largest end <= the gap start
-      const SpeakerSeg* after = nullptr;   // smallest start >= the gap end
-      for (const auto& sp : speakers_) {
-        if (sp.end <= tn.start + 1e-9 && (!before || sp.end > before->end))
-          before = &sp;
-        if (sp.start >= tn.end - 1e-9 && (!after || sp.start < after->start))
-          after = &sp;
-      }
-      if (before && after && before->speaker == after->speaker &&
-          before->speaker_id == after->speaker_id) {
-        tn.speaker = before->speaker;
-        tn.speaker_id = before->speaker_id;
-      }
-    }
-    // Re-coalesce consecutive same-speaker turns after the fill.
-    std::vector<Turn> merged;
-    merged.reserve(turns.size());
-    for (const auto& tn : turns) {
-      if (!merged.empty() && merged.back().speaker == tn.speaker &&
-          merged.back().speaker_id == tn.speaker_id)
-        merged.back().end = tn.end;
-      else
-        merged.push_back(tn);
-    }
-    turns.swap(merged);
-  }
-
-  if (turns.empty()) {
-    return {MakeEntry(t.start, t.end, "unknown", "", t.text, t.id)};
-  }
-  if (turns.size() == 1) {
-    return {MakeEntry(turns[0].start, turns[0].end, turns[0].speaker,
-                      turns[0].speaker_id, t.text, t.id)};
-  }
-
-  // Alignment-aware allocation (preferred): when per-unit timestamps exist for
-  // this text, attribute characters by their real timing. Adjacent units are
-  // grouped only across short gaps; a larger gap is evidence for a possible
-  // turn change inside one ASR segment. Each run is assigned to the diarization
-  // turn containing its midpoint, snapping noisy diar boundaries to nearby
-  // alignment pauses without letting long ASR segments swallow a real speaker
-  // change.
-  if (auto ait = align_.find(t.id);
-      ait != align_.end() && !ait->second.units.empty()) {
-    const auto& units = ait->second.units;
-    std::vector<std::string> slices(turns.size());
-    auto boundary_near_gap = [&](double gap_start, double gap_end) {
-      if (align_boundary_split_tolerance_sec_ <= 0.0) return false;
-      for (std::size_t k = 1; k < turns.size(); ++k) {
-        const Turn& left = turns[k - 1];
-        const Turn& right = turns[k];
-        if (left.speaker == right.speaker &&
-            left.speaker_id == right.speaker_id) {
-          continue;
-        }
-        const double boundary = right.start;
-        if (boundary >= gap_start - align_boundary_split_tolerance_sec_ &&
-            boundary <= gap_end + align_boundary_split_tolerance_sec_) {
-          return true;
-        }
-      }
-      return false;
-    };
-    std::size_t i = 0;
-    while (i < units.size()) {
-      std::size_t j = i;  // extend the run while consecutive units are gapless
-      if (align_snap_pause_sec_ > 0.0) {
-        while (j + 1 < units.size()) {
-          const double gap = units[j + 1].start - units[j].end;
-          if (gap > align_snap_pause_sec_ ||
-              boundary_near_gap(units[j].end, units[j + 1].start)) {
-            break;
-          }
-          ++j;
-        }
-      }
-      const double mid = 0.5 * (units[i].start + units[j].end);
-      std::size_t ti = 0;
-      while (ti + 1 < turns.size() && mid >= turns[ti].end) ++ti;
-      for (std::size_t k = i; k <= j; ++k) slices[ti] += units[k].text;
-      i = j + 1;
-    }
-    std::vector<Entry> out;
-    out.reserve(turns.size());
-    for (std::size_t k = 0; k < turns.size(); ++k) {
-      if (slices[k].empty()) continue;
-      out.push_back(MakeEntry(turns[k].start, turns[k].end, turns[k].speaker,
-                              turns[k].speaker_id, std::move(slices[k]), t.id));
-    }
-    if (!out.empty()) return out;
-  }
-
-  // Proportional codepoint allocation across turns (cumulative to avoid drift).
-  const std::vector<std::size_t> offs = Utf8Offsets(t.text);
-  const int ncp = static_cast<int>(offs.size()) - 1;
-  const double total = t.end - t.start;
-  std::vector<Entry> out;
-  out.reserve(turns.size());  // Pre-allocate to avoid repeated reallocations
-  int cp_used = 0;
-  for (std::size_t k = 0; k < turns.size(); ++k) {
-    int cp_end;
-    if (k + 1 == turns.size() || total <= 0.0) {
-      cp_end = ncp;
-    } else {
-      const double frac = (turns[k].end - t.start) / total;
-      cp_end = static_cast<int>(std::llround(frac * ncp));
-      cp_end = std::max(cp_used, std::min(ncp, cp_end));
-    }
-    std::string slice =
-        t.text.substr(offs[cp_used], offs[cp_end] - offs[cp_used]);
-    out.push_back(MakeEntry(turns[k].start, turns[k].end, turns[k].speaker,
-                            turns[k].speaker_id, std::move(slice), t.id));
-    cp_used = cp_end;
-  }
-  return out;
+  return ids;
 }
 
-void ComprehensiveTimeline::ReprojectText(const TextSeg& t,
-                                          std::vector<Revision>* out) {
-  std::vector<Entry> pcs = SplitTextByDiar(t);
-  auto it = pieces_.find(t.id);
-  const bool changed = (it == pieces_.end()) || !EntriesEqual(it->second, pcs);
-  pieces_[t.id] = pcs;
-  // Emit a revision only when the projected result changed, not on every raw
-  // update. The revision carries ALL the (possibly multiple) pieces for this
-  // text id, keyed by text_id so the consumer replaces them as a unit.
-  if (changed && out) out->push_back({t.start, t.end, std::move(pcs)});
-}
-
-void ComprehensiveTimeline::ReprojectRange(double start, double end,
-                                           std::vector<Revision>* out) {
-  for (const auto& t : texts_) {
-    if (Overlap(t.start, t.end, start, end) > 0.0) ReprojectText(t, out);
-  }
-}
-
-std::vector<ComprehensiveTimeline::Revision>
-ComprehensiveTimeline::UpsertSpeaker(double start, double end,
-                                     const std::string& speaker, float conf,
-                                     const std::string& speaker_id) {
-  SpeakerSeg s;
-  s.start = start;
-  s.end = end;
-  s.speaker = speaker;
-  s.conf = conf;
-  s.speaker_id = speaker_id;
-  if (!speaker_id.empty()) seen_speaker_ids_.insert(speaker_id);
-  // Insert keeping speakers_ ordered by start (stable, simple; small N).
-  auto pos = std::lower_bound(
-      speakers_.begin(), speakers_.end(), start,
-      [](const SpeakerSeg& a, double v) { return a.start < v; });
-  speakers_.insert(pos, std::move(s));
-
-  std::vector<Revision> revs;
-  // Pre-allocate to avoid repeated reallocations
-  revs.reserve(1);  // Typically 0 or 1 revision
-  ReprojectRange(start, end, &revs);
-  return revs;
-}
-
-std::vector<ComprehensiveTimeline::Revision> ComprehensiveTimeline::UpsertText(
-    long id, double start, double end, const std::string& text) {
-  auto it = std::find_if(texts_.begin(), texts_.end(),
-                         [&](const TextSeg& t) { return t.id == id; });
-  if (it == texts_.end()) {
-    TextSeg t;
-    t.id = id;
-    t.start = start;
-    t.end = end;
-    t.text = text;
-    // Keep texts_ ordered by start.
-    auto pos = std::lower_bound(
-        texts_.begin(), texts_.end(), start,
-        [](const TextSeg& a, double v) { return a.start < v; });
-    it = texts_.insert(pos, std::move(t));
-  } else {
-    it->start = start;
-    it->end = end;
-    it->text = text;
-  }
-  std::vector<Revision> revs;
-  // Pre-allocate to avoid repeated reallocations
-  revs.reserve(1);  // Typically 0 or 1 revision
-  ReprojectText(*it, &revs);
-  return revs;
-}
-
-std::vector<ComprehensiveTimeline::Revision>
-ComprehensiveTimeline::ReplaceSpeakers(const std::vector<SpeakerInput>& segs) {
-  // Diarization delivers its whole current segment view (global derivation), so
-  // replace the speaker set wholesale and re-project ALL text. Emit a revision
-  // for every text whose attributed result changed.
-  speakers_.clear();
-  speakers_.reserve(
-      segs.size());  // Pre-allocate to avoid repeated reallocations
-  for (const auto& s : segs) {
-    SpeakerSeg seg;
-    seg.start = s.start;
-    seg.end = s.end;
-    seg.speaker = s.speaker;
-    seg.conf = s.conf;
-    seg.speaker_id = s.speaker_id;
-    if (!s.speaker_id.empty()) seen_speaker_ids_.insert(s.speaker_id);
-    auto pos = std::lower_bound(
-        speakers_.begin(), speakers_.end(), s.start,
-        [](const SpeakerSeg& a, double v) { return a.start < v; });
-    speakers_.insert(pos, std::move(seg));
-  }
-  std::vector<Revision> revs;
-  // Pre-allocate to avoid repeated reallocations
-  revs.reserve(texts_.size());  // Maximum possible revisions
-  for (const auto& t : texts_) ReprojectText(t, &revs);
-  return revs;
-}
-
-std::vector<std::string> ComprehensiveTimeline::AllSpeakerIds() const {
-  std::lock_guard<std::mutex> lock(mutex_);
-  return {seen_speaker_ids_.begin(), seen_speaker_ids_.end()};
-}
-
-std::map<std::string, std::string> ComprehensiveTimeline::SpeakerLabelIds()
+ComprehensiveTimeline::TrackSnapshot ComprehensiveTimeline::SnapshotTracks()
     const {
   std::lock_guard<std::mutex> lock(mutex_);
-  std::map<std::string, std::string> out;
-  for (const auto& s : speakers_) {
-    if (!s.speaker_id.empty()) out[s.speaker] = s.speaker_id;
+  TrackSnapshot snapshot;
+  snapshot.diarization = diarization_;
+  snapshot.asr = asr_;
+  snapshot.vad = vad_;
+  snapshot.align.reserve(align_.size());
+  for (const auto& [text_id, group] : align_) {
+    (void)text_id;
+    snapshot.align.push_back(group);
   }
-  return out;
+  std::stable_sort(snapshot.align.begin(), snapshot.align.end(),
+                   [](const AlignGroup& a, const AlignGroup& b) {
+                     return a.start < b.start;
+                   });
+  snapshot.business_speaker = BuildBusinessSnapshotLocked();
+  snapshot.speaker_label_ids = BuildSpeakerLabelIdsLocked();
+  snapshot.speaker_ids.assign(seen_speaker_ids_.begin(),
+                              seen_speaker_ids_.end());
+  return snapshot;
 }
 
-void ComprehensiveTimeline::AddVad(double start, double end) {
-  VadSeg v{start, end};
-  auto pos =
-      std::lower_bound(vad_.begin(), vad_.end(), start,
-                       [](const VadSeg& a, double s) { return a.start < s; });
-  vad_.insert(pos, v);
+std::vector<ComprehensiveTimeline::SpeakerInput>
+ComprehensiveTimeline::SnapshotDiarization() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return diarization_;
+}
+
+std::vector<ComprehensiveTimeline::RawTextSeg>
+ComprehensiveTimeline::SnapshotRawTexts() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return asr_;
 }
 
 std::vector<ComprehensiveTimeline::VadSeg> ComprehensiveTimeline::SnapshotVad()
@@ -659,151 +298,78 @@ std::vector<ComprehensiveTimeline::VadSeg> ComprehensiveTimeline::SnapshotVad()
   return vad_;
 }
 
-std::vector<ComprehensiveTimeline::Entry> ComprehensiveTimeline::Snapshot()
+ComprehensiveTimeline::VadEvidence ComprehensiveTimeline::SnapshotVadEvidence()
     const {
   std::lock_guard<std::mutex> lock(mutex_);
-  return BuildLegacySnapshot();
-}
-
-std::vector<ComprehensiveTimeline::Entry>
-ComprehensiveTimeline::BuildLegacySnapshot() const {
-  // The comprehensive view is the accuracy-first projection of every finalized
-  // ASR text segment through the current diarization view. It may coalesce
-  // adjacent pieces created by one source text segment, but it preserves
-  // text_id boundaries so ASR finalization evidence remains visible to the
-  // terminal timeline JSON. Presentation-level speaker-turn grouping belongs
-  // in a separate consumer view.
-  std::vector<Entry> all;
-  // Pre-allocate to avoid repeated reallocations
-  all.reserve(texts_.size() * 2);  // Estimate maximum entries
-  for (const auto& kv : pieces_) {
-    for (const auto& e : kv.second) all.push_back(e);
-  }
-  std::sort(all.begin(), all.end(),
-            [](const Entry& a, const Entry& b) { return a.start < b.start; });
-
-  std::vector<Entry> out;
-  for (const auto& e : all) {
-    if (!out.empty() && out.back().speaker == e.speaker &&
-        out.back().speaker_id == e.speaker_id &&
-        out.back().text_id == e.text_id) {
-      out.back().end = std::max(out.back().end, e.end);
-      out.back().text += e.text;
-      MergeEntrySupport(&out.back(), e);
-    } else {
-      out.push_back(e);
-    }
-  }
-  return out;
-}
-
-std::vector<ComprehensiveTimeline::RawTextSeg>
-ComprehensiveTimeline::SnapshotRawTexts() const {
-  std::lock_guard<std::mutex> lock(mutex_);
-  std::vector<RawTextSeg> out;
-  out.reserve(texts_.size());
-  for (const auto& t : texts_) {
-    out.push_back({t.id, t.start, t.end, t.text});
-  }
-  return out;
-}
-
-std::vector<ComprehensiveTimeline::Revision> ComprehensiveTimeline::UpsertAlign(
-    long text_id, double start, double end,
-    const std::vector<AlignUnitSeg>& units) {
-  AlignGroup g;
-  g.text_id = text_id;
-  g.start = start;
-  g.end = end;
-  g.units = units;
-  align_[text_id] = std::move(g);  // idempotent replace by id
-  // Re-project the matching text now that exact per-unit timestamps refine its
-  // diarization split (it was time-proportional before alignment arrived).
-  std::vector<Revision> revs;
-  for (const auto& t : texts_) {
-    if (t.id == text_id) {
-      ReprojectText(t, &revs);
-      break;
-    }
-  }
-  return revs;
+  return {vad_snapshot_, vad_horizon_sec_};
 }
 
 std::vector<ComprehensiveTimeline::AlignGroup>
 ComprehensiveTimeline::SnapshotAlign() const {
   std::lock_guard<std::mutex> lock(mutex_);
-  std::vector<AlignGroup> out;
-  out.reserve(align_.size());
-  for (const auto& kv : align_) out.push_back(kv.second);
-  std::sort(out.begin(), out.end(),
-            [](const AlignGroup& a, const AlignGroup& b) {
-              return a.start < b.start;
-            });
-  return out;
+  std::vector<AlignGroup> groups;
+  groups.reserve(align_.size());
+  for (const auto& [text_id, group] : align_) {
+    (void)text_id;
+    groups.push_back(group);
+  }
+  std::stable_sort(groups.begin(), groups.end(),
+                   [](const AlignGroup& a, const AlignGroup& b) {
+                     return a.start < b.start;
+                   });
+  return groups;
+}
+
+std::optional<ComprehensiveTimeline::RawTextSeg>
+ComprehensiveTimeline::FindAsrFinal(long text_id) const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  const auto found = std::find_if(
+      asr_.begin(), asr_.end(),
+      [&](const RawTextSeg& segment) { return segment.id == text_id; });
+  if (found == asr_.end()) return std::nullopt;
+  return *found;
+}
+
+std::optional<ComprehensiveTimeline::AlignGroup>
+ComprehensiveTimeline::FindAlignment(long text_id) const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  const auto found = align_.find(text_id);
+  if (found == align_.end()) return std::nullopt;
+  return found->second;
+}
+
+std::vector<ComprehensiveTimeline::Entry> ComprehensiveTimeline::Snapshot()
+    const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return BuildBusinessSnapshotLocked();
+}
+
+std::map<std::string, std::string> ComprehensiveTimeline::SpeakerLabelIds()
+    const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return BuildSpeakerLabelIdsLocked();
+}
+
+std::vector<std::string> ComprehensiveTimeline::AllSpeakerIds() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return {seen_speaker_ids_.begin(), seen_speaker_ids_.end()};
 }
 
 void ComprehensiveTimeline::Clear() {
-  std::lock_guard<std::mutex> lock(mutex_);
-  speakers_.clear();
-  seen_speaker_ids_.clear();
-  texts_.clear();
-  vad_.clear();
-  vad_snapshot_ = std::make_shared<const std::vector<VadSeg>>();
-  vad_horizon_sec_ = -1e9;
-  pieces_.clear();
-  align_.clear();
-}
-
-void ComprehensiveTimeline::CleanupOldData(double keep_until_sec) {
-  // Remove speaker segments that end before keep_until_sec
-  auto speaker_it = speakers_.begin();
-  while (speaker_it != speakers_.end()) {
-    if (speaker_it->end <= keep_until_sec) {
-      speaker_it = speakers_.erase(speaker_it);
-    } else {
-      ++speaker_it;
-    }
+  std::vector<EvidenceSubscriber> subscribers;
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    diarization_.clear();
+    asr_.clear();
+    vad_.clear();
+    vad_snapshot_ = std::make_shared<const std::vector<VadSeg>>();
+    vad_horizon_sec_ = -1e9;
+    align_.clear();
+    business_speaker_.clear();
+    seen_speaker_ids_.clear();
+    subscribers = CopyEvidenceSubscribersLocked();
   }
-
-  // Remove text segments that end before keep_until_sec
-  auto text_it = texts_.begin();
-  while (text_it != texts_.end()) {
-    if (text_it->end <= keep_until_sec) {
-      // Remove from pieces_ map as well
-      pieces_.erase(text_it->id);
-      text_it = texts_.erase(text_it);
-    } else {
-      ++text_it;
-    }
-  }
-
-  // Remove VAD segments that end before keep_until_sec
-  auto vad_it = vad_.begin();
-  while (vad_it != vad_.end()) {
-    if (vad_it->end <= keep_until_sec) {
-      vad_it = vad_.erase(vad_it);
-    } else {
-      ++vad_it;
-    }
-  }
-
-  // Clean up pieces_ map for any remaining texts
-  std::vector<long> texts_to_remove;
-  for (const auto& kv : pieces_) {
-    bool found = false;
-    for (const auto& t : texts_) {
-      if (t.id == kv.first) {
-        found = true;
-        break;
-      }
-    }
-    if (!found) {
-      texts_to_remove.push_back(kv.first);
-    }
-  }
-  for (long id : texts_to_remove) {
-    pieces_.erase(id);
-  }
+  DispatchEvidence({EvidenceTrack::kReset, -1}, subscribers);
 }
 
 }  // namespace pipeline

@@ -35,9 +35,10 @@
 #include "gpu/scheduler.h"
 #include "pipeline/align_worker.h"
 #include "pipeline/asr_worker.h"
-#include "pipeline/gpu_vad.h"
+#include "pipeline/business_speaker_pipeline.h"
 #include "pipeline/comprehensive_timeline.h"
 #include "pipeline/diarization_worker.h"
+#include "pipeline/gpu_vad.h"
 #include "pipeline/pipeline_audio_cache.h"
 #include "pipeline/retained_audio_buffer.h"
 // Forward declarations for protocol types (layering: pipeline depends on
@@ -282,9 +283,6 @@ class AuditoryStream {
   // Block until both workers have processed up to `target_samples`.
   void WaitForBarrier(long target_samples);
   std::string Serialize();  // build the comprehensive timeline JSON
-  // Serialize one revision (Spec 004) to a {"type":"revision",...} message.
-  static std::string SerializeRevision(const ComprehensiveTimeline::Revision& r,
-                                       const char* source);
   void EmitLocked(const std::string& json);  // serialize transport sends
   // Spec 002 FR7: build the periodic GPU-scheduling telemetry message from the
   // priority registry + each pipeline's compute/occupancy summary.
@@ -384,10 +382,13 @@ class AuditoryStream {
   // comp_mutex_ protects only controller-side compatibility snapshots such as
   // last_segments_ and last_transcript_.
   ComprehensiveTimeline comp_;
+  // Declared after comp_ so automatic destruction unsubscribes before the
+  // evidence store is destroyed.
+  std::unique_ptr<BusinessSpeakerPipeline> business_speaker_pipeline_;
   mutable std::mutex comp_mutex_;
 
-  // Spec 004 Phase 12: protocol timeline for pipeline registration and routing.
-  // Bridges to ComprehensiveTimeline for the comprehensive view.
+  // Spec 004 Phase 12: protocol timeline for registration and external mirrors.
+  // Runtime evidence exchange remains in ComprehensiveTimeline.
   std::unique_ptr<protocol::ProtocolTimeline> protocol_timeline_;
   std::unique_ptr<protocol::PipelineHandle> ws_input_handle_;
   std::unique_ptr<protocol::PipelineHandle> vad_handle_;
@@ -396,6 +397,7 @@ class AuditoryStream {
   // Forced-alignment pipeline handle. The worker consumes finalized ASR records
   // through the typed ComprehensiveTimeline subscription below.
   std::unique_ptr<protocol::PipelineHandle> align_handle_;
+  std::unique_ptr<protocol::PipelineHandle> business_speaker_handle_;
   long comp_asr_subscription_id_ = 0;
 
   // Spec 004 Phase 13: session persistence store. Saves timeline JSON on

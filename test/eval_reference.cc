@@ -1,28 +1,28 @@
-// Manual evaluation harness against a real diarized-transcript reference.
+// Structural business-speaker projection harness using a diarized reference.
 //
 // Usage: orator_eval <reference.txt> [num_preview_turns]
 //
-// What it does (and why it's a real test of implemented code):
+// What it does:
 //   1. Parses the reference into utterances {time, speaker, text}.
 //   2. Derives a ground-truth diarization track (speaker turns) AND an
 //      ASR-style transcript that carries text+timing but NO speaker labels.
-//   3. Deposits both into the runtime ComprehensiveTimeline (Spec 004), which
-//      re-attributes each text segment to a speaker purely by time overlap.
-//   4. Reports attribution accuracy vs the reference and previews the produced
-//      timeline so it can be compared by hand against the reference file.
+//   3. Deposits both into the runtime typed store and runs the registered
+//      business-speaker policy used by the product.
+//   4. Reports projection self-consistency and previews the produced timeline.
 //
-// This exercises the runtime diarization->timeline alignment on real 4-speaker
-// data even though the neural Sortformer weights cannot be loaded in this
-// environment.
+// The speaker evidence is derived from the reference itself, not from
+// Sortformer output. Therefore the percentage below is a mechanical policy
+// diagnostic only. It is not model accuracy and cannot satisfy the contextual
+// semantic review required by the Test Review Protocol and Spec 013.
 
 #include <iostream>
 #include <string>
 #include <unordered_map>
 
 #include "io/reference_transcript.h"
-#include "test_comprehensive_timeline_access.h"
+#include "test_business_speaker_pipeline_access.h"
 
-using orator::pipeline::TestComprehensiveTimeline;
+using orator::pipeline::TestBusinessSpeakerPipeline;
 
 using namespace orator;
 
@@ -54,14 +54,13 @@ int main(int argc, char** argv) {
   auto diar = ref.ToDiarSegments(5.0);
   auto transcript = ref.ToTranscript(5.0);
 
-  // Deposit into the runtime ComprehensiveTimeline. Diarization provides the
-  // speaker set (who/when); ASR provides text (what/when); the timeline
-  // attributes each text segment to a speaker purely by time overlap.
-  pipeline::TestComprehensiveTimeline timeline;
-  std::vector<pipeline::TestComprehensiveTimeline::SpeakerInput> spk;
+  // Deposit into the runtime evidence store through the business-pipeline test
+  // adapter. Diarization provides who/when and ASR provides what/when.
+  pipeline::TestBusinessSpeakerPipeline timeline;
+  std::vector<pipeline::TestBusinessSpeakerPipeline::SpeakerInput> spk;
   spk.reserve(diar.size());
   for (const auto& d : diar) {
-    pipeline::TestComprehensiveTimeline::SpeakerInput s;
+    pipeline::TestBusinessSpeakerPipeline::SpeakerInput s;
     s.start = d.start_sec;
     s.end = d.end_sec;
     s.speaker = d.speaker_id.empty()
@@ -79,9 +78,9 @@ int main(int argc, char** argv) {
   std::vector<pipeline::ComprehensiveTimeline::Entry> entries =
       timeline.Snapshot();
 
-  // Attribution accuracy: each text entry's attributed speaker (by time
-  // overlap) vs the reference speaker. Entries are keyed by text_id = utterance
-  // index.
+  // Projection self-consistency: each text entry's attributed speaker vs the
+  // same reference that supplied the diarization evidence. Entries are keyed
+  // by text_id = utterance index.
   int correct = 0;
   std::unordered_map<std::string, int> per_speaker_total, per_speaker_correct;
   std::unordered_map<long, std::string> attributed;
@@ -101,7 +100,7 @@ int main(int argc, char** argv) {
           ? 0.0
           : 100.0 * correct / static_cast<double>(ref.utterances.size());
 
-  std::cout << "=== Timeline-alignment attribution (vs reference) ===\n";
+  std::cout << "=== Projection self-consistency (not model accuracy) ===\n";
   std::cout << "Overall: " << correct << "/" << ref.utterances.size() << " = "
             << acc << "%\n";
   for (const auto& s : speakers) {

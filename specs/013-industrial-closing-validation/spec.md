@@ -59,16 +59,18 @@ subject to the complete acceptance gates in this spec.
    `ComprehensiveTimeline`, while forced alignment receives finalized typed ASR
    records through a `ComprehensiveTimeline` subscription. Protocol messages
    are emitted only after typed track commit.
-3. `ComprehensiveTimeline` currently performs speaker selection, gap filling,
-   and text projection. The Constitution defines it as a pure container and
-   alignment layer that does not infer or back-fill pipeline content.
+3. **Resolved in Phase 1**: `ComprehensiveTimeline` is now a pure typed store.
+   A registered `business_speaker` pipeline owns speaker selection, gap policy,
+   align-aware text projection, and support diagnostics, and writes only its
+   own revisable track. Raw ASR and alignment records reject conflicting
+   same-ID deposits.
 4. **Partially resolved**: timeline gap-fill is a typed TOML field and startup
    now applies defaults, TOML, environment, then CLI. Other lower-level
    behavioral environment switches still require migration or removal.
 5. **Resolved in Phase 1**: finalized ASR allocates one `text_id` and reuses it
    for the typed sink and live event; the terminal ASR track serializes that ID.
    End-to-end align/revision/export/reconnect/Web UI convergence remains open.
-6. The configured CTest suite contains 50 C++ tests. CMake defines a Python test
+6. The configured CTest suite contains 51 C++ tests. CMake defines a Python test
    registration helper, but no Python WebSocket tests are registered and the
    documented wrapper directory is absent.
 7. `test_diar_stream` verifies a short stored NeMo fixture using lower-level

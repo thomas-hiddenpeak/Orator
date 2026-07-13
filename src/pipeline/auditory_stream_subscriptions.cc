@@ -6,6 +6,7 @@
 
 #include "pipeline/auditory_stream_subscriptions.h"
 
+#include "core/log.h"
 #include "core/time_base.h"
 #include "core/types.h"
 #include "pipeline/comprehensive_timeline.h"
@@ -17,7 +18,6 @@
 #include "protocol/topic_router.h"
 
 #include <cstdio>
-#include <map>
 #include <mutex>
 #include <string>
 #include <utility>
@@ -26,24 +26,6 @@
 namespace orator {
 namespace pipeline {
 
-// Shared revision serializer defined in src/pipeline/json_util.cc.
-std::string SerializeRevisionToJson(
-    const ComprehensiveTimeline::Revision& r, const char* source,
-    const std::map<std::string, std::string>* label_ids = nullptr);
-
-// ---------------------------------------------------------------------------
-// Local helper: serialize a Revision to JSON and emit via callback.
-// Uses the shared SerializeRevisionToJson from json_util.
-// ---------------------------------------------------------------------------
-namespace {
-void DoEmitRevision(const ComprehensiveTimeline::Revision& r,
-                    const char* source, const RevisionEmitter& emit_rev,
-                    const std::map<std::string, std::string>* label_ids =
-                        nullptr) {
-  emit_rev(SerializeRevisionToJson(r, source, label_ids));
-}
-}  // namespace
-
 // ---------------------------------------------------------------------------
 // Speaker sink callback: typed deposit first, then protocol mirror.
 // ---------------------------------------------------------------------------
@@ -51,7 +33,6 @@ void HandleSpeakerSink(ComprehensiveTimeline& comp, std::mutex& state_mutex,
                        std::vector<core::DiarSegment>& last_segments,
                        protocol::ProtocolTimeline* protocol_timeline,
                        protocol::PipelineHandle* diar_handle,
-                       const RevisionEmitter& emit_rev,
                        const std::vector<core::DiarSegment>& segs) {
   std::string segments_json = "[";
   std::vector<ComprehensiveTimeline::SpeakerInput> typed_segments;
@@ -87,11 +68,7 @@ void HandleSpeakerSink(ComprehensiveTimeline& comp, std::mutex& state_mutex,
   }
   segments_json += "]";
 
-  const auto revisions = comp.DepositDiarization(typed_segments);
-  const auto label_ids = comp.SpeakerLabelIds();
-  for (const auto& revision : revisions) {
-    DoEmitRevision(revision, "diar", emit_rev, &label_ids);
-  }
+  comp.DepositDiarization(typed_segments);
 
   protocol::Message msg;
   msg.topic = protocol::kDiarSpeakerSegment.to_string();
@@ -112,17 +89,18 @@ void HandleSpeakerSink(ComprehensiveTimeline& comp, std::mutex& state_mutex,
 void HandleTextSink(ComprehensiveTimeline& comp,
                     protocol::ProtocolTimeline* protocol_timeline,
                     protocol::PipelineHandle* asr_handle, long id, double start,
-                    double end, const std::string& text, bool is_final,
-                    const RevisionEmitter& emit_rev) {
+                    double end, const std::string& text, bool is_final) {
   // Finals go to asr/transcript, in-progress partials to
-  // asr/transcript_partial. The comprehensive timeline and forced aligner
-  // consume the typed finalized track only, so each segment is recorded once.
+  // asr/transcript_partial. Business fusion and forced alignment consume only
+  // the typed finalized track, so each segment is recorded once.
   if (is_final) {
-    const auto revisions = comp.DepositAsrFinal({id, start, end, text});
-    const auto label_ids = comp.SpeakerLabelIds();
-    for (const auto& revision : revisions) {
-      DoEmitRevision(revision, "asr", emit_rev, &label_ids);
+    const auto result = comp.DepositAsrFinal({id, start, end, text});
+    if (result == ComprehensiveTimeline::DepositResult::kConflict ||
+        result == ComprehensiveTimeline::DepositResult::kInvalid) {
+      LOG_ERROR("[timeline] rejected ASR final id=%ld\n", id);
+      return;
     }
+    if (result == ComprehensiveTimeline::DepositResult::kUnchanged) return;
   }
   const protocol::Topic& topic =
       is_final ? protocol::kAsrTranscript : protocol::kAsrTranscriptPartial;
@@ -169,12 +147,14 @@ void HandleAlignSink(ComprehensiveTimeline& comp,
                         ",\"end\":" + std::to_string(seg_end) +
                         ",\"units\":" + units_json + "}";
 
-  const auto revisions =
+  const auto result =
       comp.DepositAlignment({id, seg_start, seg_end, std::move(typed_units)});
-  const auto label_ids = comp.SpeakerLabelIds();
-  for (const auto& revision : revisions) {
-    DoEmitRevision(revision, "align", emit, &label_ids);
+  if (result == ComprehensiveTimeline::DepositResult::kConflict ||
+      result == ComprehensiveTimeline::DepositResult::kInvalid) {
+    LOG_ERROR("[timeline] rejected alignment id=%ld\n", id);
+    return;
   }
+  if (result == ComprehensiveTimeline::DepositResult::kUnchanged) return;
 
   protocol::Message msg;
   msg.topic = protocol::kAlignUnits.to_string();
@@ -188,6 +168,27 @@ void HandleAlignSink(ComprehensiveTimeline& comp,
                              protocol::QoS::AT_LEAST_ONCE);
 
   if (emit) emit("{\"type\":\"align\"," + payload.substr(1));
+}
+
+void HandleBusinessSpeakerRevision(
+    protocol::ProtocolTimeline* protocol_timeline,
+    protocol::PipelineHandle* business_handle, const RevisionEmitter& emit,
+    const ComprehensiveTimeline::Revision& revision) {
+  const std::string payload =
+      SerializeRevisionToJson(revision, "business_speaker");
+
+  protocol::Message message;
+  message.topic = protocol::kBusinessSpeakerRevision.to_string();
+  message.pipeline = "business_speaker";
+  message.pipeline_version = "1.0.0";
+  message.timestamp_sec = revision.dirty_start;
+  message.qos = static_cast<uint8_t>(protocol::QoS::AT_LEAST_ONCE);
+  message.schema_version = 1;
+  message.data = payload;
+  protocol_timeline->Publish(*business_handle,
+                             protocol::kBusinessSpeakerRevision, message,
+                             protocol::QoS::AT_LEAST_ONCE);
+  if (emit) emit(payload);
 }
 
 // ---------------------------------------------------------------------------

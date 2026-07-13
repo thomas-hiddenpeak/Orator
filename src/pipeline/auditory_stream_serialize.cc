@@ -18,7 +18,6 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
-#include <map>
 #include <optional>
 #include <set>
 #include <stdexcept>
@@ -290,20 +289,6 @@ std::string OptionalJson(double value, bool valid, int precision = 3) {
 
 }  // namespace
 
-// Shared revision serializer defined in src/pipeline/json_util.cc.
-std::string SerializeRevisionToJson(
-    const ComprehensiveTimeline::Revision& r, const char* source,
-    const std::map<std::string, std::string>* label_ids = nullptr);
-
-// ---------------------------------------------------------------------------
-// Serialize one revision (Spec 004) to a {"type":"revision",...} message.
-// Delegates to the shared SerializeRevisionToJson helper in json_util.
-// ---------------------------------------------------------------------------
-std::string AuditoryStream::SerializeRevision(
-    const ComprehensiveTimeline::Revision& r, const char* source) {
-  return SerializeRevisionToJson(r, source);
-}
-
 // ---------------------------------------------------------------------------
 // Serialize GPU telemetry snapshot (Spec 002 FR7).
 // ---------------------------------------------------------------------------
@@ -382,23 +367,19 @@ std::string AuditoryStream::SerializeGpuTelemetry() const {
 // ---------------------------------------------------------------------------
 std::string AuditoryStream::Serialize() {
   // Read one atomic copy of every typed track, then build the timeline
-  // document. The document has a shared time axis and three parts:
-  //   - "tracks": one independent track per pipeline (diarization, asr), each a
-  //     list of that pipeline's time-ordered entries.
-  //   - "comprehensive": an accuracy-first derived view that projects each
-  //     finalized ASR text_id span through diarization ownership, preserving
-  //     ASR final boundaries while splitting text at diarization boundaries.
-  // A consumer reads whichever part it needs. Adding a future pipeline adds a
-  // track and, optionally, a contribution to the comprehensive view.
+  // document. The document has a shared time axis and two views:
+  //   - "tracks": one independent, time-ordered track per registered pipeline,
+  //     including business_speaker.
+  //   - "comprehensive": a compatibility alias of that stored business track.
+  // Adding a future pipeline adds a track without changing existing raw tracks.
   // Every producer deposits typed evidence before protocol serialization, so
   // Serialize never parses protocol JSON and never mutates a track.
   const auto tracks = comp_.SnapshotTracks();
   const auto& diar_view = tracks.diarization;
-  const auto& comp_view = tracks.legacy_comprehensive;
+  const auto& comp_view = tracks.business_speaker;
   const auto& vad_view = tracks.vad;
   const auto& raw_texts = tracks.asr;
   const auto& align_view = tracks.align;
-  const auto& speaker_label_ids = tracks.speaker_label_ids;
   // Populate last_transcript_ from raw_texts for the transcript() accessor.
   core::Transcript transcript;
   for (const auto& r : raw_texts) {
@@ -421,6 +402,53 @@ std::string AuditoryStream::Serialize() {
   const bool wclk_ok = wall_clock_ok_.load();
 
   char buf[256];
+  std::string business_entries_json;
+  for (size_t i = 0; i < comp_view.size(); ++i) {
+    const auto& entry = comp_view[i];
+    int speaker_index = -1;
+    if (entry.speaker.rfind("speaker_", 0) == 0) {
+      try {
+        speaker_index = std::stoi(entry.speaker.substr(8));
+      } catch (const std::invalid_argument&) {
+        speaker_index = -1;
+      } catch (const std::out_of_range&) {
+        speaker_index = -1;
+      }
+    }
+    std::snprintf(buf, sizeof(buf),
+                  "{\"start\":%.3f,\"end\":%.3f,\"text_id\":%ld,"
+                  "\"speaker\":%d",
+                  entry.start, entry.end, entry.text_id, speaker_index);
+    business_entries_json += buf;
+    if (!entry.speaker_id.empty()) {
+      business_entries_json += ",\"speaker_id\":\"" + entry.speaker_id + "\"";
+      const std::string name = speaker_db_
+                                   ? speaker_db_->DisplayName(entry.speaker_id)
+                                   : std::string();
+      if (!name.empty()) {
+        business_entries_json +=
+            ",\"speaker_name\":\"" + JsonEscape(name) + "\"";
+      }
+    }
+    std::snprintf(buf, sizeof(buf),
+                  ",\"speaker_support\":\"%s\","
+                  "\"speaker_uncertain\":%s,"
+                  "\"diar_overlap_sec\":%.3f,"
+                  "\"diar_total_overlap_sec\":%.3f,"
+                  "\"diar_coverage_ratio\":%.3f,"
+                  "\"diar_total_coverage_ratio\":%.3f,"
+                  "\"diar_max_gap_sec\":%.3f,"
+                  "\"diar_island_count\":%d",
+                  entry.speaker_support.c_str(),
+                  entry.speaker_uncertain ? "true" : "false",
+                  entry.diar_overlap_sec, entry.diar_total_overlap_sec,
+                  entry.diar_coverage_ratio, entry.diar_total_coverage_ratio,
+                  entry.diar_max_gap_sec, entry.diar_island_count);
+    business_entries_json += buf;
+    business_entries_json += ",\"text\":\"" + JsonEscape(entry.text) + "\"}";
+    if (i + 1 < comp_view.size()) business_entries_json += ",";
+  }
+
   std::string out = "{\"type\":\"timeline\",\"schema_version\":1,";
   std::snprintf(buf, sizeof(buf),
                 "\"audio_sec\":%.3f,\"sample_rate\":%d,"
@@ -534,66 +562,13 @@ std::string AuditoryStream::Serialize() {
     }
     out += "]}";
   }
+  out +=
+      ",{\"kind\":\"business_speaker\",\"source\":\"business_speaker\","
+      "\"entries\":[" +
+      business_entries_json + "]}";
   out += "]";  // close "tracks"
 
-  // Comprehensive view: diarization-attributed ASR text pieces, ordered by
-  // time, with source text_id boundaries preserved.
-  out += ",\"comprehensive\":[";
-  if (asr_) {
-    for (size_t i = 0; i < comp_view.size(); ++i) {
-      const auto& e = comp_view[i];
-      // Extract numeric speaker index from "speaker_N" format.
-      int spk_idx = -1;
-      if (e.speaker.size() > 8 && e.speaker.substr(0, 8) == "speaker_") {
-        try {
-          spk_idx = std::stoi(e.speaker.substr(8));
-        } catch (const std::invalid_argument&) {
-          spk_idx = -1;
-        } catch (const std::out_of_range&) {
-          spk_idx = -1;
-        }
-      }
-      std::snprintf(buf, sizeof(buf),
-                    "{\"start\":%.3f,\"end\":%.3f,\"text_id\":%ld,"
-                    "\"speaker\":%d",
-                    e.start, e.end, e.text_id, spk_idx);
-      out += buf;
-      // Spec 010: the comprehensive entry carries the resolved global
-      // voiceprint id (and optional display name) for this exact interval. Do
-      // not remap by diarizer-local label here: local labels can drift to a new
-      // global identity later in the session.
-      std::string entry_speaker_id = e.speaker_id;
-      if (entry_speaker_id.empty()) {
-        auto id_it = speaker_label_ids.find(e.speaker);
-        if (id_it != speaker_label_ids.end()) entry_speaker_id = id_it->second;
-      }
-      if (!entry_speaker_id.empty()) {
-        out += ",\"speaker_id\":\"" + entry_speaker_id + "\"";
-        const std::string nm = speaker_db_
-                                   ? speaker_db_->DisplayName(entry_speaker_id)
-                                   : std::string();
-        if (!nm.empty()) out += ",\"speaker_name\":\"" + JsonEscape(nm) + "\"";
-      }
-      std::snprintf(buf, sizeof(buf),
-                    ",\"speaker_support\":\"%s\","
-                    "\"speaker_uncertain\":%s,"
-                    "\"diar_overlap_sec\":%.3f,"
-                    "\"diar_total_overlap_sec\":%.3f,"
-                    "\"diar_coverage_ratio\":%.3f,"
-                    "\"diar_total_coverage_ratio\":%.3f,"
-                    "\"diar_max_gap_sec\":%.3f,"
-                    "\"diar_island_count\":%d",
-                    e.speaker_support.c_str(),
-                    e.speaker_uncertain ? "true" : "false",
-                    e.diar_overlap_sec, e.diar_total_overlap_sec,
-                    e.diar_coverage_ratio, e.diar_total_coverage_ratio,
-                    e.diar_max_gap_sec, e.diar_island_count);
-      out += buf;
-      out += ",\"text\":\"" + JsonEscape(e.text) + "\"}";
-      if (i + 1 < comp_view.size()) out += ",";
-    }
-  }
-  out += "]}";
+  out += ",\"comprehensive\":[" + business_entries_json + "]}";
   return out;
 }
 
@@ -602,7 +577,7 @@ std::string AuditoryStream::Serialize() {
 // ---------------------------------------------------------------------------
 std::string AuditoryStream::SerializeSpeakers() const {
   // List every global identity resolved anywhere in this session (accumulated
-  // in the comprehensive timeline), joined with the
+  // in the typed evidence store), joined with the
   // display names from the speaker database (its own name mutex). Using the
   // accumulated set — not the <=N current diarizer-slot mappings — keeps the
   // speaker panel consistent with the transcript, which accumulates ids the

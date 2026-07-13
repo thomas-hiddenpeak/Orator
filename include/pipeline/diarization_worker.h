@@ -38,18 +38,19 @@ class DiarizationWorker {
     double pad_offset = 0.0;   // extra time after segment end
     double min_dur_on = 0.5;   // minimum segment duration (seconds)
     double min_dur_off = 1.0;  // minimum gap for merging (seconds)
-    // Spec 010: periodically reset the diarizer's streaming state so each window
-    // stays in the model's accurate regime (the fixed spkcache degrades over a
-    // long continuous session). Slots are offset per session and stitched back
-    // into stable global identities by the voiceprint stage. 0 = disabled.
+    // Spec 010: periodically reset the diarizer's streaming state so each
+    // window stays in the model's accurate regime (the fixed spkcache degrades
+    // over a long continuous session). Slots are offset per session and
+    // stitched back into stable global identities by the voiceprint stage. 0 =
+    // disabled.
     double reset_period_sec = 0.0;
   };
 
-  // Spec 004: delivers the pipeline's current speaker view (who/when) to the
-  // comprehensive timeline. The diarization segments are a GLOBAL derivation
+  // Delivers the pipeline's current typed speaker evidence (who/when) to the
+  // controller. The diarization segments are a GLOBAL derivation
   // from frames (boundaries shift as frames arrive), so the whole current view
-  // is delivered (the controller calls ReplaceSpeakers). Called live as audio
-  // is processed (throttled) and once on Finalize.
+  // is delivered (the controller deposits the full producer view). Called as
+  // audio is processed (throttled) and once on Finalize.
   using SpeakerSink =
       std::function<void(const std::vector<core::DiarSegment>&)>;
 
@@ -62,16 +63,15 @@ class DiarizationWorker {
   DiarizationWorker(core::IDiarizer* diarizer, Params params, core::TimeBase tb,
                     cudaStream_t stream);
 
-  // Set the comprehensive-timeline speaker-view sink (Spec 004). Optional.
+  // Set the typed diarization evidence sink. Optional.
   void set_speaker_sink(SpeakerSink sink) { speaker_sink_ = std::move(sink); }
 
-  // Post-diarization segment processor (Spec 010): a hook invoked on the freshly
-  // derived segment view BEFORE it is delivered to the sink, allowed to mutate
-  // the segments in place (e.g. fill DiarSegment::speaker_id with a resolved
-  // global voiceprint identity). Optional; the worker depends only on this
-  // std::function, never on a concrete speaker-identity stage (Art. III).
-  using SegmentProcessor =
-      std::function<void(std::vector<core::DiarSegment>&)>;
+  // Post-diarization segment processor (Spec 010): a hook invoked on the
+  // freshly derived segment view BEFORE it is delivered to the sink, allowed to
+  // mutate the segments in place (e.g. fill DiarSegment::speaker_id with a
+  // resolved global voiceprint identity). Optional; the worker depends only on
+  // this std::function, never on a concrete speaker-identity stage (Art. III).
+  using SegmentProcessor = std::function<void(std::vector<core::DiarSegment>&)>;
   void set_segment_processor(SegmentProcessor p) {
     segment_processor_ = std::move(p);
   }
@@ -103,8 +103,8 @@ class DiarizationWorker {
   // Spec 010: per-session reset bookkeeping. Each entry is (start diar-frame
   // index in diar_probs_, absolute start time sec) for a diarizer session; the
   // first is (0, 0). Segments are derived per session with a local-speaker
-  // offset so a slot never spans a reset boundary (where slot identity changes),
-  // and each session's times are anchored to its absolute start.
+  // offset so a slot never spans a reset boundary (where slot identity
+  // changes), and each session's times are anchored to its absolute start.
   std::vector<std::pair<int, double>> session_bounds_{{0, 0.0}};
   long session_start_sample_ = 0;
 

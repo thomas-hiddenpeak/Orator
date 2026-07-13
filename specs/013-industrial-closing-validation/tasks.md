@@ -25,7 +25,7 @@
   `ComprehensiveTimeline`.
 - [x] T014 Replace forced aligner's direct protocol subscription with finalized
   ASR evidence read through `ComprehensiveTimeline`.
-- [ ] T015 Move speaker choice, text projection, and gap policy into a registered
+- [x] T015 Move speaker choice, text projection, and gap policy into a registered
   `business_speaker` pipeline and keep raw tracks immutable.
 - [x] T016 Fix finalized ASR `text_id` allocation/emission order and serialize IDs
   explicitly in the ASR terminal track.

@@ -207,21 +207,26 @@ WebSocket PCM
   -> AuditoryWsHandler
   -> AuditoryStream::PushAudio
   -> per-pipeline audio caches
-  -> DiarizationWorker / AsrWorker / VAD / AlignWorker / SpeakerIdentityStage
-  -> ProtocolTimeline topics
-  -> ComprehensiveTimeline
-  -> WebSocket JSON events and final timeline
+  -> DiarizationWorker / AsrWorker / VAD / SpeakerIdentityStage
+  -> ComprehensiveTimeline raw typed tracks
+       -> AlignWorker (reads finalized ASR, writes align)
+       -> BusinessSpeakerPipeline (reads raw evidence, writes business_speaker)
+  -> ProtocolTimeline mirrors committed track records
+  -> WebSocket live events and terminal timeline
 ```
 
 关键设计约束：
 
 - 所有流水线使用同一个 `core::TimeBase`。
 - 时间码必须通过 `TimeBase::SecondsAt()`、`SampleAt()`、`Duration()` 等接口派生。
-- 流水线之间不直接共享结果，不通过回调、共享指针或原子标志交换业务数据。
+- 流水线之间不直接交换结果，不建立 pipeline-to-pipeline 回调、共享指针或
+  原子标志；跨流水线读取统一经过会话拥有的类型化时间线。
 - 跨流水线业务证据只通过类型化 `ComprehensiveTimeline` 汇合；
   `ProtocolTimeline` 仅镜像已提交记录，用于持久化、传输和外部观察。
 - ASR 输出文本和自身时间码；diarization 输出 speaker 和自身时间码；
-  comprehensive layer 只做时间对齐，不修改管线内容。
+  raw tracks 采用 append-once/不可变语义。注册的 `business_speaker` 管线独立
+  负责 speaker 选择、align-aware 文本切分、gap policy 和支持度诊断，并写入
+  自己的可修订轨道；容器不改写任何原始管线内容。
 - ASR 的 VAD gate 读取 `ComprehensiveTimeline` 的不可变 VAD 快照，避免热路径
   反复反序列化或读取 VAD worker 私有状态。
 

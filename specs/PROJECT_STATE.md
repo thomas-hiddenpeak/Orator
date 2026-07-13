@@ -58,10 +58,11 @@ seconds scale. `AuditoryStream` now owns one immutable session `TimeBase` and
 injects it into each private cache, worker, and retained audio store. Pipeline
 records now commit as typed `ComprehensiveTimeline` evidence before protocol
 serialization: ASR reads VAD snapshots there, and forced alignment subscribes
-to finalized ASR records there. `ComprehensiveTimeline` still derives speaker
-ownership and performs optional gap fill, which conflicts with its
-constitutional pure-container wording. Spec 013 keeps that remaining ownership
-item as a closure blocker.
+to finalized ASR records there. A registered `BusinessSpeakerPipeline` consumes
+raw typed evidence, owns speaker choice/text projection/gap policy, and writes a
+separate revisable `business_speaker` track. `ComprehensiveTimeline` is now a
+pure thread-safe typed store; raw ASR and alignment records are append-once and
+reject conflicting same-ID deposits.
 
 ### Target pipeline responsibility boundaries
 
@@ -71,9 +72,19 @@ item as a closure blocker.
 - **Diarization** outputs ONLY its own speaker identities + time codes. It never
   attributes text.
 - **Comprehensive timeline** stores and aligns typed tracks on the common base.
-  Under the Spec 013 target architecture, a registered business-speaker fusion
-  pipeline derives the user-facing attribution track; the container itself does
-  not choose a speaker or fill missing evidence.
+  The registered business-speaker fusion pipeline derives the user-facing
+  attribution track; the container itself does not choose a speaker or fill
+  missing evidence.
+
+**2026-07-13 Phase 1 verification**: the configured CTest suite passed 51/51.
+A 120 s, rate=1 real-WebSocket run with committed `orator.toml` produced 25
+diarization, 10 ASR, 39 VAD, 10 alignment, and 25 business-speaker entries.
+Every alignment/business `text_id` resolved to one raw ASR record, business
+spans stayed inside their source span, the business track exactly matched the
+compatibility `comprehensive` view, and each source text was reconstructed
+byte-for-byte from its business slices. This is architecture/transport evidence,
+not contextual accuracy evidence. Total wall time was 123.272 s for 120 s audio,
+so the current `wall_clock_ok` gate remains open.
 
 ## 3. Component status
 
@@ -83,19 +94,19 @@ item as a closure blocker.
 | Native Qwen3-ASR engine | Numerical oracle verified; semantic closure open | Stored stage fixtures report mel 3.9e-3, encoder 1.3e-3, and decoder argmax parity. These numerical gates do not establish the Spec 013 full contextual semantic or silence-hallucination gates. Pure bf16 compute. |
 | Forced alignment (Qwen3-ForcedAligner-0.6B, Spec 009) | Implemented; numerical and prior WS evidence recorded | The registered `AlignWorker` consumes typed finalized ASR records from `ComprehensiveTimeline`, reads the matching retained audio span, deposits a typed alignment group, then mirrors `align/units` to protocol and WebSocket. Partials are never aligned. Stage-level torch-oracle checks and the 2026-06-30 60-minute real-WebSocket run reported 119/119 segment coverage, 13,594 units, no bounds/monotonicity failures, and no crash after the CUDA grid-stride fix. These historical results establish the aligner implementation, not current Spec 013 product closure; repeatable full-session acceptance remains open. |
 | WhisperMel / BPE tokenizer / sharded safetensors loader | ✅ Verified | Unit-tested. |
-| Decoupling (interfaces + registry) | Typed cross-track flow corrected; fusion ownership open | Model interfaces and registry construction are in place. VAD→ASR and ASR→forced-align now flow only through typed `ComprehensiveTimeline` reads/subscriptions; protocol topics mirror committed tracks for persistence and transport. The comprehensive container still performs fusion decisions, so Spec 013 T015 requires an explicit registered business-speaker pipeline. |
+| Decoupling (interfaces + registry) | Contract corrected; product acceptance open | Model interfaces and registry construction are in place. VAD→ASR, ASR→forced-align, and raw evidence→business speaker now flow only through typed `ComprehensiveTimeline` reads/subscriptions. The registered `business_speaker` pipeline owns fusion policy and writes its own track; protocol topics mirror committed records for persistence and transport. Full product validation remains open under Spec 013. |
 | `OverlapTimelineMerger` / `ITimelineMerger` | 🗑️ Removed | The old one-shot max-overlap merger and its orphaned interface were deleted — superseded by `ComprehensiveTimeline` (Spec 004). |
 | WebSocket server (libwebsockets v4.3.3) | ✅ Refactored | Replaced hand-rolled POSIX WS with libwebsockets (multi-client, RFC 6455/7692). Eliminated file-scope static variables (`serve_server`, `serve_factory`, `pss_list_head`) → instance members via `lws_context_user`. Thread-safe `SendText` with wakeup/cancel-service. ServeOnce mode for unit tests. |
 | ASR + WS integration | Implemented; product convergence open | `AuditoryStream` owns one private `PipelineAudioCache` per active producer and uses separate worker threads. One session-owned `TimeBase` is injected into all active stores and workers. Final ASR live emission and its typed sink reuse the same allocated `text_id`, and the ASR terminal track serializes it. ASR reads immutable VAD evidence snapshots from `ComprehensiveTimeline`; forced alignment consumes typed finalized ASR records from the same store. Full ID convergence through revisions/export/reconnect/Web UI is not yet proven. Silent-input filtering has useful prior evidence but must be repeated under Spec 013. |
 | Incremental KV-cache ASR streaming (Spec 003) | ✅ Implemented, verified, committed (8cc31ab); params refined 2026-07-03 | Persistent KV cache + prefix caching + chunk-local windowed encoder; partial-emission every 1 s via WebSocket. Full 1hr CER 16.1% / 6.22x; beats production Silero-VAD at every scale. **Current params**: `kStreamWindowMel=100` (1 s), `max_new_tokens=32`, `unfixed_chunks=2`, `unfixed_tokens=15`, `segment_sec=24.0`, `vad_min_overlap_sec=0.12`. 2026-07-03 real WS `test.mp3` 600 s A/B after the VAD-overlap filter: `segment_sec=24` produced 49 ASR finals vs 67 at 12 s, with the same final comprehensive count (115) and better `To C` wording; default restored to 24 s for ASR semantic stability. |
-| Revisable comprehensive timeline (Spec 004) | Runtime candidate implemented; ownership contract open | Tracks and revision serialization exist, including align-aware projection and speaker-support fields. The class currently selects speakers, fills some gaps, and splits text, while Article III defines it as a pure container/alignment layer. Gap-fill is now controlled by typed `[timeline].gap_fill_enabled`; Spec 013 still requires business inference to move to an explicit track-producing pipeline. |
+| Revisable comprehensive timeline (Spec 004) | Container/fusion ownership corrected; acceptance open | `ComprehensiveTimeline` stores typed diarization, ASR, VAD, alignment, and business tracks and publishes immutable snapshots/typed updates. `BusinessSpeakerPipeline` owns align-aware projection, gap fill, and speaker-support diagnostics. The terminal `comprehensive` field is a compatibility alias serialized from the exact stored `business_speaker` entries. Full contextual acceptance remains open. |
 | Reusable common time base (Spec 004) | Session source ownership corrected; full reconciliation open | `AuditoryStream` owns one immutable `TimeBase` and injects it into every active private cache, worker, and retained audio store. Focused tests preserve the supplied sample rate and origin. Spec 013 still requires mandatory end-of-stream extent reconciliation for every registered track. |
 | Pipeline protocol layer (Spec 004) | ✅ Implemented | Phases 7–12 complete: data types (topic.h, schema.h), pipeline registry, topic router, storage layer (MEMORY + DISK), ProtocolTimeline integration, WS v2 envelope with describe command, --storage-disk-path flag. 25/25 tests pass. |
 | Streaming validation | Manual real-WebSocket tool present; automated gate missing | `tools/verify/py/ws_unified_test.py` is the only current Python WebSocket client and captures live events, terminal JSON, and `tegrastats`. It is not registered as an active CTest integration test. Its obsolete matrix mode does not apply the labelled overrides and ranks unknown duration, so it is invalid for configuration selection. |
 | Logging system | ✅ Include-level `core/log.h` | Level-based macros (`LOG_DEBUG`/`INFO`/`WARN`/`ERROR`) with compile-time floor (`ORATOR_LOG_LEVEL`) and runtime env-var gate. All 14 `fprintf(stderr)` calls in src/ replaced. |
 | CUDA kernel unit tests | ✅ `test_kernels`: 13/13 passed | GPU kernel operations (Add, Multiply, NormalizeVector, CosineSimilarity, BatchCosineSimilarity) validated against CPU reference; includes edge cases (zero, single-element, large 1M vectors). |
 | CI pipeline | ✅ GitHub Actions | `.github/workflows/ci.yml`: CUDA 12.5, CMake build + ctest + warning check + Python syntax verification. Triggered on push/PR to master. |
-| Test suite | 50 C++ CTest entries; real-WebSocket automation open | The current suite includes canonical-time-base, ASR-final-ID, typed evidence ordering, immutable VAD snapshot, and ASR/align protocol-mirroring tests. `test/CMakeLists.txt` defines `orator_add_py_test`, but invokes it zero times; `test/integration/py/run_py_test.py` is absent. The configured suite still does not automatically validate the product transport, Web UI, microphone, silence, or full terminal document. |
+| Test suite | 51 C++ CTest entries; real-WebSocket automation open | The current suite includes canonical-time-base, append-once raw records, raw/business track isolation, ASR-final-ID, typed evidence ordering, immutable VAD snapshots, business-pipeline registration, punctuation-preserving align projection, and protocol-mirroring tests. `test/CMakeLists.txt` defines `orator_add_py_test`, but invokes it zero times; `test/integration/py/run_py_test.py` is absent. The configured suite still does not automatically validate the product transport, Web UI, microphone, silence, or full terminal document. |
 | Diar tail parameter experiments | ❌ No accepted fix | 2026-07-10 TOML experiments used `diar_evidence_probe` on full `test.mp3` for strict onset/offset, `min_dur_on=1.2`, `min_dur_on=2.0`, `chunk_left_context=2`, `chunk_right_context=0`, and `left2_right0`. Threshold/min-duration changes deleted evidence without recovering the correct speaker; context variants did not solve 3270-3304 s and some removed the small local-2 hint at 3299.76 s. NeMo full-length reference on the same audio produced the same hard-window spk3 bias (`3270-3304.5`: spk3 313/431 frames; `3240-3360`: spk3 1013/1500 frames). `test_diar_stream` still passes against the stored NeMo oracle sample (`max_abs=0`, `mean_abs=0`). See Spec 012 `diar-tail-toml-experiments-2026-07-10.md`. |
 | TitaNet tail voiceprint review | ❌ No accepted override | 2026-07-10 orthogonal speaker-embedding review used `speaker_embedding_probe` on full `test.mp3` with 600 s, 60 s, and 30 s buckets. The hard-window `L3@3270-3300` bucket remains closest to historical L3 (`L3@3300-3330=0.762`, historical L3 up to 0.724) while best non-L3 alternatives are lower (`L0=0.440`, `L1=0.424`, `L2=0.321`). This rejects direct TitaNet override for 3270-3304 s. See Spec 012 `titanet-tail-evidence-2026-07-10.md`. |
 | OnText protocol matching | ✅ Fixed | Substring `text.find("end")` → JSON key `text.find("\"end\"")` to prevent false positives on partial matches. Same for reset/flush. |
@@ -107,7 +118,7 @@ item as a closure blocker.
 | ISpeakerEmbedder (core/stages.h) | ✅ Active in Spec 010 | Interface declares a fixed-dimension speaker embedding extractor. Runtime implementation: `model::TitaNetEmbedder`, wired into the diarization pipeline by `SpeakerIdentityStage` when `[speaker].enable=true` and `model_dir` is set. |
 | ISpeakerRegistry (core/stages.h) | ✅ Active in Spec 010 | Interface declares a persistent enrolled-speaker registry with 1:N matching. Runtime implementation: `model::SpeakerDatabase`, loaded/saved through `[speaker].registry_path` and used by `SpeakerIdentityStage` for global speaker ids. |
 | ISink (core/stages.h) | 🔒 Retained, partially active | Interface for terminal timeline consumers. The runtime uses `Emit` callbacks (std::function) instead for primary flow, but a concrete implementation `JsonSink` exists in `include/io/json_sink.h` and `src/io/json_sink.cc` for JSON serialization to streams. Retained as a contract option for non-callback consumers. |
-| ComprehensiveTimeline event system | 🔒 Retained, not implemented | The documentation previously claimed Subscribe/Unsubscribe/EventHandler/DispatchEvents were fully implemented with `fire_event_()` called from mutation methods, but code inspection of `comprehensive_timeline.h` and `comprehensive_timeline.cc` shows these event system components are not actually implemented. The container currently uses direct revision returns via `UpsertSpeaker`, `UpsertText`, `ReplaceSpeakers` methods. Retained as infrastructure concept for future pipeline growth. |
+| ComprehensiveTimeline typed subscriptions | Implemented; acceptance open | The container commits typed records under lock, then emits typed evidence updates after commit. Readers obtain immutable snapshots or ID-keyed records. Focused tests cover callback ordering, unsubscribe behavior, VAD snapshot immutability, append-once conflicts, reset, and raw/business isolation. Runtime transport and full-session convergence remain Spec 013 gates. |
 
 ## 4. Measured performance (GPU fixed at 1.3 GHz, power mode MaxN)
 
@@ -247,13 +258,14 @@ Findings:
 
 ## 7. Immediate next step
 
-Continue [Spec 013](013-industrial-closing-validation/spec.md) Phase 1 by moving
-speaker choice, text projection, and gap policy into the registered
-`business_speaker` pipeline, then add full extent and ID-convergence checks and
-remove remaining behavioral environment-only switches. Do not resume parameter tuning or make a
-product-closure claim before the architecture, reference-ledger, and
-reproducibility gates pass. The bullets below are historical implementation and
-measurement records; none independently satisfies Spec 013 acceptance.
+Continue [Spec 013](013-industrial-closing-validation/spec.md) Phase 1 with full
+end-of-stream extent reconciliation, ID-convergence coverage, and migration of
+remaining behavioral environment-only switches. Then restore a single-reader,
+registered real-WebSocket integration gate and freeze the reproducible baseline.
+Do not resume parameter tuning or make a product-closure claim before the
+architecture, reference-ledger, and reproducibility gates pass. The bullets
+below are historical implementation and measurement records; none independently
+satisfies Spec 013 acceptance.
 
 - **Spec 012 speaker-business recovery — historical evidence line** (2026-07-09).
   The latest runtime candidate fixes the known full-length regression windows by
@@ -292,7 +304,7 @@ measurement records; none independently satisfies Spec 013 acceptance.
   - README env var table + Python test CTest registration + protocol envelope unwrapping in web UI
 - **Spec 004 — Protocol Layer**: Implemented. Phases 7–12 complete. Phase 13 (session persistence): core backend (SessionStore T130–T132) and WS commands (T133–T134) implemented; T135 (Web UI session history panel) NOT YET IMPLEMENTED. Web UI (`app.js`) now includes `unwrapEnvelope()` for Spec 004 topic-based protocol envelopes. Integration test (`ws_ui_integration_test.py`) uses `unwrap_envelope()` for all WS message parsing.
 - **Full-length streaming verification**: 2026-06-21. 3615 s (1 hr) audio pushed through real WebSocket → 382.0 s wall = **9.46× real-time**. All three tracks (ASR/diarization/VAD) cover 100 % of the audio, no crash, no clock drift, no data loss. Achieved 9.25× on a consecutive warm-GPU re-run and 5.82× on a cold-start run, confirming model-load overhead is one-time.
-- **Historical Python integration-test claim** (2026-06-22). The documented `test/run_py_test.py` lifecycle is not present in the current tree. The current 50 C++ tests still do not include a registered real-WebSocket gate; restoring one is a Spec 013 task.
+- **Historical Python integration-test claim** (2026-06-22). The documented `test/run_py_test.py` lifecycle is not present in the current tree. The current 51 C++ tests still do not include a registered real-WebSocket gate; restoring one is a Spec 013 task.
 - **TOML config system** (2026-06-22; precedence corrected 2026-07-13). Runtime fields are broadly represented in `orator.toml`, and `ws_main.cc` now applies defaults → TOML → environment → CLI. Several lower-level environment-only switches remain, so configuration consistency is still open under Spec 013. See `include/io/config_reader.h`, `src/io/config_reader.cc`, `src/net/ws_main.cc`, and `orator.toml`.
 - **VAD-gated ASR fix** (2026-06-22). VAD async-lag protection via segment-start confirmation check. ASR segments reduced from 43→18 (120s test). RTF improved 4.7→3.7. Parameters tuned: `asr_vad_trail_sec=1.0`, `vad_min_silence_ms=300`. See `src/pipeline/asr_worker.cc:61-141`.
 - **Full-length verification (v7)** (2026-06-23). 3615s (1 hr) audio at 420× injection: **964s wall (3.75×)**, no crash, no data loss. 300s verification confirms 3 ASR segments cover 300s of audio (merging 90 VAD segments). Speed regression from 9.46× (pre-v7) due to VAD segment-start check keeping ASR segments open longer, causing more audio to pass through GPU processing. 120s test at 1× real-time still at RTF 3.7.

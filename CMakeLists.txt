@@ -101,6 +101,7 @@ set(ORATOR_CORE_SOURCES
     src/pipeline/auditory_stream_serialize.cc
     src/pipeline/asr_preprocessor.cc
     src/pipeline/comprehensive_timeline.cc
+    src/pipeline/business_speaker_pipeline.cc
     src/pipeline/gpu_vad.cu
     src/pipeline/shared_audio_buffer.cc
     src/pipeline/pipeline_audio_cache.cc
