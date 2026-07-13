@@ -186,14 +186,41 @@ int main() {
   std::mutex state_mutex;
   std::vector<orator::core::DiarSegment> last_segments;
   const std::vector<orator::core::DiarSegment> diar_segments = {
-      {0.1, 0.2, 2, "spk_2", 0.9f}};
+      {1.0, 2.0, 2, "spk_2", 0.9f},
+      {0.1, 0.2, 3, "spk_3", 0.8f},
+      {1.0, 1.5, 1, "spk_1", 0.7f},
+      {1.0, 1.5, 0, "spk_0", 0.6f},
+  };
   orator::pipeline::HandleSpeakerSink(evidence, state_mutex, last_segments,
                                       &protocol, diar_handle.get(), emit,
                                       diar_segments);
-  CHECK(evidence.SnapshotTracks().diarization.size() == 1,
-        "diarization commits to the typed track");
+  const auto diarization = evidence.SnapshotTracks().diarization;
+  CHECK(diarization.size() == 4, "diarization commits to the typed track");
+  CHECK(last_segments.size() == 4 &&
+            last_segments[0].local_speaker == 3 &&
+            last_segments[1].local_speaker == 0 &&
+            last_segments[2].local_speaker == 1 &&
+            last_segments[3].local_speaker == 2,
+        "speaker sink canonicalizes overlapping segment order");
+  CHECK(diarization.size() == last_segments.size() &&
+            diarization[0].speaker == "speaker_3" &&
+            diarization[1].speaker == "speaker_0" &&
+            diarization[2].speaker == "speaker_1" &&
+            diarization[3].speaker == "speaker_2",
+        "terminal diarization preserves the live canonical order");
   CHECK(events.back().find("\"type\":\"diar\"") != std::string::npos,
         "diarization emits a self-describing live event");
+  const std::string& diar_event = events.back();
+  const auto first = diar_event.find("\"start\":0.100");
+  const auto overlap_zero = diar_event.find(
+      "\"start\":1.000,\"end\":1.500,\"speaker\":\"speaker_0\"");
+  const auto overlap_one = diar_event.find(
+      "\"start\":1.000,\"end\":1.500,\"speaker\":\"speaker_1\"");
+  const auto longest = diar_event.find(
+      "\"start\":1.000,\"end\":2.000,\"speaker\":\"speaker_2\"");
+  CHECK(first < overlap_zero && overlap_zero < overlap_one &&
+            overlap_one < longest,
+        "live diarization uses terminal canonical ordering");
 
   PipelineDescriptor vad_descriptor;
   vad_descriptor.name = "vad";

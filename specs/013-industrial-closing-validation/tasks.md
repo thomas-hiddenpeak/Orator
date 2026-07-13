@@ -10,8 +10,10 @@
 - [ ] T003 Correct all remaining closure and implementation claims in
   `PROJECT_STATE.md`, active specs, READMEs, and code comments.
 - [x] T004 Define the reproducibility manifest and artifact naming convention.
-- [ ] T005 Freeze the current unaccepted baseline commit, TOML, registry state,
-  model/data hashes, and full JSON package.
+- [x] T005 Freeze the current unaccepted baseline commit, TOML, registry state,
+  model/data hashes, and full JSON package. The `ee0dd82` full package is
+  retained as diagnostic evidence and explicitly rejected by its live/terminal
+  ordering contract; see `baseline-2026-07-14.md`.
 
 ## Phase 1: Contract Compliance
 
@@ -63,11 +65,15 @@
   generated silence with isolated TOML storage.
 - [ ] T042 Run clean build, warning check, full CTest, JavaScript checks, and
   selected sanitizer/CUDA memory checks.
-- [ ] T043 Run 120 s, 360 s, and 600 s real-WebSocket tests with committed TOML.
+- [x] T043 Run 120 s, 360 s, and 600 s real-WebSocket tests with committed TOML.
 - [ ] T044 Run one full current-baseline WebSocket capture with continuous
   `tegrastats` and browser evidence.
 - [ ] T045 Complete the 556-row baseline context review and publish all required
   score breakdowns without script-inferred judgments.
+- [x] T046 Canonicalize equal-start overlapping diarization records before the
+  typed/live split and retain strict live/terminal equality validation. The
+  full `ee0dd82` diagnostic package exposed three order-only mismatches;
+  `test_typed_evidence_flow` now covers the contract.
 
 ## Phase 4: Existing-Model Upper Bound
 

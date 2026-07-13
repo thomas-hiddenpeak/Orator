@@ -17,6 +17,8 @@
 #include "protocol/topic.h"
 #include "protocol/topic_router.h"
 
+#include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <mutex>
 #include <string>
@@ -25,6 +27,22 @@
 
 namespace orator {
 namespace pipeline {
+namespace {
+
+bool DiarSegmentLess(const core::DiarSegment& a,
+                     const core::DiarSegment& b) {
+  constexpr double kTimeEpsilon = 1e-9;
+  if (std::abs(a.start_sec - b.start_sec) > kTimeEpsilon) {
+    return a.start_sec < b.start_sec;
+  }
+  if (a.end_sec != b.end_sec) return a.end_sec < b.end_sec;
+  if (a.local_speaker != b.local_speaker) {
+    return a.local_speaker < b.local_speaker;
+  }
+  return a.speaker_id < b.speaker_id;
+}
+
+}  // namespace
 
 // ---------------------------------------------------------------------------
 // Speaker sink callback: typed deposit first, then protocol mirror.
@@ -35,15 +53,19 @@ void HandleSpeakerSink(ComprehensiveTimeline& comp, std::mutex& state_mutex,
                        protocol::PipelineHandle* diar_handle,
                        const EventEmitter& emit,
                        const std::vector<core::DiarSegment>& segs) {
+  std::vector<core::DiarSegment> ordered_segments = segs;
+  std::stable_sort(ordered_segments.begin(), ordered_segments.end(),
+                   DiarSegmentLess);
+
   std::string segments_json = "[";
   std::vector<ComprehensiveTimeline::SpeakerInput> typed_segments;
-  typed_segments.reserve(segs.size());
+  typed_segments.reserve(ordered_segments.size());
   {
     std::lock_guard<std::mutex> lk(state_mutex);
-    last_segments = segs;
+    last_segments = ordered_segments;
   }
-  for (size_t i = 0; i < segs.size(); ++i) {
-    const auto& s = segs[i];
+  for (size_t i = 0; i < ordered_segments.size(); ++i) {
+    const auto& s = ordered_segments[i];
     // Keep "speaker" as the diarizer-local label (preserves the integer
     // mapping consumers derive from "speaker_<n>"); expose the resolved
     // global voiceprint identity, when any, in a separate "speaker_id" field
@@ -65,7 +87,7 @@ void HandleSpeakerSink(ComprehensiveTimeline& comp, std::mutex& state_mutex,
                     s.confidence);
     }
     segments_json += b;
-    if (i + 1 < segs.size()) segments_json += ",";
+    if (i + 1 < ordered_segments.size()) segments_json += ",";
   }
   segments_json += "]";
 
@@ -75,7 +97,8 @@ void HandleSpeakerSink(ComprehensiveTimeline& comp, std::mutex& state_mutex,
   msg.topic = protocol::kDiarSpeakerSegment.to_string();
   msg.pipeline = "diar";
   msg.pipeline_version = "1.0.0";
-  msg.timestamp_sec = segs.empty() ? 0.0 : segs[0].start_sec;
+  msg.timestamp_sec =
+      ordered_segments.empty() ? 0.0 : ordered_segments[0].start_sec;
   msg.qos = static_cast<uint8_t>(protocol::QoS::AT_LEAST_ONCE);
   msg.schema_version = 1;
   msg.data = "{\"type\":\"diar\",\"source\":\"sortformer\",\"segments\":" +

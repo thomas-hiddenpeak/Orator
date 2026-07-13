@@ -14,7 +14,7 @@ work is specified under [specs/](.).
 > pass is the consistency proof. Status lines advance to `Implemented` in the
 > same change that lands the code, with the commit reference.
 
-- **Last updated**: 2026-07-13 (Spec 013 contract and product-surface gates established)
+- **Last updated**: 2026-07-14 (Spec 013 frozen baseline and diar ordering contract)
 - **Branch**: `master`
 - **Constitution**: v1.6.0
 - **Product closure**: **OPEN / NOT ACCEPTED**. No current artifact proves the
@@ -89,8 +89,9 @@ The single-reader client captured 120 continuous `tegrastats` samples and
 finished in 121.214 s (0.990x). This is architecture/transport evidence, not
 contextual accuracy evidence.
 
-**2026-07-13 contract/UI verification**: CMake now registers 53 tests (51 C++,
-one Node browser-model test, and one real-WebSocket integration test). The
+**2026-07-13 contract/UI verification**: CMake now registers 55 tests (51 C++,
+two Python tooling tests, one real-WebSocket Python integration test, and one
+Node browser-model test). The
 registered WS gate uses an isolated generated TOML and the sole unified socket
 client to run 12 s of canonical speech plus 30 s of generated zero PCM; both
 had no mechanical contract errors, and silence produced no live or terminal
@@ -100,6 +101,19 @@ exact reload, deliberate server restart with clean reconnect, fake-device
 microphone capture, and desktop/mobile screenshots with no unexpected browser
 errors. This is short-path product-contract evidence, not the required physical
 microphone, full-session context review, or accuracy result.
+
+**2026-07-14 frozen baseline**: clean commit `ee0dd82` completed committed-TOML
+120/360/600 s real-WebSocket runs at 0.990x/0.998x/0.999x with no mechanical
+contract errors. Its 3615.12 s diagnostic run completed in 3616.496 s (1.000x),
+and all seven tracks reached 57,841,920 samples with zero gaps, but the package
+was correctly rejected because three equal-start overlapping diar pairs had a
+different live and terminal order. The 773 normalized records were otherwise
+identical. `HandleSpeakerSink` now canonicalizes producer records before both
+typed deposit and live serialization; the strict validator remains unchanged,
+and `test_typed_evidence_flow` covers the equal-start case. The configured
+55-test suite passes. See
+[baseline-2026-07-14.md](013-industrial-closing-validation/baseline-2026-07-14.md).
+No full-session accuracy result or closing claim follows from this evidence.
 
 ## 3. Component status
 
@@ -117,11 +131,11 @@ microphone, full-session context review, or accuracy result.
 | Revisable comprehensive timeline (Spec 004) | Container/fusion ownership corrected; acceptance open | `ComprehensiveTimeline` stores typed diarization, ASR, VAD, alignment, and business tracks and publishes immutable snapshots/typed updates. `BusinessSpeakerPipeline` owns align-aware projection, gap fill, and speaker-support diagnostics. The terminal `comprehensive` field is a compatibility alias serialized from the exact stored `business_speaker` entries. Full contextual acceptance remains open. |
 | Reusable common time base (Spec 004) | Session ownership and final reconciliation implemented; acceptance open | `AuditoryStream` owns one immutable `TimeBase` and injects it into every active private cache, worker, and retained audio store. Finalization reconciles exact sample extents for input, diarization, speaker identity, ASR, VAD, alignment, and business speaker; focused tests and the 2026-07-13 120 s real-WebSocket run reported zero gaps. Full-session repeatability remains open under Spec 013. |
 | Pipeline protocol layer (Spec 004) | ✅ Implemented | Phases 7–12 complete: data types (topic.h, schema.h), pipeline registry, topic router, storage layer (MEMORY + DISK), ProtocolTimeline integration, WS v2 envelope with describe command, --storage-disk-path flag. 25/25 tests pass. |
-| Streaming validation | Registered short-path gate; closing runs open | `tools/verify/py/ws_unified_test.py` has one socket reader, correlates command responses without competing reads, captures continuous `tegrastats`, and rejects mechanical live/final, typed-track, ID, alignment, VAD/diar, and extent violations. `test_ws_contract` now starts the real server with isolated TOML storage and runs canonical speech plus generated silence through that sole client. Structural checks never assign semantic accuracy; 120/360/600/full contextual gates remain open. |
+| Streaming validation | Registered short-path gate; closing runs open | `tools/verify/py/ws_unified_test.py` has one socket reader, correlates command responses without competing reads, captures continuous `tegrastats`, and rejects mechanical live/final, typed-track, ID, alignment, VAD/diar, and extent violations. `HandleSpeakerSink` canonicalizes overlapping diar records before typed/live publication so strict live/terminal equality is deterministic. `test_ws_contract` starts the real server with isolated TOML storage and runs canonical speech plus generated silence through that sole client. Structural checks never assign semantic accuracy; post-fix 120/360/600/full contextual gates remain open. |
 | Logging system | ✅ Include-level `core/log.h` | Level-based macros (`LOG_DEBUG`/`INFO`/`WARN`/`ERROR`) with compile-time floor (`ORATOR_LOG_LEVEL`) and runtime env-var gate. All 14 `fprintf(stderr)` calls in src/ replaced. |
 | CUDA kernel unit tests | ✅ `test_kernels`: 13/13 passed | GPU kernel operations (Add, Multiply, NormalizeVector, CosineSimilarity, BatchCosineSimilarity) validated against CPU reference; includes edge cases (zero, single-element, large 1M vectors). |
 | CI pipeline | ✅ GitHub Actions | `.github/workflows/ci.yml`: CUDA 12.5, CMake build + ctest + warning check + Python syntax verification. Triggered on push/PR to master. |
-| Test suite | 53 configured CTest entries | The suite contains 51 C++ tests plus `test_ws_contract` and `test_web_model`. It covers canonical time-base ownership, exact extents, append-once raw records, raw/business isolation, stable IDs, typed ordering, immutable/active VAD evidence, endpoint/retract behavior, protocol mirrors, real transport speech/silence, and deterministic browser-state convergence. Playwright and physical-microphone acceptance remain outside CTest, and no automated result substitutes for the 556-row review. |
+| Test suite | 55 configured CTest entries | The suite contains 51 C++ tests, three Python tests (`test_repro_manifest`, `test_closing_ledger`, and `test_ws_contract`), and `test_web_model`. It covers canonical time-base ownership, exact extents, append-once raw records, raw/business isolation, stable IDs, deterministic overlapping-diar ordering, typed ordering, immutable/active VAD evidence, endpoint/retract behavior, protocol mirrors, real transport speech/silence, reproducibility/ledger validation, and deterministic browser-state convergence. Playwright and physical-microphone acceptance remain outside CTest, and no automated result substitutes for the 556-row review. |
 | Diar tail parameter experiments | ❌ No accepted fix | 2026-07-10 TOML experiments used `diar_evidence_probe` on full `test.mp3` for strict onset/offset, `min_dur_on=1.2`, `min_dur_on=2.0`, `chunk_left_context=2`, `chunk_right_context=0`, and `left2_right0`. Threshold/min-duration changes deleted evidence without recovering the correct speaker; context variants did not solve 3270-3304 s and some removed the small local-2 hint at 3299.76 s. NeMo full-length reference on the same audio produced the same hard-window spk3 bias (`3270-3304.5`: spk3 313/431 frames; `3240-3360`: spk3 1013/1500 frames). `test_diar_stream` still passes against the stored NeMo oracle sample (`max_abs=0`, `mean_abs=0`). See Spec 012 `diar-tail-toml-experiments-2026-07-10.md`. |
 | TitaNet tail voiceprint review | ❌ No accepted override | 2026-07-10 orthogonal speaker-embedding review used `speaker_embedding_probe` on full `test.mp3` with 600 s, 60 s, and 30 s buckets. The hard-window `L3@3270-3300` bucket remains closest to historical L3 (`L3@3300-3330=0.762`, historical L3 up to 0.724) while best non-L3 alternatives are lower (`L0=0.440`, `L1=0.424`, `L2=0.321`). This rejects direct TitaNet override for 3270-3304 s. See Spec 012 `titanet-tail-evidence-2026-07-10.md`. |
 | OnText protocol matching | ✅ Fixed | Substring `text.find("end")` → JSON key `text.find("\"end\"")` to prevent false positives on partial matches. Same for reset/flush. |
