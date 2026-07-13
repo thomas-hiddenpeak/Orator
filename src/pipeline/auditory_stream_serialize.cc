@@ -400,6 +400,9 @@ std::string AuditoryStream::Serialize() {
   const double asr_c = asr_compute_sec();
   const double wall_start = session_start_wall_sec_.load();
   const bool wclk_ok = wall_clock_ok_.load();
+  const bool timebase_reconciled = timebase_reconciled_.load();
+  const bool timebase_ok = timebase_ok_.load();
+  const auto extents = track_extents();
 
   char buf[256];
   std::string business_entries_json;
@@ -450,12 +453,26 @@ std::string AuditoryStream::Serialize() {
   }
 
   std::string out = "{\"type\":\"timeline\",\"schema_version\":1,";
-  std::snprintf(buf, sizeof(buf),
-                "\"audio_sec\":%.3f,\"sample_rate\":%d,"
-                "\"session_start_wall_sec\":%.3f,\"wall_clock_ok\":%s,",
-                audio, config_.sample_rate, wall_start,
-                wclk_ok ? "true" : "false");
+  std::snprintf(
+      buf, sizeof(buf),
+      "\"audio_sec\":%.3f,\"sample_rate\":%d,"
+      "\"session_start_wall_sec\":%.3f,\"wall_clock_ok\":%s,"
+      "\"timebase_reconciled\":%s,\"timebase_ok\":%s,",
+      audio, config_.sample_rate, wall_start, wclk_ok ? "true" : "false",
+      timebase_reconciled ? "true" : "false", timebase_ok ? "true" : "false");
   out += buf;
+  out += "\"track_extents\":[";
+  for (std::size_t i = 0; i < extents.size(); ++i) {
+    const auto& extent = extents[i];
+    std::snprintf(buf, sizeof(buf),
+                  "{\"pipeline\":\"%s\",\"processed_samples\":%ld,"
+                  "\"common_total_samples\":%ld,\"gap_samples\":%ld}",
+                  extent.pipeline.c_str(), extent.processed_samples,
+                  extent.common_total_samples, extent.gap_samples);
+    out += buf;
+    if (i + 1 < extents.size()) out += ",";
+  }
+  out += "],";
   out += "\"tracks\":[";
 
   // Track: speaker diarization.

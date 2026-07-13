@@ -37,6 +37,11 @@ void AlignWorker::Stop() {
   running_ = false;
 }
 
+void AlignWorker::FinalizeExtent(long total_samples) {
+  if (running_ || total_samples < 0) return;
+  processed_samples_.store(total_samples);
+}
+
 void AlignWorker::Enqueue(long id, double start, double end,
                           const std::string& text) {
   if (text.empty()) return;

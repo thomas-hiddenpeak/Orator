@@ -221,6 +221,13 @@ class AuditoryStream {
   // controller serializes these calls so the transport sees one at a time.
   using Emit = std::function<void(const std::string&)>;
 
+  struct TrackExtent {
+    std::string pipeline;
+    long processed_samples = 0;
+    long common_total_samples = 0;
+    long gap_samples = 0;
+  };
+
   AuditoryStream(const Config& config, Emit emit);
   ~AuditoryStream();
 
@@ -236,10 +243,10 @@ class AuditoryStream {
   void PushAudio(const float* samples, int n);
 
   // Send the comprehensive timeline. When finalize is true: signal
-  // end-of-stream, process all remaining audio, join both workers, then
-  // serialize. When false (flush): wait until both workers have processed all
-  // audio appended so far, then serialize; streaming continues and worker state
-  // is retained.
+  // end-of-stream, process all remaining audio, join every worker, reconcile
+  // every active pipeline extent, then serialize. When false (flush): wait for
+  // the direct audio consumers to process all audio appended so far, then
+  // serialize; streaming continues and worker state is retained.
   void EmitTimeline(bool finalize);
 
   // Stop the workers (if running), clear all state for a fresh session, then
@@ -259,6 +266,9 @@ class AuditoryStream {
     return session_start_wall_sec_.load();
   }
   bool wall_clock_ok() const { return wall_clock_ok_.load(); }
+  bool timebase_reconciled() const { return timebase_reconciled_.load(); }
+  bool timebase_ok() const { return timebase_ok_.load(); }
+  std::vector<TrackExtent> track_extents() const;
   const core::TimeBase& time_base() const { return time_base_; }
 
   // Spec 004 Phase 12: access to protocol timeline for describe command.
@@ -280,8 +290,9 @@ class AuditoryStream {
  private:
   void StartWorkers();  // start diar + asr threads
   void StopWorkers();   // close buffer, join threads
-  // Block until both workers have processed up to `target_samples`.
+  // Block until direct audio consumers have processed `target_samples`.
   void WaitForBarrier(long target_samples);
+  void ReconcileFinalExtents();
   std::string Serialize();  // build the comprehensive timeline JSON
   void EmitLocked(const std::string& json);  // serialize transport sends
   // Spec 002 FR7: build the periodic GPU-scheduling telemetry message from the
@@ -343,6 +354,7 @@ class AuditoryStream {
   // Spec 004: independent VAD detector (third pipeline consumer).
   std::unique_ptr<core::IVad> vad_detector_;
   std::thread vad_thread_;
+  std::atomic<long> vad_processed_samples_{0};
 
   // Spec 002: per-pipeline GPU stream priority registry. Each pipeline declares
   // a priority index + class at registration and (when stream-routed) receives
@@ -404,10 +416,12 @@ class AuditoryStream {
   // Reset(). Null when persistence is disabled (empty storage_disk_path).
   std::unique_ptr<protocol::SessionStore> session_store_;
 
-  // Wall clock anchor for session-level physical-time mapping.
-  // Set at Reset() (entry), validated at EmitTimeline(finalize=true) (exit).
+  // Wall-clock anchor is set by the first audio sample, so connection setup,
+  // optional commands, and idle time before ingest are excluded.
   std::atomic<double> session_start_wall_sec_{0.0};
   std::atomic<bool> wall_clock_ok_{true};
+  std::atomic<bool> timebase_reconciled_{false};
+  std::atomic<bool> timebase_ok_{true};
 };
 
 }  // namespace pipeline

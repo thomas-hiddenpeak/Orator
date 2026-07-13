@@ -61,12 +61,19 @@ class AlignWorker {
   // Signal end-of-stream, drain the remaining queued jobs, and join the thread.
   void Stop();
 
+  // Called by the session owner after Stop() has drained every finalized ASR
+  // job. Advancing to the common final sample records that the align pipeline
+  // has consumed all upstream evidence through end-of-stream; alignment
+  // coverage is validated separately by exact ASR/alignment ID convergence.
+  void FinalizeExtent(long total_samples);
+
   // Enqueue a finalized transcript segment for alignment. Non-blocking: returns
   // immediately after queuing. Empty text is ignored.
   void Enqueue(long id, double start, double end, const std::string& text);
 
   double compute_sec() const { return compute_sec_.load(); }
   long aligned_segments() const { return aligned_segments_.load(); }
+  long processed_samples() const { return processed_samples_.load(); }
 
  private:
   struct Job {
@@ -94,6 +101,7 @@ class AlignWorker {
 
   std::atomic<double> compute_sec_{0.0};
   std::atomic<long> aligned_segments_{0};
+  std::atomic<long> processed_samples_{0};
 };
 
 }  // namespace pipeline

@@ -126,6 +126,7 @@ std::string ProtocolTimeline::Describe() const {
 
   std::ostringstream out;
   out << "{\n";
+  out << "  \"type\": \"describe\",\n";
 
   auto pipelines = registry_->Describe();
   out << "  \"pipelines\": [\n";

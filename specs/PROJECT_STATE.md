@@ -77,14 +77,17 @@ reject conflicting same-ID deposits.
   missing evidence.
 
 **2026-07-13 Phase 1 verification**: the configured CTest suite passed 51/51.
-A 120 s, rate=1 real-WebSocket run with committed `orator.toml` produced 25
-diarization, 10 ASR, 39 VAD, 10 alignment, and 25 business-speaker entries.
-Every alignment/business `text_id` resolved to one raw ASR record, business
-spans stayed inside their source span, the business track exactly matched the
-compatibility `comprehensive` view, and each source text was reconstructed
-byte-for-byte from its business slices. This is architecture/transport evidence,
-not contextual accuracy evidence. Total wall time was 123.272 s for 120 s audio,
-so the current `wall_clock_ok` gate remains open.
+A 120 s, rate=1 real-WebSocket run with committed `orator.toml`
+(`/tmp/orator_spec013_t011_120s.json`) produced 25 diarization, 10 ASR, 39 VAD,
+10 alignment, and 25 business-speaker entries. Every alignment/business
+`text_id` resolved to one raw ASR record, business spans stayed inside their
+source span, the business track exactly matched the compatibility
+`comprehensive` view, and each source text was reconstructed byte-for-byte from
+its business slices. All seven active extents ended at 1,920,000 samples with
+zero gap; `timebase_reconciled`, `timebase_ok`, and `wall_clock_ok` were true.
+The single-reader client captured 120 continuous `tegrastats` samples and
+finished in 121.214 s (0.990x). This is architecture/transport evidence, not
+contextual accuracy evidence.
 
 ## 3. Component status
 
@@ -100,9 +103,9 @@ so the current `wall_clock_ok` gate remains open.
 | ASR + WS integration | Implemented; product convergence open | `AuditoryStream` owns one private `PipelineAudioCache` per active producer and uses separate worker threads. One session-owned `TimeBase` is injected into all active stores and workers. Final ASR live emission and its typed sink reuse the same allocated `text_id`, and the ASR terminal track serializes it. ASR reads immutable VAD evidence snapshots from `ComprehensiveTimeline`; forced alignment consumes typed finalized ASR records from the same store. Full ID convergence through revisions/export/reconnect/Web UI is not yet proven. Silent-input filtering has useful prior evidence but must be repeated under Spec 013. |
 | Incremental KV-cache ASR streaming (Spec 003) | ✅ Implemented, verified, committed (8cc31ab); params refined 2026-07-03 | Persistent KV cache + prefix caching + chunk-local windowed encoder; partial-emission every 1 s via WebSocket. Full 1hr CER 16.1% / 6.22x; beats production Silero-VAD at every scale. **Current params**: `kStreamWindowMel=100` (1 s), `max_new_tokens=32`, `unfixed_chunks=2`, `unfixed_tokens=15`, `segment_sec=24.0`, `vad_min_overlap_sec=0.12`. 2026-07-03 real WS `test.mp3` 600 s A/B after the VAD-overlap filter: `segment_sec=24` produced 49 ASR finals vs 67 at 12 s, with the same final comprehensive count (115) and better `To C` wording; default restored to 24 s for ASR semantic stability. |
 | Revisable comprehensive timeline (Spec 004) | Container/fusion ownership corrected; acceptance open | `ComprehensiveTimeline` stores typed diarization, ASR, VAD, alignment, and business tracks and publishes immutable snapshots/typed updates. `BusinessSpeakerPipeline` owns align-aware projection, gap fill, and speaker-support diagnostics. The terminal `comprehensive` field is a compatibility alias serialized from the exact stored `business_speaker` entries. Full contextual acceptance remains open. |
-| Reusable common time base (Spec 004) | Session source ownership corrected; full reconciliation open | `AuditoryStream` owns one immutable `TimeBase` and injects it into every active private cache, worker, and retained audio store. Focused tests preserve the supplied sample rate and origin. Spec 013 still requires mandatory end-of-stream extent reconciliation for every registered track. |
+| Reusable common time base (Spec 004) | Session ownership and final reconciliation implemented; acceptance open | `AuditoryStream` owns one immutable `TimeBase` and injects it into every active private cache, worker, and retained audio store. Finalization reconciles exact sample extents for input, diarization, speaker identity, ASR, VAD, alignment, and business speaker; focused tests and the 2026-07-13 120 s real-WebSocket run reported zero gaps. Full-session repeatability remains open under Spec 013. |
 | Pipeline protocol layer (Spec 004) | ✅ Implemented | Phases 7–12 complete: data types (topic.h, schema.h), pipeline registry, topic router, storage layer (MEMORY + DISK), ProtocolTimeline integration, WS v2 envelope with describe command, --storage-disk-path flag. 25/25 tests pass. |
-| Streaming validation | Manual real-WebSocket tool present; automated gate missing | `tools/verify/py/ws_unified_test.py` is the only current Python WebSocket client and captures live events, terminal JSON, and `tegrastats`. It is not registered as an active CTest integration test. Its obsolete matrix mode does not apply the labelled overrides and ranks unknown duration, so it is invalid for configuration selection. |
+| Streaming validation | Single-reader real-WebSocket client corrected; CTest registration open | `tools/verify/py/ws_unified_test.py` now has one socket reader, correlates optional command responses without competing frame reads, captures continuous `tegrastats`, and rejects mechanical live/final, typed-track, ID, alignment, and extent contract violations. The invalid parameter-matrix mode and three blocking telemetry snapshots were removed. It is not yet registered as an active CTest integration test, and its structural checks are not semantic accuracy judgments. |
 | Logging system | ✅ Include-level `core/log.h` | Level-based macros (`LOG_DEBUG`/`INFO`/`WARN`/`ERROR`) with compile-time floor (`ORATOR_LOG_LEVEL`) and runtime env-var gate. All 14 `fprintf(stderr)` calls in src/ replaced. |
 | CUDA kernel unit tests | ✅ `test_kernels`: 13/13 passed | GPU kernel operations (Add, Multiply, NormalizeVector, CosineSimilarity, BatchCosineSimilarity) validated against CPU reference; includes edge cases (zero, single-element, large 1M vectors). |
 | CI pipeline | ✅ GitHub Actions | `.github/workflows/ci.yml`: CUDA 12.5, CMake build + ctest + warning check + Python syntax verification. Triggered on push/PR to master. |
@@ -258,10 +261,10 @@ Findings:
 
 ## 7. Immediate next step
 
-Continue [Spec 013](013-industrial-closing-validation/spec.md) Phase 1 with full
-end-of-stream extent reconciliation, ID-convergence coverage, and migration of
-remaining behavioral environment-only switches. Then restore a single-reader,
-registered real-WebSocket integration gate and freeze the reproducible baseline.
+Continue [Spec 013](013-industrial-closing-validation/spec.md) Phase 1 with the
+remaining ID-convergence coverage and migration of behavioral environment-only
+switches. Then register the corrected real-WebSocket integration gate, complete
+Web UI/browser contract coverage, and freeze the reproducible baseline.
 Do not resume parameter tuning or make a product-closure claim before the
 architecture, reference-ledger, and reproducibility gates pass. The bullets
 below are historical implementation and measurement records; none independently

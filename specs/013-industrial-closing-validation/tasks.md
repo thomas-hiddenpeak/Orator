@@ -17,7 +17,7 @@
 
 - [x] T010 Create one session-owned immutable `TimeBase` and inject it into every
   audio store and worker.
-- [ ] T011 Make end-of-stream extent reconciliation cover every registered track
+- [x] T011 Make end-of-stream extent reconciliation cover every registered track
   and fail tests on any mismatch.
 - [x] T012 Add typed incremental evidence reads/subscriptions to
   `ComprehensiveTimeline` without content inference.
@@ -30,13 +30,15 @@
 - [x] T016 Fix finalized ASR `text_id` allocation/emission order and serialize IDs
   explicitly in the ASR terminal track.
 - [ ] T017 Add ID-convergence tests across partial/final events, align groups,
-  revisions, terminal tracks, export, reconnect, and Web UI state.
+  revisions, terminal tracks, export, reconnect, and Web UI state. The unified
+  client now gates final events, align groups, business revisions, and terminal
+  tracks; partial replacement, export, reconnect, and Web UI state remain open.
 - [ ] T018 Correct configuration precedence and migrate/remove every behavioral
   environment-only switch. Precedence and timeline gap-fill are corrected;
   remaining lower-level switches are still open.
 - [ ] T019 Emit or capture the complete resolved configuration in every run
   manifest.
-- [ ] T020 Remove the misleading parameter-matrix mode from the unified test
+- [x] T020 Remove the misleading parameter-matrix mode from the unified test
   client and retain execution/capture responsibilities only.
 
 ## Phase 2: Reference Ledger

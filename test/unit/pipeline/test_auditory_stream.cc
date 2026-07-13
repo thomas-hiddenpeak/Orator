@@ -227,8 +227,26 @@ int main() {
     stream.PushAudio(silence.data(), static_cast<int>(silence.size()));
     stream.EmitTimeline(true);
     CHECK(!last_emit.empty(), "EmitTimeline produced output");
+    CHECK(stream.session_start_wall_sec() > 0.0,
+          "first audio sample anchors the session wall clock");
+    CHECK(stream.wall_clock_ok(),
+          "wall-clock gate excludes idle time before first audio");
+    CHECK(stream.timebase_reconciled(),
+          "finalize reconciles active pipeline extents");
+    CHECK(stream.timebase_ok(), "all active pipeline extents match");
+    bool all_extents_match = true;
+    for (const auto& extent : stream.track_extents()) {
+      if (extent.gap_samples != 0) all_extents_match = false;
+    }
+    CHECK(all_extents_match, "every reported track extent has zero gap");
     CHECK(last_emit.find("\"type\":\"timeline\"") != std::string::npos,
           "output is a timeline JSON");
+    CHECK(last_emit.find("\"timebase_reconciled\":true") != std::string::npos,
+          "terminal JSON records completed extent reconciliation");
+    CHECK(last_emit.find("\"timebase_ok\":true") != std::string::npos,
+          "terminal JSON records successful extent reconciliation");
+    CHECK(last_emit.find("\"gap_samples\":0") != std::string::npos,
+          "terminal JSON exposes per-track sample gaps");
     CHECK(last_emit.find("\"tracks\"") != std::string::npos,
           "timeline contains tracks array");
     CHECK(last_emit.find("\"kind\":\"business_speaker\"") != std::string::npos,

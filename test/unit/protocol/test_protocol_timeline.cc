@@ -51,6 +51,8 @@ int main() {
     desc.version = "0.1";
     auto handle = tl.RegisterPipeline(std::move(desc));
     std::string desc_str = tl.Describe();
+    CHECK(desc_str.find("\"type\": \"describe\"") != std::string::npos,
+          "Describe carries a routable response type");
     CHECK(desc_str.find("describe_me") != std::string::npos,
           "Describe contains pipeline name");
     (void)handle;

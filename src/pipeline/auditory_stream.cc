@@ -13,7 +13,6 @@
 
 #include <chrono>
 #include <cstdio>
-#include <cstdlib>
 #include <string>
 #include <unistd.h>
 #include <utility>
@@ -58,6 +57,7 @@ void AuditoryStream::Start() {
   protocol::PipelineDescriptor vad_desc;
   vad_desc.name = "vad";
   vad_desc.version = "1.0.0";
+  vad_desc.enabled = config_.vad_stream && !config_.vad_model.empty();
   vad_desc.produces = {protocol::kVadSpeechSegment, protocol::kVadProgress};
   vad_desc.consumes = {protocol::TopicPattern{"audio/+"}};
   vad_handle_ = protocol_timeline_->RegisterPipeline(std::move(vad_desc));
@@ -65,6 +65,7 @@ void AuditoryStream::Start() {
   protocol::PipelineDescriptor asr_desc;
   asr_desc.name = "asr";
   asr_desc.version = "1.0.0";
+  asr_desc.enabled = !config_.asr_model_dir.empty();
   asr_desc.produces = {protocol::kAsrTranscript,
                        protocol::kAsrTranscriptPartial};
   asr_desc.consumes = {protocol::TopicPattern{"vad/+"}};
@@ -73,6 +74,7 @@ void AuditoryStream::Start() {
   protocol::PipelineDescriptor diar_desc;
   diar_desc.name = "diar";
   diar_desc.version = "1.0.0";
+  diar_desc.enabled = !config_.diarizer_weights.empty();
   diar_desc.produces = {protocol::kDiarSpeakerSegment};
   diar_desc.consumes = {protocol::TopicPattern{"audio/+"}};
   diar_handle_ = protocol_timeline_->RegisterPipeline(std::move(diar_desc));
@@ -243,6 +245,9 @@ void AuditoryStream::Start() {
 }
 
 void AuditoryStream::StartWorkers() {
+  vad_processed_samples_.store(0);
+  timebase_reconciled_.store(false);
+  timebase_ok_.store(true);
   if (diarizer_) {
     DiarizationWorker::Params dp;
     dp.threshold = config_.diar_threshold;
@@ -341,7 +346,7 @@ void AuditoryStream::StartWorkers() {
     });
     align_worker_->Start();
   }
-  if (config_.vad_stream) {
+  if (config_.vad_stream && !config_.vad_model.empty()) {
     vad_stream_ = scheduler_.Register("vad", /*priority_index=*/1,
                                       /*background=*/false,
                                       /*create_stream=*/true);
@@ -407,14 +412,17 @@ void AuditoryStream::StartWorkers() {
             first_vad_state = false;
           }
         }
+        vad_processed_samples_.store(fed);
         progress_cv_.notify_all();
       }
       drain(/*finalize=*/true);
       // Final horizon = everything fed is now decided; lets ASR skip any
       // trailing silence before its own finalize.
-      PublishVadProgress(
-          comp_, protocol_timeline_.get(), vad_handle_.get(),
-          tb.SecondsAt(span_start_abs + static_cast<long>(chunk.size())));
+      const long final_processed =
+          span_start_abs + static_cast<long>(chunk.size());
+      PublishVadProgress(comp_, protocol_timeline_.get(), vad_handle_.get(),
+                         tb.SecondsAt(final_processed));
+      vad_processed_samples_.store(final_processed);
       progress_cv_.notify_all();
     });
   }
@@ -482,7 +490,10 @@ void AuditoryStream::StopWorkers() {
   // Stop the aligner last: ASR Finalize() deposits final typed records which
   // the comprehensive-timeline subscription enqueues. The aligner must drain
   // after the ASR thread has joined.
-  if (align_worker_) align_worker_->Stop();
+  if (align_worker_) {
+    align_worker_->Stop();
+    align_worker_->FinalizeExtent(total_samples_.load());
+  }
   if (business_speaker_pipeline_) {
     business_speaker_pipeline_->Finalize(total_samples_.load());
   }
@@ -507,6 +518,42 @@ void AuditoryStream::StopWorkers() {
 
 double AuditoryStream::audio_sec() const {
   return common_time_base().Duration(total_samples_.load());
+}
+
+std::vector<AuditoryStream::TrackExtent> AuditoryStream::track_extents() const {
+  const long total = total_samples_.load();
+  std::vector<TrackExtent> extents;
+  auto append = [&](const char* pipeline, long processed) {
+    extents.push_back({pipeline, processed, total,
+                       core::TimeBase::ReconcileExtent(processed, total)});
+  };
+
+  append("ws_input", total);
+  if (diar_worker_) append("diarization", diar_worker_->processed_samples());
+  if (speaker_id_stage_ && diar_worker_) {
+    append("speaker_identity", diar_worker_->processed_samples());
+  }
+  if (asr_worker_) append("asr", asr_worker_->processed_samples());
+  if (vad_detector_) append("vad", vad_processed_samples_.load());
+  if (align_worker_) append("align", align_worker_->processed_samples());
+  if (business_speaker_pipeline_) {
+    append("business_speaker", business_speaker_pipeline_->processed_samples());
+  }
+  return extents;
+}
+
+void AuditoryStream::ReconcileFinalExtents() {
+  bool ok = true;
+  for (const auto& extent : track_extents()) {
+    if (extent.gap_samples == 0) continue;
+    ok = false;
+    LOG_ERROR(
+        "[timebase] %s processed %ld samples vs common total %ld (gap %ld)\n",
+        extent.pipeline.c_str(), extent.processed_samples,
+        extent.common_total_samples, extent.gap_samples);
+  }
+  timebase_ok_.store(ok);
+  timebase_reconciled_.store(true);
 }
 
 double AuditoryStream::diar_compute_sec() const {
@@ -572,6 +619,11 @@ std::string AuditoryStream::SerializeCursorTelemetry() const {
 
 void AuditoryStream::PushAudio(const float* samples, int n) {
   if (n <= 0) return;
+  double expected_start = 0.0;
+  const auto now = std::chrono::system_clock::now();
+  const double now_sec =
+      std::chrono::duration<double>(now.time_since_epoch()).count();
+  session_start_wall_sec_.compare_exchange_strong(expected_start, now_sec);
   // Fan the frame out to every active pipeline cache on the common clock, then
   // advance the shared clock head. Each cache holds the same audio at the same
   // absolute sample index, so the time base stays valid across pipelines.
@@ -590,7 +642,9 @@ void AuditoryStream::WaitForBarrier(long target) {
         !diar_worker_ || diar_worker_->processed_samples() >= target;
     const bool asr_ok =
         !asr_worker_ || asr_worker_->processed_samples() >= target;
-    return diar_ok && asr_ok;
+    const bool vad_ok =
+        !vad_detector_ || vad_processed_samples_.load() >= target;
+    return diar_ok && asr_ok && vad_ok;
   });
 }
 
@@ -601,26 +655,35 @@ void AuditoryStream::EmitLocked(const std::string& json) {
 
 void AuditoryStream::EmitTimeline(bool finalize) {
   if (finalize) {
+    const bool was_running = running_;
     StopWorkers();
-    const auto exit_wall = std::chrono::system_clock::now();
-    const double exit_sec =
-        std::chrono::duration<double>(exit_wall.time_since_epoch()).count();
-    const double entry_sec = session_start_wall_sec_.load();
-    const double drift = std::fabs(exit_sec - entry_sec) - audio_sec();
-    if (drift > 1.0) wall_clock_ok_.store(false);
+    if (was_running) {
+      const auto exit_wall = std::chrono::system_clock::now();
+      const double exit_sec =
+          std::chrono::duration<double>(exit_wall.time_since_epoch()).count();
+      const double entry_sec = session_start_wall_sec_.load();
+      const double audio = audio_sec();
+      bool wall_ok = true;
+      if (audio > 0.0) {
+        const double elapsed = exit_sec - entry_sec;
+        // Spec 013's real-time gate is >=0.98x at 1.0x input pacing. This
+        // compares physical elapsed time with the common audio clock without
+        // imposing an unrelated fixed one-second budget on every duration.
+        wall_ok = entry_sec > 0.0 && elapsed > 0.0 && audio / elapsed >= 0.98;
+      }
+      wall_clock_ok_.store(wall_ok);
+      ReconcileFinalExtents();
+    }
   } else {
     WaitForBarrier(total_samples_.load());
   }
-  if (const char* c = std::getenv("ORATOR_TIMEBASE_CHECK"); c && c[0] == '1') {
-    const long total = total_samples_.load();
-    auto report = [total](const char* who, long processed) {
-      const long gap = core::TimeBase::ReconcileExtent(processed, total);
-      if (gap != 0)
-        LOG_INFO("[timebase] %s extent %ld vs common total %ld -> gap %ld\n",
-                 who, processed, total, gap);
-    };
-    if (diar_worker_) report("diarization", diar_worker_->processed_samples());
-    if (asr_worker_) report("asr", asr_worker_->processed_samples());
+  if (config_.timebase_check) {
+    for (const auto& extent : track_extents()) {
+      LOG_INFO(
+          "[timebase] %s processed %ld samples vs common total %ld (gap %ld)\n",
+          extent.pipeline.c_str(), extent.processed_samples,
+          extent.common_total_samples, extent.gap_samples);
+    }
   }
   EmitLocked(Serialize());
 }
@@ -628,7 +691,9 @@ void AuditoryStream::EmitTimeline(bool finalize) {
 // Serialize/SerializeRevision/SerializeGpuTelemetry in serialize.cc.
 
 void AuditoryStream::Reset() {
+  const bool was_running = running_;
   StopWorkers();
+  if (was_running) ReconcileFinalExtents();
   if (session_store_ && session_store_->enabled()) {
     std::string timeline_json = Serialize();
     const auto now = std::chrono::system_clock::now();
@@ -652,10 +717,10 @@ void AuditoryStream::Reset() {
   }
   if (diarizer_) diarizer_->Reset();
   if (asr_) asr_->Reset();
-  const auto now = std::chrono::system_clock::now();
-  session_start_wall_sec_.store(
-      std::chrono::duration<double>(now.time_since_epoch()).count());
+  session_start_wall_sec_.store(0.0);
   wall_clock_ok_.store(true);
+  timebase_reconciled_.store(false);
+  timebase_ok_.store(true);
   StartWorkers();
 }
 

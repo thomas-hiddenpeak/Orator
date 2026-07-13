@@ -37,9 +37,6 @@ Usage:
   # Test all WebSocket interfaces:
   python3 tools/verify/py/ws_unified_test.py --duration 120 --port 8765 --out test.json \
     --test-describe --test-reset --test-sessions --test-load-session session_id
-
-  # Parameter matrix evaluation (120s, all configs):
-  python3 tools/verify/py/ws_unified_test.py --matrix-eval 120 --port 8765 --out matrix_results.json
 """
 
 import argparse
@@ -56,26 +53,6 @@ import time
 GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 SAMPLE_RATE = 16000
 BYTES_PER_SAMPLE = 2  # int16 mono
-
-# Full 3x3x3 parameter evaluation matrix for diarization
-PARAM_MATRIX = [
-    # (threshold, merge_gap, sil_frames)
-    # --- baseline region ---
-    (0.50, 0.5, 3),
-    (0.50, 0.6, 3),  (0.50, 0.8, 3),  (0.50, 1.0, 3),
-    (0.50, 0.6, 5),  (0.50, 0.8, 5),  (0.50, 1.0, 5),
-    (0.50, 0.6, 7),  (0.50, 0.8, 7),  (0.50, 1.0, 7),
-    # --- optimal region ---
-    (0.40, 0.5, 3),
-    (0.40, 0.6, 3),  (0.40, 0.8, 3),  (0.40, 1.0, 3),
-    (0.40, 0.6, 5),  (0.40, 0.8, 5),  (0.40, 1.0, 5),
-    (0.40, 0.6, 7),  (0.40, 0.8, 7),  (0.40, 1.0, 7),
-    # --- aggressive region ---
-    (0.35, 0.5, 3),
-    (0.35, 0.6, 3),  (0.35, 0.8, 3),  (0.35, 1.0, 3),
-    (0.35, 0.6, 5),  (0.35, 0.8, 5),  (0.35, 1.0, 5),
-    (0.35, 0.6, 7),  (0.35, 0.8, 7),  (0.35, 1.0, 7),
-]
 
 
 def mask_frame(opcode: int, payload: bytes) -> bytes:
@@ -152,16 +129,34 @@ def handshake(sock, host, port):
 
 
 class Reader(threading.Thread):
-    """Captures every server text frame; signals when the timeline arrives."""
+    """The single socket reader for live events, commands, and timelines."""
 
     def __init__(self, sock):
         super().__init__(daemon=True)
         self.sock = sock
-        self.events = []           # incremental {"type":"asr"} events
-        self.timeline = None       # final {"type":"timeline"} document
-        self.ready = None          # {"type":"ready"} info
-        self.telemetry = []        # periodic {"type":"gpu_telemetry"/"cursor_progress"}
-        self.timeline_event = threading.Event()
+        self.events = []
+        self.timelines = []
+        self.ready = None
+        self.telemetry = []
+        self.messages = []
+        self._condition = threading.Condition()
+
+    def message_index(self):
+        with self._condition:
+            return len(self.messages)
+
+    def wait_for(self, predicate, after_index=0, timeout=30.0):
+        """Wait for the first parsed message after an absolute list index."""
+        deadline = time.monotonic() + timeout
+        with self._condition:
+            while True:
+                for message in self.messages[after_index:]:
+                    if predicate(message):
+                        return message
+                remaining = deadline - time.monotonic()
+                if remaining <= 0.0:
+                    return None
+                self._condition.wait(remaining)
 
     def run(self):
         while True:
@@ -180,112 +175,71 @@ class Reader(threading.Thread):
                     raw = json.loads(raw['data'])
             except (ValueError, UnicodeDecodeError, json.JSONDecodeError):
                 continue
+            if not isinstance(raw, dict):
+                continue
             kind = raw.get("type")
+            with self._condition:
+                self.messages.append(raw)
+                if kind in ("asr_partial", "asr", "revision", "align",
+                            "diar", "vad", "vad_state"):
+                    self.events.append(raw)
+                elif kind == "timeline":
+                    self.timelines.append(raw)
+                elif kind == "ready":
+                    self.ready = raw
+                elif kind in ("gpu_telemetry", "cursor_progress"):
+                    self.telemetry.append(raw)
+                self._condition.notify_all()
+
             if kind == "asr":
-                self.events.append(raw)
                 t = raw.get("text", "")
                 print(f"  [stream] asr [{raw.get('start'):.2f}-{raw.get('end'):.2f}] {t}")
             elif kind == "align":
-                self.events.append(raw)
-                us = raw.get("units", [])
+                units = raw.get("units", [])
                 preview = " ".join(
-                    f"{u.get('text')}[{u.get('start'):.2f}-{u.get('end'):.2f}]"
-                    for u in us[:8])
+                    f"{unit.get('text')}[{unit.get('start'):.2f}-{unit.get('end'):.2f}]"
+                    for unit in units[:8])
                 print(f"  [stream] align [{raw.get('start'):.2f}-{raw.get('end'):.2f}] "
-                      f"({len(us)} units) {preview}")
-            elif kind == "timeline":
-                self.timeline = raw
-                self.timeline_event.set()
-            elif kind == "ready":
-                self.ready = raw
-            elif kind in ("gpu_telemetry", "cursor_progress"):
-                # Spec 011: capture the runtime's periodic telemetry samples so
-                # the offline rerun exporter has the per-pipeline RTF / cursor
-                # time series without a live connection.
-                self.telemetry.append(raw)
+                      f"({len(units)} units) {preview}")
 
 
 def parse_audio_file(audio_path: str, duration_sec: float = None) -> bytes:
-    """Read audio file, convert to PCM if needed, optionally truncate to duration."""
+    """Read audio, convert supported containers, and optionally truncate it."""
     import subprocess
-    import os
     import tempfile
-    
-    # Check if audio file exists
+
     if not os.path.exists(audio_path):
         raise FileNotFoundError(f"Audio file not found: {audio_path}")
-    
-    # Check if file is MP3 or other non-PCM format
-    if audio_path.endswith('.mp3') or audio_path.endswith('.wav') or audio_path.endswith('.flac'):
-        # Convert to PCM using the project's dump_pcm tool or ffmpeg
-        pcm_file = tempfile.NamedTemporaryFile(suffix='.pcm', delete=False).name
+
+    if audio_path.lower().endswith((".mp3", ".wav", ".flac")):
+        pcm_file = tempfile.NamedTemporaryFile(
+            suffix=".pcm", delete=False).name
         try:
-            # Try to use ffmpeg to convert to 16kHz mono int16 PCM
-            result = subprocess.run([
-                'ffmpeg', '-y', '-i', audio_path, '-ar', '16000', '-ac', '1', '-f', 's16le', pcm_file
-            ], capture_output=True, text=True)
-            
+            result = subprocess.run(
+                ["ffmpeg", "-y", "-i", audio_path, "-ar", "16000",
+                 "-ac", "1", "-f", "s16le", pcm_file],
+                capture_output=True, text=True, check=False)
             if result.returncode != 0:
-                print(f"Warning: ffmpeg conversion failed, trying alternative method")
-                # Fallback: try to read as PCM anyway
-                with open(audio_path, "rb") as f:
-                    pcm = f.read()
-            else:
-                # Read the converted PCM file
-                with open(pcm_file, "rb") as f:
-                    pcm = f.read()
+                detail = result.stderr.strip().splitlines()
+                reason = detail[-1] if detail else "unknown ffmpeg error"
+                raise RuntimeError(f"audio conversion failed: {reason}")
+            with open(pcm_file, "rb") as pcm_input:
+                pcm = pcm_input.read()
         finally:
-            # Clean up temp file if it exists and is not the original
-            if os.path.exists(pcm_file) and pcm_file != audio_path:
-                try:
-                    os.unlink(pcm_file)
-                except:
-                    pass
+            try:
+                os.unlink(pcm_file)
+            except FileNotFoundError:
+                pass
     else:
-        # Assume it's already PCM format
-        with open(audio_path, "rb") as f:
-            pcm = f.read()
-    
+        with open(audio_path, "rb") as pcm_input:
+            pcm = pcm_input.read()
+
     if duration_sec is not None:
         total_samples = int(duration_sec * SAMPLE_RATE)
         max_bytes = total_samples * BYTES_PER_SAMPLE
         pcm = pcm[:max_bytes]
-    
+
     return pcm
-
-
-def collect_tegrastats_snapshot():
-    """Collect Jetson device metrics using tegrastats if available."""
-    import subprocess
-    import shutil
-    
-    metrics = {}
-    if shutil.which('tegrastats') is None:
-        return metrics
-        
-    try:
-        # Run tegrastats in the background, capture output, then kill it after 2.5 seconds
-        proc = subprocess.Popen(
-            ['tegrastats', '--interval', '1000'],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True
-        )
-        time.sleep(2.5)  # Collect ~2-3 lines of metrics
-        if proc.poll() is None:
-            proc.terminate()
-            try:
-                proc.wait(timeout=1)
-            except subprocess.TimeoutExpired:
-                proc.kill()
-                proc.wait()
-        
-        stdout, stderr = proc.communicate()
-        if stdout:
-            metrics['tegrastats_snapshot'] = stdout.strip()
-    except Exception:
-        pass
-    return metrics
 
 
 class TegraSampler(threading.Thread):
@@ -341,6 +295,142 @@ class TegraSampler(threading.Thread):
         self.join(timeout=2.0)
 
 
+def validate_terminal_contract(events, timeline):
+    """Return mechanical live/final and typed-track contract violations."""
+    issues = []
+    track_list = timeline.get("tracks", [])
+    tracks = {}
+    for track in track_list:
+        kind = track.get("kind")
+        if not kind:
+            issues.append("terminal track without kind")
+        elif kind in tracks:
+            issues.append(f"duplicate terminal track kind: {kind}")
+        else:
+            tracks[kind] = track
+
+    asr_entries = tracks.get("asr", {}).get("entries", [])
+    asr_by_id = {}
+    for entry in asr_entries:
+        text_id = entry.get("text_id")
+        if text_id in asr_by_id:
+            issues.append(f"duplicate terminal ASR text_id: {text_id}")
+        asr_by_id[text_id] = entry
+
+    live_asr = {}
+    for event in events:
+        if event.get("type") != "asr":
+            continue
+        text_id = event.get("text_id")
+        if text_id in live_asr:
+            issues.append(f"duplicate live final ASR text_id: {text_id}")
+        live_asr[text_id] = event
+    if set(live_asr) != set(asr_by_id):
+        issues.append(
+            "live/terminal ASR ID mismatch: "
+            f"live={sorted(live_asr)} terminal={sorted(asr_by_id)}")
+    for text_id in set(live_asr) & set(asr_by_id):
+        live = live_asr[text_id]
+        final = asr_by_id[text_id]
+        if live.get("text") != final.get("text"):
+            issues.append(f"live/terminal ASR text mismatch: {text_id}")
+        for field in ("start", "end"):
+            if abs(float(live.get(field, 0.0)) -
+                   float(final.get(field, 0.0))) > 0.0015:
+                issues.append(
+                    f"live/terminal ASR {field} mismatch: {text_id}")
+
+    align_track = tracks.get("align")
+    if align_track is not None:
+        align_entries = align_track.get("entries", [])
+        align_ids = [entry.get("text_id") for entry in align_entries]
+        if len(align_ids) != len(set(align_ids)):
+            issues.append("duplicate alignment text_id")
+        if set(align_ids) != set(asr_by_id):
+            issues.append(
+                "ASR/alignment ID mismatch: "
+                f"asr={sorted(asr_by_id)} align={sorted(align_ids)}")
+        for group in align_entries:
+            group_start = float(group.get("start", 0.0))
+            group_end = float(group.get("end", 0.0))
+            previous_start = group_start
+            previous_end = group_start
+            for unit in group.get("units", []):
+                start = float(unit.get("start", 0.0))
+                end = float(unit.get("end", 0.0))
+                if (start < group_start - 0.0015 or
+                        end > group_end + 0.0015 or end < start - 0.0015):
+                    issues.append(
+                        f"out-of-bounds alignment unit: {group.get('text_id')}")
+                    break
+                if (start < previous_start - 0.0015 or
+                        end < previous_end - 0.0015):
+                    issues.append(
+                        f"non-monotonic alignment unit: {group.get('text_id')}")
+                    break
+                previous_start = start
+                previous_end = end
+
+    business = tracks.get("business_speaker", {}).get("entries", [])
+    comprehensive = timeline.get("comprehensive", [])
+    if business != comprehensive:
+        issues.append("business_speaker track differs from comprehensive alias")
+    business_by_id = {}
+    for entry in business:
+        text_id = entry.get("text_id")
+        business_by_id.setdefault(text_id, []).append(entry)
+        source = asr_by_id.get(text_id)
+        if source is None:
+            issues.append(f"business entry without ASR source: {text_id}")
+            continue
+        if (float(entry.get("start", 0.0)) <
+                float(source.get("start", 0.0)) - 0.0015 or
+                float(entry.get("end", 0.0)) >
+                float(source.get("end", 0.0)) + 0.0015):
+            issues.append(f"business entry outside ASR span: {text_id}")
+    for text_id, source in asr_by_id.items():
+        pieces = business_by_id.get(text_id, [])
+        reconstructed = "".join(piece.get("text", "") for piece in pieces)
+        if reconstructed != source.get("text", ""):
+            issues.append(f"business text reconstruction mismatch: {text_id}")
+
+    def projection(entries):
+        fields = ("start", "end", "text_id", "speaker", "speaker_id",
+                  "text", "speaker_support", "speaker_uncertain")
+        return [{field: entry.get(field) for field in fields}
+                for entry in entries]
+
+    latest_revision = {}
+    for event in events:
+        if (event.get("type") != "revision" or
+                event.get("source") != "business_speaker"):
+            continue
+        entries = event.get("entries", [])
+        text_ids = {entry.get("text_id") for entry in entries}
+        for text_id in text_ids:
+            latest_revision[text_id] = [
+                entry for entry in entries if entry.get("text_id") == text_id]
+    if set(latest_revision) != set(asr_by_id):
+        issues.append(
+            "business revision/ASR ID mismatch: "
+            f"revision={sorted(latest_revision)} asr={sorted(asr_by_id)}")
+    for text_id in set(latest_revision) & set(business_by_id):
+        if projection(latest_revision[text_id]) != projection(
+                business_by_id[text_id]):
+            issues.append(f"revision/terminal business mismatch: {text_id}")
+
+    if not timeline.get("timebase_reconciled", False):
+        issues.append("terminal time-base reconciliation not completed")
+    if not timeline.get("timebase_ok", False):
+        issues.append("terminal time-base reconciliation failed")
+    for extent in timeline.get("track_extents", []):
+        if extent.get("gap_samples") != 0:
+            issues.append(
+                f"nonzero extent gap for {extent.get('pipeline')}: "
+                f"{extent.get('gap_samples')}")
+    return issues
+
+
 def main(args):
     # Parse audio file (handles MP3, WAV, FLAC, and PCM formats)
     pcm = parse_audio_file(args.pcm, args.duration)
@@ -352,148 +442,131 @@ def main(args):
     handshake(sock, args.host, args.port)
     reader = Reader(sock)
     reader.start()
-    
-    # Give the server a moment to send "ready"
-    time.sleep(0.5)
+
+    ready = reader.wait_for(
+        lambda message: message.get("type") == "ready",
+        timeout=args.command_timeout)
+    if ready is None:
+        raise RuntimeError("no ready response from WebSocket server")
     print(f"connected; streaming {audio_sec:.2f}s of audio "
           f"({'max rate' if args.rate == 0 else str(args.rate) + 'x'}, "
           f"{args.frame_ms}ms frames)")
-    
-    # Test describe command if requested
+
+    command_responses = {}
+
+    def run_command(name, payload, predicate):
+        start_index = reader.message_index()
+        print(f"  [test] sending {name} command...")
+        sock.sendall(mask_frame(0x1, json.dumps(payload).encode("utf-8")))
+        response = reader.wait_for(
+            predicate, after_index=start_index, timeout=args.command_timeout)
+        if response is None:
+            raise RuntimeError(
+                f"no {name} response within {args.command_timeout:.1f}s")
+        command_responses[name] = response
+        if name == "describe":
+            pipeline_names = [
+                item.get("name") for item in response.get("pipelines", [])]
+            summary = {"type": response.get("type"),
+                       "pipelines": pipeline_names,
+                       "schema_count": len(response.get("schemas", []))}
+        elif name == "sessions":
+            summary = {"type": response.get("type"),
+                       "session_count": len(response.get("sessions", []))}
+        elif name == "load_session" and response.get("type") == "timeline":
+            summary = {"type": "timeline",
+                       "audio_sec": response.get("audio_sec")}
+        else:
+            summary = response
+        print(f"  [test] {name} response: "
+              f"{json.dumps(summary, ensure_ascii=False)}")
+
     if args.test_describe:
-        print("  [test] sending describe command...")
-        sock.sendall(mask_frame(0x1, b'{"describe":true}'))
-        # Read response
-        op, pl = read_frame(sock)
-        if op == 0x1 and pl:
-            try:
-                raw = json.loads(pl.decode("utf-8"))
-                # Spec 004 envelope unwrapping
-                if 'data' in raw and isinstance(raw['data'], str):
-                    raw = json.loads(raw['data'])
-                print(f"  [test] describe response: {json.dumps(raw, indent=2)}")
-            except (ValueError, UnicodeDecodeError, json.JSONDecodeError):
-                print(f"  [test] describe response (raw): {pl.decode('utf-8', errors='replace')}")
-        else:
-            print("  [test] no describe response received")
-    
-    # Test reset command if requested
+        run_command(
+            "describe", {"describe": True},
+            lambda message: message.get("type") == "describe" or
+            ("pipelines" in message and "schemas" in message))
+
     if args.test_reset:
-        print("  [test] sending reset command...")
-        sock.sendall(mask_frame(0x1, b'{"reset":true}'))
-        # Read response
-        op, pl = read_frame(sock)
-        if op == 0x1 and pl:
-            try:
-                raw = json.loads(pl.decode("utf-8"))
-                # Spec 004 envelope unwrapping
-                if 'data' in raw and isinstance(raw['data'], str):
-                    raw = json.loads(raw['data'])
-                print(f"  [test] reset response: {json.dumps(raw, indent=2)}")
-            except (ValueError, UnicodeDecodeError, json.JSONDecodeError):
-                print(f"  [test] reset response (raw): {pl.decode('utf-8', errors='replace')}")
-        else:
-            print("  [test] no reset response received")
-    
-    # Test sessions command if requested
+        run_command(
+            "reset", {"reset": True},
+            lambda message: message.get("type") == "reset_ok")
+
     if args.test_sessions:
-        print("  [test] sending sessions command...")
-        sock.sendall(mask_frame(0x1, b'{"sessions":true}'))
-        # Read response
-        op, pl = read_frame(sock)
-        if op == 0x1 and pl:
-            try:
-                raw = json.loads(pl.decode("utf-8"))
-                # Spec 004 envelope unwrapping
-                if 'data' in raw and isinstance(raw['data'], str):
-                    raw = json.loads(raw['data'])
-                print(f"  [test] sessions response: {json.dumps(raw, indent=2)}")
-            except (ValueError, UnicodeDecodeError, json.JSONDecodeError):
-                print(f"  [test] sessions response (raw): {pl.decode('utf-8', errors='replace')}")
-        else:
-            print("  [test] no sessions response received")
-    
-    # Test load_session command if requested
+        run_command(
+            "sessions", {"sessions": True},
+            lambda message: message.get("type") == "sessions")
+
     if args.test_load_session:
         session_id = args.test_load_session
-        print(f"  [test] sending load_session command for session: {session_id}...")
-        load_cmd = f'{{"load_session":"{session_id}"}}'
-        sock.sendall(mask_frame(0x1, load_cmd.encode('utf-8')))
-        # Read response
-        op, pl = read_frame(sock)
-        if op == 0x1 and pl:
-            try:
-                raw = json.loads(pl.decode("utf-8"))
-                # Spec 004 envelope unwrapping
-                if 'data' in raw and isinstance(raw['data'], str):
-                    raw = json.loads(raw['data'])
-                print(f"  [test] load_session response: {json.dumps(raw, indent=2)}")
-            except (ValueError, UnicodeDecodeError, json.JSONDecodeError):
-                print(f"  [test] load_session response (raw): {pl.decode('utf-8', errors='replace')}")
-        else:
-            print("  [test] no load_session response received")
+        run_command(
+            "load_session",
+            {"load_session": True, "session_id": session_id},
+            lambda message: message.get("type") == "timeline" or
+            "error" in message)
 
-    # Collect initial tegrastats snapshot before streaming
-    tegrastats_before = collect_tegrastats_snapshot()
-    
-    # Producer: push PCM frames through the socket
+    # Producer: push PCM frames through the socket.
     t0 = time.monotonic()
-    # Continuous device telemetry for the streamed duration (Spec 011 Phase 2).
     tegra_sampler = TegraSampler(t0, interval_ms=1000)
     tegra_sampler.start()
-    sent = 0
-    for off in range(0, len(pcm), frame_bytes):
-        sock.sendall(mask_frame(0x2, pcm[off:off + frame_bytes]))
-        sent += 1
-        if args.rate > 0:
-            target_wall = (sent * args.frame_ms / 1000.0) / args.rate
-            slack = target_wall - (time.monotonic() - t0)
-            if slack > 0:
-                time.sleep(slack)
-    push_wall = time.monotonic() - t0
-    
-    # Collect tegrastats snapshot after streaming
-    tegrastats_after = collect_tegrastats_snapshot()
+    try:
+        sent = 0
+        for off in range(0, len(pcm), frame_bytes):
+            sock.sendall(mask_frame(0x2, pcm[off:off + frame_bytes]))
+            sent += 1
+            if args.rate > 0:
+                target_wall = (sent * args.frame_ms / 1000.0) / args.rate
+                slack = target_wall - (time.monotonic() - t0)
+                if slack > 0:
+                    time.sleep(slack)
+        push_wall = time.monotonic() - t0
 
-    # Flush: send flush command and wait for the timeline document
-    sock.sendall(mask_frame(0x1, b'{"flush":true}'))
-    print("  [flush] waiting for timeline...")
-    got_flush = reader.timeline_event.wait(timeout=args.timeline_timeout)
-    if got_flush and reader.timeline is not None:
-        print(f"  [flush] timeline received ({reader.timeline.get('audio_sec', '?')}s)")
-    else:
-        print("  [flush] no timeline (continuing to end)")
+        flush_index = reader.message_index()
+        sock.sendall(mask_frame(0x1, b'{"flush":true}'))
+        print("  [flush] waiting for timeline...")
+        flush_timeline = reader.wait_for(
+            lambda message: message.get("type") == "timeline",
+            after_index=flush_index, timeout=args.timeline_timeout)
+        if flush_timeline is not None:
+            print("  [flush] timeline received "
+                  f"({flush_timeline.get('audio_sec', '?')}s)")
+        else:
+            print("  [flush] no timeline (continuing to end)")
 
-    # End: send end command and wait for the final timeline document
-    reader.timeline_event.clear()
-    sock.sendall(mask_frame(0x1, b'{"end":true}'))
-    print("  [end] waiting for final timeline...")
-    got_end = reader.timeline_event.wait(timeout=args.timeline_timeout)
-    total_wall = time.monotonic() - t0
-    sock.sendall(mask_frame(0x8, b"\x03\xe8"))  # CLOSE
-    sock.close()
-    
-    # Join the reader thread
-    reader.join(timeout=2.0)
+        end_index = reader.message_index()
+        sock.sendall(mask_frame(0x1, b'{"end":true}'))
+        print("  [end] waiting for final timeline...")
+        final_timeline = reader.wait_for(
+            lambda message: message.get("type") == "timeline",
+            after_index=end_index, timeout=args.timeline_timeout)
+        total_wall = time.monotonic() - t0
+    finally:
+        tegra_sampler.stop()
+        try:
+            sock.sendall(mask_frame(0x8, b"\x03\xe8"))
+        except (BrokenPipeError, ConnectionResetError, OSError):
+            pass
+        sock.close()
+        reader.join(timeout=2.0)
 
-    if not got_end or reader.timeline is None:
+    device_series = tegra_sampler.samples
+
+    if final_timeline is None:
         print(f"ERROR: no final timeline received within {args.timeline_timeout:.1f}s",
               file=sys.stderr)
         print("\n=== TEST_SCRIPT_COMPLETED_WITH_ERRORS ===")
         return 1
 
-    tl = reader.timeline
+    tl = final_timeline
     tracks = {t.get("kind"): t for t in tl.get("tracks", [])}
     diar = tracks.get("diarization", {})
     asr = tracks.get("asr", {})
     diar_compute = diar.get("compute_sec")
     asr_compute = asr.get("compute_sec")
+    contract_issues = validate_terminal_contract(reader.events, tl)
     
-    # Collect final tegrastats snapshot after timeline
-    tegrastats_final = collect_tegrastats_snapshot()
-    # Stop the continuous device sampler and harvest its time series.
-    tegra_sampler.stop()
-    device_series = tegra_sampler.samples
+    first_device_line = device_series[0]["line"] if device_series else None
+    last_device_line = device_series[-1]["line"] if device_series else None
     
     out = {
         "meta": {
@@ -509,13 +582,15 @@ def main(args):
             "asr_compute_sec": asr_compute,
             "diar_rt_factor": diar.get("real_time_factor"),
             "asr_rt_factor": asr.get("real_time_factor"),
+            "contract_issues": contract_issues,
         },
         "tegrastats": {
-            "before": tegrastats_before.get('tegrastats_snapshot') if tegrastats_before else None,
-            "after": tegrastats_after.get('tegrastats_snapshot') if tegrastats_after else None,
-            "final": tegrastats_final.get('tegrastats_snapshot') if tegrastats_final else None,
+            "before": first_device_line,
+            "after": last_device_line,
+            "final": last_device_line,
         },
         "device_series": device_series,
+        "command_responses": command_responses,
         "events": reader.events,
         "telemetry": reader.telemetry,
         "timeline": tl,
@@ -538,14 +613,18 @@ def main(args):
     m = out["meta"]
     n_diar = len(diar.get("entries", []))
     n_asr = len(asr.get("entries", []))
-    comprehensive = tl.get("comprehensive", [])
-    
     print(f"\nwrote {args.out}")
     print(f"  audio={audio_sec:.2f}s  total_wall={total_wall:.2f}s  "
           f"stream_rt={m['stream_rt_factor']}x")
     print(f"  diar: {n_diar} segments, rt={m['diar_rt_factor']}x   "
           f"asr: {n_asr} utterances, rt={m['asr_rt_factor']}x")
-    
+
+    if contract_issues:
+        for issue in contract_issues:
+            print(f"  CONTRACT ERROR: {issue}", file=sys.stderr)
+        print("\n=== TEST_SCRIPT_COMPLETED_WITH_ERRORS ===")
+        return 1
+
     # Send completion signal to terminal/agent
     print("\n=== TEST_SCRIPT_COMPLETED_SUCCESSFULLY ===")
     return 0
@@ -571,7 +650,8 @@ if __name__ == "__main__":
     ap.add_argument("--test-reset", action="store_true", help="Test reset command")
     ap.add_argument("--test-sessions", action="store_true", help="Test sessions command")
     ap.add_argument("--test-load-session", type=str, help="Test load_session command with session ID")
-    ap.add_argument("--matrix-eval", type=int, metavar='SEC', help='Run parameter matrix evaluation (duration in seconds)')
+    ap.add_argument("--command-timeout", type=float, default=30.0,
+                    help="Seconds to wait for ready and optional command responses")
     ap.add_argument("--max-total-time", type=float, default=7200.0,
                     help="Maximum total execution time in seconds (default: 7200)")
     args = ap.parse_args()
@@ -588,267 +668,18 @@ if __name__ == "__main__":
     signal.signal(signal.SIGALRM, timeout_handler)
     signal.alarm(int(args.max_total_time))
 
-    try:
-        # Handle parameter matrix evaluation mode
-        if args.matrix_eval:
-            # Import websocket module for parameter evaluation
-            import websocket
-            
-            # Full 3x3x3 parameter evaluation matrix
-            PARAM_MATRIX = [
-                # (threshold, merge_gap, sil_frames)
-                # --- baseline region ---
-                (0.50, 0.5, 3),
-                (0.50, 0.6, 3),  (0.50, 0.8, 3),  (0.50, 1.0, 3),
-                (0.50, 0.6, 5),  (0.50, 0.8, 5),  (0.50, 1.0, 5),
-                (0.50, 0.6, 7),  (0.50, 0.8, 7),  (0.50, 1.0, 7),
-                # --- optimal region ---
-                (0.40, 0.5, 3),
-                (0.40, 0.6, 3),  (0.40, 0.8, 3),  (0.40, 1.0, 3),
-                (0.40, 0.6, 5),  (0.40, 0.8, 5),  (0.40, 1.0, 5),
-                (0.40, 0.6, 7),  (0.40, 0.8, 7),  (0.40, 1.0, 7),
-                # --- aggressive region ---
-                (0.35, 0.5, 3),
-                (0.35, 0.6, 3),  (0.35, 0.8, 3),  (0.35, 1.0, 3),
-                (0.35, 0.6, 5),  (0.35, 0.8, 5),  (0.35, 1.0, 5),
-                (0.35, 0.6, 7),  (0.35, 0.8, 7),  (0.35, 1.0, 7),
-            ]
-
-            def prepare_audio(duration_sec: int, audio_path: str) -> bytes:
-                """Convert first N seconds of test.mp3 to PCM bytes."""
-                if not os.path.exists(audio_path):
-                    raise FileNotFoundError(f"Audio file not found: {audio_path}")
-                return subprocess.run(
-                    ['ffmpeg', '-y', '-i', audio_path, '-f', 's16le', '-ar', '16000', '-ac', '1',
-                     '-t', str(duration_sec), '-'],
-                    capture_output=True).stdout
-
-            def collect_timeline(ws, timeout: float) -> dict:
-                import json
-                ws.settimeout(1.0)
-                t0 = time.time()
-                while time.time() - t0 < timeout:
-                    try:
-                        m = ws.recv()
-                        j = json.loads(m)
-                        if 'data' in j and isinstance(j['data'], str):
-                            j = json.loads(j['data'])
-                        if j.get('type') == 'timeline':
-                            return j
-                    except:
-                        continue
-                return None
-
-            def eval_single(duration_sec: int, port: int, overrides: dict = None, audio_path: str = "test/data/audio/test.mp3") -> dict:
-                """Run a single evaluation and return standardized metrics."""
-                cfg = {}
-                for k, v in (overrides or {}).items():
-                    if k.startswith('diar_'):
-                        cfg[k] = v
-
-                audio = prepare_audio(duration_sec, audio_path)
-
-                # Connect to existing server instead of starting a new one
-                ws = websocket.create_connection(f'ws://127.0.0.1:{port}', timeout=10)
-                ws.recv()  # ready
-
-                # Push at 1x, drain server responses to avoid buffer fill
-                t0 = time.time()
-                sent = 0
-                ws.settimeout(0.01)
-                while sent < len(audio):
-                    ws.send(audio[sent:sent + 16000], opcode=0x02)
-                    sent += 16000
-                    elapsed = time.time() - t0
-                    if elapsed < sent / 32000:
-                        time.sleep(sent / 32000 - elapsed)
-                    # Drain server responses to prevent WS buffer blocking
-                    while True:
-                        try:
-                            ws.recv()
-                        except:
-                            break
-                    ws.settimeout(0.01)
-
-                push_sec = time.time() - t0
-                ws.send(json.dumps({'end': True}))
-                tl = collect_timeline(ws, 120)
-                wall_sec = time.time() - t0
-                ws.close()
-
-                if not tl:
-                    print("ERROR: no timeline received")
-                    print("\n=== TEST_SCRIPT_COMPLETED_WITH_ERRORS ===")
-                    return {'error': 'no_timeline', 'wall_sec': wall_sec}
-
-                t = tl.get('timeline', tl)
-                tracks = {k.get('kind'): k for k in t.get('tracks', [])}
-                comp = t.get('comprehensive', [])
-                diar = tracks.get('diarization', {})
-                asr = tracks.get('asr', {})
-                vad = tracks.get('vad', {})
-
-                # Core pipeline metrics
-                metrics = {
-                    'audio_sec': t.get('audio_sec', duration_sec),
-                    'wall_sec': round(wall_sec, 1),
-                    'push_sec': round(push_sec, 1),
-                    'rtf': round(duration_sec / wall_sec, 2) if wall_sec > 0 else 0,
-                    'wall_clock_ok': t.get('wall_clock_ok', False),
-                    'pipelines': {
-                        'diarization': {'segments': len(diar.get('entries', [])),
-                                        'compute_sec': round(diar.get('compute_sec', 0), 2)},
-                        'asr': {'utterances': len(asr.get('entries', [])),
-                                'compute_sec': round(asr.get('compute_sec', 0), 2)},
-                        'vad': {'segments': len(vad.get('entries', [])),
-                                'compute_sec': round(vad.get('compute_sec', 0), 2)},
-                    },
-                }
-
-                # Speaker metrics
-                speakers = set()
-                total_unknown = 0.0
-                total_duration = 0.0
-                transitions = 0
-                prev_spk = None
-                total_segments = 0
-
-                for c in comp:
-                    spk = c.get('speaker', '?')
-                    span = c['end'] - c['start']
-                    if isinstance(spk, int) and spk >= 0:
-                        speakers.add(spk)
-                    if spk == -1:
-                        total_unknown += span
-                    total_duration += span
-                    if spk != prev_spk:
-                        transitions += 1
-                        prev_spk = spk
-                    total_segments += 1
-
-                metrics['speakers'] = {
-                    'count': len(speakers),
-                    'ids': sorted(speakers),
-                    'transitions': transitions,
-                    'comprehensive_turns': total_segments,
-                    'unknown_pct': round(total_unknown / total_duration * 100, 1) if total_duration > 0 else 0,
-                }
-
-                # Config params
-                metrics['config'] = {
-                    'diar_threshold': overrides.get('diar_threshold', 0.4) if overrides else 0.4,
-                    'diar_merge_gap_sec': overrides.get('diar_merge_gap_sec', 0.8) if overrides else 0.8,
-                    'diar_spkcache_sil_frames': overrides.get('diar_spkcache_sil_frames', 3) if overrides else 3,
-                }
-
-                # ASR transcript sample
-                asr_entries = asr.get('entries', [])
-                metrics['asr_sample'] = [{'start': e['start'], 'end': e['end'],
-                                           'text': e['text'][:100]}
-                                          for e in asr_entries]
-
-                return metrics
-
-            def eval_matrix(duration_sec: int, port: int, audio_path: str = "test/data/audio/test.mp3"):
-                """Run the full parameter matrix and output consolidated results."""
-                results = []
-                n = len(PARAM_MATRIX)
-
-                for i, (thr, mg, sil) in enumerate(PARAM_MATRIX):
-                    overrides = {
-                        'diar_threshold': thr,
-                        'diar_merge_gap_sec': mg,
-                        'diar_spkcache_sil_frames': sil,
-                    }
-                    print(f'  [{i+1:2d}/{n}] thr={thr:.2f} mg={mg:.1f} sil={sil} ... ', end='', flush=True)
-                    r = eval_single(duration_sec, port, overrides, audio_path)
-                    if 'error' in r:
-                        print(f'FAILED: {r["error"]}')
-                        continue
-
-                    spk = r['speakers']
-                    pip = r['pipelines']
-                    print(f'segs={pip["diarization"]["segments"]:3d} '
-                          f'unk={spk["unknown_pct"]:5.1f}% '
-                          f'turns={spk["comprehensive_turns"]:3d} '
-                          f'trans={spk["transitions"]:3d} '
-                          f'spk={spk["count"]}')
-                    results.append(r)
-                    time.sleep(1)
-
-                # Rank by unknown_pct ascending
-                results.sort(key=lambda x: x['speakers']['unknown_pct'])
-
-                output = {
-                    'duration_sec': duration_sec,
-                    'total_configs': n,
-                    'completed': len(results),
-                    'ranking': [{
-                        'rank': i + 1,
-                        'config': r['config'],
-                        'segs': r['pipelines']['diarization']['segments'],
-                        'unknown_pct': r['speakers']['unknown_pct'],
-                        'turns': r['speakers']['comprehensive_turns'],
-                        'transitions': r['speakers']['transitions'],
-                        'speakers': r['speakers']['count'],
-                    } for i, r in enumerate(results)],
-                }
-
-                # Print summary
-                print(f'\n{"─"*70}')
-                print(f'MATRIX RESULTS ({duration_sec}s)')
-                print(f'{"─"*70}')
-                print(f'{"Rank":>4s} {"thr":>5s} {"mg":>5s} {"sil":>4s} {"Segs":>5s} {"Unk%":>6s} {"Turns":>6s} {"Trans":>6s} {"Spk":>4s}')
-                print(f'{"─"*70}')
-                for r in output['ranking']:
-                    cfg = r['config']
-                    print(f'{r["rank"]:4d} {cfg["diar_threshold"]:5.2f} {cfg["diar_merge_gap_sec"]:5.1f} '
-                          f'{cfg["diar_spkcache_sil_frames"]:4d} {r["segs"]:5d} {r["unknown_pct"]:6.1f}% '
-                          f'{r["turns"]:6d} {r["transitions"]:6d} {r["speakers"]:4d}')
-
-                # Find best
-                best = results[0]
-                print(f'\nBest: thr={best["config"]["diar_threshold"]} '
-                      f'mg={best["config"]["diar_merge_gap_sec"]} '
-                      f'sil={best["config"]["diar_spkcache_sil_frames"]} '
-                      f'→ unk={best["speakers"]["unknown_pct"]}%')
-
-                return output
-
-            # Run matrix evaluation
-            print(f'Matrix: {args.matrix_eval}s x {len(PARAM_MATRIX)} configs (port {args.port})')
-            output_file = args.out if args.out else f"matrix_results_{args.matrix_eval}s.json"
-            r = eval_matrix(args.matrix_eval, args.port, args.pcm)
-            if args.out:
-                with open(args.out, 'w') as f:
-                    json.dump(r, f, indent=2, ensure_ascii=False)
-                print(f'Output: {args.out}')
-            
-            # Send completion signal to terminal/agent
-            print("\n=== TEST_SCRIPT_COMPLETED_SUCCESSFULLY ===")
-            signal.alarm(0)  # Cancel timeout
-            sys.exit(0)
-
-        # Standard streaming test mode
-        if not args.out:
-            print("ERROR: --out is required for standard streaming test mode", file=sys.stderr)
-            print("\n=== TEST_SCRIPT_COMPLETED_WITH_ERRORS ===")
-            signal.alarm(0)  # Cancel timeout
-            sys.exit(1)
-
-        # Standard streaming test mode execution
-        try:
-            result = main(args)
-            signal.alarm(0)  # Cancel timeout
-            sys.exit(result)
-        except Exception as e:
-            print(f"\nERROR: Unexpected exception: {e}", file=sys.stderr)
-            print("\n=== TEST_SCRIPT_COMPLETED_WITH_ERRORS ===")
-            signal.alarm(0)  # Cancel timeout
-            sys.exit(1)
-            
-    except Exception as e:
-        print(f"\nERROR: Unexpected exception in main block: {e}", file=sys.stderr)
+    if not args.out:
+        print("ERROR: --out is required", file=sys.stderr)
         print("\n=== TEST_SCRIPT_COMPLETED_WITH_ERRORS ===")
-        signal.alarm(0)  # Cancel timeout
+        signal.alarm(0)
         sys.exit(1)
+
+    try:
+        result = main(args)
+    except Exception as error:
+        print(f"\nERROR: Unexpected exception: {error}", file=sys.stderr)
+        print("\n=== TEST_SCRIPT_COMPLETED_WITH_ERRORS ===")
+        result = 1
+    finally:
+        signal.alarm(0)
+    sys.exit(result)

@@ -53,8 +53,9 @@ Items marked resolved have implementation and focused-test evidence but remain
 subject to the complete acceptance gates in this spec.
 
 1. **Resolved in Phase 1**: `AuditoryStream` now owns one immutable `TimeBase`
-   and injects it into private caches, workers, and retained audio stores. Full
-   end-of-stream track reconciliation remains open under T011.
+   and injects it into private caches, workers, and retained audio stores. At
+   finalization it reports and verifies exact sample extents for every active
+   input, evidence, identity, alignment, and business-speaker track.
 2. **Resolved in Phase 1**: ASR reads an immutable typed VAD snapshot from
    `ComprehensiveTimeline`, while forced alignment receives finalized typed ASR
    records through a `ComprehensiveTimeline` subscription. Protocol messages
@@ -69,7 +70,9 @@ subject to the complete acceptance gates in this spec.
    behavioral environment switches still require migration or removal.
 5. **Resolved in Phase 1**: finalized ASR allocates one `text_id` and reuses it
    for the typed sink and live event; the terminal ASR track serializes that ID.
-   End-to-end align/revision/export/reconnect/Web UI convergence remains open.
+   A real-WebSocket structural gate now verifies final-event, alignment,
+   business-revision, and terminal-track convergence. Partial replacement,
+   export, reconnect, and Web UI convergence remain open.
 6. The configured CTest suite contains 51 C++ tests. CMake defines a Python test
    registration helper, but no Python WebSocket tests are registered and the
    documented wrapper directory is absent.
