@@ -64,16 +64,32 @@ def hash_path(path):
     }
 
 
-def command_output(command, cwd):
+def command_probe(command, cwd):
     try:
         result = subprocess.run(
             command, cwd=cwd, capture_output=True, text=True,
             check=False, timeout=15)
-    except (OSError, subprocess.TimeoutExpired):
+    except OSError as error:
+        return {"returncode": None, "output": str(error)}
+    except subprocess.TimeoutExpired as error:
+        stdout = error.stdout or ""
+        stderr = error.stderr or ""
+        if isinstance(stdout, bytes):
+            stdout = stdout.decode("utf-8", errors="replace")
+        if isinstance(stderr, bytes):
+            stderr = stderr.decode("utf-8", errors="replace")
+        return {"returncode": 124, "output": (stdout + stderr).strip()}
+    return {
+        "returncode": result.returncode,
+        "output": (result.stdout + result.stderr).strip(),
+    }
+
+
+def command_output(command, cwd):
+    probe = command_probe(command, cwd)
+    if probe["returncode"] != 0:
         return None
-    if result.returncode != 0:
-        return None
-    output = (result.stdout + result.stderr).strip()
+    output = probe["output"]
     return output or None
 
 
@@ -134,12 +150,24 @@ def build_manifest(args):
     if registry_path:
         assets["speaker_registry"] = hash_path(
             resolve_path(repo, registry_path))
+    missing_assets = [
+        name for name, asset in assets.items()
+        if name != "speaker_registry" and not asset["exists"]
+    ]
+    if missing_assets:
+        raise FileNotFoundError(
+            "required fixture assets are missing: " + ", ".join(missing_assets))
 
     models = {}
     if not args.skip_model_hashes:
         for name, path in model_paths(config, repo).items():
             print(f"hashing {name}: {path}", file=sys.stderr)
             models[name] = hash_path(path)
+        missing_models = [
+            name for name, asset in models.items() if not asset["exists"]]
+        if missing_models:
+            raise FileNotFoundError(
+                "configured models are missing: " + ", ".join(missing_models))
 
     short_commit = (commit or "unknown")[:12]
     manifest = {
@@ -164,9 +192,10 @@ def build_manifest(args):
             "platform": platform.platform(),
             "machine": platform.machine(),
             "jetson_release": read_optional("/etc/nv_tegra_release"),
-            "nvpmodel": command_output(["nvpmodel", "-q"], repo),
-            "jetson_clocks": command_output(["jetson_clocks", "--show"], repo),
-            "tegrastats_probe": first_line(
+            "nvpmodel": command_probe(["nvpmodel", "-q"], repo),
+            "jetson_clocks": command_probe(
+                ["jetson_clocks", "--show"], repo),
+            "tegrastats_probe": command_probe(
                 ["timeout", "2s", "tegrastats", "--interval", "1000"], repo),
         },
         "tools": {
@@ -191,7 +220,7 @@ def main():
     parser.add_argument("--repo", default=".")
     parser.add_argument("--config", default="orator.toml")
     parser.add_argument("--audio", default="test/data/audio/test.mp3")
-    parser.add_argument("--reference", default="test/data/audio/test.txt")
+    parser.add_argument("--reference", default="test/data/reference/test.txt")
     parser.add_argument("--executable", default="build/orator_ws")
     parser.add_argument("--registry")
     parser.add_argument("--skip-model-hashes", action="store_true",

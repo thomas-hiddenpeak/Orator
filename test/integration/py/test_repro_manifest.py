@@ -37,6 +37,12 @@ class ReproManifestTest(unittest.TestCase):
         missing = repro_manifest.hash_path("/tmp/orator-manifest-no-such-file")
         self.assertFalse(missing["exists"])
 
+    def test_failed_command_keeps_diagnostic_output(self):
+        result = repro_manifest.command_probe(
+            ["sh", "-c", "printf diagnostic; exit 3"], str(REPO))
+        self.assertEqual(result["returncode"], 3)
+        self.assertEqual(result["output"], "diagnostic")
+
     def test_directory_digest_matches_serialized_file_ledger(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             path = pathlib.Path(temp_dir) / "value.json"

@@ -22,7 +22,7 @@ python3 tools/verify/py/repro_manifest.py \
   --repo . \
   --config orator.toml \
   --audio test/data/audio/test.mp3 \
-  --reference test/data/audio/test.txt \
+  --reference test/data/reference/test.txt \
   --executable build/orator_ws \
   --registry /path/to/frozen-speakers.bin \
   --out /path/to/orator-fixture-<timestamp>-<commit12>.json
