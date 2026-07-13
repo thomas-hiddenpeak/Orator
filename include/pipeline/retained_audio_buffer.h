@@ -15,12 +15,14 @@
 #include <mutex>
 #include <vector>
 
+#include "core/time_base.h"
+
 namespace orator {
 namespace pipeline {
 
 class RetainedAudioBuffer {
  public:
-  RetainedAudioBuffer(int sample_rate, double retain_sec);
+  RetainedAudioBuffer(core::TimeBase time_base, double retain_sec);
 
   // Append `n` mono float samples at the stream head. Drops the oldest samples
   // beyond the retention window. Thread-safe.
@@ -36,11 +38,13 @@ class RetainedAudioBuffer {
   // Total samples appended this session (absolute clock head).
   long total_samples() const;
 
+  const core::TimeBase& time_base() const { return time_base_; }
+
   void Reset();
 
  private:
   mutable std::mutex mutex_;
-  const int sample_rate_;
+  const core::TimeBase time_base_;
   const long retain_samples_;
   std::vector<float> buf_;  // retained tail: buf_[0] is absolute sample base_
   long base_ = 0;

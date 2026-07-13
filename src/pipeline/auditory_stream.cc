@@ -27,7 +27,9 @@ namespace orator {
 namespace pipeline {
 
 AuditoryStream::AuditoryStream(const Config& config, Emit emit)
-    : config_(config), emit_(std::move(emit)) {
+    : config_(config),
+      time_base_(config.sample_rate, 0),
+      emit_(std::move(emit)) {
   comp_.set_align_snap_pause_sec(config_.timeline_align_snap_pause_sec);
   comp_.set_align_boundary_split_tolerance_sec(
       config_.timeline_align_boundary_split_tolerance_sec);
@@ -37,6 +39,7 @@ AuditoryStream::AuditoryStream(const Config& config, Emit emit)
       config_.timeline_speaker_support_max_gap_sec);
   comp_.set_speaker_support_max_islands(
       config_.timeline_speaker_support_max_islands);
+  comp_.set_gap_fill_enabled(config_.timeline_gap_fill_enabled);
 }
 
 AuditoryStream::~AuditoryStream() { StopWorkers(); }
@@ -355,7 +358,7 @@ void AuditoryStream::StartWorkers() {
   }
   if (aligner_) {
     align_audio_ = std::make_unique<RetainedAudioBuffer>(
-        config_.sample_rate, config_.align_retain_sec);
+        common_time_base(), config_.align_retain_sec);
     AlignWorker::Params ap;
     ap.sample_rate = config_.sample_rate;
     ap.language = config_.align_language;

@@ -213,6 +213,10 @@ int main() {
         MakeTestConfig(),
         [&last_emit](const std::string& json) { last_emit = json; });
     stream.Start();
+    CHECK(stream.time_base().sample_rate() == 16000,
+          "controller exposes canonical session sample rate");
+    CHECK(stream.time_base().origin_sample() == 0,
+          "controller exposes canonical session origin");
     // Push 10 ms of silence at 16 kHz.
     std::vector<float> silence(160, 0.0f);
     stream.PushAudio(silence.data(), static_cast<int>(silence.size()));

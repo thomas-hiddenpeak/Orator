@@ -60,6 +60,12 @@ orator_add_test(test_diar_stream unit/pipeline/test_diar_stream.cc)
 orator_add_test(test_auditory_stream unit/pipeline/test_auditory_stream.cc)
 target_link_libraries(test_auditory_stream PRIVATE pthread)
 
+orator_add_test(test_pipeline_audio_cache unit/pipeline/test_pipeline_audio_cache.cc)
+target_link_libraries(test_pipeline_audio_cache PRIVATE pthread)
+
+orator_add_test(test_asr_worker unit/pipeline/test_asr_worker.cc)
+target_link_libraries(test_asr_worker PRIVATE pthread)
+
 orator_add_test(test_retained_audio unit/pipeline/test_retained_audio.cc)
 target_link_libraries(test_retained_audio PRIVATE pthread)
 

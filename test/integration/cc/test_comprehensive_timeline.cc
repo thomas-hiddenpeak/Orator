@@ -306,6 +306,21 @@ int main() {
   // ---- 12. Fully covered speaker intervals are labelled strong. ----
   {
     TestComprehensiveTimeline tl;
+    tl.set_gap_fill_enabled(false);
+    tl.UpsertText(0, 0.0, 5.0, "ABCDE");
+    tl.ReplaceSpeakers({{0.0, 1.0, "speaker_0", 0.9f, "spk_0"},
+                        {4.0, 5.0, "speaker_0", 0.9f, "spk_0"}});
+    const auto snap = tl.Snapshot();
+    bool has_unknown = false;
+    for (const auto& entry : snap) {
+      if (entry.speaker == "unknown") has_unknown = true;
+    }
+    CHECK(has_unknown, "TOML-disabled gap fill preserves unsupported interval");
+  }
+
+  // ---- 13. Fully covered speaker intervals are labelled strong. ----
+  {
+    TestComprehensiveTimeline tl;
     tl.UpsertText(0, 0.0, 3.0, "ABC");
     tl.ReplaceSpeakers({{0.0, 3.0, "speaker_1", 0.9f, "spk_1"}});
     auto snap = tl.Snapshot();

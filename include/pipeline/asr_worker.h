@@ -43,8 +43,8 @@ class AsrWorker {
       std::function<void(long id, double start, double end,
                          const std::string& text, bool is_final)>;
 
-  // `tb` is the common time base inherited from SharedAudioBuffer::time_base().
-  // The worker holds it as a member and derives all time codes from it.
+  // `tb` comes from the session audio-ingest owner's canonical time base. The
+  // worker holds that value and derives all time codes from it.
   // Text segments are delivered via text_sink_ (→ ProtocolTimeline → comp_);
   // raw tokens are no longer written to an external StreamTimeline.
   class VadCache {

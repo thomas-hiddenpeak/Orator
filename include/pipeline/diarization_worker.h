@@ -56,8 +56,8 @@ class DiarizationWorker {
   // `diarizer` is owned by the controller and must outlive the worker.
   // The diarizer must already be initialized + weight-loaded.
   // `stream` is the CUDA stream for all GPU work (kernels, copies, sync).
-  // `tb` is the common time base inherited from SharedAudioBuffer::time_base().
-  // The worker holds it as a member and derives all time codes from it.
+  // `tb` comes from the session audio-ingest owner's canonical time base. The
+  // worker holds that value and derives all time codes from it.
   // Frames are accumulated internally (no external StreamTimeline needed).
   DiarizationWorker(core::IDiarizer* diarizer, Params params, core::TimeBase tb,
                     cudaStream_t stream);

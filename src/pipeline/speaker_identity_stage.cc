@@ -26,7 +26,7 @@ SpeakerIdentityStage::SpeakerIdentityStage(core::ISpeakerEmbedder* embedder,
       db_(db),
       tb_(tb),
       config_(config),
-      audio_(static_cast<int>(tb.sample_rate()), config.retain_sec) {
+      audio_(tb, config.retain_sec) {
   next_global_id_ = db_ ? db_->Size() : 0;
 }
 

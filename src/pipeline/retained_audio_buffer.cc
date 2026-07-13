@@ -6,9 +6,10 @@
 namespace orator {
 namespace pipeline {
 
-RetainedAudioBuffer::RetainedAudioBuffer(int sample_rate, double retain_sec)
-    : sample_rate_(sample_rate),
-      retain_samples_(std::lround(retain_sec * sample_rate)) {}
+RetainedAudioBuffer::RetainedAudioBuffer(core::TimeBase time_base,
+                                         double retain_sec)
+    : time_base_(time_base),
+      retain_samples_(std::lround(retain_sec * time_base_.sample_rate())) {}
 
 void RetainedAudioBuffer::Append(const float* samples, int n) {
   if (n <= 0) return;

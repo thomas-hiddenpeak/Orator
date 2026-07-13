@@ -79,13 +79,7 @@ int main(int argc, char** argv) {
   // ── Step 1: compile-time defaults (Config struct initializers) ────
   pipeline::AuditoryStream::Config cfg;
 
-  // ── Step 2: CLI args override defaults ────────────────────────────
-  if (argc > 1) cfg.port = std::atoi(argv[1]);
-  const bool asr_arg_provided = argc > 3;
-  if (argc > 2) cfg.diarizer_weights = argv[2];
-  if (asr_arg_provided) cfg.asr_model_dir = argv[3];
-
-  // ── Step 3: TOML config file overrides defaults ──────────────────
+  // ── Step 2: TOML config file overrides defaults ──────────────────
   {
     const char* config_path = std::getenv("ORATOR_CONFIG");
     if (config_path == nullptr || config_path[0] == '\0') {
@@ -94,7 +88,7 @@ int main(int argc, char** argv) {
     io::ApplyTomlConfig(config_path, cfg);
   }
 
-  // ── Step 4: sync toml params into env for deep getenv() code ─────
+  // ── Step 3: sync TOML params into env for legacy getenv() code ───
   // (Existing model code reads these via getenv; setting the env var is
   //  the least-invasive bridge. The loading order is preserved: env set
   //  here can still be overridden by the user's env below.)
@@ -116,7 +110,7 @@ int main(int argc, char** argv) {
   set_env_int("ORATOR_GPU_SERIAL", cfg.gpu_scheduling_mode == 1);
   set_env_int("ORATOR_GPU_CONCURRENT", cfg.gpu_scheduling_mode == 2);
 
-  // ── Step 5: environment variables override toml + defaults ────────
+  // ── Step 4: environment variables override TOML + defaults ───────
   ReadEnvInt("ORATOR_ASR_MAX_NEW_TOKENS", &cfg.asr_max_new_tokens);
   ReadEnvDouble("ORATOR_ASR_SEGMENT_SEC", &cfg.asr_segment_sec);
   ReadEnvString("ORATOR_ASR_LANGUAGE", &cfg.asr_language);
@@ -165,6 +159,9 @@ int main(int argc, char** argv) {
   } else if (ReadEnvInt("ORATOR_GPU_CONCURRENT", &gpu_mode) && gpu_mode == 1) {
     cfg.gpu_scheduling_mode = 2;
   }
+
+  // ── Step 5: CLI arguments are the final overrides ────────────────
+  io::ApplyCommandLineConfig(argc, argv, cfg);
 
   // ── Step 6: finalize port / ui_port ───────────────────────────────
   if (cfg.ui_port <= 0) cfg.ui_port = cfg.port + 1;

@@ -46,27 +46,28 @@ general industrial-readiness claim.
   equivalent state. It is safer than a confident wrong attribution, but it does
   not count as correct for the 90 percent gate.
 
-## 3. Verified Baseline Defects
+## 3. Verified Baseline Defects and Remediation Status
 
-The following code-level defects block closure independently of model accuracy:
+The following code-level defects were verified when this spec was approved.
+Items marked resolved have implementation and focused-test evidence but remain
+subject to the complete acceptance gates in this spec.
 
-1. `AuditoryStream::common_time_base()` and
-   `PipelineAudioCache::time_base()` construct `TimeBase(sample_rate, 0)` values
-   on demand. Production does not obtain one session clock from the configured
-   common-clock owner required by Constitution Article III.
+1. **Resolved in Phase 1**: `AuditoryStream` now owns one immutable `TimeBase`
+   and injects it into private caches, workers, and retained audio stores. Full
+   end-of-stream track reconciliation remains open under T011.
 2. ASR reads VAD through a shared `VadCache`, and forced alignment receives ASR
    finals through `ProtocolTimeline` subscriptions. These are pipeline data
    paths outside `ComprehensiveTimeline`.
 3. `ComprehensiveTimeline` currently performs speaker selection, gap filling,
    and text projection. The Constitution defines it as a pure container and
    alignment layer that does not infer or back-fill pipeline content.
-4. `ORATOR_TIMELINE_NO_GAPFILL` and several model/debug environment switches
-   bypass typed TOML configuration. `ws_main.cc` applies CLI values before TOML,
-   while Article IX requires CLI to be the final override.
-5. A finalized ASR event increments `inc_text_id_` before emitting its live
-   message, so the live final ID can differ from the timeline/align ID. The
-   serialized ASR track also omits `text_id`.
-6. The configured CTest suite contains 47 C++ tests. CMake defines a Python test
+4. **Partially resolved**: timeline gap-fill is a typed TOML field and startup
+   now applies defaults, TOML, environment, then CLI. Other lower-level
+   behavioral environment switches still require migration or removal.
+5. **Resolved in Phase 1**: finalized ASR allocates one `text_id` and reuses it
+   for the typed sink and live event; the terminal ASR track serializes that ID.
+   End-to-end align/revision/export/reconnect/Web UI convergence remains open.
+6. The configured CTest suite contains 49 C++ tests. CMake defines a Python test
    registration helper, but no Python WebSocket tests are registered and the
    documented wrapper directory is absent.
 7. `test_diar_stream` verifies a short stored NeMo fixture using lower-level

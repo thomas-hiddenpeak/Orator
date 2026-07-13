@@ -51,6 +51,7 @@ struct DiarSegment {
 
 // A single ASR token/word with timing (the upstream ASR result).
 struct AsrToken {
+  long text_id = -1;
   double start_sec = 0.0;
   double end_sec = 0.0;
   std::string text;

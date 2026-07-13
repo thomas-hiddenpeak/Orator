@@ -18,8 +18,8 @@
 //     counts onto the common clock.
 //
 // It carries no data buffers and owns no threads; it is safe to copy and pass
-// by value. Instantiate one per session (e.g. from
-// SharedAudioBuffer::time_base()) and derive sub-stream bases as needed.
+// by value. The session audio-ingest owner constructs one canonical value and
+// passes copies from that source to audio stores and workers.
 
 #include <cmath>
 

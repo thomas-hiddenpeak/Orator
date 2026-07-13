@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
-#include <cstdlib>
 #include <utility>
 
 namespace orator {
@@ -299,11 +298,9 @@ ComprehensiveTimeline::SplitTextByDiar(const TextSeg& t) const {
   // bounding the gap on BOTH sides are the SAME speaker -- a brief pause inside
   // one speaker's turn. A gap at a speaker transition (different speakers on
   // each side), or with no segment on one side, stays "unknown": the layer
-  // never guesses across a speaker change. ORATOR_TIMELINE_NO_GAPFILL=1
-  // disables it (A/B + safety fallback to the honest-unknown behaviour).
-  static const bool no_gapfill =
-      std::getenv("ORATOR_TIMELINE_NO_GAPFILL") != nullptr;
-  if (!no_gapfill) {
+  // never guesses across a speaker change. The policy is explicit in TOML so
+  // every run records whether this view-level behavior is enabled.
+  if (gap_fill_enabled_) {
     for (auto& tn : turns) {
       if (tn.speaker != "unknown") continue;
       const SpeakerSeg* before = nullptr;  // largest end <= the gap start

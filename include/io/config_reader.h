@@ -25,5 +25,10 @@ namespace io {
 bool ApplyTomlConfig(const std::string& path,
                      pipeline::AuditoryStream::Config& cfg);
 
+// Apply positional server CLI overrides after TOML and environment settings.
+// Supported arguments: port, diarizer weights, ASR model directory.
+void ApplyCommandLineConfig(int argc, char* const argv[],
+                            pipeline::AuditoryStream::Config& cfg);
+
 }  // namespace io
 }  // namespace orator

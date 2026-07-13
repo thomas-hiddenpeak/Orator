@@ -106,6 +106,7 @@ class AuditoryStream {
     double timeline_speaker_support_min_coverage_ratio = 0.50;
     double timeline_speaker_support_max_gap_sec = 1.00;
     int timeline_speaker_support_max_islands = 1;
+    bool timeline_gap_fill_enabled = true;
 
     // ── VAD pipeline ─────────────────────────────────────────────────
     bool vad_stream = true;
@@ -257,6 +258,7 @@ class AuditoryStream {
     return session_start_wall_sec_.load();
   }
   bool wall_clock_ok() const { return wall_clock_ok_.load(); }
+  const core::TimeBase& time_base() const { return time_base_; }
 
   // Spec 004 Phase 12: access to protocol timeline for describe command.
   const protocol::ProtocolTimeline* protocol_timeline() const {
@@ -293,9 +295,7 @@ class AuditoryStream {
   // The session's common time base (origin = stream start, sample 0). Every
   // pipeline cache and worker derives its time codes from this, so all
   // pipelines align by construction rather than each counting from 0.
-  core::TimeBase common_time_base() const {
-    return core::TimeBase(config_.sample_rate, 0);
-  }
+  const core::TimeBase& common_time_base() const { return time_base_; }
 
   // Build a fresh private audio cache for one pipeline. All caches share the
   // common clock and the same backlog cap; the cap is an interface placeholder
@@ -303,10 +303,11 @@ class AuditoryStream {
   std::unique_ptr<PipelineAudioCache> MakeAudioCache() const {
     PipelineAudioCache::Config cc;
     cc.max_memory_samples = config_.buffer_max_samples;
-    return std::make_unique<PipelineAudioCache>(config_.sample_rate, cc);
+    return std::make_unique<PipelineAudioCache>(time_base_, cc);
   }
 
   Config config_;
+  const core::TimeBase time_base_;
   Emit emit_;
 
   std::unique_ptr<core::IDiarizer> diarizer_;

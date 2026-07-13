@@ -4,8 +4,10 @@
 #include <cstdio>
 #include <vector>
 
+#include "core/time_base.h"
 #include "pipeline/retained_audio_buffer.h"
 
+using orator::core::TimeBase;
 using orator::pipeline::RetainedAudioBuffer;
 
 static int g_fail = 0;
@@ -19,7 +21,7 @@ static int g_fail = 0;
   } while (0)
 
 static void test_basic_span() {
-  RetainedAudioBuffer buf(/*sample_rate=*/100,
+  RetainedAudioBuffer buf(TimeBase(/*sample_rate=*/100),
                           /*retain_sec=*/10.0);  // 1000 smp
   std::vector<float> a(500);
   for (int i = 0; i < 500; ++i) a[i] = static_cast<float>(i);
@@ -33,7 +35,8 @@ static void test_basic_span() {
 }
 
 static void test_window_trim() {
-  RetainedAudioBuffer buf(/*sample_rate=*/100, /*retain_sec=*/1.0);  // 100 smp
+  RetainedAudioBuffer buf(TimeBase(/*sample_rate=*/100),
+                          /*retain_sec=*/1.0);  // 100 smp
   std::vector<float> a(250);
   for (int i = 0; i < 250; ++i) a[i] = static_cast<float>(i);
   buf.Append(a.data(), 250);
@@ -49,7 +52,7 @@ static void test_window_trim() {
 }
 
 static void test_out_of_range() {
-  RetainedAudioBuffer buf(100, 10.0);
+  RetainedAudioBuffer buf(TimeBase(100), 10.0);
   std::vector<float> a(100, 1.0f);
   buf.Append(a.data(), 100);
   CHECK(buf.ReadSpan(50, 200).empty(), "span past head unavailable");
@@ -58,7 +61,7 @@ static void test_out_of_range() {
 }
 
 static void test_incremental_append() {
-  RetainedAudioBuffer buf(100, 10.0);
+  RetainedAudioBuffer buf(TimeBase(100), 10.0);
   for (int blk = 0; blk < 5; ++blk) {
     std::vector<float> a(100);
     for (int i = 0; i < 100; ++i) a[i] = static_cast<float>(blk * 100 + i);
@@ -71,6 +74,13 @@ static void test_incremental_append() {
 }
 
 int main() {
+  {
+    RetainedAudioBuffer buf(TimeBase(100, 17), 1.0);
+    CHECK(buf.time_base().sample_rate() == 100,
+          "retained buffer preserves canonical sample rate");
+    CHECK(buf.time_base().origin_sample() == 17,
+          "retained buffer preserves canonical origin");
+  }
   test_basic_span();
   test_window_trim();
   test_out_of_range();

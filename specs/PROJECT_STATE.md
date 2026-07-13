@@ -14,7 +14,7 @@ work is specified under [specs/](.).
 > pass is the consistency proof. Status lines advance to `Implemented` in the
 > same change that lands the code, with the commit reference.
 
-- **Last updated**: 2026-07-13 (Spec 013 started; Constitution 1.6.0 clarifies canonical clock ownership and supplemental safety/holdout tests)
+- **Last updated**: 2026-07-13 (Spec 013 Phase 1 contract remediation in progress)
 - **Branch**: `master`
 - **Constitution**: v1.6.0
 - **Product closure**: **OPEN / NOT ACCEPTED**. No current artifact proves the
@@ -34,7 +34,7 @@ absolute time base.
 
 ## 2. Current phase
 
-**Spec 013 is the active closing-validation draft.** It does not replace the
+**Spec 013 is the active approved closing-validation work.** It does not replace the
 implemented feature contracts in Specs 001-012; it defines the architecture
 corrections, complete reference review, and conjunctive evidence required before
 the combined product can be accepted. Spec 004 remains the feature specification
@@ -54,13 +54,13 @@ code findings recorded below.
 The system runs three active producer pipelines —
 diarization (who/when), ASR (what/when), and VAD speech-activity detection — each
 feeding one **native, revisable comprehensive timeline** on a single absolute
-seconds scale. The values are numerically anchored at sample zero, but production
-currently constructs multiple equivalent `TimeBase` values instead of inheriting
-one session-owned source. ASR consumes VAD through `VadCache`, and forced
-alignment consumes ASR through `ProtocolTimeline`; these paths are not fully
-independent under Constitution Article III. `ComprehensiveTimeline` also derives
-speaker ownership and performs optional gap fill, which conflicts with its
-constitutional pure-container wording. Spec 013 treats these as closure blockers.
+seconds scale. `AuditoryStream` now owns one immutable session `TimeBase` and
+injects it into each private cache, worker, and retained audio store. ASR still
+consumes VAD through `VadCache`, and forced alignment still consumes ASR through
+`ProtocolTimeline`; these paths are not fully independent under Constitution
+Article III. `ComprehensiveTimeline` also derives speaker ownership and performs
+optional gap fill, which conflicts with its constitutional pure-container
+wording. Spec 013 keeps those remaining items as closure blockers.
 
 ### Target pipeline responsibility boundaries
 
@@ -85,23 +85,23 @@ constitutional pure-container wording. Spec 013 treats these as closure blockers
 | Decoupling (interfaces + registry) | Partial; Article III remediation required | Model interfaces and registry construction are in place. ASR currently reads VAD through a shared `VadCache`; forced alignment is enqueued from ASR protocol events; the comprehensive container also performs fusion decisions. Spec 013 requires typed track-mediated consumption and an explicit fusion pipeline. |
 | `OverlapTimelineMerger` / `ITimelineMerger` | 🗑️ Removed | The old one-shot max-overlap merger and its orphaned interface were deleted — superseded by `ComprehensiveTimeline` (Spec 004). |
 | WebSocket server (libwebsockets v4.3.3) | ✅ Refactored | Replaced hand-rolled POSIX WS with libwebsockets (multi-client, RFC 6455/7692). Eliminated file-scope static variables (`serve_server`, `serve_factory`, `pss_list_head`) → instance members via `lws_context_user`. Thread-safe `SendText` with wakeup/cancel-service. ServeOnce mode for unit tests. |
-| ASR + WS integration | Implemented; closure contracts open | `AuditoryStream` owns one private `PipelineAudioCache` per active producer and uses separate worker threads. This avoids one slow consumer retaining every other consumer's audio. The current cross-track paths are not constitutionally complete: ASR's local `VadCache` is populated by `ProtocolTimeline`, align is enqueued from ASR protocol events, and `common_time_base()` constructs equivalent values on demand. Final ASR live emission also increments `text_id` before serialization, creating an ID-convergence risk for the Web UI. Silent-input filtering has useful prior evidence but must be repeated under Spec 013. |
+| ASR + WS integration | Implemented; cross-track contracts open | `AuditoryStream` owns one private `PipelineAudioCache` per active producer and uses separate worker threads. One session-owned `TimeBase` is injected into all active stores and workers. Final ASR live emission and its typed sink now reuse the same allocated `text_id`, and the ASR terminal track serializes it. ASR's local `VadCache` is still populated by `ProtocolTimeline`, align is still enqueued from ASR protocol events, and full ID convergence through align/revision/export/reconnect/Web UI is not yet proven. Silent-input filtering has useful prior evidence but must be repeated under Spec 013. |
 | Incremental KV-cache ASR streaming (Spec 003) | ✅ Implemented, verified, committed (8cc31ab); params refined 2026-07-03 | Persistent KV cache + prefix caching + chunk-local windowed encoder; partial-emission every 1 s via WebSocket. Full 1hr CER 16.1% / 6.22x; beats production Silero-VAD at every scale. **Current params**: `kStreamWindowMel=100` (1 s), `max_new_tokens=32`, `unfixed_chunks=2`, `unfixed_tokens=15`, `segment_sec=24.0`, `vad_min_overlap_sec=0.12`. 2026-07-03 real WS `test.mp3` 600 s A/B after the VAD-overlap filter: `segment_sec=24` produced 49 ASR finals vs 67 at 12 s, with the same final comprehensive count (115) and better `To C` wording; default restored to 24 s for ASR semantic stability. |
-| Revisable comprehensive timeline (Spec 004) | Runtime candidate implemented; ownership contract open | Tracks and revision serialization exist, including align-aware projection and speaker-support fields. The class currently selects speakers, fills some gaps, and splits text, while Article III defines it as a pure container/alignment layer. `ORATOR_TIMELINE_NO_GAPFILL` is also an environment-only behavior switch. Spec 013 moves business inference to an explicit track-producing pipeline. |
-| Reusable common time base (Spec 004) | Numerically consistent values; source ownership non-compliant | Workers generally derive times through `TimeBase` methods and prior extent checks were numerically clean. Production does not inherit one clock from one owner: `AuditoryStream::common_time_base()` and each cache construct `TimeBase(sample_rate, 0)` values. Spec 013 requires one session-owned source plus mandatory reconciliation for every track. |
+| Revisable comprehensive timeline (Spec 004) | Runtime candidate implemented; ownership contract open | Tracks and revision serialization exist, including align-aware projection and speaker-support fields. The class currently selects speakers, fills some gaps, and splits text, while Article III defines it as a pure container/alignment layer. Gap-fill is now controlled by typed `[timeline].gap_fill_enabled`; Spec 013 still requires business inference to move to an explicit track-producing pipeline. |
+| Reusable common time base (Spec 004) | Session source ownership corrected; full reconciliation open | `AuditoryStream` owns one immutable `TimeBase` and injects it into every active private cache, worker, and retained audio store. Focused tests preserve the supplied sample rate and origin. Spec 013 still requires mandatory end-of-stream extent reconciliation for every registered track. |
 | Pipeline protocol layer (Spec 004) | ✅ Implemented | Phases 7–12 complete: data types (topic.h, schema.h), pipeline registry, topic router, storage layer (MEMORY + DISK), ProtocolTimeline integration, WS v2 envelope with describe command, --storage-disk-path flag. 25/25 tests pass. |
 | Streaming validation | Manual real-WebSocket tool present; automated gate missing | `tools/verify/py/ws_unified_test.py` is the only current Python WebSocket client and captures live events, terminal JSON, and `tegrastats`. It is not registered as an active CTest integration test. Its obsolete matrix mode does not apply the labelled overrides and ranks unknown duration, so it is invalid for configuration selection. |
 | Logging system | ✅ Include-level `core/log.h` | Level-based macros (`LOG_DEBUG`/`INFO`/`WARN`/`ERROR`) with compile-time floor (`ORATOR_LOG_LEVEL`) and runtime env-var gate. All 14 `fprintf(stderr)` calls in src/ replaced. |
 | CUDA kernel unit tests | ✅ `test_kernels`: 13/13 passed | GPU kernel operations (Add, Multiply, NormalizeVector, CosineSimilarity, BatchCosineSimilarity) validated against CPU reference; includes edge cases (zero, single-element, large 1M vectors). |
 | CI pipeline | ✅ GitHub Actions | `.github/workflows/ci.yml`: CUDA 12.5, CMake build + ctest + warning check + Python syntax verification. Triggered on push/PR to master. |
-| Test suite | 47 C++ CTest entries; real-WebSocket automation open | `ctest -N` on 2026-07-13 lists 47 C++ tests. `test/CMakeLists.txt` defines `orator_add_py_test`, but invokes it zero times; `test/integration/py/run_py_test.py` is absent. Historical build/test and real-stream results remain evidence for their commits, but the current configured suite does not automatically validate the product transport, Web UI, microphone, silence, or full terminal document. |
+| Test suite | 49 C++ CTest entries; real-WebSocket automation open | Full CTest on 2026-07-13 passes 49/49, including new canonical-time-base and ASR-final-ID focused tests. `test/CMakeLists.txt` defines `orator_add_py_test`, but invokes it zero times; `test/integration/py/run_py_test.py` is absent. The current configured suite still does not automatically validate the product transport, Web UI, microphone, silence, or full terminal document. |
 | Diar tail parameter experiments | ❌ No accepted fix | 2026-07-10 TOML experiments used `diar_evidence_probe` on full `test.mp3` for strict onset/offset, `min_dur_on=1.2`, `min_dur_on=2.0`, `chunk_left_context=2`, `chunk_right_context=0`, and `left2_right0`. Threshold/min-duration changes deleted evidence without recovering the correct speaker; context variants did not solve 3270-3304 s and some removed the small local-2 hint at 3299.76 s. NeMo full-length reference on the same audio produced the same hard-window spk3 bias (`3270-3304.5`: spk3 313/431 frames; `3240-3360`: spk3 1013/1500 frames). `test_diar_stream` still passes against the stored NeMo oracle sample (`max_abs=0`, `mean_abs=0`). See Spec 012 `diar-tail-toml-experiments-2026-07-10.md`. |
 | TitaNet tail voiceprint review | ❌ No accepted override | 2026-07-10 orthogonal speaker-embedding review used `speaker_embedding_probe` on full `test.mp3` with 600 s, 60 s, and 30 s buckets. The hard-window `L3@3270-3300` bucket remains closest to historical L3 (`L3@3300-3330=0.762`, historical L3 up to 0.724) while best non-L3 alternatives are lower (`L0=0.440`, `L1=0.424`, `L2=0.321`). This rejects direct TitaNet override for 3270-3304 s. See Spec 012 `titanet-tail-evidence-2026-07-10.md`. |
 | OnText protocol matching | ✅ Fixed | Substring `text.find("end")` → JSON key `text.find("\"end\"")` to prevent false positives on partial matches. Same for reset/flush. |
 | GPU telemetry default | ✅ Changed | `gpu_telemetry_interval_sec = 0.0` (was 1.0); disabled by default, opt-in via `ORATOR_GPU_TELEMETRY_SEC`. |
 | VAD model path | ✅ Migrated | `models/asr/silero_vad.safetensors` → `models/vad/`. Updated 6 file references across test, include, and tools. |
-| Web UI (Spec 006 MVP) | Implemented surface; end-to-end acceptance open | Static server, modular UI, file/microphone input, transcript, timeline, telemetry, reconnect, and export code exist. The current ASR final-event off-by-one `text_id` risk can separate live rows from terminal/align IDs, and no registered browser integration gate proves live/final convergence. Spec 013 requires real browser validation. |
-| Configuration consistency | Non-compliant with Article IX | `ws_main.cc` currently applies CLI values before TOML and environment values after TOML; the documented constitutional order requires CLI last. Several behavioral switches still call `getenv()` below the typed config layer, including timeline gap-fill behavior. Acceptance runs must be TOML-defined and record the resolved configuration. |
+| Web UI (Spec 006 MVP) | Implemented surface; end-to-end acceptance open | Static server, modular UI, file/microphone input, transcript, timeline, telemetry, reconnect, and export code exist. The server-side final-event off-by-one `text_id` defect is fixed, but no registered browser integration gate yet proves live/final convergence across align, revisions, reconnect, and export. Spec 013 requires real browser validation. |
+| Configuration consistency | Precedence corrected; lower-level switches open | Startup now applies defaults, TOML, environment, then CLI, with focused precedence coverage. Timeline gap-fill moved from `ORATOR_TIMELINE_NO_GAPFILL` to typed `[timeline].gap_fill_enabled`. Several lower-level behavioral switches still call `getenv()` below the typed config layer, and resolved-configuration capture remains open. |
 | Session persistence UI (Spec 004 T135) | ❌ Not implemented | Web UI session history panel in sidebar is not yet built. Backend SessionStore + WS commands (sessions/load_session) are implemented and tested. |
 | ISpeakerEmbedder (core/stages.h) | ✅ Active in Spec 010 | Interface declares a fixed-dimension speaker embedding extractor. Runtime implementation: `model::TitaNetEmbedder`, wired into the diarization pipeline by `SpeakerIdentityStage` when `[speaker].enable=true` and `model_dir` is set. |
 | ISpeakerRegistry (core/stages.h) | ✅ Active in Spec 010 | Interface declares a persistent enrolled-speaker registry with 1:N matching. Runtime implementation: `model::SpeakerDatabase`, loaded/saved through `[speaker].registry_path` and used by `SpeakerIdentityStage` for global speaker ids. |
@@ -227,7 +227,7 @@ Findings:
 
 ## 6. SDD artifacts
 
-- [.specify/memory/constitution.md](../.specify/memory/constitution.md) — v1.4.0 (Article I §1: C++17 → C++20)
+- [.specify/memory/constitution.md](../.specify/memory/constitution.md) — v1.6.0 (one canonical session clock; supplemental test provenance)
 - [specs/001-streaming-pipeline/spec.md](001-streaming-pipeline/spec.md) — implemented
 - [specs/001-streaming-pipeline/plan.md](001-streaming-pipeline/plan.md) — implemented
 - [specs/001-streaming-pipeline/tasks.md](001-streaming-pipeline/tasks.md) — implemented
@@ -246,13 +246,13 @@ Findings:
 
 ## 7. Immediate next step
 
-Review [Spec 013](013-industrial-closing-validation/spec.md), its
-[plan](013-industrial-closing-validation/plan.md), and its
-[tasks](013-industrial-closing-validation/tasks.md). Do not resume parameter
-tuning or make a product-closure claim until the governance, architecture,
-reference-ledger, and reproducibility gates are approved. The bullets below are
-historical implementation and measurement records; none independently satisfies
-Spec 013 acceptance.
+Continue [Spec 013](013-industrial-closing-validation/spec.md) Phase 1 by moving
+cross-pipeline evidence flow into typed `ComprehensiveTimeline` tracks, adding
+full extent and ID-convergence checks, and removing remaining behavioral
+environment-only switches. Do not resume parameter tuning or make a
+product-closure claim before the architecture, reference-ledger, and
+reproducibility gates pass. The bullets below are historical implementation and
+measurement records; none independently satisfies Spec 013 acceptance.
 
 - **Spec 012 speaker-business recovery — historical evidence line** (2026-07-09).
   The latest runtime candidate fixes the known full-length regression windows by
@@ -291,8 +291,8 @@ Spec 013 acceptance.
   - README env var table + Python test CTest registration + protocol envelope unwrapping in web UI
 - **Spec 004 — Protocol Layer**: Implemented. Phases 7–12 complete. Phase 13 (session persistence): core backend (SessionStore T130–T132) and WS commands (T133–T134) implemented; T135 (Web UI session history panel) NOT YET IMPLEMENTED. Web UI (`app.js`) now includes `unwrapEnvelope()` for Spec 004 topic-based protocol envelopes. Integration test (`ws_ui_integration_test.py`) uses `unwrap_envelope()` for all WS message parsing.
 - **Full-length streaming verification**: 2026-06-21. 3615 s (1 hr) audio pushed through real WebSocket → 382.0 s wall = **9.46× real-time**. All three tracks (ASR/diarization/VAD) cover 100 % of the audio, no crash, no clock drift, no data loss. Achieved 9.25× on a consecutive warm-GPU re-run and 5.82× on a cold-start run, confirming model-load overhead is one-time.
-- **Historical Python integration-test claim** (2026-06-22). The documented `test/run_py_test.py` lifecycle is not present in the current tree, and current `ctest -N` registers only 47 C++ tests. Restoring a registered real-WebSocket gate is a Spec 013 task.
-- **TOML config system** (2026-06-22). Runtime fields are broadly represented in `orator.toml`, but current `ws_main.cc` applies defaults → CLI → TOML → environment, not the constitutional defaults → TOML → environment → CLI order. Several lower-level environment-only switches remain. Configuration consistency is therefore open under Spec 013. See `include/io/config_reader.h`, `src/io/config_reader.cc`, `src/net/ws_main.cc`, and `orator.toml`.
+- **Historical Python integration-test claim** (2026-06-22). The documented `test/run_py_test.py` lifecycle is not present in the current tree. The current 49 C++ tests still do not include a registered real-WebSocket gate; restoring one is a Spec 013 task.
+- **TOML config system** (2026-06-22; precedence corrected 2026-07-13). Runtime fields are broadly represented in `orator.toml`, and `ws_main.cc` now applies defaults → TOML → environment → CLI. Several lower-level environment-only switches remain, so configuration consistency is still open under Spec 013. See `include/io/config_reader.h`, `src/io/config_reader.cc`, `src/net/ws_main.cc`, and `orator.toml`.
 - **VAD-gated ASR fix** (2026-06-22). VAD async-lag protection via segment-start confirmation check. ASR segments reduced from 43→18 (120s test). RTF improved 4.7→3.7. Parameters tuned: `asr_vad_trail_sec=1.0`, `vad_min_silence_ms=300`. See `src/pipeline/asr_worker.cc:61-141`.
 - **Full-length verification (v7)** (2026-06-23). 3615s (1 hr) audio at 420× injection: **964s wall (3.75×)**, no crash, no data loss. 300s verification confirms 3 ASR segments cover 300s of audio (merging 90 VAD segments). Speed regression from 9.46× (pre-v7) due to VAD segment-start check keeping ASR segments open longer, causing more audio to pass through GPU processing. 120s test at 1× real-time still at RTF 3.7.
 - **NeMo feature parity — silence profile, FIFO, dynamic pop_out_len** (2026-06-24). Ported three NeMo v2.1 streaming features to `streaming_sortformer.cc`:

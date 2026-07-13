@@ -15,7 +15,7 @@
 
 ## Phase 1: Contract Compliance
 
-- [ ] T010 Create one session-owned immutable `TimeBase` and inject it into every
+- [x] T010 Create one session-owned immutable `TimeBase` and inject it into every
   audio store and worker.
 - [ ] T011 Make end-of-stream extent reconciliation cover every registered track
   and fail tests on any mismatch.
@@ -27,12 +27,13 @@
   ASR evidence read through `ComprehensiveTimeline`.
 - [ ] T015 Move speaker choice, text projection, and gap policy into a registered
   `business_speaker` pipeline and keep raw tracks immutable.
-- [ ] T016 Fix finalized ASR `text_id` allocation/emission order and serialize IDs
+- [x] T016 Fix finalized ASR `text_id` allocation/emission order and serialize IDs
   explicitly in the ASR terminal track.
 - [ ] T017 Add ID-convergence tests across partial/final events, align groups,
   revisions, terminal tracks, export, reconnect, and Web UI state.
 - [ ] T018 Correct configuration precedence and migrate/remove every behavioral
-  environment-only switch.
+  environment-only switch. Precedence and timeline gap-fill are corrected;
+  remaining lower-level switches are still open.
 - [ ] T019 Emit or capture the complete resolved configuration in every run
   manifest.
 - [ ] T020 Remove the misleading parameter-matrix mode from the unified test

@@ -5,11 +5,12 @@
 namespace orator {
 namespace pipeline {
 
-PipelineAudioCache::PipelineAudioCache(int sample_rate)
-    : PipelineAudioCache(sample_rate, Config()) {}
+PipelineAudioCache::PipelineAudioCache(core::TimeBase time_base)
+    : PipelineAudioCache(time_base, Config()) {}
 
-PipelineAudioCache::PipelineAudioCache(int sample_rate, const Config& config)
-    : sample_rate_(sample_rate), config_(config) {}
+PipelineAudioCache::PipelineAudioCache(core::TimeBase time_base,
+                                       const Config& config)
+    : time_base_(time_base), config_(config) {}
 
 PipelineAudioCache::~PipelineAudioCache() = default;
 

@@ -1,5 +1,6 @@
 #include "io/config_reader.h"
 
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <toml++/toml.h>
@@ -123,6 +124,9 @@ bool ApplyTomlConfig(const std::string& path,
       if (auto n = v->value<int>()) {
         cfg.timeline_speaker_support_max_islands = *n;
       }
+    }
+    if (auto v = sec->get("gap_fill_enabled")) {
+      if (auto b = v->value<bool>()) cfg.timeline_gap_fill_enabled = *b;
     }
   }
 
@@ -393,6 +397,13 @@ bool ApplyTomlConfig(const std::string& path,
   }
 
   return true;
+}
+
+void ApplyCommandLineConfig(int argc, char* const argv[],
+                            pipeline::AuditoryStream::Config& cfg) {
+  if (argc > 1) cfg.port = std::atoi(argv[1]);
+  if (argc > 2) cfg.diarizer_weights = argv[2];
+  if (argc > 3) cfg.asr_model_dir = argv[3];
 }
 
 }  // namespace io

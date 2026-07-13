@@ -416,6 +416,7 @@ std::string AuditoryStream::Serialize() {
     core::Transcript transcript;
     for (const auto& r : raw_texts) {
       core::AsrToken tok;
+      tok.text_id = r.id;
       tok.start_sec = r.start;
       tok.end_sec = r.end;
       tok.text = r.text;
@@ -478,8 +479,8 @@ std::string AuditoryStream::Serialize() {
     for (size_t i = 0; i < last_transcript_.tokens.size(); ++i) {
       const auto& t = last_transcript_.tokens[i];
       std::snprintf(buf, sizeof(buf),
-                    "{\"start\":%.3f,\"end\":%.3f,\"text\":\"", t.start_sec,
-                    t.end_sec);
+                    "{\"text_id\":%ld,\"start\":%.3f,\"end\":%.3f,\"text\":\"",
+                    t.text_id, t.start_sec, t.end_sec);
       out += std::string(buf) + JsonEscape(t.text) + "\"}";
       if (i + 1 < last_transcript_.tokens.size()) out += ",";
     }

@@ -340,17 +340,17 @@ void AsrWorker::EmitIncrementalChunk(const float* samples, int n,
       // Text segment goes through ProtocolTimeline → comp_ via text_sink_.
       // StreamTimeline was removed; raw text is read from
       // comp_.SnapshotRawTexts().
+      const long text_id = inc_text_id_++;
       if (text_sink_)
-        text_sink_(inc_text_id_, tok.start_sec, tok.end_sec, tok.text,
+        text_sink_(text_id, tok.start_sec, tok.end_sec, tok.text,
                    /*is_final=*/true);
-      ++inc_text_id_;
       inc_delivered_text_.clear();
       if (emit_) {
         char buf[160];
         std::snprintf(buf, sizeof(buf),
                       "{\"type\":\"asr\",\"source\":\"qwen3_asr\","
                       "\"text_id\":%ld,\"start\":%.3f,\"end\":%.3f,\"text\":\"",
-                      inc_text_id_, tok.start_sec, tok.end_sec);
+                      text_id, tok.start_sec, tok.end_sec);
         emit_(std::string(buf) + JsonEscape(tok.text) + "\"}");
       }
       inc_live_text_.clear();

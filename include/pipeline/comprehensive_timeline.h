@@ -131,6 +131,7 @@ class ComprehensiveTimeline {
   void set_speaker_support_min_coverage_ratio(double ratio);
   void set_speaker_support_max_gap_sec(double sec);
   void set_speaker_support_max_islands(int count);
+  void set_gap_fill_enabled(bool enabled) { gap_fill_enabled_ = enabled; }
 
   // The recorded VAD speech segments (sorted), for the serialized vad track.
   std::vector<VadSeg> SnapshotVad() const { return vad_; }
@@ -265,6 +266,7 @@ class ComprehensiveTimeline {
   double speaker_support_min_coverage_ratio_ = 0.50;
   double speaker_support_max_gap_sec_ = 1.00;
   int speaker_support_max_islands_ = 1;
+  bool gap_fill_enabled_ = true;
   // align track: per-unit timestamps refining an ASR segment, keyed by text_id.
   std::map<long, AlignGroup> align_;
   // Current diarization-split projection per text id (kept in sync).

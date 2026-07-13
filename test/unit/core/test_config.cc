@@ -122,6 +122,7 @@ align_boundary_split_tolerance_sec = 0.075
 speaker_support_min_coverage_ratio = 0.625
 speaker_support_max_gap_sec = 1.25
 speaker_support_max_islands = 2
+gap_fill_enabled = false
 
 [telemetry]
 gpu_interval_sec = 5.0
@@ -249,6 +250,8 @@ gpu_scheduling = "concurrent"
           "cfg.timeline_speaker_support_max_gap_sec == 1.25");
     CHECK(cfg.timeline_speaker_support_max_islands == 2,
           "cfg.timeline_speaker_support_max_islands == 2");
+    CHECK(cfg.timeline_gap_fill_enabled == false,
+          "cfg.timeline_gap_fill_enabled == false");
 
     // [telemetry]
     CHECK(cfg.gpu_telemetry_interval_sec == 5.0,
@@ -271,6 +274,26 @@ gpu_scheduling = "concurrent"
           "cfg.gpu_scheduling_mode == 2 (concurrent)");
 
     std::remove(path.c_str());
+  }
+
+  // ── CLI is the final configuration layer ───────────────────────────
+  std::printf("\n-- Command-line final override --\n");
+  {
+    pipeline::AuditoryStream::Config cfg;
+    cfg.port = 7000;
+    cfg.diarizer_weights = "/toml/diar";
+    cfg.asr_model_dir = "/env/asr";
+    char arg0[] = "orator_ws";
+    char arg1[] = "9000";
+    char arg2[] = "/cli/diar";
+    char arg3[] = "/cli/asr";
+    char* argv[] = {arg0, arg1, arg2, arg3};
+    io::ApplyCommandLineConfig(4, argv, cfg);
+    CHECK(cfg.port == 9000, "CLI port overrides earlier layers");
+    CHECK(cfg.diarizer_weights == "/cli/diar",
+          "CLI diarizer path overrides earlier layers");
+    CHECK(cfg.asr_model_dir == "/cli/asr",
+          "CLI ASR path overrides earlier layers");
   }
 
   // ── Missing file ────────────────────────────────────────────────────

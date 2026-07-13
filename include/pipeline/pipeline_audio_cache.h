@@ -52,8 +52,8 @@ class PipelineAudioCache {
     size_t offload_threshold_samples = 0;
   };
 
-  explicit PipelineAudioCache(int sample_rate);
-  PipelineAudioCache(int sample_rate, const Config& config);
+  explicit PipelineAudioCache(core::TimeBase time_base);
+  PipelineAudioCache(core::TimeBase time_base, const Config& config);
   ~PipelineAudioCache();
 
   PipelineAudioCache(const PipelineAudioCache&) = delete;
@@ -82,11 +82,10 @@ class PipelineAudioCache {
   // first.
   void Reset();
 
-  int sample_rate() const { return sample_rate_; }
+  int sample_rate() const { return time_base_.sample_rate(); }
 
-  // The session's common time base (origin = stream start, sample 0). Shared
-  // by construction across every pipeline's cache.
-  core::TimeBase time_base() const { return core::TimeBase(sample_rate_, 0); }
+  // The canonical session time base received from the audio-ingest owner.
+  const core::TimeBase& time_base() const { return time_base_; }
 
   // Total samples appended this session (absolute clock head). Thread-safe.
   long total_samples() const;
@@ -102,7 +101,7 @@ class PipelineAudioCache {
   mutable std::mutex mutex_;
   std::condition_variable cv_;
 
-  const int sample_rate_;
+  const core::TimeBase time_base_;
   Config config_;
 
   // Unread samples only: buf_ holds [read_pos_, total_), so buf_.front() is the
