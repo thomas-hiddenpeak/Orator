@@ -5,7 +5,7 @@
 ## Phase 0: Governance
 
 - [x] T001 Review and approve Spec 013 requirements, thresholds, and terminology.
-- [ ] T002 Submit the common-clock/private-cache and supplemental-test
+- [x] T002 Submit the common-clock/private-cache and supplemental-test
   Constitution amendment as a separate governance commit.
 - [ ] T003 Correct all remaining closure and implementation claims in
   `PROJECT_STATE.md`, active specs, READMEs, and code comments.

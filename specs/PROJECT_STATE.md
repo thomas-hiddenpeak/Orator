@@ -14,9 +14,9 @@ work is specified under [specs/](.).
 > pass is the consistency proof. Status lines advance to `Implemented` in the
 > same change that lands the code, with the commit reference.
 
-- **Last updated**: 2026-07-13 (code/document consistency audit and Spec 013 closing-validation draft)
+- **Last updated**: 2026-07-13 (Spec 013 started; Constitution 1.6.0 clarifies canonical clock ownership and supplemental safety/holdout tests)
 - **Branch**: `master`
-- **Constitution**: v1.5.0
+- **Constitution**: v1.6.0
 - **Product closure**: **OPEN / NOT ACCEPTED**. No current artifact proves the
   Spec 013 full-session 90 percent business-accuracy gates. Historical
   "closing" runs remain component stability and numerical-fidelity evidence,

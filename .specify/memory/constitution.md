@@ -6,9 +6,9 @@ conflicts with the Constitution, the Constitution takes precedence. Amending it
 is a deliberate, recorded action (see *Amendment Process*), not an undocumented
 change.
 
-- **Version**: 1.5.0
+- **Version**: 1.6.0
 - **Ratified**: 2026-06-12
-- **Last amended**: 2026-06-27
+- **Last amended**: 2026-07-13
 
 ---
 
@@ -73,17 +73,21 @@ the common time base — without exception.
 ### 3.1 — Common Time Base as the Foundation
 
 1. A **common time base** (`core::TimeBase`) is the shared clock for the entire
-   system. It is defined once per session, anchored at the shared audio buffer's
-   origin (absolute sample 0 = stream start), and accessible through
-   `SharedAudioBuffer::time_base()`.
+   system. It is defined exactly once per session by the audio-ingest owner,
+   anchored at that session's origin (absolute sample 0 = stream start), and
+   retained as one immutable session value. The ingest implementation MAY fan
+   audio into private per-pipeline stores so one consumer cannot retain another
+   consumer's memory; storage ownership does not create another time origin.
 2. The common time base is a **mandatory prerequisite** for every registered
-   pipeline. A pipeline MUST obtain its time base from the shared audio buffer
-   (`buffer_.time_base()`), not by constructing an independent instance.
-   Deriving a time base from `params.sample_rate` or any other local parameter
-   is a violation.
+   pipeline and audio store. Each MUST receive its time base from the session
+   audio-ingest owner, not construct an independent instance. Deriving a time
+   base from `params.sample_rate`, a cache's sample rate, or any other local
+   parameter is a violation even when the resulting numbers happen to match.
 3. A pipeline holds the common time base as a member field (e.g.
-   `core::TimeBase tb_`) and derives all time codes from it. The time base
-   is never created on-demand per operation.
+   `core::TimeBase tb_`) received from that canonical source and derives all time
+   codes from it. An immutable value copy is allowed; an independently
+   constructed origin is not. The time base is never created on demand per
+   operation.
 
 ### 3.2 — Three Consistency Principles
 
@@ -92,9 +96,9 @@ requirements with respect to the common time base. These are enforced in review;
 a pipeline that violates any one of them is rejected.
 
 4. **Origin consistency (起点一致性)**: Every pipeline derives its time origin
-   from the shared audio buffer's common time base. The absolute sample position
-   of t = 0 is identical across all pipelines by construction — inherited from
-   `buffer_.time_base()`, not assumed locally. A pipeline MUST NOT set its own
+   from the session audio-ingest owner's common time base. The absolute sample
+   position of t = 0 is identical across all pipelines by construction, not by
+   repeating equivalent constructor arguments. A pipeline MUST NOT set its own
    origin independently.
 5. **Process consistency (过程一致性)**: During internal processing, a pipeline
    MUST compute all time codes through the common time base's conversion methods
@@ -140,8 +144,9 @@ a pipeline that violates any one of them is rejected.
 ## Article IV — Streaming Validation Through the Real Transport
 
 1. The system is a **real-time streaming** system. The primary execution path
-   is: audio arrives incrementally → shared buffer → pipelines consume it
-   continuously.
+   is: audio arrives incrementally → the session ingest assigns absolute sample
+   positions and fans out to pipeline-owned stores → pipelines consume it
+   continuously on the one common time base.
 2. Tests MUST exercise the complete end-to-end path and assert on the **actual
    terminal output** (the comprehensive timeline JSON). A test that bypasses the
    streaming path does not validate streaming behavior.
@@ -168,9 +173,25 @@ acceptance criteria, enforced in review:
 
 ### 6.1 — Test Audio and Reference Standard
 
-1. All tests except unit tests MUST use `test.mp3` as the audio source and `test.txt` as the reference for actual pipeline testing.
-2. Actual pipeline testing MAY use different speeds for testing.
-3. When comparing results, NO script analysis MUST be used for accuracy evaluation, and NO scripts MUST be temporarily created in the command line for analysis. The test results MUST be compared item by item with the reference file by placing them in the context.
+1. Canonical pipeline acceptance tests MUST use `test.mp3` as the audio source
+   and `test.txt` as the reference. Supplemental recordings never replace this
+   mandatory gate.
+2. Product-safety tests MAY additionally use generated silence, confirmed-silent
+   excerpts, controlled noise, and live microphone input to validate endpoint,
+   hallucination, transport, and device behavior for which `test.txt` is not an
+   applicable reference.
+3. A general industrial-readiness claim MUST additionally use locked holdout
+   recordings that were not used for implementation or tuning. Their source,
+   consent/status, acoustic conditions, speakers, reference construction, and
+   hashes MUST be recorded. Holdout results are reported separately from the
+   canonical `test.mp3` result.
+4. Actual pipeline testing MAY use different input pacing speeds, but acceptance
+   reports state the speed and include real-time pacing where required.
+5. When comparing accuracy results, NO script analysis MUST assign correctness
+   or select a candidate, and NO temporary command-line scripts may be created
+   for that purpose. Results MUST be compared item by item with the reference in
+   conversational context. Tools may capture, index, and display evidence, but
+   they do not make the accuracy judgment.
 
 ### 6.2 — Test Levels and Device Metrics
 
@@ -351,4 +372,4 @@ state claim:
 - When guidance is silent, Articles II (accuracy) and V (quality) take
   precedence over other considerations.
 
-**Version 1.5.0 · Ratified 2026-06-12 · Last amended 2026-06-27**
+**Version 1.6.0 · Ratified 2026-06-12 · Last amended 2026-07-13**

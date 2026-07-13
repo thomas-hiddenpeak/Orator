@@ -182,10 +182,10 @@ remains 90 percent on the real runtime output.
 
 ## 6. Industrial-Readiness Evidence
 
-Constitution Article VI currently permits only `test.mp3` for non-unit pipeline
-tests. Before a general industrial-readiness claim, a separately reviewed
-Constitution amendment must retain `test.mp3` as the mandatory canonical gate
-while permitting additional safety and locked holdout recordings.
+Constitution 1.6.0 retains `test.mp3` as the mandatory canonical gate and permits
+additional safety and locked holdout recordings. Supplemental recordings never
+replace the canonical result and must follow the provenance requirements in
+Article VI.
 
 After that amendment, industrial readiness additionally requires:
 
@@ -221,8 +221,9 @@ industrial audio.
   acceptance.
 - **Article IV**: every acceptance result comes from incremental WebSocket input
   and the terminal comprehensive document.
-- **Article VI**: full item-by-item contextual review is mandatory. Additional
-  industrial holdouts require the explicit amendment described in Section 6.
+- **Article VI**: full item-by-item contextual review is mandatory. Supplemental
+  safety and locked holdout recordings follow the 1.6.0 provenance rules and do
+  not replace `test.mp3`.
 - **Article IX**: runtime parameter changes are TOML-only, and the implementation
   loading order must be corrected to defaults, TOML, environment, then CLI.
 - **Articles X-XI**: this spec, its plan/tasks, code, tests, and project state must
