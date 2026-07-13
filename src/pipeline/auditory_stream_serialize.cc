@@ -11,6 +11,7 @@
 #include "model/speaker_database.h"
 #include "pipeline/comprehensive_timeline.h"
 #include "pipeline/json_util.h"
+#include "pipeline/runtime_config.h"
 
 #include <cuda_runtime.h>
 
@@ -461,6 +462,7 @@ std::string AuditoryStream::Serialize() {
       audio, config_.sample_rate, wall_start, wclk_ok ? "true" : "false",
       timebase_reconciled ? "true" : "false", timebase_ok ? "true" : "false");
   out += buf;
+  out += "\"resolved_config\":" + SerializeResolvedConfig(config_) + ",";
   out += "\"track_extents\":[";
   for (std::size_t i = 0; i < extents.size(); ++i) {
     const auto& extent = extents[i];

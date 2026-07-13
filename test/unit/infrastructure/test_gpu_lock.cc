@@ -1,21 +1,20 @@
 // Unit tests for gpu/gpu_lock.h — DeviceGuard, DeviceLock,
 // ConcurrentGpuEnabled/Active.
 //
-// These tests exercise the GPU access serialization logic. The mode is resolved
-// once at first access via a static local; we set ORATOR_GPU_SERIAL=1 at the
-// very start of main() so all tests run in kSerial mode, which is the only mode
-// where DeviceGuard actually acquires the lock (kFull skips unconditionally).
+// These tests exercise the GPU access serialization logic. They configure the
+// typed process mode before creating any guards.
 
 #include <cstdio>
-#include <cstdlib>
 #include <thread>
 
 #include "gpu/gpu_lock.h"
 
 using orator::gpu::ConcurrentGpuActive;
 using orator::gpu::ConcurrentGpuEnabled;
+using orator::gpu::ConfigureSchedulingMode;
 using orator::gpu::DeviceGuard;
 using orator::gpu::DeviceLock;
+using orator::gpu::SchedulingMode;
 
 static int g_fail = 0;
 #define CHECK(cond, msg)              \
@@ -27,8 +26,7 @@ static int g_fail = 0;
   } while (0)
 
 int main() {
-  // Force serialized mode BEFORE any static-local mode resolution.
-  ::setenv("ORATOR_GPU_SERIAL", "1", 1);
+  ConfigureSchedulingMode(SchedulingMode::kSerial);
 
   std::printf("Testing gpu::DeviceGuard / DeviceLock / ConcurrentGpu...\n");
 
@@ -61,8 +59,7 @@ int main() {
   // 2. ConcurrentGpuEnabled() is false in serialized mode.
   // ------------------------------------------------------------------
   {
-    std::printf(
-        "  Test 2: ConcurrentGpuEnabled() == false under ORATOR_GPU_SERIAL\n");
+    std::printf("  Test 2: ConcurrentGpuEnabled() == false in serial mode\n");
     CHECK(!ConcurrentGpuEnabled(), "ConcurrentGpuEnabled false in serial mode");
     std::printf("  PASS\n");
   }
@@ -71,8 +68,7 @@ int main() {
   // 3. ConcurrentGpuActive() is false in serialized mode.
   // ------------------------------------------------------------------
   {
-    std::printf(
-        "  Test 3: ConcurrentGpuActive() == false under ORATOR_GPU_SERIAL\n");
+    std::printf("  Test 3: ConcurrentGpuActive() == false in serial mode\n");
     CHECK(!ConcurrentGpuActive(), "ConcurrentGpuActive false in serial mode");
     std::printf("  PASS\n");
   }

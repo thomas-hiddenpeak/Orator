@@ -5,7 +5,6 @@
 
 #include <chrono>
 #include <cmath>
-#include <cstdlib>
 #include <cstring>
 #include <stdexcept>
 
@@ -369,7 +368,7 @@ void AsrTextDecoder::DecodeForwardOnStream(float* d_x, const int* d_pos,
 
   // Profiling uses cudaEventSynchronize, which is illegal during graph capture,
   // so only time the eager default-stream (s==0) path.
-  const bool prof = (s == 0) && std::getenv("ORATOR_ASR_PROFILE2") != nullptr;
+  const bool prof = (s == 0) && config_.profile;
   cudaEvent_t e0, e1;
   if (prof) {
     cudaEventCreate(&e0);
@@ -502,7 +501,7 @@ void AsrTextDecoder::Forward(float* d_x, int Tq, int pos0,
   auto* norm_bf16 = reinterpret_cast<uint16_t*>(
       Work(10, static_cast<size_t>(Tq) * Hh / 2 + 1));
 
-  const bool prof = (Tq == 1) && std::getenv("ORATOR_ASR_PROFILE2") != nullptr;
+  const bool prof = (Tq == 1) && config_.profile;
   cudaEvent_t e0, e1, e2;
   if (prof) {
     cudaEventCreate(&e0);
@@ -701,11 +700,7 @@ std::vector<int> AsrTextDecoder::DecodeGreedy(int start_pos, int max_new,
                                               int batch, cudaStream_t stream) {
   // The graph loop checks the stop condition (EOS / repetition) only at batch
   // boundaries, so a large batch over-generates tokens past EOS for short
-  // utterances. ORATOR_ASR_BATCH overrides the batch size for tuning.
-  if (const char* b = std::getenv("ORATOR_ASR_BATCH")) {
-    const int v = std::atoi(b);
-    if (v > 0) batch = v;
-  }
+  // utterances.
   const int Hh = config_.hidden_size;
   if (!step_x_) {
     step_x_ = std::make_shared<UnifiedBuffer>(sizeof(float) * Hh);
@@ -764,7 +759,7 @@ std::vector<int> AsrTextDecoder::DecodeGreedy(int start_pos, int max_new,
   // Seed: argmax of the current (prefill) logits -> first token (step 0). Run
   // on the default stream, then drain so the device scalar `tok` is visible to
   // the capture/replay stream before any body reads it.
-  const bool dprof = std::getenv("ORATOR_ASR_DECPROF") != nullptr;
+  const bool dprof = config_.profile;
   auto clk = [] { return std::chrono::steady_clock::now(); };
   auto ms = [](auto a, auto b) {
     return std::chrono::duration<double, std::milli>(b - a).count();
@@ -778,15 +773,15 @@ std::vector<int> AsrTextDecoder::DecodeGreedy(int start_pos, int max_new,
   auto t_seed1 = clk();
 
   int emitted = 0;
-  // CUDA Graph capture is disabled when (a) explicitly via ORATOR_ASR_NOGRAPH,
-  // or (b) any lock-free GPU concurrency mode is active (Spec 002): capture is
+  // CUDA Graph capture is disabled when (a) typed runtime configuration turns
+  // it off, or (b) any lock-free GPU concurrency mode is active (Spec 002): capture is
   // a process/stream-global state machine that the concurrently-issuing
   // diarization/VAD pipeline corrupts, aborting with "operation failed ...
   // during capture". In concurrent mode the eager per-batch path is used (it
   // was measured stable and still faster end-to-end because diarization no
   // longer waits behind ASR).
-  const bool use_graph = std::getenv("ORATOR_ASR_NOGRAPH") == nullptr &&
-                         !gpu::ConcurrentGpuActive();
+  const bool use_graph =
+      config_.cuda_graph_enabled && !gpu::ConcurrentGpuActive();
 
   // If a previously captured banned graph baked different EOS ids, it is stale.
   if (graph_ready_ && (graph_ban0_ != eos0 || graph_ban1_ != eos1)) {
@@ -833,7 +828,7 @@ std::vector<int> AsrTextDecoder::DecodeGreedy(int start_pos, int max_new,
     graph_exec_banned_ = capture(eos0, eos1);
     graph_exec_ = capture(-1, -1);
     graph_ready_ = true;
-    if (std::getenv("ORATOR_ASR_PROFILE"))
+    if (config_.profile)
       std::fprintf(stderr, "[graph] ready (banned=%p normal=%p)\n",
                    graph_exec_banned_, graph_exec_);
     if (harvest(emitted)) {

@@ -7,6 +7,7 @@
 
 #include "io/config_reader.h"
 #include "pipeline/auditory_stream.h"
+#include "pipeline/runtime_config.h"
 
 using namespace orator;
 
@@ -65,6 +66,16 @@ language = "English"
 system_prompt = "Translate to French"
 ban_steps = 5
 decode_batch = 8
+profile = true
+windowed_encoder = true
+cuda_graph_enabled = false
+
+[align]
+enable = true
+model_dir = "/models/align"
+language = "English"
+max_segment_sec = 120.0
+retain_sec = 150.0
 profile = true
 
 [speaker]
@@ -137,6 +148,7 @@ log_level = 1
 timebase_check = true
 stream_progress = true
 gpu_scheduling = "concurrent"
+ws_text_log_path = "/tmp/ws-frames.jsonl"
 )";
     std::string path = WriteTemp(toml);
 
@@ -165,6 +177,18 @@ gpu_scheduling = "concurrent"
     CHECK(cfg.asr_ban_steps == 5, "cfg.asr_ban_steps == 5");
     CHECK(cfg.asr_decode_batch == 8, "cfg.asr_decode_batch == 8");
     CHECK(cfg.asr_profile == true, "cfg.asr_profile == true");
+    CHECK(cfg.asr_windowed_encoder == true, "cfg.asr_windowed_encoder == true");
+    CHECK(cfg.asr_cuda_graph_enabled == false,
+          "cfg.asr_cuda_graph_enabled == false");
+
+    // [align]
+    CHECK(cfg.align_enable == true, "cfg.align_enable == true");
+    CHECK(cfg.align_model_dir == "/models/align", "cfg.align_model_dir");
+    CHECK(cfg.align_language == "English", "cfg.align_language == English");
+    CHECK(cfg.align_max_segment_sec == 120.0,
+          "cfg.align_max_segment_sec == 120.0");
+    CHECK(cfg.align_retain_sec == 150.0, "cfg.align_retain_sec == 150.0");
+    CHECK(cfg.align_profile == true, "cfg.align_profile == true");
 
     // [speaker]
     CHECK(cfg.speaker_enable == true, "cfg.speaker_enable == true");
@@ -272,6 +296,18 @@ gpu_scheduling = "concurrent"
     CHECK(cfg.stream_progress == true, "cfg.stream_progress == true");
     CHECK(cfg.gpu_scheduling_mode == 2,
           "cfg.gpu_scheduling_mode == 2 (concurrent)");
+    CHECK(cfg.ws_text_log_path == "/tmp/ws-frames.jsonl",
+          "cfg.ws_text_log_path");
+
+    const std::string resolved = pipeline::SerializeResolvedConfig(cfg);
+    CHECK(resolved.find("\"windowed_encoder\":true") != std::string::npos,
+          "resolved config contains ASR execution mode");
+    CHECK(resolved.find("\"ws_text_log_path\":\"/tmp/ws-frames.jsonl\"") !=
+              std::string::npos,
+          "resolved config contains transport diagnostics");
+    CHECK(resolved.find("\"local_drift_competing_backfill_gap_sec\":4") !=
+              std::string::npos,
+          "resolved config contains speaker-fusion tuning");
 
     std::remove(path.c_str());
   }

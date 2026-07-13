@@ -195,6 +195,9 @@ ORATOR_CONFIG=orator.toml ./build/orator_ws 8765  # Run WS server with config fi
 - **AI session runtime data** in `.omo/` — also gitignored
 - **GPU telemetry** disabled by default; opt-in via `ORATOR_GPU_TELEMETRY_SEC`
 - **Log level** controlled by `ORATOR_LOG_LEVEL` env var or `[debug].log_level` in `orator.toml` (0=DEBUG .. 3=ERROR)
-- **Runtime config** via `orator.toml` (TOML format). All ~35 runtime parameters in 8 sections. Loading order: defaults → CLI → `orator.toml` → env. See `include/io/config_reader.h`.
+- **Runtime config** via `orator.toml` (TOML format). Runtime behavior is typed
+  through `AuditoryStream::Config`. Loading order: defaults → `orator.toml` →
+  environment → CLI. Model/GPU/transport implementations do not read
+  `ORATOR_*` directly. See `include/io/config_reader.h`.
 - **Specs 001-004 completed and verified.** Spec 006 (Web UI MVP) implemented. Active work follows Spec 004 protocol layer.
 - **VAD gate optimization** (2026-06-25): Replaced O(N²) `ProtocolTimeline::Replay(0.0)` per `ProcessSpan` call with `ProtocolTimeline` subscription → local `VadCache` (O(1) `GetAll()`). Eliminated O(N²) Replay overhead on ASR hot path, enabling real-time 1× streaming for full 3615s session. `VadCache` subscribes to `vad/speech_segment` via `ProtocolTimeline::SubscribeInternal`, populated by VAD thread's `Publish`. ASR worker reads O(1) from local `VadCache::GetAll()`.

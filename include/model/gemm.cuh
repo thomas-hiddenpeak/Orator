@@ -22,7 +22,6 @@
 #include <cuda_bf16.h>
 #include <mma.h>
 
-#include <cstdlib>
 
 namespace orator {
 namespace gemm {
@@ -486,23 +485,12 @@ inline void LaunchBf16Gemm(const uint16_t* in, const uint16_t* W,
                            int act, cudaStream_t stream) {
   if (M <= 0 || K <= 0 || N <= 0) return;
   if (K % wmma_cfg::WK == 0) {
-    // ORATOR_GEMM_WMMA1=1 forces the 1-fragment kernel (A/B + safety fallback).
-    static const bool force_wmma1 = std::getenv("ORATOR_GEMM_WMMA1") != nullptr;
-    if (!force_wmma1) {
-      dim3 block(wmma_cfg2::THREADS);
-      dim3 grid((N + wmma_cfg2::BWN - 1) / wmma_cfg2::BWN,
-                (M + wmma_cfg2::BWM - 1) / wmma_cfg2::BWM);
-      Bf16WmmaKernel2<<<grid, block, 0, stream>>>(
-          reinterpret_cast<const __nv_bfloat16*>(in),
-          reinterpret_cast<const __nv_bfloat16*>(W), bias, out, M, K, N, act);
-    } else {
-      dim3 block(wmma_cfg::THREADS);
-      dim3 grid((N + wmma_cfg::BWN - 1) / wmma_cfg::BWN,
-                (M + wmma_cfg::BWM - 1) / wmma_cfg::BWM);
-      Bf16WmmaKernel<<<grid, block, 0, stream>>>(
-          reinterpret_cast<const __nv_bfloat16*>(in),
-          reinterpret_cast<const __nv_bfloat16*>(W), bias, out, M, K, N, act);
-    }
+    dim3 block(wmma_cfg2::THREADS);
+    dim3 grid((N + wmma_cfg2::BWN - 1) / wmma_cfg2::BWN,
+              (M + wmma_cfg2::BWM - 1) / wmma_cfg2::BWM);
+    Bf16WmmaKernel2<<<grid, block, 0, stream>>>(
+        reinterpret_cast<const __nv_bfloat16*>(in),
+        reinterpret_cast<const __nv_bfloat16*>(W), bias, out, M, K, N, act);
   } else {
     dim3 block(256);
     dim3 grid((N + 255) / 256, static_cast<unsigned>(M < 65535 ? M : 65535));

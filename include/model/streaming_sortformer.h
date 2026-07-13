@@ -42,6 +42,7 @@ struct SortformerTuning {
   int spkcache_refresh_rate = -1;
   int use_silence_profile = -1;
   int fifo_len = -1;
+  int show_progress = -1;
 };
 
 // Model-specific architecture/streaming parameters (from model_config.yaml).
@@ -70,6 +71,7 @@ struct SortformerConfig {
   int spkcache_sil_frames_per_spk = 3;
   int spkcache_refresh_rate = 0;
   bool use_silence_profile = false;
+  bool show_progress = false;
 
   bool Validate() const;
   // diar frame period = hop * subsampling (e.g. 0.01 * 8 = 0.08s).

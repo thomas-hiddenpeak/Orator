@@ -125,6 +125,14 @@ target_include_directories(orator_eval PRIVATE ${TEST_UTILS_DIR})
 # WebSocket itself.
 find_program(Python3_EXECUTABLE python3)
 if(Python3_EXECUTABLE)
+  add_test(NAME test_repro_manifest
+    COMMAND ${Python3_EXECUTABLE}
+      ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/test_repro_manifest.py)
+  set_tests_properties(test_repro_manifest PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    TIMEOUT 30
+    LABELS "python;unit;reproducibility")
+
   add_test(NAME test_ws_contract
     COMMAND ${Python3_EXECUTABLE}
       ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/run_ws_integration.py

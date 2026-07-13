@@ -6,25 +6,12 @@
 #include <chrono>
 #include <cmath>
 #include <cstdio>
-#include <cstdlib>
 #include <cstring>
 #include <stdexcept>
 #include <sstream>
 
 namespace orator {
 namespace model {
-
-namespace {
-int EnvIntOr(const char* name, int fallback) {
-  const char* v = std::getenv(name);
-  if (v == nullptr || *v == '\0') return fallback;
-  char* end = nullptr;
-  long parsed = std::strtol(v, &end, 10);
-  if (end == v || (end != nullptr && *end != '\0')) return fallback;
-  if (parsed <= 0) return fallback;
-  return static_cast<int>(parsed);
-}
-}  // namespace
 
 Qwen3Asr::Qwen3Asr() = default;
 
@@ -36,9 +23,15 @@ void Qwen3Asr::Initialize(const core::AsrConfig& config) {
 void Qwen3Asr::LoadWeights(const std::string& path) {
   weights_ = std::make_unique<io::ShardedSafeTensors>(path);
   mel_ = std::make_unique<feature::WhisperMel>();
-  encoder_ = std::make_unique<AsrAudioTower>();
+  AsrAudioConfig audio_config;
+  audio_config.windowed_attention = cfg_.encoder_windowed_attention;
+  audio_config.profile = cfg_.profile;
+  encoder_ = std::make_unique<AsrAudioTower>(audio_config);
   encoder_->LoadWeights(*weights_);
-  decoder_ = std::make_unique<AsrTextDecoder>();
+  AsrTextConfig text_config;
+  text_config.profile = cfg_.profile;
+  text_config.cuda_graph_enabled = cfg_.cuda_graph_enabled;
+  decoder_ = std::make_unique<AsrTextDecoder>(text_config);
   decoder_->LoadWeights(*weights_);
   if (!tokenizer_.Load(path)) {
     throw std::runtime_error("Qwen3Asr: failed to load tokenizer from " + path);
@@ -68,13 +61,7 @@ std::string Qwen3Asr::BuildAndRun(const std::vector<float>& encoder_out,
   const int H = decoder_->hidden_size();
 
   // ---- prompt token ids ----
-  // Optional system prompt, configurable via ORATOR_ASR_SYSTEM_PROMPT.
-  // Default: a short Chinese ASR guidance string proven to stabilise output.
-  const char* sys_env = std::getenv("ORATOR_ASR_SYSTEM_PROMPT");
-  const std::string sys_prompt = (sys_env != nullptr && sys_env[0] != '\0')
-                                     ? std::string(sys_env)
-                                     : "你是一个专业的中文普通话语音识别系统，"
-                                       "请准确识别并转录所有语音内容。";
+  const std::string& sys_prompt = cfg_.system_prompt;
 
   std::vector<int> prompt;
   prompt.insert(prompt.end(), {kImStart, kSystem, kNewline});
@@ -109,7 +96,7 @@ std::string Qwen3Asr::BuildAndRun(const std::vector<float>& encoder_out,
   }
 
   // ---- prefill ----
-  const bool prof = std::getenv("ORATOR_ASR_PROFILE") != nullptr;
+  const bool prof = cfg_.profile;
   auto now = [] { return std::chrono::steady_clock::now(); };
   auto p0 = now();
   decoder_->ResetCache();
@@ -122,12 +109,10 @@ std::string Qwen3Asr::BuildAndRun(const std::vector<float>& encoder_out,
   // stop condition (EOS / repetition) is checked only at batch boundaries, so
   // the batch size bounds how many tokens are computed past EOS. batch=4 stops
   // within a few tokens of EOS (short utterances dominate streaming) while
-  // keeping the per-token sync overhead amortized. ORATOR_ASR_BATCH overrides
-  // it. ----
-  const int ban_steps = EnvIntOr("ORATOR_ASR_BAN_STEPS", 3);
-  const int decode_batch = EnvIntOr("ORATOR_ASR_DECODE_BATCH", 4);
-  std::vector<int> out_tokens = decoder_->DecodeGreedy(
-      T, max_new_tokens_, kImEnd, kEndOfText, ban_steps, decode_batch, stream);
+  // keeping the per-token sync overhead amortized. ----
+  std::vector<int> out_tokens =
+      decoder_->DecodeGreedy(T, max_new_tokens_, kImEnd, kEndOfText,
+                             cfg_.eos_ban_steps, cfg_.decode_batch, stream);
   if (prof) {
     auto p2 = now();
     auto ms = [](auto a, auto b) {
@@ -156,7 +141,7 @@ std::string Qwen3Asr::TranscribeText(const float* samples, int num_samples,
   if (!loaded_) throw std::runtime_error("Qwen3Asr: weights not loaded");
   if (samples == nullptr || num_samples <= 0) return "";
 
-  const bool prof = std::getenv("ORATOR_ASR_PROFILE") != nullptr;
+  const bool prof = cfg_.profile;
   auto now = [] { return std::chrono::steady_clock::now(); };
   auto t0 = now();
 
@@ -226,11 +211,7 @@ void Qwen3Asr::StreamReset(long base_sample) {
   stream_raw_decoded_.clear();
 
   // Fixed system prefix up to and including <audio_start>. Matches BuildAndRun.
-  const char* sys_env = std::getenv("ORATOR_ASR_SYSTEM_PROMPT");
-  const std::string sys_prompt = (sys_env != nullptr && sys_env[0] != '\0')
-                                     ? std::string(sys_env)
-                                     : "你是一个专业的中文普通话语音识别系统，"
-                                       "请准确识别并转录所有语音内容。";
+  const std::string& sys_prompt = cfg_.system_prompt;
   std::vector<int> prefix;
   prefix.insert(prefix.end(), {kImStart, kSystem, kNewline});
   for (int t : tokenizer_.Encode(sys_prompt)) prefix.push_back(t);
@@ -253,7 +234,7 @@ std::string Qwen3Asr::StreamChunk(const float* pcm, int n,
   if (!stream_active_) StreamReset(0);
   if (pcm != nullptr && n > 0) seg_pcm_.insert(seg_pcm_.end(), pcm, pcm + n);
 
-  const bool prof = std::getenv("ORATOR_ASR_PROFILE") != nullptr;
+  const bool prof = cfg_.profile;
   auto pnow = [] { return std::chrono::steady_clock::now(); };
   const auto ps0 = pnow();
 
@@ -388,11 +369,9 @@ std::string Qwen3Asr::StreamDecodeStep(cudaStream_t stream) {
   // checkpoint; truncated after decode).
   decoder_->PrefillAt(embeds.data(), S, stream_cache_ckpt_, stream);
 
-  const int ban_steps = EnvIntOr("ORATOR_ASR_BAN_STEPS", 3);
-  const int decode_batch = EnvIntOr("ORATOR_ASR_DECODE_BATCH", 4);
-  std::vector<int> gen =
-      decoder_->DecodeGreedy(stream_cache_ckpt_ + S, max_new_tokens_, kImEnd,
-                             kEndOfText, ban_steps, decode_batch, stream);
+  std::vector<int> gen = decoder_->DecodeGreedy(
+      stream_cache_ckpt_ + S, max_new_tokens_, kImEnd, kEndOfText,
+      cfg_.eos_ban_steps, cfg_.decode_batch, stream);
   // Drop the suffix + generated KV; keep the persistent [system][audio] cache.
   decoder_->TruncateCache(stream_cache_ckpt_);
 

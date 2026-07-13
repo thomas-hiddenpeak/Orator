@@ -27,6 +27,11 @@ class Qwen3ForcedAligner : public core::IForcedAligner {
  public:
   Qwen3ForcedAligner();
 
+  void set_profile(bool enabled) override {
+    profile_ = enabled;
+    tower_.set_profile(enabled);
+  }
+
   // Load tokenizer + audio tower + projector + language model + score head from
   // the model directory (models/ForcedAligner).
   void LoadWeights(const std::string& model_dir) override;
@@ -52,6 +57,7 @@ class Qwen3ForcedAligner : public core::IForcedAligner {
   AlignerLm lm_;
   io::BpeTokenizer tok_;
   bool loaded_ = false;
+  bool profile_ = false;
 };
 
 }  // namespace model

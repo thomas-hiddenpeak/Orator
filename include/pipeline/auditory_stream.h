@@ -79,6 +79,7 @@ class AuditoryStream {
     int port = 8765;
     int ui_port = 0;  // 0 = auto (port+1)
     std::string ui_root = "web";
+    std::string config_source_path = "orator.toml";
 
     // ── ASR pipeline ─────────────────────────────────────────────────
     bool asr_vad_gate = true;
@@ -89,10 +90,13 @@ class AuditoryStream {
     int asr_max_new_tokens = 32;
     double asr_segment_sec = 24.0;
     std::string asr_language = "Chinese";
-    std::string asr_system_prompt = "";
+    std::string asr_system_prompt =
+        "你是一个专业的中文普通话语音识别系统，请准确识别并转录所有语音内容。";
     int asr_ban_steps = 3;
     int asr_decode_batch = 4;
     bool asr_profile = false;
+    bool asr_windowed_encoder = false;
+    bool asr_cuda_graph_enabled = true;
 
     // ── Forced alignment pipeline ────────────────────────────────────
     std::string align_model_dir = "";  // empty = forced aligner disabled
@@ -100,6 +104,7 @@ class AuditoryStream {
     std::string align_language = "Chinese";
     double align_max_segment_sec = 300.0;  // skip absurdly long spans
     double align_retain_sec = 180.0;       // retained audio window for readback
+    bool align_profile = false;
 
     // ── Comprehensive timeline view ──────────────────────────────────
     double timeline_align_snap_pause_sec = 0.25;
@@ -214,6 +219,7 @@ class AuditoryStream {
     int log_level = 2;  // 0=DEBUG, 1=INFO, 2=WARN, 3=ERROR
     bool timebase_check = false;
     bool stream_progress = false;
+    std::string ws_text_log_path;
   };
 
   // Delivers a result event as a JSON string. Invoked from the ASR worker

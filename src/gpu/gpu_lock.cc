@@ -1,18 +1,11 @@
 #include "gpu/gpu_lock.h"
 
-#include <cstdlib>
+#include <atomic>
 
 namespace orator {
 namespace gpu {
 
 namespace {
-// Parse a boolean-ish env var (set + leading 1/t/T/y/Y => true).
-bool EnvTrue(const char* name) {
-  const char* v = std::getenv(name);
-  return v != nullptr && (v[0] == '1' || v[0] == 't' || v[0] == 'T' ||
-                          v[0] == 'y' || v[0] == 'Y');
-}
-
 // GPU concurrency mode (resolved once at first use). Spec 002:
 //   kSerial  — every GPU region takes the global lock (legacy behavior).
 //   kFull    — all pipelines (ASR, diarization, VAD) drop the lock. This is the
@@ -20,21 +13,32 @@ bool EnvTrue(const char* name) {
 //              after stream routing is complete.
 //   kAsrOnly — ONLY the ASR own-stream pipeline is lock-free; diarization + VAD
 //              still hold the lock. Intermediate/legacy option.
-// Resolution: ORATOR_GPU_SERIAL=1 forces kSerial; ORATOR_GPU_CONCURRENT=1
-// selects kFull; otherwise kFull (default).
 enum class GpuMode { kSerial, kAsrOnly, kFull };
 
-GpuMode ResolveMode() {
-  if (EnvTrue("ORATOR_GPU_SERIAL")) return GpuMode::kSerial;
-  if (EnvTrue("ORATOR_GPU_CONCURRENT")) return GpuMode::kFull;
-  return GpuMode::kFull;
+std::atomic<SchedulingMode>& ConfiguredMode() {
+  static std::atomic<SchedulingMode> mode{SchedulingMode::kAuto};
+  return mode;
 }
 
 GpuMode Mode() {
-  static const GpuMode m = ResolveMode();
-  return m;
+  switch (ConfiguredMode().load(std::memory_order_relaxed)) {
+    case SchedulingMode::kSerial:
+      return GpuMode::kSerial;
+    case SchedulingMode::kConcurrent:
+    case SchedulingMode::kAuto:
+      return GpuMode::kFull;
+  }
+  return GpuMode::kFull;
 }
 }  // namespace
+
+void ConfigureSchedulingMode(SchedulingMode mode) {
+  ConfiguredMode().store(mode, std::memory_order_relaxed);
+}
+
+SchedulingMode CurrentSchedulingMode() {
+  return ConfiguredMode().load(std::memory_order_relaxed);
+}
 
 std::mutex& DeviceLock() {
   static std::mutex lock;

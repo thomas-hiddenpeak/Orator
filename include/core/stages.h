@@ -24,6 +24,7 @@ struct DiarizationConfig {
   int sample_rate = 16000;
   int max_speakers = 4;
   float activity_threshold = 0.5f;  // prob >= threshold => speaker active
+  bool show_progress = false;
 };
 
 // Streaming speaker diarization model.
@@ -87,6 +88,13 @@ class ISpeakerRegistry {
 struct AsrConfig {
   int sample_rate = 16000;
   std::string language = "";  // BCP-47-ish hint; "" => auto-detect
+  std::string system_prompt =
+      "你是一个专业的中文普通话语音识别系统，请准确识别并转录所有语音内容。";
+  int eos_ban_steps = 3;
+  int decode_batch = 4;
+  bool profile = false;
+  bool encoder_windowed_attention = false;
+  bool cuda_graph_enabled = true;
 };
 
 // Automatic speech recognition: turns audio into a timed token Transcript.
@@ -193,6 +201,7 @@ struct AlignUnit {
 class IForcedAligner {
  public:
   virtual ~IForcedAligner() = default;
+  virtual void set_profile(bool /*enabled*/) {}
   // Load weights from a model directory.
   virtual void LoadWeights(const std::string& path) = 0;
   // Align `transcript` to `pcm` (mono 16 kHz, `n` samples). `language` is a

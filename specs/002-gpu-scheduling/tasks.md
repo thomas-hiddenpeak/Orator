@@ -251,7 +251,9 @@ kernels (P2.5). The decoder retains its capture path gated on
   (`GemvBf16Vec4Kernel`): each lane issues a single 16-byte load (512-byte
   coalesced warp transaction) instead of half2, raising memory-level parallelism
   on the bandwidth-bound decode. Dispatched for K%8==0 (every Qwen3 projection);
-  half2 `GemvBf16Kernel` retained as fallback + `ORATOR_GEMV_HALF2=1` A/B toggle.
+  half2 `GemvBf16Kernel` retained as an implementation fallback. The historical
+  `ORATOR_GEMV_HALF2` A/B switch was removed by Spec 013; acceptance builds use
+  the selected production kernel deterministically.
   Added M=1 oracle shapes to `test_asr_gemm` (max_rel ≤ 4.8e-4) and a
   segmentation-independent `BenchGemv` microbench (`ORATOR_GEMM_BENCH=1`).
   Measured isolated speedup: +2.9%/+5.4%/+9.9%/+3.6%/+10.1% (attn-o / qkv /
@@ -268,7 +270,8 @@ kernels (P2.5). The decoder retains its capture path gated on
   numerical error -- the root cause of the earlier warp-tiled attempt's
   *concurrency* crash (a latent OOB that corrupted a concurrent stream, benign
   only under CUDA_LAUNCH_BLOCKING). Portable `nvcuda::wmma` (SM 8.0+, runs on
-  Orin). Old 1-fragment kernel retained as `ORATOR_GEMM_WMMA1=1` A/B + fallback.
+  Orin). The old 1-fragment implementation remains in source for numerical
+  reference, but Spec 013 removed the runtime `ORATOR_GEMM_WMMA1` A/B switch.
   Measured isolated speedup +17-24% on M=256 encoder shapes
   (attn-proj/fc1/fc2/conv_out), +5-17% on M=512. Validated: build clean; full
   oracle 7/7 (worst 1.09e-2); ctest 45/45; 5 concurrent real-WS 120s runs all

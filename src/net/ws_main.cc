@@ -14,10 +14,12 @@
 #include <string>
 #include <thread>
 
+#include "core/log.h"
 #include "io/config_reader.h"
 #include "net/auditory_ws_handler.h"
 #include "net/http_static_server.h"
 #include "net/websocket_server.h"
+#include "pipeline/runtime_config.h"
 
 using namespace orator;
 
@@ -85,32 +87,11 @@ int main(int argc, char** argv) {
     if (config_path == nullptr || config_path[0] == '\0') {
       config_path = "orator.toml";
     }
+    cfg.config_source_path = config_path;
     io::ApplyTomlConfig(config_path, cfg);
   }
 
-  // ── Step 3: sync TOML params into env for legacy getenv() code ───
-  // (Existing model code reads these via getenv; setting the env var is
-  //  the least-invasive bridge. The loading order is preserved: env set
-  //  here can still be overridden by the user's env below.)
-  auto set_env_int = [](const char* name, int val) {
-    setenv(name, std::to_string(val).c_str(), 0);
-  };
-  auto set_env_flag = [](const char* name, bool val) {
-    setenv(name, val ? "1" : "0", 0);
-  };
-  set_env_int("ORATOR_LOG_LEVEL", cfg.log_level);
-  set_env_flag("ORATOR_TIMEBASE_CHECK", cfg.timebase_check);
-  set_env_flag("ORATOR_ASR_PROFILE", cfg.asr_profile);
-  set_env_int("ORATOR_ASR_BAN_STEPS", cfg.asr_ban_steps);
-  set_env_int("ORATOR_ASR_DECODE_BATCH", cfg.asr_decode_batch);
-  set_env_flag("ORATOR_STREAM_PROGRESS", cfg.stream_progress);
-  if (!cfg.asr_system_prompt.empty()) {
-    setenv("ORATOR_ASR_SYSTEM_PROMPT", cfg.asr_system_prompt.c_str(), 0);
-  }
-  set_env_int("ORATOR_GPU_SERIAL", cfg.gpu_scheduling_mode == 1);
-  set_env_int("ORATOR_GPU_CONCURRENT", cfg.gpu_scheduling_mode == 2);
-
-  // ── Step 4: environment variables override TOML + defaults ───────
+  // ── Step 3: environment variables override TOML + defaults ───────
   ReadEnvInt("ORATOR_ASR_MAX_NEW_TOKENS", &cfg.asr_max_new_tokens);
   ReadEnvDouble("ORATOR_ASR_SEGMENT_SEC", &cfg.asr_segment_sec);
   ReadEnvString("ORATOR_ASR_LANGUAGE", &cfg.asr_language);
@@ -142,9 +123,15 @@ int main(int argc, char** argv) {
   cfg.asr_profile = ReadEnvFlag("ORATOR_ASR_PROFILE", cfg.asr_profile);
   ReadEnvInt("ORATOR_ASR_BAN_STEPS", &cfg.asr_ban_steps);
   ReadEnvInt("ORATOR_ASR_DECODE_BATCH", &cfg.asr_decode_batch);
+  cfg.asr_windowed_encoder =
+      ReadEnvFlag("ORATOR_ASR_WINDOWED_ENCODER", cfg.asr_windowed_encoder);
+  cfg.asr_cuda_graph_enabled =
+      ReadEnvFlag("ORATOR_ASR_CUDA_GRAPH", cfg.asr_cuda_graph_enabled);
   cfg.stream_progress =
       ReadEnvFlag("ORATOR_STREAM_PROGRESS", cfg.stream_progress);
   ReadEnvString("ORATOR_ASR_SYSTEM_PROMPT", &cfg.asr_system_prompt);
+  cfg.align_profile = ReadEnvFlag("ORATOR_ALIGN_PROFILE", cfg.align_profile);
+  ReadEnvString("ORATOR_WS_TEXT_LOG_PATH", &cfg.ws_text_log_path);
   ReadEnvDouble("ORATOR_DIAR_ONSET", &cfg.diar_onset);
   ReadEnvDouble("ORATOR_DIAR_OFFSET", &cfg.diar_offset);
   ReadEnvDouble("ORATOR_DIAR_PAD_ONSET", &cfg.diar_pad_onset);
@@ -160,13 +147,16 @@ int main(int argc, char** argv) {
     cfg.gpu_scheduling_mode = 2;
   }
 
-  // ── Step 5: CLI arguments are the final overrides ────────────────
+  // ── Step 4: CLI arguments are the final overrides ────────────────
   io::ApplyCommandLineConfig(argc, argv, cfg);
 
-  // ── Step 6: finalize port / ui_port ───────────────────────────────
+  // ── Step 5: finalize port / ui_port and process diagnostics ──────
   if (cfg.ui_port <= 0) cfg.ui_port = cfg.port + 1;
+  SetOratorLogLevel(cfg.log_level);
+  std::cout << "resolved_config=" << pipeline::SerializeResolvedConfig(cfg)
+            << std::endl;
 
-  // ── Step 7: start pipeline + servers ──────────────────────────────
+  // ── Step 6: start pipeline + servers ──────────────────────────────
   auto emit_target = std::make_shared<net::SessionEmit>();
   auto stream = std::make_shared<pipeline::AuditoryStream>(
       cfg, [emit_target](const std::string& json) { emit_target->Send(json); });
@@ -179,7 +169,7 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  net::WebSocketServer server(cfg.port);
+  net::WebSocketServer server(cfg.port, cfg.ws_text_log_path);
   if (!server.Start()) {
     std::cerr << "failed to bind port " << cfg.port << std::endl;
     return 1;
@@ -187,7 +177,7 @@ int main(int argc, char** argv) {
   net::HttpStaticServer ui(cfg.ui_port, cfg.ui_root);
   if (!ui.Start()) {
     std::cerr << "failed to bind UI port " << cfg.ui_port
-              << " (set ORATOR_UI_PORT to override)" << std::endl;
+              << " (set server.ui_port in the runtime config)" << std::endl;
     return 1;
   }
 

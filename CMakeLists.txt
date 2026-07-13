@@ -99,6 +99,7 @@ set(ORATOR_CORE_SOURCES
     src/pipeline/auditory_stream.cc
     src/pipeline/auditory_stream_subscriptions.cc
     src/pipeline/auditory_stream_serialize.cc
+    src/pipeline/runtime_config.cc
     src/pipeline/asr_preprocessor.cc
     src/pipeline/comprehensive_timeline.cc
     src/pipeline/business_speaker_pipeline.cc

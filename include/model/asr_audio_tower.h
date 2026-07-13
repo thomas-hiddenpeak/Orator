@@ -45,6 +45,8 @@ struct AsrAudioConfig {
   int n_window = 50;  // chunk = n_window*2 mel frames
   int n_window_infer = 800;
   int max_source_positions = 1500;
+  bool windowed_attention = false;
+  bool profile = false;
 };
 
 class AsrAudioTower {
@@ -80,6 +82,7 @@ class AsrAudioTower {
   static int OutputLength(int mel_frames);
 
   const AsrAudioConfig& config() const { return config_; }
+  void set_profile(bool enabled) { config_.profile = enabled; }
 
  private:
   struct DevBuf {

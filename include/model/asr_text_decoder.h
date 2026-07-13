@@ -38,6 +38,8 @@ struct AsrTextConfig {
   float rms_norm_eps = 1e-6f;
   float rope_theta = 1000000.0f;
   int max_seq_len = 2048;
+  bool profile = false;
+  bool cuda_graph_enabled = true;
 };
 
 class AsrTextDecoder {

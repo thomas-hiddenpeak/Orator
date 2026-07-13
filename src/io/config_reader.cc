@@ -79,6 +79,12 @@ bool ApplyTomlConfig(const std::string& path,
     if (auto v = sec->get("profile")) {
       if (auto b = v->value<bool>()) cfg.asr_profile = *b;
     }
+    if (auto v = sec->get("windowed_encoder")) {
+      if (auto b = v->value<bool>()) cfg.asr_windowed_encoder = *b;
+    }
+    if (auto v = sec->get("cuda_graph_enabled")) {
+      if (auto b = v->value<bool>()) cfg.asr_cuda_graph_enabled = *b;
+    }
   }
 
   // ── [align] ───────────────────────────────────────────────────────
@@ -97,6 +103,9 @@ bool ApplyTomlConfig(const std::string& path,
     }
     if (auto v = sec->get("retain_sec")) {
       if (auto d = v->value<double>()) cfg.align_retain_sec = *d;
+    }
+    if (auto v = sec->get("profile")) {
+      if (auto b = v->value<bool>()) cfg.align_profile = *b;
     }
   }
 
@@ -383,6 +392,9 @@ bool ApplyTomlConfig(const std::string& path,
     }
     if (auto v = sec->get("stream_progress")) {
       if (auto b = v->value<bool>()) cfg.stream_progress = *b;
+    }
+    if (auto v = sec->get("ws_text_log_path")) {
+      if (auto s = v->value<std::string>()) cfg.ws_text_log_path = *s;
     }
     if (auto v = sec->get("gpu_scheduling")) {
       if (auto s = v->value<std::string>()) {

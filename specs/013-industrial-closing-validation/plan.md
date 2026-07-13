@@ -92,6 +92,23 @@ included in the run manifest. The obsolete matrix mode in
 `ws_unified_test.py` is removed because it labels overrides without applying
 them and ranks candidates by unknown duration rather than business accuracy.
 
+The migration keeps environment overrides only at the process entry point,
+where they are parsed into `AuditoryStream::Config` before any model is
+constructed. Model, GPU, and transport implementations never call `getenv()`.
+The accepted typed controls are:
+
+- `[asr]`: system prompt, EOS-ban steps, decode batch, profiling, encoder
+  attention mode, and CUDA-graph enablement;
+- `[align]`: profiling;
+- `[debug]`: log level, time-base diagnostics, Sortformer progress, GPU
+  scheduling, and the optional WebSocket text-frame log path.
+
+Legacy kernel-forcing variables used only for local A/B experiments are
+removed rather than promoted to product configuration. The terminal timeline
+contains a canonical `resolved_config` object after defaults, TOML,
+environment, and CLI resolution. The unified client copies that object into a
+sidecar run manifest and hashes the canonical representation.
+
 ## 4. Phase 2: Build the Full Reference Turn Ledger
 
 The 556 timestamped reference entries are reviewed against the complete audio.
@@ -268,4 +285,3 @@ only after that review.
   history rewriting is not used.
 - Frozen raw evidence and the signed reference ledger are never rewritten by a
   candidate tool.
-

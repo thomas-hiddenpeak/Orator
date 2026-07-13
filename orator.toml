@@ -63,8 +63,9 @@ segment_sec = 24.0
 # Language hint ("" = auto-detect)
 language = "Chinese"
 
-# Optional system prompt for ASR decoder
-system_prompt = ""
+# System prompt for ASR decoder. Keep the accepted prompt explicit so the
+# resolved run configuration describes the model input exactly.
+system_prompt = "你是一个专业的中文普通话语音识别系统，请准确识别并转录所有语音内容。"
 
 # Decoder beam ban steps (suppress repetitive n-grams)
 ban_steps = 3
@@ -72,8 +73,15 @@ ban_steps = 3
 # Decode batch size (parallel token candidates)
 decode_batch = 4
 
-# Enable per-frame ASR timing profile (ORATOR_ASR_PROFILE)
+# Enable ASR timing diagnostics
 profile = false
+
+# Use trained encoder attention windows instead of full utterance attention.
+windowed_encoder = false
+
+# Permit CUDA graph capture when GPU scheduling is serial. Concurrent scheduling
+# disables capture automatically because capture is process-global.
+cuda_graph_enabled = true
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Forced alignment — aligns each finalized ASR transcript segment to its audio,
@@ -97,6 +105,9 @@ max_segment_sec = 300.0
 # Retained audio window (seconds) for span readback. Must exceed the longest
 # segment plus the ASR-to-alignment lag, bounded to cap memory.
 retain_sec = 180.0
+
+# Enable forced-aligner timing diagnostics
+profile = false
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Comprehensive timeline — derived who-said-what view on the common time base
@@ -319,15 +330,18 @@ gpu_interval_sec = 1.0
 # Log level: 0=DEBUG, 1=INFO, 2=WARN, 3=ERROR
 log_level = 2
 
-# Enable timebase consistency checks (ORATOR_TIMEBASE_CHECK)
+# Enable timebase consistency checks
 timebase_check = false
 
-# Show diarizer streaming progress bar (ORATOR_STREAM_PROGRESS)
+# Show diarizer streaming progress bar
 stream_progress = false
 
-# GPU scheduling mode: "auto" (default), "serial" (ORATOR_GPU_SERIAL),
-# or "concurrent" (ORATOR_GPU_CONCURRENT)
+# GPU scheduling mode: "auto" (default), "serial", or "concurrent"
 gpu_scheduling = "auto"
+
+# Optional JSONL log of inbound/outbound WebSocket text frames. It may contain
+# transcript text; keep empty outside an isolated diagnostic run.
+ws_text_log_path = ""
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Buffer — shared audio buffer configuration
@@ -356,25 +370,3 @@ lag_warn_samples = 0
 
 # Maximum allowed lag in samples before critical. 0 = no limit.
 lag_critical_samples = 0
-
-# ══════════════════════════════════════════════════════════════════════════════
-# Debug — ASR model development knobs (read via std::getenv, not via Config)
-# ══════════════════════════════════════════════════════════════════════════════
-[debug_model]
-# Per-token GPU timing (ORATOR_ASR_PROFILE2)
-# profile2 = false
-
-# Decode batch override (ORATOR_ASR_BATCH)
-# batch = 0
-
-# Decoder profiling (ORATOR_ASR_DECPROF)
-# decprof = false
-
-# Disable CUDA graph capture (ORATOR_ASR_NOGRAPH)
-# no_graph = false
-
-# Windowed encoder mode (ORATOR_ASR_WINDOWED)
-# windowed_encoder = false
-
-# Force cuBLAS GEMV (ORATOR_ASR_CUBLAS_GEMV)
-# cublas_gemv = false

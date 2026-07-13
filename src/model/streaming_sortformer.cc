@@ -5,7 +5,6 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
-#include <cstdlib>
 #include <cstring>
 #include <limits>
 #include <numeric>
@@ -327,6 +326,8 @@ void SortformerDiarizer::ApplyStreamingTuning(const SortformerTuning& tuning) {
   if (tuning.use_silence_profile >= 0)
     config_.use_silence_profile = (tuning.use_silence_profile != 0);
   if (tuning.fifo_len >= 0) config_.fifo_len = tuning.fifo_len;
+  if (tuning.show_progress >= 0)
+    config_.show_progress = (tuning.show_progress != 0);
 }
 
 void SortformerDiarizer::Initialize(const core::DiarizationConfig& config) {
@@ -447,7 +448,7 @@ core::DiarizationFrames SortformerDiarizer::RunStreaming(const float* mel_fm,
   int chunk_idx = 0;
   const int num_chunks = (t_mel + chunk_mel - 1) / chunk_mel;
   while (stt < t_mel) {
-    if (std::getenv("ORATOR_STREAM_PROGRESS")) {
+    if (config_.show_progress) {
       std::fprintf(stderr, "\r  streaming chunk %d/%d (t=%.0fs)   ",
                    chunk_idx + 1, num_chunks, stt * config_.hop_size_sec);
       std::fflush(stderr);
@@ -460,7 +461,7 @@ core::DiarizationFrames SortformerDiarizer::RunStreaming(const float* mel_fm,
     stt = std::min(stt + chunk_mel, t_mel);
     ++chunk_idx;
   }
-  if (std::getenv("ORATOR_STREAM_PROGRESS")) std::fprintf(stderr, "\n");
+  if (config_.show_progress) std::fprintf(stderr, "\n");
 
   core::DiarizationFrames out;
   out.num_frames = total_frames;

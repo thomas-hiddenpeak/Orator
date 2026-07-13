@@ -3,6 +3,7 @@
 
 #include "core/log.h"
 #include "core/registry.h"
+#include "gpu/gpu_lock.h"
 #include "model/builtin_registration.h"
 #include "model/speaker_database.h"
 #include "model/streaming_sortformer.h"
@@ -34,6 +35,13 @@ AuditoryStream::~AuditoryStream() {
 }
 
 void AuditoryStream::Start() {
+  gpu::SchedulingMode gpu_mode = gpu::SchedulingMode::kAuto;
+  if (config_.gpu_scheduling_mode == 1) {
+    gpu_mode = gpu::SchedulingMode::kSerial;
+  } else if (config_.gpu_scheduling_mode == 2) {
+    gpu_mode = gpu::SchedulingMode::kConcurrent;
+  }
+  gpu::ConfigureSchedulingMode(gpu_mode);
   model::EnsureBuiltinsRegistered();
   {
     std::string session_dir = config_.session_dir;
@@ -139,6 +147,7 @@ void AuditoryStream::Start() {
     dc.sample_rate = config_.sample_rate;
     dc.max_speakers = config_.max_speakers;
     dc.activity_threshold = config_.diar_threshold;
+    dc.show_progress = config_.stream_progress;
     diarizer_->Initialize(dc);
     diarizer_->LoadWeights(config_.diarizer_weights);
     // Apply streaming tuning parameters from config.
@@ -152,6 +161,7 @@ void AuditoryStream::Start() {
     tuning.spkcache_refresh_rate = config_.diar_spkcache_refresh_rate;
     tuning.use_silence_profile = config_.diar_use_silence_profile ? 1 : 0;
     tuning.fifo_len = config_.diar_fifo_len;
+    tuning.show_progress = config_.stream_progress ? 1 : 0;
     static_cast<model::SortformerDiarizer*>(diarizer_.get())
         ->ApplyStreamingTuning(tuning);
     diar_stream_ = scheduler_.Register("diarization", /*priority_index=*/0,
@@ -163,6 +173,12 @@ void AuditoryStream::Start() {
     core::AsrConfig ac;
     ac.sample_rate = config_.sample_rate;
     ac.language = config_.asr_language;
+    ac.system_prompt = config_.asr_system_prompt;
+    ac.eos_ban_steps = config_.asr_ban_steps;
+    ac.decode_batch = config_.asr_decode_batch;
+    ac.profile = config_.asr_profile;
+    ac.encoder_windowed_attention = config_.asr_windowed_encoder;
+    ac.cuda_graph_enabled = config_.asr_cuda_graph_enabled;
     asr_->Initialize(ac);
     asr_->set_max_new_tokens(config_.asr_max_new_tokens);
     asr_->LoadWeights(config_.asr_model_dir);
@@ -179,6 +195,7 @@ void AuditoryStream::Start() {
   if (align_on) {
     aligner_ = core::Registry<core::IForcedAligner>::Instance().Create(
         "qwen3_forced_aligner");
+    aligner_->set_profile(config_.align_profile);
     aligner_->LoadWeights(config_.align_model_dir);
   }
 

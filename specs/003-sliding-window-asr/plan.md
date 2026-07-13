@@ -111,7 +111,7 @@ cap) (FR5, AC5).
 ### 2.2 `AsrAudioTower` (streaming chunk-local mode)
 - The encoder already chunks mel into `n_window*2` frames with per-chunk conv +
   per-chunk positional embedding. For streaming we run the trained windowed
-  attention (`ORATOR_ASR_WINDOWED`) so a standalone chunk encode equals its slice
+  attention (now typed as `[asr].windowed_encoder`) so a standalone chunk encode equals its slice
   of a full encode. T020 verifies the equivalence (AC2). Chunk size is chosen to
   be a whole number of encoder windows so boundaries are clean.
 

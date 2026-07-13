@@ -51,9 +51,6 @@ int main(int argc, char** argv) {
   const double window_sec = argc > 4 ? std::atof(argv[4]) : 8.0;
   const int sr = 16000;
 
-  // Force the trained windowed attention -- chunk-locality only holds there.
-  setenv("ORATOR_ASR_WINDOWED", "1", /*overwrite=*/1);
-
   if (!std::ifstream(model_dir + "/model.safetensors.index.json").good()) {
     std::printf("[skip] need weights at %s\n", model_dir.c_str());
     return 0;
@@ -68,7 +65,9 @@ int main(int argc, char** argv) {
 
   io::ShardedSafeTensors w(model_dir);
   feature::WhisperMel mel_engine;
-  model::AsrAudioTower tower{};
+  model::AsrAudioConfig tower_config;
+  tower_config.windowed_attention = true;
+  model::AsrAudioTower tower{tower_config};
   tower.LoadWeights(w);
 
   // ---- mel over the full audio (interior frames are stream-stable) ----

@@ -25,10 +25,16 @@ namespace gpu {
 // guard(gpu::DeviceLock());` around a GPU-touching region.
 std::mutex& DeviceLock();
 
-// Spec 002: GPU concurrency mode. The PRODUCTION DEFAULT is full concurrency:
-// all pipelines (ASR, diarization, VAD) run lock-free. Env overrides:
-// ORATOR_GPU_SERIAL=1 forces the legacy fully-serialized mode (every region
-// locks).
+enum class SchedulingMode { kAuto = 0, kSerial = 1, kConcurrent = 2 };
+
+// Configure the process-wide mode before workers start. kAuto currently selects
+// full concurrency. Runtime configuration is resolved by the server entry point
+// and passed here explicitly; this layer never reads process environment.
+void ConfigureSchedulingMode(SchedulingMode mode);
+SchedulingMode CurrentSchedulingMode();
+
+// Spec 002: GPU concurrency mode. The production default is full concurrency:
+// all pipelines (ASR, diarization, VAD) run lock-free.
 //
 // ConcurrentGpuEnabled() is true only in full mode.
 bool ConcurrentGpuEnabled();

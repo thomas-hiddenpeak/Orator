@@ -387,13 +387,10 @@ static void TestLinearVsF64Reference() {
 
 // ---------------------------------------------------------------------------
 // GEMV microbenchmark (ORATOR_GEMM_BENCH=1) -- segmentation-independent
-// isolation of the M=1 decode kernel. Run twice to A/B the variants:
-//   ./test_asr_gemm  (default = GemvBf16Vec4Kernel, 128-bit float4 loads)
-//   ORATOR_GEMV_HALF2=1 ./test_asr_gemm  (legacy GemvBf16Kernel, half2 loads)
+// isolation of the production M=1 decode kernel (128-bit float4 loads).
 // Reports avg us/call and effective weight-read bandwidth (GB/s) per shape.
 static void BenchGemv() {
-  printf("  BENCH GEMV (M=1) %s\n",
-         std::getenv("ORATOR_GEMV_HALF2") ? "[half2]" : "[float4]");
+  printf("  BENCH GEMV (M=1) [float4]\n");
   struct Shape {
     int K, N;
     const char* tag;

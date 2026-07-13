@@ -41,11 +41,14 @@ Usage:
 
 import argparse
 import base64
+import datetime
 import hashlib
 import json
 import os
+import platform
 import socket
 import struct
+import subprocess
 import sys
 import threading
 import time
@@ -53,6 +56,116 @@ import time
 GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 SAMPLE_RATE = 16000
 BYTES_PER_SAMPLE = 2  # int16 mono
+
+
+def canonical_json_sha256(value) -> str:
+    payload = json.dumps(
+        value, ensure_ascii=False, sort_keys=True,
+        separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def sha256_file(path: str):
+    if not path or not os.path.isfile(path):
+        return None
+    digest = hashlib.sha256()
+    with open(path, "rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def command_output(command):
+    try:
+        result = subprocess.run(
+            command, cwd=os.getcwd(), capture_output=True, text=True,
+            check=False, timeout=10)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if result.returncode != 0:
+        return None
+    return result.stdout.strip()
+
+
+def git_metadata():
+    commit = command_output(["git", "rev-parse", "HEAD"])
+    status = command_output(
+        ["git", "status", "--porcelain", "--untracked-files=normal"])
+    return {
+        "commit": commit,
+        "dirty": bool(status),
+        "status": status.splitlines() if status else [],
+    }
+
+
+def write_run_manifest(args, timeline, pcm, artifact_path):
+    resolved = timeline.get("resolved_config")
+    generated = datetime.datetime.now(datetime.timezone.utc)
+    commit = git_metadata()
+    short_commit = (commit.get("commit") or "unknown")[:12]
+    duration_label = f"{len(pcm) // BYTES_PER_SAMPLE / SAMPLE_RATE:.3f}s"
+    artifact_id = (
+        f"orator-{generated.strftime('%Y%m%dT%H%M%SZ')}-"
+        f"{short_commit}-{duration_label}")
+
+    config_path = None
+    if isinstance(resolved, dict):
+        config_path = resolved.get("config_source_path")
+    jetson_release = None
+    try:
+        with open("/etc/nv_tegra_release", encoding="utf-8") as release_file:
+            jetson_release = release_file.read().strip()
+    except OSError:
+        pass
+
+    manifest = {
+        "schema_version": 1,
+        "artifact_id": artifact_id,
+        "generated_utc": generated.isoformat(),
+        "artifact": {
+            "path": os.path.abspath(artifact_path),
+            "sha256": sha256_file(artifact_path),
+        },
+        "source_audio": {
+            "path": os.path.abspath(args.pcm),
+            "container_sha256": sha256_file(args.pcm),
+            "stream_pcm_s16le_sha256": hashlib.sha256(pcm).hexdigest(),
+            "samples": len(pcm) // BYTES_PER_SAMPLE,
+            "sample_rate": SAMPLE_RATE,
+        },
+        "resolved_config": resolved,
+        "resolved_config_sha256": (
+            canonical_json_sha256(resolved)
+            if isinstance(resolved, dict) else None),
+        "config_source": {
+            "path": os.path.abspath(config_path) if config_path else None,
+            "sha256": sha256_file(config_path),
+        },
+        "git": commit,
+        "client_environment_overrides": {
+            key: value for key, value in sorted(os.environ.items())
+            if key.startswith("ORATOR_")
+        },
+        "host": {
+            "platform": platform.platform(),
+            "machine": platform.machine(),
+            "python": platform.python_version(),
+            "jetson_release": jetson_release,
+            "nvpmodel": command_output(["nvpmodel", "-q"]),
+            "jetson_clocks": command_output(["jetson_clocks", "--show"]),
+        },
+        "invocation": {
+            "host": args.host,
+            "port": args.port,
+            "duration_sec": args.duration,
+            "rate": args.rate,
+            "frame_ms": args.frame_ms,
+        },
+    }
+    manifest_path = artifact_path + ".manifest.json"
+    with open(manifest_path, "w", encoding="utf-8") as output:
+        json.dump(manifest, output, ensure_ascii=False, indent=2)
+    return manifest_path, manifest
 
 
 def mask_frame(opcode: int, payload: bytes) -> bytes:
@@ -298,6 +411,8 @@ class TegraSampler(threading.Thread):
 def validate_terminal_contract(events, timeline):
     """Return mechanical live/final and typed-track contract violations."""
     issues = []
+    if not isinstance(timeline.get("resolved_config"), dict):
+        issues.append("terminal timeline has no resolved_config object")
     track_list = timeline.get("tracks", [])
     tracks = {}
     for track in track_list:
@@ -652,6 +767,9 @@ def main(args):
             "diar_rt_factor": diar.get("real_time_factor"),
             "asr_rt_factor": asr.get("real_time_factor"),
             "contract_issues": contract_issues,
+            "resolved_config_sha256": (
+                canonical_json_sha256(tl.get("resolved_config"))
+                if isinstance(tl.get("resolved_config"), dict) else None),
         },
         "tegrastats": {
             "before": first_device_line,
@@ -667,6 +785,7 @@ def main(args):
     
     with open(args.out, "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, indent=2)
+    manifest_path, _ = write_run_manifest(args, tl, pcm, args.out)
 
     if getattr(args, "rrd", None):
         import os
@@ -683,6 +802,7 @@ def main(args):
     n_diar = len(diar.get("entries", []))
     n_asr = len(asr.get("entries", []))
     print(f"\nwrote {args.out}")
+    print(f"  manifest={manifest_path}")
     print(f"  audio={audio_sec:.2f}s  total_wall={total_wall:.2f}s  "
           f"stream_rt={m['stream_rt_factor']}x")
     print(f"  diar: {n_diar} segments, rt={m['diar_rt_factor']}x   "

@@ -2,7 +2,6 @@
 
 #include <cuda_bf16.h>
 
-#include <cstdlib>
 #include <stdexcept>
 
 #include "gpu/memory.h"
@@ -193,10 +192,7 @@ void LinearPre(const uint16_t* in_bf16, const uint16_t* W_bf16,
   if (M == 1 && (K & 1) == 0) {
     const int grid = (N + kGemvWarps - 1) / kGemvWarps;
     const size_t shmem = static_cast<size_t>(K) * sizeof(__nv_bfloat16);
-    // ORATOR_GEMV_HALF2=1 forces the legacy half2 kernel (A/B + safety
-    // fallback).
-    static const bool force_half2 = std::getenv("ORATOR_GEMV_HALF2") != nullptr;
-    if ((K & 7) == 0 && !force_half2) {
+    if ((K & 7) == 0) {
       GemvBf16Vec4Kernel<<<grid, kGemvWarps * 32, shmem, stream>>>(
           reinterpret_cast<const __nv_bfloat16*>(in_bf16),
           reinterpret_cast<const __nv_bfloat16*>(W_bf16), bias_f32, out_f32, K,

@@ -9,7 +9,7 @@
   Constitution amendment as a separate governance commit.
 - [ ] T003 Correct all remaining closure and implementation claims in
   `PROJECT_STATE.md`, active specs, READMEs, and code comments.
-- [ ] T004 Define the reproducibility manifest and artifact naming convention.
+- [x] T004 Define the reproducibility manifest and artifact naming convention.
 - [ ] T005 Freeze the current unaccepted baseline commit, TOML, registry state,
   model/data hashes, and full JSON package.
 
@@ -32,11 +32,13 @@
 - [x] T017 Add ID-convergence tests across partial/final events, align groups,
   revisions, terminal tracks, export, reconnect, and Web UI state. Node model
   tests, the unified client, and the real Chromium flow cover the full chain.
-- [ ] T018 Correct configuration precedence and migrate/remove every behavioral
+- [x] T018 Correct configuration precedence and migrate/remove every behavioral
   environment-only switch. Precedence and timeline gap-fill are corrected;
-  remaining lower-level switches are still open.
-- [ ] T019 Emit or capture the complete resolved configuration in every run
-  manifest.
+  migrate ASR/align/Sortformer/GPU/transport controls through typed config and
+  remove legacy GEMM kernel-forcing switches before marking complete.
+- [x] T019 Emit or capture the complete resolved configuration in every run
+  manifest. The terminal timeline must carry the canonical resolved object and
+  the unified client must persist its hash in the artifact sidecar.
 - [x] T020 Remove the misleading parameter-matrix mode from the unified test
   client and retain execution/capture responsibilities only.
 

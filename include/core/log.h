@@ -1,7 +1,7 @@
 #pragma once
 
+#include <atomic>
 #include <cstdio>
-#include <cstdlib>
 
 // ------------------------------------------------------------------
 // Level-based logging for Orator.
@@ -11,9 +11,8 @@
 //   LOG_ERROR("lws_create_context failed");
 //   LOG_DEBUG("RECEIVE: len=%zu", n);
 //
-// Control at compile time via LOG_LEVEL env var at program start
-// (runtime), or by defining ORATOR_LOG_LEVEL before including this
-// header (compile-time floor).
+// Control at runtime with SetOratorLogLevel(), or define ORATOR_LOG_LEVEL
+// before including this header to set the compile-time floor.
 //
 // Levels: 0=DEBUG, 1=INFO, 2=WARN, 3=ERROR
 // ------------------------------------------------------------------
@@ -30,18 +29,19 @@ enum OratorLogLevel {
 #define ORATOR_LOG_LEVEL ORATOR_LOG_DEBUG
 #endif
 
-// Runtime gate: check env var once per call (fine for infrequent logging).
-// If the env is not set, all levels at or above the compile-time floor pass.
-inline int OratorLogLevel_Runtime() {
-  static const int level = []() -> int {
-    const char* e = std::getenv("ORATOR_LOG_LEVEL");
-    if (!e) return ORATOR_LOG_LEVEL;
-    int v = std::atoi(e);
-    return (v < ORATOR_LOG_DEBUG)   ? static_cast<int>(ORATOR_LOG_DEBUG)
-           : (v > ORATOR_LOG_ERROR) ? static_cast<int>(ORATOR_LOG_ERROR)
-                                    : v;
-  }();
+inline std::atomic<int>& OratorRuntimeLogLevelStorage() {
+  static std::atomic<int> level{ORATOR_LOG_LEVEL};
   return level;
+}
+
+inline void SetOratorLogLevel(int level) {
+  if (level < ORATOR_LOG_DEBUG) level = ORATOR_LOG_DEBUG;
+  if (level > ORATOR_LOG_ERROR) level = ORATOR_LOG_ERROR;
+  OratorRuntimeLogLevelStorage().store(level, std::memory_order_relaxed);
+}
+
+inline int OratorLogLevel_Runtime() {
+  return OratorRuntimeLogLevelStorage().load(std::memory_order_relaxed);
 }
 
 #define LOG_DEBUG(...)                                \

@@ -65,9 +65,10 @@ subject to the complete acceptance gates in this spec.
    align-aware text projection, and support diagnostics, and writes only its
    own revisable track. Raw ASR and alignment records reject conflicting
    same-ID deposits.
-4. **Partially resolved**: timeline gap-fill is a typed TOML field and startup
-   now applies defaults, TOML, environment, then CLI. Other lower-level
-   behavioral environment switches still require migration or removal.
+4. **Resolved for the runtime contract**: timeline gap-fill and every retained
+   model/GPU/transport behavior are typed fields; startup applies defaults,
+   TOML, environment, then CLI. Model, GPU, and transport layers no longer read
+   process environment, and terminal packages carry the resolved configuration.
 5. **Resolved in Phase 1**: finalized ASR allocates one `text_id` and reuses it
    for the typed sink and live event; the terminal ASR track serializes that ID.
    The registered real-WebSocket and Node gates plus a real Chromium run verify

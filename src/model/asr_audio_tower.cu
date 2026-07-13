@@ -7,7 +7,6 @@
 #include <chrono>
 #include <cmath>
 #include <cstdio>
-#include <cstdlib>
 #include <cstring>
 #include <stdexcept>
 
@@ -371,7 +370,7 @@ std::vector<float> AsrAudioTower::Forward(const float* mel, int n_frames,
   const int Dh = config_.head_dim;       // 64
   const int win = config_.n_window * 2;  // 100 mel frames per chunk
 
-  const bool prof = std::getenv("ORATOR_TOWER_PROFILE") != nullptr;
+  const bool prof = config_.profile;
   auto pnow = [] { return std::chrono::steady_clock::now(); };
   const auto pt0 = pnow();
 
@@ -534,7 +533,7 @@ std::vector<float> AsrAudioTower::Forward(const float* mel, int n_frames,
   // NOTE: the transformers sdpa/eager path (no flash-attn) ignores cu_seqlens
   // and runs FULL bidirectional attention over the utterance. Match that here;
   // the trained windowing only diverges for very long sequences.
-  if (const char* w = std::getenv("ORATOR_ASR_WINDOWED"); !w || w[0] != '1') {
+  if (!config_.windowed_attention) {
     for (int i = 0; i < N; ++i) {
       h_seg_start[i] = 0;
       h_seg_end[i] = N;

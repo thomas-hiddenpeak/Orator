@@ -7,6 +7,7 @@
 // - RFC 6455/7692 compliant
 
 #include <cstdint>
+#include <fstream>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -73,7 +74,7 @@ class WebSocketServer {
                          size_t);
 
  public:
-  explicit WebSocketServer(int port);
+  explicit WebSocketServer(int port, const std::string& text_log_path = "");
   ~WebSocketServer();
 
   // Bind + listen. Returns false on error (port in use, etc.).
@@ -91,7 +92,10 @@ class WebSocketServer {
   int port() const { return port_; }
 
  private:
+  void LogTextFrame(const char* direction, const std::string& text);
+
   int port_;
+  std::ofstream text_log_;
   struct lws_context* context_ = nullptr;
   bool running_ = false;
 

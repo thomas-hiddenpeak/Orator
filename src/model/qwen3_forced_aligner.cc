@@ -1,7 +1,6 @@
 #include "model/qwen3_forced_aligner.h"
 
 #include <chrono>
-#include <cstdlib>
 #include <stdexcept>
 
 #include "core/log.h"
@@ -39,7 +38,7 @@ std::vector<core::AlignUnit> Qwen3ForcedAligner::Align(
   if (!loaded_) throw std::runtime_error("Qwen3ForcedAligner not loaded");
   if (pcm == nullptr || n <= 0 || transcript.empty()) return {};
 
-  const bool prof = std::getenv("ORATOR_ALIGN_PROFILE") != nullptr;
+  const bool prof = profile_;
   auto now = [] { return std::chrono::steady_clock::now(); };
   const auto t0 = now();
 

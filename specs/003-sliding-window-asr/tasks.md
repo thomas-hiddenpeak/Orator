@@ -27,7 +27,8 @@
   TruncateCache, cache_len). Verified via build + integration tests.*
 - [x] **T011** Verify windowed-encoder chunk-local equivalence (AC2): probe
   encodes 120 s full vs chunk-by-chunk-append in windowed mode
-  (`ORATOR_ASR_WINDOWED`); report max abs diff over the frozen earlier tokens.
+  (now typed as `[asr].windowed_encoder`); report max abs diff over the frozen
+  earlier tokens.
   Choose `chunk_sec` = whole encoder windows. *(Verify: diff within bf16 tol
   ~1e-2; if full-attention default breaks equivalence, confirm windowed mode is
   required and document it.)*
