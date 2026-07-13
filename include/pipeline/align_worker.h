@@ -5,13 +5,14 @@
 // It owns the forced aligner and aligns each finalized ASR transcript segment
 // to its audio in a single non-autoregressive pass, producing precise per-unit
 // (word/character) timestamps. It is a downstream consumer of the ASR
-// pipeline's published transcript segments: when an `asr/transcript` segment
-// arrives it reads back exactly that audio span from a retained-window buffer
-// and aligns the known text against it.
+// pipeline's finalized typed transcript track: when ComprehensiveTimeline
+// delivers an ASR final it reads back exactly that audio span from a
+// retained-window buffer and aligns the known text against it.
 //
 // Per Constitution Art. III the pipeline never reads another pipeline's
-// internal state -- it consumes only the published transcript (id, [start,
-// end], text) and the shared audio. Alignment runs on its own thread off the
+// internal state or protocol serialization -- it consumes only the typed
+// transcript (id, [start, end], text) and its retained audio view. Alignment
+// runs on its own thread off the
 // ASR hot path so it never blocks ingest or ASR; jobs are queued and processed
 // in order, and the queue is drained on Stop().
 

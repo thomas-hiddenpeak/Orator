@@ -6,8 +6,8 @@
 //
 // ProtocolTimeline owns all protocol-layer components and provides the unified
 // API: Register/Unregister pipelines, Publish messages (stored + routed),
-// Replay/LastRetained queries, and internal subscription for pipeline data
-// flow.
+// Replay/LastRetained queries, and internal subscription for protocol-layer
+// observers. Runtime pipeline evidence exchange uses ComprehensiveTimeline.
 
 #include <cstdint>
 #include <functional>
@@ -79,8 +79,9 @@ class ProtocolTimeline {
   // Clean up old data to prevent memory accumulation
   void CleanupOldData(double keep_until_sec);
 
-  // Internal: subscribe to a topic pattern for routing callbacks.
-  // Used by ComprehensiveTimeline to receive pipeline data.
+  // Internal protocol observer: subscribe to a topic pattern for transport,
+  // persistence, diagnostics, and tests. Runtime pipelines do not use this as
+  // their private evidence path.
   using MessageHandler = std::function<void(const Message&)>;
   long SubscribeInternal(const TopicPattern& pattern, MessageHandler handler);
   void UnsubscribeInternal(long sub_id);

@@ -7,22 +7,50 @@
 #include <thread>
 
 #include "gpu/gpu_lock.h"
+#include "pipeline/comprehensive_timeline.h"
 #include "pipeline/json_util.h"
 #include "pipeline/worker_common.h"
 
 namespace orator {
 namespace pipeline {
 
+namespace {
+
+struct VadSnapshot {
+  std::shared_ptr<const std::vector<ComprehensiveTimeline::VadSeg>> segments;
+  double horizon = -1e9;
+};
+
+VadSnapshot ReadVadSnapshot(const ComprehensiveTimeline* timeline) {
+  if (timeline == nullptr) return {};
+  const auto evidence = timeline->SnapshotVadEvidence();
+  return {evidence.segments, evidence.horizon};
+}
+
+double VadOverlapSec(
+    double start, double end,
+    const std::vector<ComprehensiveTimeline::VadSeg>& vad_segments) {
+  double overlap = 0.0;
+  for (const auto& segment : vad_segments) {
+    const double a = std::max(start, segment.start);
+    const double b = std::min(end, segment.end);
+    if (b > a) overlap += b - a;
+  }
+  return overlap;
+}
+
+}  // namespace
+
 using namespace worker;
 
 AsrWorker::AsrWorker(core::IAsr* asr, const Params& params, Emit emit,
                      core::TimeBase tb, cudaStream_t stream,
-                     VadCache* vad_cache)
+                     const ComprehensiveTimeline* timeline)
     : asr_(asr),
       params_(params),
       emit_(std::move(emit)),
       tb_(tb),
-      vad_cache_(vad_cache),
+      timeline_(timeline),
       stream_(stream),
       ring_buffer_(kRingBufferSamples) {}
 
@@ -69,30 +97,18 @@ void AsrWorker::ProcessSpan(const float* samples, int n) {
 std::vector<long> AsrWorker::VadCutSamples(long span_start,
                                            long span_end) const {
   std::vector<long> cuts;
-  if (!vad_cache_) return cuts;
-  const auto segs = vad_cache_->GetAll();
-  cuts.reserve(segs.size() * 2);
-  for (const auto& [s, e] : segs) {
-    const long ss = tb_.SampleAt(s);
-    const long es = tb_.SampleAt(e);
+  const VadSnapshot vad = ReadVadSnapshot(timeline_);
+  if (!vad.segments) return cuts;
+  cuts.reserve(vad.segments->size() * 2);
+  for (const auto& segment : *vad.segments) {
+    const long ss = tb_.SampleAt(segment.start);
+    const long es = tb_.SampleAt(segment.end);
     if (ss > span_start && ss < span_end) cuts.push_back(ss);
     if (es > span_start && es < span_end) cuts.push_back(es);
   }
   std::sort(cuts.begin(), cuts.end());
   cuts.erase(std::unique(cuts.begin(), cuts.end()), cuts.end());
   return cuts;
-}
-
-double AsrWorker::VadOverlapSec(
-    double start, double end,
-    const std::vector<std::pair<double, double>>& vad_segments) {
-  double overlap = 0.0;
-  for (const auto& [s, e] : vad_segments) {
-    const double a = std::max(start, s);
-    const double b = std::min(end, e);
-    if (b > a) overlap += b - a;
-  }
-  return overlap;
 }
 
 // Act on one VAD-boundary-aligned sub-span [inc_abs_pos_, inc_abs_pos_+sub_n).
@@ -107,8 +123,7 @@ double AsrWorker::VadOverlapSec(
 // Art. III -- ASR does not wait for VAD).
 void AsrWorker::ProcessGateSubSpan(const float* sub, int sub_n) {
   if (sub_n <= 0) return;
-  const auto vad_segs = vad_cache_ ? vad_cache_->GetAll()
-                                   : std::vector<std::pair<double, double>>{};
+  const VadSnapshot vad = ReadVadSnapshot(timeline_);
   const long base = inc_abs_pos_;
   const double mid_sec = tb_.SecondsAt(base + sub_n / 2);
   const double end_sec = tb_.SecondsAt(base + sub_n);
@@ -116,14 +131,17 @@ void AsrWorker::ProcessGateSubSpan(const float* sub, int sub_n) {
   // published speech segment's end (always valid) and the VAD progress horizon
   // (advances through silence at real-time pacing). A silence sub-span is
   // skippable only when its end is within this horizon.
-  double horizon = vad_segs.empty() ? -1e9 : vad_segs.back().second;
-  if (vad_cache_) horizon = std::max(horizon, vad_cache_->horizon());
+  double horizon =
+      !vad.segments || vad.segments->empty() ? -1e9 : vad.segments->back().end;
+  horizon = std::max(horizon, vad.horizon);
 
   bool is_speech = false;
-  for (const auto& [s, e] : vad_segs) {
-    if (mid_sec >= s && mid_sec < e) {
-      is_speech = true;
-      break;
+  if (vad.segments) {
+    for (const auto& segment : *vad.segments) {
+      if (mid_sec >= segment.start && mid_sec < segment.end) {
+        is_speech = true;
+        break;
+      }
     }
   }
 
@@ -156,8 +174,9 @@ void AsrWorker::ProcessGateSubSpan(const float* sub, int sub_n) {
   // silence sub-span. Feeding the trailing window before finalize retains
   // acoustic context for the last word; silence-only segments the leading-edge
   // processing may open are dropped at emit time (no VAD speech overlap).
-  const double last_vad_end = vad_segs.empty() ? -1e9 : vad_segs.back().second;
-  const double vad_horizon = vad_cache_ ? vad_cache_->horizon() : -1e9;
+  const double last_vad_end =
+      !vad.segments || vad.segments->empty() ? -1e9 : vad.segments->back().end;
+  const double vad_horizon = vad.horizon;
   if (inc_in_segment_ && last_vad_end > -1e8 &&
       last_vad_end > last_endpoint_vad_end_ &&
       (vad_horizon - last_vad_end) >= params_.asr_vad_trail_sec) {
@@ -311,20 +330,19 @@ void AsrWorker::EmitIncrementalChunk(const float* samples, int n,
     // actually published segments (an empty cache means VAD is not ready --
     // keep the text so nothing is lost before VAD warms up).
     bool keep = true;
-    if (params_.asr_vad_gate && vad_cache_) {
-      const auto vsegs = vad_cache_->GetAll();
-      if (vsegs.empty()) {
-        const double horizon = vad_cache_->horizon();
-        if (finalizing_ || horizon >= seg_start + params_.asr_vad_trail_sec) {
+    if (params_.asr_vad_gate && timeline_) {
+      const VadSnapshot vad = ReadVadSnapshot(timeline_);
+      if (!vad.segments || vad.segments->empty()) {
+        if (finalizing_ ||
+            vad.horizon >= seg_start + params_.asr_vad_trail_sec) {
           keep = false;
         }
       } else {
-        const double overlap = VadOverlapSec(seg_start, seg_end, vsegs);
+        const double overlap = VadOverlapSec(seg_start, seg_end, *vad.segments);
         if (overlap >= params_.asr_vad_min_overlap_sec) {
           keep = true;
         } else {
-          const double horizon = vad_cache_->horizon();
-          const bool confirmed_by_vad = finalizing_ || seg_end <= horizon;
+          const bool confirmed_by_vad = finalizing_ || seg_end <= vad.horizon;
           keep = !confirmed_by_vad;
         }
       }
@@ -337,9 +355,8 @@ void AsrWorker::EmitIncrementalChunk(const float* samples, int n,
       tok.start_sec = seg_start;
       tok.end_sec = seg_end;
       tok.text = inc_live_text_;
-      // Text segment goes through ProtocolTimeline → comp_ via text_sink_.
-      // StreamTimeline was removed; raw text is read from
-      // comp_.SnapshotRawTexts().
+      // The controller deposits this finalized record into
+      // ComprehensiveTimeline before mirroring it to protocol transport.
       const long text_id = inc_text_id_++;
       if (text_sink_)
         text_sink_(text_id, tok.start_sec, tok.end_sec, tok.text,

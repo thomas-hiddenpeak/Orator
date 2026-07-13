@@ -1,17 +1,20 @@
 #pragma once
 
-// ComprehensiveTimeline (Spec 004): the native, stateful container that holds
-// the three independent pipelines' tracks on one common time base (seconds;
-// origin = absolute sample 0). It is a PURE CONTAINER + ALIGNMENT layer: it
-// only RECEIVES each pipeline's data + meta + time codes and never modifies,
-// infers, or back-fills another pipeline's content.
+// ComprehensiveTimeline (Spec 004/013): the authoritative, thread-safe typed
+// evidence store for independent pipeline tracks on one common time base
+// (seconds; origin = absolute sample 0). Producers commit typed values here
+// before protocol serialization; downstream pipelines read or subscribe here.
 //
-//   - diarization -> ReplaceSpeakers(segs)        (who / when)   [diar track]
-//   - ASR         -> UpsertText(id,start,end,text) (what / when)  [asr track]
-//   - VAD         -> AddVad(start,end)             (speech segs)  [vad track]
+//   - diarization -> DepositDiarization(segs)  (who / when)  [diar track]
+//   - ASR         -> DepositAsrFinal(segment)  (what / when) [asr track]
+//   - VAD         -> DepositVad(segment)       (speech)      [vad track]
+//   - alignment   -> DepositAlignment(group)   (text timing) [align track]
 //
-// The COMPREHENSIVE VIEW is a DERIVED PRODUCT of this container, for accurate
-// terminal output and human browsing -- it is not a fourth pipeline. The view
+// Transitional compatibility: Snapshot() still computes the legacy
+// comprehensive view inside this class. Spec 013 T015 moves that policy into a
+// registered business_speaker pipeline so this type becomes a pure container
+// and alignment layer. Until then, the legacy view is not a closure-compliant
+// final business track. The view
 // answers "who said what when" by applying available pipeline evidence on the
 // common time base: ASR supplies accepted finalized text_id spans, diarization
 // supplies speaker ownership, and forced-alignment deposits can refine internal
@@ -31,6 +34,7 @@
 //
 #include <functional>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <set>
 #include <string>
@@ -39,12 +43,6 @@
 #include <vector>
 
 namespace orator {
-
-// Forward declaration needed by friend declarations below.
-namespace protocol {
-class Message;
-}
-
 namespace pipeline {
 
 class ComprehensiveTimeline {
@@ -90,6 +88,16 @@ class ComprehensiveTimeline {
     std::string text;
   };
 
+  // One raw diarization segment. The local label and optional resolved global
+  // identity remain producer evidence; the container does not alter either.
+  struct SpeakerInput {
+    double start = 0.0;
+    double end = 0.0;
+    std::string speaker;
+    float conf = 0.0f;
+    std::string speaker_id;
+  };
+
   // Snapshot all raw text segments for the ASR track in Serialize().
   // Returns the text segments ordered by start time.
   std::vector<RawTextSeg> SnapshotRawTexts() const;
@@ -98,6 +106,13 @@ class ComprehensiveTimeline {
   struct VadSeg {
     double start = 0.0;
     double end = 0.0;
+  };
+
+  // Atomic VAD read used by downstream consumers. `horizon` is the common
+  // clock time through which VAD has finalized its speech/silence decision.
+  struct VadEvidence {
+    std::shared_ptr<const std::vector<VadSeg>> segments;
+    double horizon = -1e9;
   };
 
   // One forced-alignment unit (word/character) with its time span on the common
@@ -118,6 +133,39 @@ class ComprehensiveTimeline {
     std::vector<AlignUnitSeg> units;
   };
 
+  using AsrFinalSubscriber = std::function<void(const RawTextSeg&)>;
+
+  // One atomic copy of every typed track plus the transitional legacy view.
+  // Terminal serialization uses this to avoid mixing track generations.
+  struct TrackSnapshot {
+    std::vector<SpeakerInput> diarization;
+    std::vector<RawTextSeg> asr;
+    std::vector<VadSeg> vad;
+    std::vector<AlignGroup> align;
+    std::vector<Entry> legacy_comprehensive;
+    std::map<std::string, std::string> speaker_label_ids;
+    std::vector<std::string> speaker_ids;
+  };
+
+  // Typed producer API. Track records enter the container before any protocol
+  // serialization. Returned revisions belong to the legacy derived view and
+  // are retained until the explicit business-speaker pipeline replaces it.
+  std::vector<Revision> DepositDiarization(
+      const std::vector<SpeakerInput>& segments);
+  std::vector<Revision> DepositDiarizationSegment(const SpeakerInput& segment);
+  std::vector<Revision> DepositAsrFinal(const RawTextSeg& segment);
+  void DepositVad(const VadSeg& segment);
+  void AdvanceVadHorizon(double horizon_sec);
+  std::vector<Revision> DepositAlignment(const AlignGroup& group);
+
+  // Typed downstream reads/subscriptions. Subscribers are invoked after the
+  // record is committed and outside the container lock. They receive immutable
+  // copies and must return promptly.
+  VadEvidence SnapshotVadEvidence() const;
+  TrackSnapshot SnapshotTracks() const;
+  long SubscribeAsrFinals(AsrFinalSubscriber subscriber);
+  void UnsubscribeAsrFinals(long subscription_id);
+
   // The comprehensive view: ASR text spans projected through diarization
   // ownership, time-ordered, preserving ASR text_id/final boundaries while
   // coalescing only adjacent pieces from the same source text segment.
@@ -131,10 +179,10 @@ class ComprehensiveTimeline {
   void set_speaker_support_min_coverage_ratio(double ratio);
   void set_speaker_support_max_gap_sec(double sec);
   void set_speaker_support_max_islands(int count);
-  void set_gap_fill_enabled(bool enabled) { gap_fill_enabled_ = enabled; }
+  void set_gap_fill_enabled(bool enabled);
 
   // The recorded VAD speech segments (sorted), for the serialized vad track.
-  std::vector<VadSeg> SnapshotVad() const { return vad_; }
+  std::vector<VadSeg> SnapshotVad() const;
 
   // Map of diarization speaker LABEL ("speaker_<n>") -> resolved global
   // voiceprint id (Spec 010), for serializing the global identity onto the
@@ -154,38 +202,18 @@ class ComprehensiveTimeline {
 
   void Clear();
 
- protected:
+ private:
   // ---------------------------------------------------------------------------
-  // INTERNAL mutation API — visible only to protocol bridge (friend) and
-  // test subclasses. Production pipeline data MUST arrive through
-  // ProtocolTimeline subscriptions; never call these directly.
+  // Unlocked mutation helpers. Every production caller enters through the
+  // typed API above, which owns synchronization and subscriber dispatch.
   // ---------------------------------------------------------------------------
-
-  // Friend the three protocol subscription bridge functions.
-  friend void HandleVadSubscription(ComprehensiveTimeline&, std::mutex&,
-                                    const orator::protocol::Message&);
-  friend void HandleDiarSubscription(
-      ComprehensiveTimeline&, std::mutex&, const orator::protocol::Message&,
-      const std::function<void(const std::string&)>&);
-  friend void HandleAsrSubscription(
-      ComprehensiveTimeline&, std::mutex&, const orator::protocol::Message&,
-      const std::function<void(const std::string&)>&);
-  friend void HandleAlignSubscription(
-      ComprehensiveTimeline&, std::mutex&, const orator::protocol::Message&,
-      const std::function<void(const std::string&)>&);
   // Deposit a speaker segment (who/when). Returns revisions caused by
   // attribution changes in overlapping text segments.
   std::vector<Revision> UpsertSpeaker(double start, double end,
-                                      const std::string& speaker, float conf);
+                                      const std::string& speaker, float conf,
+                                      const std::string& speaker_id);
 
   // Replace the ENTIRE speaker set in one call and re-project all text.
-  struct SpeakerInput {
-    double start;
-    double end;
-    std::string speaker;
-    float conf;
-    std::string speaker_id;  // resolved global voiceprint id ("" if none)
-  };
   std::vector<Revision> ReplaceSpeakers(const std::vector<SpeakerInput>& segs);
 
   // Deposit or replace a text segment (what/when), keyed by a stable id.
@@ -207,7 +235,6 @@ class ComprehensiveTimeline {
   // Clean up old data to prevent memory accumulation
   void CleanupOldData(double keep_until_sec);
 
- private:
   struct SpeakerSeg {
     double start = 0.0;
     double end = 0.0;
@@ -256,11 +283,15 @@ class ComprehensiveTimeline {
   // Re-project a single text segment by id; update its pieces_; if new or
   // changed, append a revision to `out`.
   void ReprojectText(const TextSeg& t, std::vector<Revision>* out);
+  std::vector<Entry> BuildLegacySnapshot() const;
 
   std::vector<SpeakerSeg> speakers_;  // diar track: who/when (overlaps allowed)
   std::set<std::string> seen_speaker_ids_;  // every global id ever assigned
   std::vector<TextSeg> texts_;              // asr track: what/when, keyed by id
   std::vector<VadSeg> vad_;                 // vad track: speech segments
+  std::shared_ptr<const std::vector<VadSeg>> vad_snapshot_ =
+      std::make_shared<const std::vector<VadSeg>>();
+  double vad_horizon_sec_ = -1e9;
   double align_snap_pause_sec_ = 0.25;
   double align_boundary_split_tolerance_sec_ = 0.08;
   double speaker_support_min_coverage_ratio_ = 0.50;
@@ -271,6 +302,10 @@ class ComprehensiveTimeline {
   std::map<long, AlignGroup> align_;
   // Current diarization-split projection per text id (kept in sync).
   std::map<long, std::vector<Entry>> pieces_;
+
+  mutable std::mutex mutex_;
+  long next_asr_subscription_id_ = 1;
+  std::map<long, AsrFinalSubscriber> asr_final_subscribers_;
 };
 
 }  // namespace pipeline

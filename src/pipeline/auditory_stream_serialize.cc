@@ -381,8 +381,8 @@ std::string AuditoryStream::SerializeGpuTelemetry() const {
 // Serialize the comprehensive timeline JSON document.
 // ---------------------------------------------------------------------------
 std::string AuditoryStream::Serialize() {
-  // Read both result sets from the timeline store under its lock, then build
-  // the timeline document. The document has a shared time axis and three parts:
+  // Read one atomic copy of every typed track, then build the timeline
+  // document. The document has a shared time axis and three parts:
   //   - "tracks": one independent track per pipeline (diarization, asr), each a
   //     list of that pipeline's time-ordered entries.
   //   - "comprehensive": an accuracy-first derived view that projects each
@@ -390,39 +390,28 @@ std::string AuditoryStream::Serialize() {
   //     ASR final boundaries while splitting text at diarization boundaries.
   // A consumer reads whichever part it needs. Adding a future pipeline adds a
   // track and, optionally, a contribution to the comprehensive view.
-  // StreamTimeline removed — ASR track data now comes from
-  // comp_.SnapshotRawTexts(). Spec 004 Step 2: the diarization worker is the
-  // sole producer of the speaker view (it delivers live via ReplaceSpeakers +
-  // keeps last_segments_ fresh); the ASR worker delivers text live via
-  // UpsertText. So Serialize is a pure reader: snapshot everything under
-  // comp_mutex_. No derivation, no upserts here.
-  std::vector<core::DiarSegment> diar_view;
-  std::vector<ComprehensiveTimeline::Entry> comp_view;
-  std::vector<ComprehensiveTimeline::VadSeg> vad_view;
-  std::vector<ComprehensiveTimeline::RawTextSeg> raw_texts;
-  std::vector<ComprehensiveTimeline::AlignGroup> align_view;
-  std::map<std::string, std::string> speaker_label_ids;
-  {
-    std::lock_guard<std::mutex> lk(comp_mutex_);
-    diar_view = last_segments_;
-    comp_view = comp_.Snapshot();
-    vad_view = comp_.SnapshotVad();
-    raw_texts = comp_.SnapshotRawTexts();
-    align_view = comp_.SnapshotAlign();
-    speaker_label_ids = comp_.SpeakerLabelIds();
-  }
+  // Every producer deposits typed evidence before protocol serialization, so
+  // Serialize never parses protocol JSON and never mutates a track.
+  const auto tracks = comp_.SnapshotTracks();
+  const auto& diar_view = tracks.diarization;
+  const auto& comp_view = tracks.legacy_comprehensive;
+  const auto& vad_view = tracks.vad;
+  const auto& raw_texts = tracks.asr;
+  const auto& align_view = tracks.align;
+  const auto& speaker_label_ids = tracks.speaker_label_ids;
   // Populate last_transcript_ from raw_texts for the transcript() accessor.
+  core::Transcript transcript;
+  for (const auto& r : raw_texts) {
+    core::AsrToken tok;
+    tok.text_id = r.id;
+    tok.start_sec = r.start;
+    tok.end_sec = r.end;
+    tok.text = r.text;
+    transcript.tokens.push_back(std::move(tok));
+  }
   {
-    core::Transcript transcript;
-    for (const auto& r : raw_texts) {
-      core::AsrToken tok;
-      tok.text_id = r.id;
-      tok.start_sec = r.start;
-      tok.end_sec = r.end;
-      tok.text = r.text;
-      transcript.tokens.push_back(std::move(tok));
-    }
-    last_transcript_ = std::move(transcript);
+    std::lock_guard<std::mutex> lock(comp_mutex_);
+    last_transcript_ = transcript;
   }
 
   const double audio = audio_sec();
@@ -449,9 +438,19 @@ std::string AuditoryStream::Serialize() {
   out += buf;
   for (size_t i = 0; i < diar_view.size(); ++i) {
     const auto& s = diar_view[i];
+    int speaker_index = -1;
+    if (s.speaker.rfind("speaker_", 0) == 0) {
+      try {
+        speaker_index = std::stoi(s.speaker.substr(8));
+      } catch (const std::invalid_argument&) {
+        speaker_index = -1;
+      } catch (const std::out_of_range&) {
+        speaker_index = -1;
+      }
+    }
     std::snprintf(buf, sizeof(buf),
-                  "{\"start\":%.3f,\"end\":%.3f,\"speaker\":%d", s.start_sec,
-                  s.end_sec, s.local_speaker);
+                  "{\"start\":%.3f,\"end\":%.3f,\"speaker\":%d", s.start, s.end,
+                  speaker_index);
     out += buf;
     // Spec 010: surface the resolved global voiceprint identity (and optional
     // display name) alongside the diarizer-local index (backward compatible:
@@ -462,7 +461,7 @@ std::string AuditoryStream::Serialize() {
           speaker_db_ ? speaker_db_->DisplayName(s.speaker_id) : std::string();
       if (!nm.empty()) out += ",\"speaker_name\":\"" + JsonEscape(nm) + "\"";
     }
-    std::snprintf(buf, sizeof(buf), ",\"confidence\":%.3f}", s.confidence);
+    std::snprintf(buf, sizeof(buf), ",\"confidence\":%.3f}", s.conf);
     out += buf;
     if (i + 1 < diar_view.size()) out += ",";
   }
@@ -476,13 +475,13 @@ std::string AuditoryStream::Serialize() {
         "\"compute_sec\":%.3f,\"real_time_factor\":%.3f,\"entries\":[",
         asr_c, asr_c > 0 ? audio / asr_c : 0.0);
     out += buf;
-    for (size_t i = 0; i < last_transcript_.tokens.size(); ++i) {
-      const auto& t = last_transcript_.tokens[i];
+    for (size_t i = 0; i < transcript.tokens.size(); ++i) {
+      const auto& t = transcript.tokens[i];
       std::snprintf(buf, sizeof(buf),
                     "{\"text_id\":%ld,\"start\":%.3f,\"end\":%.3f,\"text\":\"",
                     t.text_id, t.start_sec, t.end_sec);
       out += std::string(buf) + JsonEscape(t.text) + "\"}";
-      if (i + 1 < last_transcript_.tokens.size()) out += ",";
+      if (i + 1 < transcript.tokens.size()) out += ",";
     }
     out += "]}";
   }
@@ -603,17 +602,13 @@ std::string AuditoryStream::Serialize() {
 // ---------------------------------------------------------------------------
 std::string AuditoryStream::SerializeSpeakers() const {
   // List every global identity resolved anywhere in this session (accumulated
-  // in the comprehensive timeline, read under comp_mutex_), joined with the
+  // in the comprehensive timeline), joined with the
   // display names from the speaker database (its own name mutex). Using the
   // accumulated set — not the <=N current diarizer-slot mappings — keeps the
   // speaker panel consistent with the transcript, which accumulates ids the
   // same way. (This avoids racing the diarization thread on the database's
   // embedding/id vectors.)
-  std::vector<std::string> id_list;
-  {
-    std::lock_guard<std::mutex> lk(comp_mutex_);
-    id_list = comp_.AllSpeakerIds();
-  }
+  const std::vector<std::string> id_list = comp_.AllSpeakerIds();
   std::string out = "{\"type\":\"speakers\",\"speakers\":[";
   bool first = true;
   for (const auto& id : id_list) {

@@ -4,6 +4,7 @@
 
 #include "test_comprehensive_timeline_access.h"
 
+using orator::pipeline::ComprehensiveTimeline;
 using orator::pipeline::TestComprehensiveTimeline;
 
 static int g_fail = 0;
@@ -335,6 +336,42 @@ int main() {
       CHECK(snap[0].diar_island_count == 1,
             "complete coverage has one selected-speaker island");
     }
+  }
+
+  // ---- 14. Typed evidence reads are immutable and subscriptions carry the
+  // committed ASR final rather than a protocol-serialized reconstruction. ----
+  {
+    ComprehensiveTimeline tl;
+    int notifications = 0;
+    ComprehensiveTimeline::RawTextSeg observed;
+    const long subscription = tl.SubscribeAsrFinals(
+        [&notifications,
+         &observed](const ComprehensiveTimeline::RawTextSeg& segment) {
+          ++notifications;
+          observed = segment;
+        });
+
+    tl.DepositAsrFinal({7, 1.0, 2.0, "typed final"});
+    CHECK(notifications == 1, "typed ASR final subscriber called once");
+    CHECK(observed.id == 7 && observed.start == 1.0 && observed.end == 2.0 &&
+              observed.text == "typed final",
+          "subscriber receives the committed typed ASR record");
+
+    tl.UnsubscribeAsrFinals(subscription);
+    tl.DepositAsrFinal({8, 2.0, 3.0, "after unsubscribe"});
+    CHECK(notifications == 1, "unsubscribed ASR reader receives no updates");
+
+    tl.DepositVad({1.0, 1.5});
+    tl.AdvanceVadHorizon(2.0);
+    const auto first = tl.SnapshotVadEvidence();
+    tl.DepositVad({2.0, 2.5});
+    tl.AdvanceVadHorizon(1.0);
+    const auto second = tl.SnapshotVadEvidence();
+    CHECK(first.segments && first.segments->size() == 1,
+          "earlier VAD snapshot remains immutable after a later deposit");
+    CHECK(second.segments && second.segments->size() == 2,
+          "latest VAD snapshot contains both typed segments");
+    CHECK(second.horizon == 2.0, "VAD decision horizon advances monotonically");
   }
 
   if (g_fail == 0) {

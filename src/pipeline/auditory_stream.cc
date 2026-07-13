@@ -7,7 +7,6 @@
 #include "model/speaker_database.h"
 #include "model/streaming_sortformer.h"
 #include "model/titanet_embedder.h"
-#include "pipeline/json_util.h"
 #include "pipeline/speaker_identity_stage.h"
 #include "protocol/protocol_timeline.h"
 #include "protocol/session_store.h"
@@ -20,8 +19,6 @@
 #include <utility>
 
 #include <cuda_runtime.h>
-
-using VadCache = orator::pipeline::AsrWorker::VadCache;
 
 namespace orator {
 namespace pipeline {
@@ -42,7 +39,10 @@ AuditoryStream::AuditoryStream(const Config& config, Emit emit)
   comp_.set_gap_fill_enabled(config_.timeline_gap_fill_enabled);
 }
 
-AuditoryStream::~AuditoryStream() { StopWorkers(); }
+AuditoryStream::~AuditoryStream() {
+  StopWorkers();
+  comp_.UnsubscribeAsrFinals(comp_asr_subscription_id_);
+}
 
 void AuditoryStream::Start() {
   model::EnsureBuiltinsRegistered();
@@ -98,45 +98,15 @@ void AuditoryStream::Start() {
     align_handle_ = protocol_timeline_->RegisterPipeline(std::move(align_desc));
   }
 
-  vad_sub_id_ = protocol_timeline_->SubscribeInternal(
-      protocol::TopicPattern{"vad/+"}, [this](const protocol::Message& msg) {
-        HandleVadSubscription(comp_, comp_mutex_, msg);
-      });
-  diar_sub_id_ = protocol_timeline_->SubscribeInternal(
-      protocol::TopicPattern{"diar/+"}, [this](const protocol::Message& msg) {
-        HandleDiarSubscription(
-            comp_, comp_mutex_, msg,
-            [this](const std::string& rev_json) { EmitLocked(rev_json); });
-      });
-  asr_sub_id_ = protocol_timeline_->SubscribeInternal(
-      protocol::TopicPattern{"asr/+"}, [this](const protocol::Message& msg) {
-        HandleAsrSubscription(
-            comp_, comp_mutex_, msg,
-            [this](const std::string& rev_json) { EmitLocked(rev_json); });
-      });
-
-  // Forced alignment: enqueue each finalized transcript segment (asr/transcript
-  // only, not the partial topic) for alignment. The aligner is a downstream
-  // consumer of the published transcript -- it never reads ASR internal state.
-  if (align_on) {
-    align_sub_id_ = protocol_timeline_->SubscribeInternal(
-        protocol::TopicPattern(protocol::kAsrTranscript.to_string()),
-        [this](const protocol::Message& msg) {
+  // Forced alignment consumes finalized ASR evidence only through the typed
+  // comprehensive timeline subscription. Protocol topics mirror the same
+  // records for persistence and transport; they are not the private data bus.
+  if (align_on && comp_asr_subscription_id_ == 0) {
+    comp_asr_subscription_id_ = comp_.SubscribeAsrFinals(
+        [this](const ComprehensiveTimeline::RawTextSeg& segment) {
           if (!align_worker_) return;
-          const long id = static_cast<long>(JsonParseNum(msg.data, "id"));
-          const double start = JsonParseNum(msg.data, "start");
-          const double end = JsonParseNum(msg.data, "end");
-          const std::string text = JsonParseStr(msg.data, "text");
-          align_worker_->Enqueue(id, start, end, text);
-        });
-    // Output side: incorporate the published per-unit alignment into the
-    // comprehensive timeline's align track (time-base consistent).
-    align_units_sub_id_ = protocol_timeline_->SubscribeInternal(
-        protocol::TopicPattern(protocol::kAlignUnits.to_string()),
-        [this](const protocol::Message& msg) {
-          HandleAlignSubscription(
-              comp_, comp_mutex_, msg,
-              [this](const std::string& rev_json) { EmitLocked(rev_json); });
+          align_worker_->Enqueue(segment.id, segment.start, segment.end,
+                                 segment.text);
         });
   }
 
@@ -270,8 +240,11 @@ void AuditoryStream::StartWorkers() {
         diarizer_.get(), dp, common_time_base(), diar_stream_);
     diar_worker_->set_speaker_sink(
         [this](const std::vector<core::DiarSegment>& segs) {
-          HandleSpeakerSink(comp_mutex_, last_segments_,
-                            protocol_timeline_.get(), diar_handle_.get(), segs);
+          HandleSpeakerSink(
+              comp_, comp_mutex_, last_segments_, protocol_timeline_.get(),
+              diar_handle_.get(),
+              [this](const std::string& revision) { EmitLocked(revision); },
+              segs);
         });
     // Spec 010: resolve global voiceprint identities on the segment view before
     // it is delivered. The worker depends only on a std::function (Art. III);
@@ -309,36 +282,15 @@ void AuditoryStream::StartWorkers() {
     p.asr_vad_min_overlap_sec = config_.asr_vad_min_overlap_sec;
     p.max_audio_tokens = config_.asr_max_audio_tokens;
 
-    // VAD gate: ASR reads VAD speech segments from local cache populated by
-    // ProtocolTimeline subscription. Eliminates O(N^2) Replay calls on hot
-    // path.
-    vad_cache_ = std::make_unique<orator::pipeline::AsrWorker::VadCache>();
-
-    // Subscribe to VAD events from ProtocolTimeline to populate the cache.
-    vad_sub_id_ = protocol_timeline_->SubscribeInternal(
-        protocol::TopicPattern(protocol::kVadSpeechSegment.to_string()),
-        [this](const protocol::Message& msg) {
-          double s = JsonParseNum(msg.data, "start");
-          double e = JsonParseNum(msg.data, "end");
-          if (s >= 0.0 && e > s) vad_cache_->AddSegment(s, e);
-        });
-
-    // Subscribe to the VAD progress/horizon heartbeat so the gate can skip
-    // confirmed silence at real-time pacing (non-blocking: snapshot read).
-    vad_progress_sub_id_ = protocol_timeline_->SubscribeInternal(
-        protocol::TopicPattern(protocol::kVadProgress.to_string()),
-        [this](const protocol::Message& msg) {
-          double h = JsonParseNum(msg.data, "horizon");
-          if (h >= 0.0) vad_cache_->set_horizon(h);
-        });
-
     asr_worker_ = std::make_unique<AsrWorker>(
         asr_.get(), p, [this](const std::string& json) { EmitLocked(json); },
-        common_time_base(), asr_stream_, vad_cache_.get());
+        common_time_base(), asr_stream_, &comp_);
     asr_worker_->set_text_sink([this](long id, double start, double end,
                                       const std::string& text, bool is_final) {
-      HandleTextSink(protocol_timeline_.get(), asr_handle_.get(), id, start,
-                     end, text, is_final);
+      HandleTextSink(
+          comp_, protocol_timeline_.get(), asr_handle_.get(), id, start, end,
+          text, is_final,
+          [this](const std::string& revision) { EmitLocked(revision); });
     });
     asr_audio_ = MakeAudioCache();
     asr_thread_ = std::thread([this] {
@@ -368,7 +320,7 @@ void AuditoryStream::StartWorkers() {
     align_worker_->set_sink([this](long id, double seg_start, double seg_end,
                                    const std::vector<core::AlignUnit>& units) {
       HandleAlignSink(
-          protocol_timeline_.get(), align_handle_.get(),
+          comp_, protocol_timeline_.get(), align_handle_.get(),
           [this](const std::string& j) { EmitLocked(j); }, id, seg_start,
           seg_end, units);
     });
@@ -397,7 +349,7 @@ void AuditoryStream::StartWorkers() {
       std::vector<float> chunk;
       std::vector<core::VadSegmentResult> segs;
       auto drain = [this, &tb, &segs](bool finalize) {
-        HandleVadDrain(vad_detector_.get(), protocol_timeline_.get(),
+        HandleVadDrain(vad_detector_.get(), comp_, protocol_timeline_.get(),
                        vad_handle_.get(), tb, &segs, finalize);
       };
       // VAD progress heartbeat: while VAD is in confirmed silence, advance the
@@ -418,7 +370,8 @@ void AuditoryStream::StartWorkers() {
         if (!vad_detector_->is_in_speech()) {
           const double h = tb.SecondsAt(fed) - kGuardSec;
           if (h >= last_horizon + kMinAdvanceSec) {
-            PublishVadProgress(protocol_timeline_.get(), vad_handle_.get(), h);
+            PublishVadProgress(comp_, protocol_timeline_.get(),
+                               vad_handle_.get(), h);
             last_horizon = h;
           }
         }
@@ -445,7 +398,7 @@ void AuditoryStream::StartWorkers() {
       // Final horizon = everything fed is now decided; lets ASR skip any
       // trailing silence before its own finalize.
       PublishVadProgress(
-          protocol_timeline_.get(), vad_handle_.get(),
+          comp_, protocol_timeline_.get(), vad_handle_.get(),
           tb.SecondsAt(span_start_abs + static_cast<long>(chunk.size())));
       progress_cv_.notify_all();
     });

@@ -8,6 +8,7 @@
 #include "core/stages.h"
 #include "core/time_base.h"
 #include "pipeline/asr_worker.h"
+#include "pipeline/comprehensive_timeline.h"
 
 namespace {
 
@@ -83,6 +84,34 @@ int main() {
   }
   CHECK(final_zero, "first final event reuses sink ID zero");
   CHECK(final_one, "second final event reuses sink ID one");
+
+  {
+    FakeAsr silent_asr;
+    orator::pipeline::ComprehensiveTimeline evidence;
+    evidence.AdvanceVadHorizon(1.0);
+    params.asr_vad_gate = true;
+    std::vector<std::string> silent_events;
+    int silent_finals = 0;
+    orator::pipeline::AsrWorker silent_worker(
+        &silent_asr, params,
+        [&silent_events](const std::string& event) {
+          silent_events.push_back(event);
+        },
+        orator::core::TimeBase(100), /*stream=*/0, &evidence);
+    silent_worker.set_text_sink(
+        [&silent_finals](long, double, double, const std::string&, bool final) {
+          if (final) ++silent_finals;
+        });
+    silent_worker.ProcessSpan(audio.data(), static_cast<int>(audio.size()));
+    silent_worker.Finalize();
+
+    CHECK(silent_worker.processed_samples() == static_cast<long>(audio.size()),
+          "ASR accounts for silence skipped from typed VAD evidence");
+    CHECK(silent_events.empty(),
+          "confirmed silence from typed VAD evidence emits no ASR event");
+    CHECK(silent_finals == 0,
+          "confirmed silence from typed VAD evidence deposits no ASR final");
+  }
 
   if (failures == 0) {
     std::printf("test_asr_worker PASSED\n");

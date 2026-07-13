@@ -55,9 +55,10 @@ subject to the complete acceptance gates in this spec.
 1. **Resolved in Phase 1**: `AuditoryStream` now owns one immutable `TimeBase`
    and injects it into private caches, workers, and retained audio stores. Full
    end-of-stream track reconciliation remains open under T011.
-2. ASR reads VAD through a shared `VadCache`, and forced alignment receives ASR
-   finals through `ProtocolTimeline` subscriptions. These are pipeline data
-   paths outside `ComprehensiveTimeline`.
+2. **Resolved in Phase 1**: ASR reads an immutable typed VAD snapshot from
+   `ComprehensiveTimeline`, while forced alignment receives finalized typed ASR
+   records through a `ComprehensiveTimeline` subscription. Protocol messages
+   are emitted only after typed track commit.
 3. `ComprehensiveTimeline` currently performs speaker selection, gap filling,
    and text projection. The Constitution defines it as a pure container and
    alignment layer that does not infer or back-fill pipeline content.
@@ -67,7 +68,7 @@ subject to the complete acceptance gates in this spec.
 5. **Resolved in Phase 1**: finalized ASR allocates one `text_id` and reuses it
    for the typed sink and live event; the terminal ASR track serializes that ID.
    End-to-end align/revision/export/reconnect/Web UI convergence remains open.
-6. The configured CTest suite contains 49 C++ tests. CMake defines a Python test
+6. The configured CTest suite contains 50 C++ tests. CMake defines a Python test
    registration helper, but no Python WebSocket tests are registered and the
    documented wrapper directory is absent.
 7. `test_diar_stream` verifies a short stored NeMo fixture using lower-level

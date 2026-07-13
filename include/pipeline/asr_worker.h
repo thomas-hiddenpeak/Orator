@@ -3,15 +3,17 @@
 // AsrWorker: the speech-recognition pipeline as an independent unit.
 //
 // It owns the ASR engine and drives it over audio spans handed to it (by the
-// controller's worker thread, pulled from the SharedAudioBuffer). It runs the
+// controller's worker thread, pulled from its private PipelineAudioCache). It
+// reads finalized VAD evidence from ComprehensiveTimeline and runs the
 // Spec 003 incremental KV-cache session: continuous audio is fed into a
 // persistent decode session and committed in fixed-cadence segments, each
-// deposited into the shared StreamTimeline as a timed token and emitted as an
-// incremental event. It keeps its own state and never reads diarization output.
+// deposited as a typed ASR record and emitted as an incremental event. It keeps
+// its own state and never reads diarization output.
 
 #include <atomic>
 #include <functional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "core/stages.h"
@@ -20,6 +22,8 @@
 
 namespace orator {
 namespace pipeline {
+
+class ComprehensiveTimeline;
 
 class AsrWorker {
  public:
@@ -45,41 +49,12 @@ class AsrWorker {
 
   // `tb` comes from the session audio-ingest owner's canonical time base. The
   // worker holds that value and derives all time codes from it.
-  // Text segments are delivered via text_sink_ (→ ProtocolTimeline → comp_);
-  // raw tokens are no longer written to an external StreamTimeline.
-  class VadCache {
-   public:
-    void AddSegment(double start, double end) {
-      std::lock_guard<std::mutex> lk(mutex_);
-      segments_.emplace_back(start, end);
-    }
-    std::vector<std::pair<double, double>> GetAll() const {
-      std::lock_guard<std::mutex> lk(mutex_);
-      return segments_;
-    }
-    // The absolute time (common clock, sec) up to which VAD has processed and
-    // confirmed its speech/silence decision. ASR treats a silence sub-span as
-    // skippable only when its end is within this horizon, so at real-time
-    // pacing (VAD ~= ASR at the leading edge) ASR can still skip confirmed
-    // silence instead of spending GPU on it. Published by the VAD pipeline via
-    // `vad/progress` and consumed here -- ASR never blocks on VAD.
-    void set_horizon(double sec) {
-      std::lock_guard<std::mutex> lk(mutex_);
-      horizon_ = sec;
-    }
-    double horizon() const {
-      std::lock_guard<std::mutex> lk(mutex_);
-      return horizon_;
-    }
-
-   private:
-    mutable std::mutex mutex_;
-    std::vector<std::pair<double, double>> segments_;
-    double horizon_ = -1e9;
-  };
+  // Text segments are deposited by the controller through text_sink_. VAD
+  // evidence is read only from the typed ComprehensiveTimeline track.
 
   AsrWorker(core::IAsr* asr, const Params& params, Emit emit, core::TimeBase tb,
-            cudaStream_t stream = 0, VadCache* vad_cache = nullptr);
+            cudaStream_t stream = 0,
+            const ComprehensiveTimeline* timeline = nullptr);
 
   void set_text_sink(TextSegmentSink sink) { text_sink_ = std::move(sink); }
 
@@ -106,9 +81,6 @@ class AsrWorker {
   // already published.
   void ProcessGateSubSpan(const float* sub, int sub_n);
   std::vector<long> VadCutSamples(long span_start, long span_end) const;
-  static double VadOverlapSec(
-      double start, double end,
-      const std::vector<std::pair<double, double>>& vad_segments);
 
   core::IAsr* asr_;
   Params params_;
@@ -116,9 +88,9 @@ class AsrWorker {
   TextSegmentSink text_sink_;
   core::TimeBase tb_;
 
-  // Local VAD segment cache — updated by subscribing to VAD events via
-  // ProtocolTimeline. Eliminates O(N^2) Replay calls on hot path.
-  VadCache* vad_cache_ = nullptr;
+  // Authoritative typed evidence store. Snapshot reads are non-blocking with
+  // respect to VAD progress and never access VAD worker state directly.
+  const ComprehensiveTimeline* timeline_ = nullptr;
 
   std::atomic<long> processed_samples_{0};
   std::atomic<int> debug_segments_started_{0};

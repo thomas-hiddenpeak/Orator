@@ -218,11 +218,12 @@ WebSocket PCM
 - 所有流水线使用同一个 `core::TimeBase`。
 - 时间码必须通过 `TimeBase::SecondsAt()`、`SampleAt()`、`Duration()` 等接口派生。
 - 流水线之间不直接共享结果，不通过回调、共享指针或原子标志交换业务数据。
-- 跨流水线数据通过 `ProtocolTimeline` / `ComprehensiveTimeline` 汇合。
+- 跨流水线业务证据只通过类型化 `ComprehensiveTimeline` 汇合；
+  `ProtocolTimeline` 仅镜像已提交记录，用于持久化、传输和外部观察。
 - ASR 输出文本和自身时间码；diarization 输出 speaker 和自身时间码；
   comprehensive layer 只做时间对齐，不修改管线内容。
-- ASR 的 VAD gate 使用本地 `VadCache`，由 `ProtocolTimeline` 订阅更新，避免热路径
-  反复 `Replay()`。
+- ASR 的 VAD gate 读取 `ComprehensiveTimeline` 的不可变 VAD 快照，避免热路径
+  反复反序列化或读取 VAD worker 私有状态。
 
 ## WebSocket 输出
 

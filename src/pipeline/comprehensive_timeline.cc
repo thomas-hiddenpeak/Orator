@@ -95,6 +95,108 @@ bool EntriesEqual(const std::vector<ComprehensiveTimeline::Entry>& a,
 }
 }  // namespace
 
+std::vector<ComprehensiveTimeline::Revision>
+ComprehensiveTimeline::DepositDiarization(
+    const std::vector<SpeakerInput>& segments) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return ReplaceSpeakers(segments);
+}
+
+std::vector<ComprehensiveTimeline::Revision>
+ComprehensiveTimeline::DepositDiarizationSegment(const SpeakerInput& segment) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return UpsertSpeaker(segment.start, segment.end, segment.speaker,
+                       segment.conf, segment.speaker_id);
+}
+
+std::vector<ComprehensiveTimeline::Revision>
+ComprehensiveTimeline::DepositAsrFinal(const RawTextSeg& segment) {
+  std::vector<Revision> revisions;
+  std::vector<AsrFinalSubscriber> subscribers;
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    revisions =
+        UpsertText(segment.id, segment.start, segment.end, segment.text);
+    subscribers.reserve(asr_final_subscribers_.size());
+    for (const auto& [id, subscriber] : asr_final_subscribers_) {
+      (void)id;
+      subscribers.push_back(subscriber);
+    }
+  }
+  for (const auto& subscriber : subscribers) subscriber(segment);
+  return revisions;
+}
+
+void ComprehensiveTimeline::DepositVad(const VadSeg& segment) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  AddVad(segment.start, segment.end);
+  vad_snapshot_ = std::make_shared<const std::vector<VadSeg>>(vad_);
+}
+
+void ComprehensiveTimeline::AdvanceVadHorizon(double horizon_sec) {
+  if (!std::isfinite(horizon_sec)) return;
+  std::lock_guard<std::mutex> lock(mutex_);
+  vad_horizon_sec_ = std::max(vad_horizon_sec_, horizon_sec);
+}
+
+std::vector<ComprehensiveTimeline::Revision>
+ComprehensiveTimeline::DepositAlignment(const AlignGroup& group) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return UpsertAlign(group.text_id, group.start, group.end, group.units);
+}
+
+ComprehensiveTimeline::VadEvidence ComprehensiveTimeline::SnapshotVadEvidence()
+    const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return {vad_snapshot_, vad_horizon_sec_};
+}
+
+ComprehensiveTimeline::TrackSnapshot ComprehensiveTimeline::SnapshotTracks()
+    const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  TrackSnapshot snapshot;
+  snapshot.diarization.reserve(speakers_.size());
+  for (const auto& speaker : speakers_) {
+    snapshot.diarization.push_back({speaker.start, speaker.end, speaker.speaker,
+                                    speaker.conf, speaker.speaker_id});
+    if (!speaker.speaker_id.empty()) {
+      snapshot.speaker_label_ids[speaker.speaker] = speaker.speaker_id;
+    }
+  }
+  snapshot.asr.reserve(texts_.size());
+  for (const auto& text : texts_) {
+    snapshot.asr.push_back({text.id, text.start, text.end, text.text});
+  }
+  snapshot.vad = vad_;
+  snapshot.align.reserve(align_.size());
+  for (const auto& [text_id, group] : align_) {
+    (void)text_id;
+    snapshot.align.push_back(group);
+  }
+  std::sort(snapshot.align.begin(), snapshot.align.end(),
+            [](const AlignGroup& a, const AlignGroup& b) {
+              return a.start < b.start;
+            });
+  snapshot.legacy_comprehensive = BuildLegacySnapshot();
+  snapshot.speaker_ids.assign(seen_speaker_ids_.begin(),
+                              seen_speaker_ids_.end());
+  return snapshot;
+}
+
+long ComprehensiveTimeline::SubscribeAsrFinals(AsrFinalSubscriber subscriber) {
+  if (!subscriber) return 0;
+  std::lock_guard<std::mutex> lock(mutex_);
+  const long id = next_asr_subscription_id_++;
+  asr_final_subscribers_.emplace(id, std::move(subscriber));
+  return id;
+}
+
+void ComprehensiveTimeline::UnsubscribeAsrFinals(long subscription_id) {
+  if (subscription_id <= 0) return;
+  std::lock_guard<std::mutex> lock(mutex_);
+  asr_final_subscribers_.erase(subscription_id);
+}
+
 ComprehensiveTimeline::SpeakerAttr ComprehensiveTimeline::AttributeInterval(
     double start, double end) const {
   double best_overlap = 0.0;
@@ -129,24 +231,34 @@ ComprehensiveTimeline::SpeakerAttr ComprehensiveTimeline::AttributeInterval(
 }
 
 void ComprehensiveTimeline::set_align_snap_pause_sec(double sec) {
+  std::lock_guard<std::mutex> lock(mutex_);
   align_snap_pause_sec_ = std::max(0.0, sec);
 }
 
 void ComprehensiveTimeline::set_align_boundary_split_tolerance_sec(double sec) {
+  std::lock_guard<std::mutex> lock(mutex_);
   align_boundary_split_tolerance_sec_ = std::max(0.0, sec);
 }
 
 void ComprehensiveTimeline::set_speaker_support_min_coverage_ratio(
     double ratio) {
+  std::lock_guard<std::mutex> lock(mutex_);
   speaker_support_min_coverage_ratio_ = std::max(0.0, std::min(1.0, ratio));
 }
 
 void ComprehensiveTimeline::set_speaker_support_max_gap_sec(double sec) {
+  std::lock_guard<std::mutex> lock(mutex_);
   speaker_support_max_gap_sec_ = std::max(0.0, sec);
 }
 
 void ComprehensiveTimeline::set_speaker_support_max_islands(int count) {
+  std::lock_guard<std::mutex> lock(mutex_);
   speaker_support_max_islands_ = std::max(1, count);
+}
+
+void ComprehensiveTimeline::set_gap_fill_enabled(bool enabled) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  gap_fill_enabled_ = enabled;
 }
 
 ComprehensiveTimeline::SpeakerSupport
@@ -441,12 +553,15 @@ void ComprehensiveTimeline::ReprojectRange(double start, double end,
 
 std::vector<ComprehensiveTimeline::Revision>
 ComprehensiveTimeline::UpsertSpeaker(double start, double end,
-                                     const std::string& speaker, float conf) {
+                                     const std::string& speaker, float conf,
+                                     const std::string& speaker_id) {
   SpeakerSeg s;
   s.start = start;
   s.end = end;
   s.speaker = speaker;
   s.conf = conf;
+  s.speaker_id = speaker_id;
+  if (!speaker_id.empty()) seen_speaker_ids_.insert(speaker_id);
   // Insert keeping speakers_ ordered by start (stable, simple; small N).
   auto pos = std::lower_bound(
       speakers_.begin(), speakers_.end(), start,
@@ -516,11 +631,13 @@ ComprehensiveTimeline::ReplaceSpeakers(const std::vector<SpeakerInput>& segs) {
 }
 
 std::vector<std::string> ComprehensiveTimeline::AllSpeakerIds() const {
+  std::lock_guard<std::mutex> lock(mutex_);
   return {seen_speaker_ids_.begin(), seen_speaker_ids_.end()};
 }
 
 std::map<std::string, std::string> ComprehensiveTimeline::SpeakerLabelIds()
     const {
+  std::lock_guard<std::mutex> lock(mutex_);
   std::map<std::string, std::string> out;
   for (const auto& s : speakers_) {
     if (!s.speaker_id.empty()) out[s.speaker] = s.speaker_id;
@@ -536,8 +653,20 @@ void ComprehensiveTimeline::AddVad(double start, double end) {
   vad_.insert(pos, v);
 }
 
+std::vector<ComprehensiveTimeline::VadSeg> ComprehensiveTimeline::SnapshotVad()
+    const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return vad_;
+}
+
 std::vector<ComprehensiveTimeline::Entry> ComprehensiveTimeline::Snapshot()
     const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return BuildLegacySnapshot();
+}
+
+std::vector<ComprehensiveTimeline::Entry>
+ComprehensiveTimeline::BuildLegacySnapshot() const {
   // The comprehensive view is the accuracy-first projection of every finalized
   // ASR text segment through the current diarization view. It may coalesce
   // adjacent pieces created by one source text segment, but it preserves
@@ -570,6 +699,7 @@ std::vector<ComprehensiveTimeline::Entry> ComprehensiveTimeline::Snapshot()
 
 std::vector<ComprehensiveTimeline::RawTextSeg>
 ComprehensiveTimeline::SnapshotRawTexts() const {
+  std::lock_guard<std::mutex> lock(mutex_);
   std::vector<RawTextSeg> out;
   out.reserve(texts_.size());
   for (const auto& t : texts_) {
@@ -601,6 +731,7 @@ std::vector<ComprehensiveTimeline::Revision> ComprehensiveTimeline::UpsertAlign(
 
 std::vector<ComprehensiveTimeline::AlignGroup>
 ComprehensiveTimeline::SnapshotAlign() const {
+  std::lock_guard<std::mutex> lock(mutex_);
   std::vector<AlignGroup> out;
   out.reserve(align_.size());
   for (const auto& kv : align_) out.push_back(kv.second);
@@ -612,9 +743,13 @@ ComprehensiveTimeline::SnapshotAlign() const {
 }
 
 void ComprehensiveTimeline::Clear() {
+  std::lock_guard<std::mutex> lock(mutex_);
   speakers_.clear();
+  seen_speaker_ids_.clear();
   texts_.clear();
   vad_.clear();
+  vad_snapshot_ = std::make_shared<const std::vector<VadSeg>>();
+  vad_horizon_sec_ = -1e9;
   pieces_.clear();
   align_.clear();
 }

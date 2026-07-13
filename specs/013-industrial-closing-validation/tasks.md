@@ -19,11 +19,11 @@
   audio store and worker.
 - [ ] T011 Make end-of-stream extent reconciliation cover every registered track
   and fail tests on any mismatch.
-- [ ] T012 Add typed incremental evidence reads/subscriptions to
+- [x] T012 Add typed incremental evidence reads/subscriptions to
   `ComprehensiveTimeline` without content inference.
-- [ ] T013 Replace the ASR `VadCache` pointer path with VAD evidence read through
+- [x] T013 Replace the ASR `VadCache` pointer path with VAD evidence read through
   `ComprehensiveTimeline`.
-- [ ] T014 Replace forced aligner's direct protocol subscription with finalized
+- [x] T014 Replace forced aligner's direct protocol subscription with finalized
   ASR evidence read through `ComprehensiveTimeline`.
 - [ ] T015 Move speaker choice, text projection, and gap policy into a registered
   `business_speaker` pipeline and keep raw tracks immutable.

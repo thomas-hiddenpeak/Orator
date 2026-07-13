@@ -20,7 +20,6 @@ namespace orator {
 using RevisionEmitter = std::function<void(const std::string&)>;
 
 namespace protocol {
-class Message;
 class PipelineHandle;
 class ProtocolTimeline;
 }  // namespace protocol
@@ -29,58 +28,33 @@ namespace pipeline {
 
 class ComprehensiveTimeline;
 
-// VAD subscription: parse {"start":..., "end":...} → comp_.AddVad()
-void HandleVadSubscription(ComprehensiveTimeline& comp, std::mutex& comp_mutex,
-                           const protocol::Message& msg);
-
-// Diar subscription: parse {"segments":[{...},...]} → comp_.ReplaceSpeakers()
-// emit_rev is called outside comp_mutex for each revision produced.
-void HandleDiarSubscription(ComprehensiveTimeline& comp, std::mutex& comp_mutex,
-                            const protocol::Message& msg,
-                            const RevisionEmitter& emit_rev);
-
-// ASR subscription: parse {"id":..., "start":..., "end":..., "text":"..."}
-// → comp_.UpsertText(). emit_rev is called outside comp_mutex for each
-// revision produced.
-void HandleAsrSubscription(ComprehensiveTimeline& comp, std::mutex& comp_mutex,
-                           const protocol::Message& msg,
-                           const RevisionEmitter& emit_rev);
-
-// Align subscription: parse {"id":..,"start":..,"end":..,"units":[{...}]}
-// → comp_.UpsertAlign(). Incorporates the forced-alignment per-unit timestamps
-// into the comprehensive timeline, refining each text's diarization split by
-// exact per-unit timing; emit_rev pushes the resulting revisions.
-void HandleAlignSubscription(ComprehensiveTimeline& comp,
-                             std::mutex& comp_mutex,
-                             const protocol::Message& msg,
-                             const RevisionEmitter& emit_rev);
-
-// Speaker sink callback: diarization worker → protocol publish
-void HandleSpeakerSink(std::mutex& comp_mutex,
+// Speaker sink callback: diarization worker → typed track deposit → protocol
+// mirror. Revisions are emitted after the typed deposit commits.
+void HandleSpeakerSink(ComprehensiveTimeline& comp, std::mutex& state_mutex,
                        std::vector<core::DiarSegment>& last_segments,
                        protocol::ProtocolTimeline* protocol_timeline,
                        protocol::PipelineHandle* diar_handle,
+                       const RevisionEmitter& emit_rev,
                        const std::vector<core::DiarSegment>& segs);
 
-// Text sink callback: ASR worker → protocol publish. Finals are published on
-// asr/transcript; in-progress partials on asr/transcript_partial. The forced
-// aligner subscribes to asr/transcript only, so it aligns each segment once,
-// against its finalized text -- not every partial revision.
-void HandleTextSink(protocol::ProtocolTimeline* protocol_timeline,
+// Text sink callback: ASR worker → typed final deposit → protocol mirror.
+// Partials are transport-only and never enter the finalized ASR track.
+void HandleTextSink(ComprehensiveTimeline& comp,
+                    protocol::ProtocolTimeline* protocol_timeline,
                     protocol::PipelineHandle* asr_handle, long id, double start,
-                    double end, const std::string& text, bool is_final);
+                    double end, const std::string& text, bool is_final,
+                    const RevisionEmitter& emit_rev);
 
-// Align sink callback: forced-alignment worker → protocol publish + WS emit.
-// Builds the align/units message (per-unit timestamps for one transcript
-// segment) and publishes it on align/units; `emit` forwards the same JSON to
-// the transport so the client receives the alignment incrementally.
-void HandleAlignSink(protocol::ProtocolTimeline* protocol_timeline,
+// Align sink callback: forced-alignment worker → typed track deposit → protocol
+// mirror + WS event.
+void HandleAlignSink(ComprehensiveTimeline& comp,
+                     protocol::ProtocolTimeline* protocol_timeline,
                      protocol::PipelineHandle* align_handle,
                      const RevisionEmitter& emit, long id, double seg_start,
                      double seg_end, const std::vector<core::AlignUnit>& units);
 
-// VAD drain: extract segments from IVad and publish to protocol timeline.
-void HandleVadDrain(core::IVad* vad_detector,
+// VAD drain: extract segments, deposit typed evidence, then mirror to protocol.
+void HandleVadDrain(core::IVad* vad_detector, ComprehensiveTimeline& comp,
                     protocol::ProtocolTimeline* protocol_timeline,
                     protocol::PipelineHandle* vad_handle,
                     const core::TimeBase& tb,
@@ -89,7 +63,8 @@ void HandleVadDrain(core::IVad* vad_detector,
 // Publish a VAD progress/horizon heartbeat: the absolute time (common clock)
 // up to which VAD has processed and confirmed silence, so ASR can skip
 // confirmed silence at real-time pacing. Frequent + lossy (AT_MOST_ONCE).
-void PublishVadProgress(protocol::ProtocolTimeline* protocol_timeline,
+void PublishVadProgress(ComprehensiveTimeline& comp,
+                        protocol::ProtocolTimeline* protocol_timeline,
                         protocol::PipelineHandle* vad_handle,
                         double horizon_sec);
 

@@ -87,6 +87,7 @@ target_link_libraries(test_http_server PRIVATE pthread)
 
 # Integration tests
 orator_add_test(test_comprehensive_timeline integration/cc/test_comprehensive_timeline.cc)
+orator_add_test(test_typed_evidence_flow integration/cc/test_typed_evidence_flow.cc)
 orator_add_test(test_registration integration/cc/test_registration.cc)
 
 # test_asr_ops reads PyTorch-GPU reference activations under models/reference;

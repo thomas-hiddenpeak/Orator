@@ -380,10 +380,9 @@ class AuditoryStream {
   std::vector<core::DiarSegment> last_segments_;
   core::Transcript last_transcript_;
 
-  // Spec 004: native stateful comprehensive view. ASR commits upsert text
-  // incrementally (with live revision push); diar segments are upserted at
-  // serialize (frame->segment is global). Guarded by comp_mutex_ because the
-  // ASR worker thread and the controller both touch it.
+  // Authoritative typed evidence store. It owns its track synchronization;
+  // comp_mutex_ protects only controller-side compatibility snapshots such as
+  // last_segments_ and last_transcript_.
   ComprehensiveTimeline comp_;
   mutable std::mutex comp_mutex_;
 
@@ -394,21 +393,10 @@ class AuditoryStream {
   std::unique_ptr<protocol::PipelineHandle> vad_handle_;
   std::unique_ptr<protocol::PipelineHandle> asr_handle_;
   std::unique_ptr<protocol::PipelineHandle> diar_handle_;
-  // Spec 004 Phase 12: internal subscription IDs bridging ProtocolTimeline
-  // messages back to ComprehensiveTimeline. Unsubscribed in Reset().
-  long vad_sub_id_ = 0;
-  long vad_progress_sub_id_ = 0;
-  long diar_sub_id_ = 0;
-  long asr_sub_id_ = 0;
-  // Forced-alignment pipeline handle + asr/transcript subscription. The aligner
-  // consumes published transcripts only (never ASR internal state, Art. III).
+  // Forced-alignment pipeline handle. The worker consumes finalized ASR records
+  // through the typed ComprehensiveTimeline subscription below.
   std::unique_ptr<protocol::PipelineHandle> align_handle_;
-  long align_sub_id_ = 0;
-  long align_units_sub_id_ = 0;
-
-  // VAD gate: local cache populated by ProtocolTimeline subscription.
-  // Avoids O(N^2) Replay calls on the ASR worker hot path.
-  std::unique_ptr<orator::pipeline::AsrWorker::VadCache> vad_cache_;
+  long comp_asr_subscription_id_ = 0;
 
   // Spec 004 Phase 13: session persistence store. Saves timeline JSON on
   // Reset(). Null when persistence is disabled (empty storage_disk_path).
