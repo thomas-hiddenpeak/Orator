@@ -17,8 +17,8 @@
 
 namespace orator {
 
-// Emit callback for revision JSON strings.
-using RevisionEmitter = std::function<void(const std::string&)>;
+// Emit callback for self-describing live-event JSON strings.
+using EventEmitter = std::function<void(const std::string&)>;
 
 namespace protocol {
 class PipelineHandle;
@@ -34,6 +34,7 @@ void HandleSpeakerSink(ComprehensiveTimeline& comp, std::mutex& state_mutex,
                        std::vector<core::DiarSegment>& last_segments,
                        protocol::ProtocolTimeline* protocol_timeline,
                        protocol::PipelineHandle* diar_handle,
+                       const EventEmitter& emit,
                        const std::vector<core::DiarSegment>& segs);
 
 // Text sink callback: ASR worker → typed final deposit → protocol mirror.
@@ -48,21 +49,21 @@ void HandleTextSink(ComprehensiveTimeline& comp,
 void HandleAlignSink(ComprehensiveTimeline& comp,
                      protocol::ProtocolTimeline* protocol_timeline,
                      protocol::PipelineHandle* align_handle,
-                     const RevisionEmitter& emit, long id, double seg_start,
+                     const EventEmitter& emit, long id, double seg_start,
                      double seg_end, const std::vector<core::AlignUnit>& units);
 
 // Mirror an already committed business-speaker revision to protocol and the
 // live WebSocket event stream.
 void HandleBusinessSpeakerRevision(
     protocol::ProtocolTimeline* protocol_timeline,
-    protocol::PipelineHandle* business_handle, const RevisionEmitter& emit,
+    protocol::PipelineHandle* business_handle, const EventEmitter& emit,
     const ComprehensiveTimeline::Revision& revision);
 
 // VAD drain: extract segments, deposit typed evidence, then mirror to protocol.
 void HandleVadDrain(core::IVad* vad_detector, ComprehensiveTimeline& comp,
                     protocol::ProtocolTimeline* protocol_timeline,
                     protocol::PipelineHandle* vad_handle,
-                    const core::TimeBase& tb,
+                    const EventEmitter& emit, const core::TimeBase& tb,
                     std::vector<core::VadSegmentResult>* segs, bool finalize);
 
 // Publish a VAD progress/horizon heartbeat: the absolute time (common clock)

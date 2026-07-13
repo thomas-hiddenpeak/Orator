@@ -113,6 +113,38 @@ int main() {
           "confirmed silence from typed VAD evidence deposits no ASR final");
   }
 
+  {
+    FakeAsr retract_asr;
+    orator::pipeline::ComprehensiveTimeline evidence;
+    params.asr_vad_gate = true;
+    std::vector<std::string> retract_events;
+    evidence.UpdateVadState(true, 0.1);
+    orator::pipeline::AsrWorker retract_worker(
+        &retract_asr, params,
+        [&retract_events](const std::string& event) {
+          retract_events.push_back(event);
+        },
+        orator::core::TimeBase(100), /*stream=*/0, &evidence);
+    retract_worker.set_text_sink(
+        [](long, double, double, const std::string&, bool) {});
+    retract_worker.ProcessSpan(audio.data(), static_cast<int>(audio.size()));
+    evidence.UpdateVadState(false, 0.2);
+    evidence.AdvanceVadHorizon(2.0);
+    retract_worker.Finalize();
+
+    CHECK(retract_events.size() == 2,
+          "VAD-rejected provisional transcript emits partial and retract");
+    if (retract_events.size() == 2) {
+      CHECK(retract_events[0].find("\"type\":\"asr_partial\"") !=
+                std::string::npos,
+            "provisional transcript emits a partial event");
+      CHECK(retract_events[1].find("\"type\":\"asr_retract\"") !=
+                    std::string::npos &&
+                retract_events[1].find("\"text_id\":0") != std::string::npos,
+            "retract event reuses the provisional text ID");
+    }
+  }
+
   if (failures == 0) {
     std::printf("test_asr_worker PASSED\n");
     return 0;

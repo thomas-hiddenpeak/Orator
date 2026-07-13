@@ -1,8 +1,10 @@
 # Orator 测试目录
 
-当前 CMake 配置注册 51 项 C++ CTest。本目录尚无已注册的
-Python/WebSocket 集成测试；真实流客户端位于
-`tools/verify/py/ws_unified_test.py`，恢复自动 CTest 门禁由 Spec 013 跟踪。
+当前 CMake 配置注册 53 项 CTest：51 项 C++ 测试、1 项真实
+Python/WebSocket 语音与静音合同测试、1 项 Node Web UI 状态模型测试。
+真实流客户端仍只有 `tools/verify/py/ws_unified_test.py`；
+`integration/py/run_ws_integration.py` 只负责服务端生命周期和临时 TOML
+隔离，不读写 WebSocket。
 
 ## 目录结构
 
@@ -19,6 +21,10 @@ test/
 │   ├── test_business_speaker_pipeline.cc
 │   ├── test_typed_evidence_flow.cc
 │   └── test_registration.cc
+├── integration/py/
+│   └── run_ws_integration.py # 进程启停与测试隔离，不是 WS 客户端
+├── web/
+│   └── model_contract.test.mjs
 ├── data/
 │   ├── audio/test.mp3
 │   └── reference/test.txt
@@ -42,6 +48,8 @@ ctest --test-dir build --output-on-failure
 ```bash
 ctest --test-dir build -R test_business_speaker_pipeline --output-on-failure
 ctest --test-dir build -R test_typed_evidence_flow --output-on-failure
+ctest --test-dir build -R test_ws_contract --output-on-failure
+ctest --test-dir build -R test_web_model --output-on-failure
 ```
 
 部分模型测试需要 CUDA、GPU 和本地模型/参考文件。准确率与产品收官评估还必须
@@ -52,6 +60,6 @@ ctest --test-dir build -R test_typed_evidence_flow --output-on-failure
 
 1. C++ 测试放入对应分层，并在 `test/CMakeLists.txt` 用
    `orator_add_test` 注册。
-2. Python 测试必须通过 `orator_add_py_test` 注册，并明确服务端启停、
-   超时、`orator.toml` 和产物路径。
+2. Python 流式测试必须调用唯一的 `ws_unified_test.py` 客户端；辅助脚本
+   只可负责服务端启停、超时、临时 TOML 和产物路径，并通过 CTest 注册。
 3. 流式产品测试必须走真实 WebSocket，不得直接调用内部 worker 代替。

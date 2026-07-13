@@ -33,6 +33,7 @@ void HandleSpeakerSink(ComprehensiveTimeline& comp, std::mutex& state_mutex,
                        std::vector<core::DiarSegment>& last_segments,
                        protocol::ProtocolTimeline* protocol_timeline,
                        protocol::PipelineHandle* diar_handle,
+                       const EventEmitter& emit,
                        const std::vector<core::DiarSegment>& segs) {
   std::string segments_json = "[";
   std::vector<ComprehensiveTimeline::SpeakerInput> typed_segments;
@@ -77,10 +78,12 @@ void HandleSpeakerSink(ComprehensiveTimeline& comp, std::mutex& state_mutex,
   msg.timestamp_sec = segs.empty() ? 0.0 : segs[0].start_sec;
   msg.qos = static_cast<uint8_t>(protocol::QoS::AT_LEAST_ONCE);
   msg.schema_version = 1;
-  msg.data = "{\"source\":\"sortformer\",\"segments\":" + segments_json + "}";
+  msg.data = "{\"type\":\"diar\",\"source\":\"sortformer\",\"segments\":" +
+             segments_json + "}";
 
   protocol_timeline->Publish(*diar_handle, protocol::kDiarSpeakerSegment, msg,
                              protocol::QoS::AT_LEAST_ONCE);
+  if (emit) emit(msg.data);
 }
 
 // ---------------------------------------------------------------------------
@@ -111,7 +114,9 @@ void HandleTextSink(ComprehensiveTimeline& comp,
   msg.timestamp_sec = start;
   msg.qos = static_cast<uint8_t>(protocol::QoS::AT_LEAST_ONCE);
   msg.schema_version = 1;
-  msg.data = "{\"id\":" + std::to_string(id) +
+  msg.data = "{\"type\":\"" + std::string(is_final ? "asr" : "asr_partial") +
+             "\",\"id\":" + std::to_string(id) +
+             ",\"text_id\":" + std::to_string(id) +
              ",\"start\":" + std::to_string(start) +
              ",\"end\":" + std::to_string(end) + ",\"text\":\"" +
              JsonEscape(text) + "\"}";
@@ -125,7 +130,7 @@ void HandleTextSink(ComprehensiveTimeline& comp,
 void HandleAlignSink(ComprehensiveTimeline& comp,
                      protocol::ProtocolTimeline* protocol_timeline,
                      protocol::PipelineHandle* align_handle,
-                     const RevisionEmitter& emit, long id, double seg_start,
+                     const EventEmitter& emit, long id, double seg_start,
                      double seg_end,
                      const std::vector<core::AlignUnit>& units) {
   std::string units_json = "[";
@@ -142,7 +147,8 @@ void HandleAlignSink(ComprehensiveTimeline& comp,
   }
   units_json += "]";
 
-  std::string payload = "{\"id\":" + std::to_string(id) +
+  std::string payload = "{\"type\":\"align\",\"id\":" + std::to_string(id) +
+                        ",\"text_id\":" + std::to_string(id) +
                         ",\"start\":" + std::to_string(seg_start) +
                         ",\"end\":" + std::to_string(seg_end) +
                         ",\"units\":" + units_json + "}";
@@ -167,12 +173,12 @@ void HandleAlignSink(ComprehensiveTimeline& comp,
   protocol_timeline->Publish(*align_handle, protocol::kAlignUnits, msg,
                              protocol::QoS::AT_LEAST_ONCE);
 
-  if (emit) emit("{\"type\":\"align\"," + payload.substr(1));
+  if (emit) emit(payload);
 }
 
 void HandleBusinessSpeakerRevision(
     protocol::ProtocolTimeline* protocol_timeline,
-    protocol::PipelineHandle* business_handle, const RevisionEmitter& emit,
+    protocol::PipelineHandle* business_handle, const EventEmitter& emit,
     const ComprehensiveTimeline::Revision& revision) {
   const std::string payload =
       SerializeRevisionToJson(revision, "business_speaker");
@@ -197,7 +203,7 @@ void HandleBusinessSpeakerRevision(
 void HandleVadDrain(core::IVad* vad_detector, ComprehensiveTimeline& comp,
                     protocol::ProtocolTimeline* protocol_timeline,
                     protocol::PipelineHandle* vad_handle,
-                    const core::TimeBase& tb,
+                    const EventEmitter& emit, const core::TimeBase& tb,
                     std::vector<core::VadSegmentResult>* segs, bool finalize) {
   segs->clear();
   vad_detector->DrainSegments(finalize, segs);
@@ -214,11 +220,13 @@ void HandleVadDrain(core::IVad* vad_detector, ComprehensiveTimeline& comp,
     msg.schema_version = 1;
     char buf[128];
     std::snprintf(buf, sizeof(buf),
-                  "{\"start\":%.3f,\"end\":%.3f,\"source\":\"silero_gpu\"}", s,
-                  e);
+                  "{\"type\":\"vad\",\"start\":%.3f,\"end\":%.3f,"
+                  "\"source\":\"silero_gpu\"}",
+                  s, e);
     msg.data = buf;
     protocol_timeline->Publish(*vad_handle, protocol::kVadSpeechSegment, msg,
                                protocol::QoS::AT_LEAST_ONCE);
+    if (emit) emit(msg.data);
   }
 }
 
@@ -236,7 +244,8 @@ void PublishVadProgress(ComprehensiveTimeline& comp,
   msg.qos = static_cast<uint8_t>(protocol::QoS::AT_MOST_ONCE);
   msg.schema_version = 1;
   char buf[64];
-  std::snprintf(buf, sizeof(buf), "{\"horizon\":%.3f}", horizon_sec);
+  std::snprintf(buf, sizeof(buf),
+                "{\"type\":\"vad_progress\",\"horizon\":%.3f}", horizon_sec);
   msg.data = buf;
   // AT_MOST_ONCE: a frequent, lossy heartbeat -- the next one supersedes it.
   protocol_timeline->Publish(*vad_handle, protocol::kVadProgress, msg,

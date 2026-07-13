@@ -2,7 +2,7 @@
 
 - **Feature**: `004-comprehensive-timeline`
 - **Spec**: [spec.md](spec.md) · **Plan**: [plan.md](plan.md)
-- **Status**: Phases 1–6 Implemented. Phases 7–12 (protocol layer) Implemented. Phase 13 (session persistence): T130–T134 Implemented, T135 NOT YET IMPLEMENTED.
+- **Status**: Phases 1–6 Implemented. Phases 7–12 (protocol layer) Implemented. Phase 13 (session persistence): T130–T135 Implemented; browser reload revalidated under Spec 013 on 2026-07-13.
 - **Constitution**: v1.3.0
 
 > Ordered, independently verifiable steps. Each phase builds + tests before the
@@ -301,11 +301,11 @@ Target: save timeline JSON on `Reset()`, expose session list/load over WS.
 | ID | Task | Verification |
 |----|------|-------------|
 | T130 | Create `include/protocol/session_store.h` — `SessionStore` class with `Save(session_id, json)`, `List()`, `Load(session_id)`, configurable directory. File per session: `<dir>/<session_id>.json`. List returns JSON array of `{id, time, audio_sec}` lightweight metadata. | Unit test writes 3 sessions, lists, loads one, all match. |
-| T131 | Implement `src/protocol/session_store.cc` — disk I/O via `<fstream>`, atomic write (write to `.tmp`, rename). Metadata extracted from timeline JSON's `session_start_wall_sec` and `audio_duration` fields. | Same as T130. |
+| T131 | Implement `src/protocol/session_store.cc` — disk I/O via `<fstream>`, atomic write (write to `.tmp`, rename). Metadata extracted from timeline JSON's `session_start_wall_sec` and current `audio_sec` fields, with legacy `audio_duration` compatibility. | Same as T130. |
 | T132 | Wire `AuditoryStream::Reset()` — call `Serialize()` before clearing state, pass to `SessionStore::Save()` with UUID-like session ID (`<wall_sec_hex>-<pid_hex>`). Guarded by optional `store_`: if unset (no disk path), skip. | After Reset, file appears in session dir. |
 | T133 | Add WS command `{"cmd":"sessions"}` → returns `{"type":"sessions","list":[...]}`. Add `{"cmd":"load_session","session_id":"<id>"}` → returns full timeline message. Both handled in `ws_main.cc`. | WS client receives session list; load returns matching JSON. |
 | T134 | Add `ORATOR_SESSION_DIR` env var to `ws_main.cc`. Default: `<ORATOR_STORAGE_DISK_PATH>/sessions/`. When empty, persistence disabled. | Env var controls directory; empty = no-op. |
-| T135 | Web UI: session history panel in sidebar, list on load, click to restore + reset + load. | NOT YET IMPLEMENTED. Visual: sessions appear after reset, click loads timeline. |
+| T135 | Web UI: session history panel in sidebar, list on load, click to restore + reset + load. | IMPLEMENTED. Real Chromium test finalized a 12 s session, found it by corrected metadata, and reloaded a byte-equivalent timeline on 2026-07-13. |
 
 ## Definition of Done (Phases 7–12)
 Protocol layer replaces hard-coded pipeline interfaces; pipelines register via

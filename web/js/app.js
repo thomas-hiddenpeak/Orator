@@ -63,6 +63,20 @@ function updateMetrics() {
   vadLed.classList.toggle("active", model.vadSpeech);
 }
 
+function resetSessionView() {
+  transcript.clear();
+  observability.clear();
+  speakers.clear();
+  timeline.setModel(model);
+  timeline.schedule();
+  downloadBtn.classList.add("hidden");
+  progressRow.hidden = true;
+  progressFill.style.width = "0%";
+  durationLabel.textContent = "00:00";
+  statusLabel.textContent = "Streaming...";
+  updateMetrics();
+}
+
 /* ── WS wiring ── */
 const ws = new OratorWs({
   onOpen() {
@@ -72,19 +86,29 @@ const ws = new OratorWs({
     setTimeout(() => ws.sessions(), 500);
     setTimeout(() => ws.speakers(), 600);
   },
-  onClose() { setConn(false); },
+  onClose() {
+    if (micRunning) stopMic();
+    if (fileHandle) fileHandle.cancel();
+    fileHandle = null;
+    fileSending = false;
+    setConn(false);
+  },
   onError() { showError("WebSocket connection error"); },
   onMessage(type, msg) {
     switch (type) {
       case "ready":
-        model.sampleRate = msg.sample_rate || 16000;
-        model.asrEnabled = msg.asr !== false;
+        model.beginSession(msg);
+        resetSessionView();
         break;
       case "asr_partial": model.applyAsr(msg, false); break;
+      case "asr_retract": model.retractAsr(msg); break;
       case "asr": model.applyAsr(msg, true); break;
       case "revision": model.applyRevision(msg); break;
       case "align": model.applyAlign(msg); timeline.schedule(); break;
+      case "diar": model.applyDiar(msg); break;
+      case "vad": model.applyVad(msg); break;
       case "vad_state": model.applyVadState(msg); break;
+      case "vad_progress": model.applyVadProgress(msg); break;
       case "gpu_telemetry": model.applyGpuTelemetry(msg); break;
       case "cursor_progress": model.applyCursorProgress(msg); break;
       case "timeline":
@@ -189,12 +213,7 @@ flushBtn.addEventListener("click", () => ws.flush());
 endBtn.addEventListener("click", () => { if (micRunning) stopMic(); ws.end(); });
 clearBtn.addEventListener("click", () => {
   model.reset();
-  transcript.clear(); observability.clear(); speakers.clear();
-  timeline.setModel(model); timeline.schedule();
-  downloadBtn.classList.add("hidden");
-  progressRow.hidden = true; progressFill.style.width = "0%";
-  durationLabel.textContent = "00:00"; statusLabel.textContent = "Streaming...";
-  updateMetrics();
+  resetSessionView();
   ws.reset();
 });
 downloadBtn.addEventListener("click", () => {

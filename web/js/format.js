@@ -46,6 +46,14 @@ export function fmtTime(sec) {
   return String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0") + "." + ms;
 }
 
+export function fmtWallTime(sec) {
+  if (typeof sec !== "number" || !Number.isFinite(sec) || sec <= 0) return "-";
+  const date = new Date(sec * 1000);
+  const pad = (value) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ` +
+    `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
 export function fmtMMSS(sec) {
   if (typeof sec !== "number" || isNaN(sec)) return "--:--";
   const m = Math.floor(sec / 60);

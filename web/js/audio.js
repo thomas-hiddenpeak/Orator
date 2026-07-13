@@ -27,6 +27,16 @@ function downsample(input, srcRate, dstRate) {
   return out;
 }
 
+export function copyPcmFrame(int16, offsetBytes, maxBytes) {
+  const nextOffset = Math.min(offsetBytes + maxBytes, int16.byteLength);
+  const start = int16.byteOffset + offsetBytes;
+  const end = int16.byteOffset + nextOffset;
+  return {
+    data: int16.buffer.slice(start, end),
+    nextOffset,
+  };
+}
+
 export class MicCapture {
   constructor(sendBinary, targetRate) {
     this.send = sendBinary;
@@ -94,10 +104,9 @@ export async function streamFile(file, sendBinary, targetRate, onProgress, onDon
 
   function sendChunk() {
     if (cancelled) return;
-    const end = Math.min(offset + bytesPerChunk, int16.byteLength);
-    const slice = new Int16Array(int16.buffer, offset, (end - offset) / 2);
-    sendBinary(slice.buffer);
-    offset = end;
+    const frame = copyPcmFrame(int16, offset, bytesPerChunk);
+    sendBinary(frame.data);
+    offset = frame.nextOffset;
     if (onProgress) onProgress(offset / int16.byteLength, durationSec);
     if (offset < int16.byteLength) setTimeout(sendChunk, 60);
     else if (onDone) onDone();

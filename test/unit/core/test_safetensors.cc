@@ -5,7 +5,6 @@
 #include <cstring>
 #include <iostream>
 #include <string>
-#include <unistd.h>
 #include <vector>
 
 #include "core/tensor.h"
@@ -13,39 +12,11 @@
 
 using namespace orator;
 
-namespace {
-
-std::string GetWorkspaceRoot() {
-  constexpr char kProcSelfExe[] = "/proc/self/exe";
-  char exe[4096];
-  ssize_t len = readlink(kProcSelfExe, exe, sizeof(exe) - 1);
-  if (len < 0) return ".";
-  exe[len] = '\0';
-
-  std::string dir(exe);
-  size_t pos = dir.rfind('/');
-  if (pos == std::string::npos) return ".";
-  dir = dir.substr(0, pos);
-
-  for (int i = 0; i < 2; ++i) {
-    pos = dir.rfind('/');
-    if (pos == std::string::npos) {
-      dir = ".";
-      break;
-    }
-    dir = dir.substr(0, pos);
-  }
-  if (dir.empty()) dir = ".";
-  return dir;
-}
-
-}  // namespace
-
 int main() {
   std::cout << "Testing safetensors reader (zero-copy mmap)..." << std::endl;
 
-  std::string root = GetWorkspaceRoot();
-  std::string sortformer_path = root + "/models/sortformer_4spk_v2.safetensors";
+  const std::string sortformer_path = std::string(ORATOR_TEST_SOURCE_DIR) +
+                                      "/models/sortformer_4spk_v2.safetensors";
 
   io::SafeTensorReader reader(sortformer_path);
   std::cout << "Loaded sortformer (" << reader.GetWeightNames().size()

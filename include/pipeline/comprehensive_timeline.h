@@ -68,6 +68,8 @@ class ComprehensiveTimeline {
   struct VadEvidence {
     std::shared_ptr<const std::vector<VadSeg>> segments;
     double horizon = -1e9;
+    bool in_speech = false;
+    double state_observed_at = -1e9;
   };
 
   struct AlignUnitSeg {
@@ -123,6 +125,7 @@ class ComprehensiveTimeline {
   DepositResult DepositAsrFinal(const RawTextSeg& segment);
   void DepositVad(const VadSeg& segment);
   void AdvanceVadHorizon(double horizon_sec);
+  void UpdateVadState(bool in_speech, double observed_at_sec);
   DepositResult DepositAlignment(const AlignGroup& group);
 
   // Registered derived pipelines write only their own track. This operation
@@ -172,6 +175,8 @@ class ComprehensiveTimeline {
   std::shared_ptr<const std::vector<VadSeg>> vad_snapshot_ =
       std::make_shared<const std::vector<VadSeg>>();
   double vad_horizon_sec_ = -1e9;
+  bool vad_in_speech_ = false;
+  double vad_state_observed_at_sec_ = -1e9;
   std::map<long, AlignGroup> align_;
   std::map<long, std::vector<Entry>> business_speaker_;
   std::set<std::string> seen_speaker_ids_;

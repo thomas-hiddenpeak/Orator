@@ -335,8 +335,6 @@ body {
 }
 
 /* Timeline — raw JSON data view */
-.timeline-panel { }
-
 .timeline-header {
   display: flex;
   justify-content: space-between;
@@ -400,11 +398,6 @@ body {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
-#timelineCanvas:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: -2px;
-}
-
 .hidden { display: none !important; }
 
 /* Session history */

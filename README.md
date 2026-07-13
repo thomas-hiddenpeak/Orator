@@ -286,7 +286,7 @@ UI 支持：
 
 - 麦克风输入和音频文件上传。
 - 实时 transcript 和 partial draft。
-- diar / ASR / VAD / align 四轨 canvas timeline。
+- diar / ASR / VAD / align 轨道数据与终态综合 JSON 检查视图；图形化时间线仍是开放工作。
 - GPU telemetry 和 cursor progress observability 面板。
 - speaker registry 显示和重命名。
 - session 列表和加载。

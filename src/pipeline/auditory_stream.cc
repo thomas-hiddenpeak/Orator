@@ -265,8 +265,10 @@ void AuditoryStream::StartWorkers() {
         diarizer_.get(), dp, common_time_base(), diar_stream_);
     diar_worker_->set_speaker_sink(
         [this](const std::vector<core::DiarSegment>& segs) {
-          HandleSpeakerSink(comp_, comp_mutex_, last_segments_,
-                            protocol_timeline_.get(), diar_handle_.get(), segs);
+          HandleSpeakerSink(
+              comp_, comp_mutex_, last_segments_, protocol_timeline_.get(),
+              diar_handle_.get(),
+              [this](const std::string& json) { EmitLocked(json); }, segs);
         });
     // Spec 010: resolve global voiceprint identities on the segment view before
     // it is delivered. The worker depends only on a std::function (Art. III);
@@ -298,7 +300,8 @@ void AuditoryStream::StartWorkers() {
     AsrWorker::Params p;
     p.sample_rate = config_.sample_rate;
     p.segment_sec = config_.asr_segment_sec;
-    p.asr_vad_gate = config_.asr_vad_gate;
+    p.asr_vad_gate = config_.asr_vad_gate && config_.vad_stream &&
+                     !config_.vad_model.empty();
     p.asr_vad_lead_ms = config_.asr_vad_lead_ms;
     p.asr_vad_trail_sec = config_.asr_vad_trail_sec;
     p.asr_vad_min_overlap_sec = config_.asr_vad_min_overlap_sec;
@@ -369,8 +372,11 @@ void AuditoryStream::StartWorkers() {
       std::vector<float> chunk;
       std::vector<core::VadSegmentResult> segs;
       auto drain = [this, &tb, &segs](bool finalize) {
-        HandleVadDrain(vad_detector_.get(), comp_, protocol_timeline_.get(),
-                       vad_handle_.get(), tb, &segs, finalize);
+        HandleVadDrain(
+            vad_detector_.get(), comp_, protocol_timeline_.get(),
+            vad_handle_.get(),
+            [this](const std::string& json) { EmitLocked(json); }, tb, &segs,
+            finalize);
       };
       // VAD progress heartbeat: while VAD is in confirmed silence, advance the
       // horizon it publishes so ASR can skip silence at real-time pacing. The
@@ -385,8 +391,9 @@ void AuditoryStream::StartWorkers() {
       bool first_vad_state = true;
       while (vad_audio_->WaitAndRead(&chunk, &span_start_abs)) {
         vad_detector_->Push(chunk.data(), static_cast<int>(chunk.size()));
-        drain(/*finalize=*/false);
         const long fed = span_start_abs + static_cast<long>(chunk.size());
+        comp_.UpdateVadState(vad_detector_->is_in_speech(), tb.SecondsAt(fed));
+        drain(/*finalize=*/false);
         if (!vad_detector_->is_in_speech()) {
           const double h = tb.SecondsAt(fed) - kGuardSec;
           if (h >= last_horizon + kMinAdvanceSec) {

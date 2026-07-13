@@ -70,12 +70,14 @@ subject to the complete acceptance gates in this spec.
    behavioral environment switches still require migration or removal.
 5. **Resolved in Phase 1**: finalized ASR allocates one `text_id` and reuses it
    for the typed sink and live event; the terminal ASR track serializes that ID.
-   A real-WebSocket structural gate now verifies final-event, alignment,
-   business-revision, and terminal-track convergence. Partial replacement,
-   export, reconnect, and Web UI convergence remain open.
-6. The configured CTest suite contains 51 C++ tests. CMake defines a Python test
-   registration helper, but no Python WebSocket tests are registered and the
-   documented wrapper directory is absent.
+   The registered real-WebSocket and Node gates plus a real Chromium run verify
+   partial/final/retract, alignment, business revision, terminal track, exact
+   export/load, and reconnect convergence. Full-session repeatability remains
+   open.
+6. The configured CTest suite contains 53 tests: 51 C++ tests, one registered
+   real-WebSocket speech/silence integration gate, and one dependency-free Node
+   browser-model gate. The browser acceptance tool remains manual because
+   Playwright is a tools-only dependency.
 7. `test_diar_stream` verifies a short stored NeMo fixture using lower-level
    defaults. It does not establish numerical parity for the accepted full
    runtime TOML profile over the complete session.

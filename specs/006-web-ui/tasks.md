@@ -5,7 +5,7 @@ Spec 006 implementation broken into ordered, independently verifiable tasks orga
 
 ---
 
-## Phase 1: MVP — Basic UI, Real-Time Transcript, Metrics (DRAFT)
+## Phase 1: MVP — Basic UI, Real-Time Transcript, Metrics
 
 ### T001 — Create web/ directory and static assets structure
 **Status**: ✅ COMPLETED
@@ -121,8 +121,9 @@ Spec 006 implementation broken into ordered, independently verifiable tasks orga
 
 ---
 
-### T007 — Implement basic timeline rendering (Canvas)
-**Status**: ✅ COMPLETED (in app.js, exceeds spec: Canvas implementation)
+### T007 — Implement basic timeline rendering
+**Status**: COMPLETED (current `render/timeline.js` presents the exact formatted
+live/terminal JSON document)
 **Goal**: Display diarization and ASR entries as an HTML list (MVP).
 **Content**:
 - Parse final `{"type":"timeline",...}`.
@@ -162,7 +163,8 @@ Spec 006 implementation broken into ordered, independently verifiable tasks orga
 ## Phase 2: Enhanced Visualization — Canvas Timeline, Zoom/Pan
 
 ### T009 — Implement Canvas-based timeline rendering
-**Status**: ✅ COMPLETED (2026-06-21)
+**Status**: OPEN — a historical Canvas implementation was removed; the current
+main timeline is a formatted JSON inspection view.
 **Goal**: Replace HTML list with graphical Canvas timeline.
 **Content**:
 - `timeline_renderer.js` rewritten to use Canvas 2D API.
@@ -183,7 +185,7 @@ Spec 006 implementation broken into ordered, independently verifiable tasks orga
 ---
 
 ### T010 — Add zoom and pan controls to timeline
-**Status**: ✅ COMPLETED (2026-06-21)
+**Status**: OPEN — no current graphical timeline exists to zoom or pan.
 **Goal**: Allow users to zoom in/out and scroll horizontally.
 **Controls**:
 - Zoom buttons (+, −) or slider.
@@ -246,7 +248,8 @@ Spec 006 implementation broken into ordered, independently verifiable tasks orga
 ---
 
 ### T013 — Performance optimization for large recordings
-**Status**: COMPLETED (rAF render scheduler, viewport pre-filtering, lazy transcript loading (MAX_TRANSCRIPT_ROWS=500))
+**Status**: PARTIAL (rAF coalescing and a 600-row transcript cap exist; the
+Canvas viewport and 10-hour timeline performance gates are not implemented)
 **Goal**: Handle long recordings (> 2 hours) without UI lag.
 **Steps**:
 1. Implement viewport clipping in Canvas rendering (only render visible portion).
@@ -276,7 +279,9 @@ Spec 006 implementation broken into ordered, independently verifiable tasks orga
 ---
 
 ### T015 — Polish responsive design and browser compatibility
-**Status**: COMPLETED (ARIA labels, keyboard canvas nav, focus-visible styles, touch targets ≥44px, screen reader roles)
+**Status**: PARTIAL (ARIA/focus/touch styles and Chromium desktop/mobile
+screenshots verified; graphical-timeline keyboard controls and Firefox/Safari
+evidence are open)
 **Goal**: Ensure UI works on Chrome, Firefox, Safari, and tablet devices.
 **Steps**:
 1. Test on Chrome 120+, Firefox 121+, Safari 17+ (desktop).
@@ -294,7 +299,9 @@ Spec 006 implementation broken into ordered, independently verifiable tasks orga
 ---
 
 ### T016 — Final testing and documentation
-**Status**: COMPLETED (integration test exists; web/README.md created with architecture, data flow, and developer guide)
+**Status**: PARTIAL (Node model tests, registered real-WebSocket test, Chromium
+integration flow, and current README exist; physical microphone,
+Firefox/Safari, graphical timeline, and final Spec 013 acceptance remain open)
 **Goal**: Comprehensive testing, documentation, code review.
 **Steps**:
 1. Unit tests (optional): Mock WebSocket; test state transitions in ui_controller.
@@ -326,14 +333,14 @@ Spec 006 implementation broken into ordered, independently verifiable tasks orga
 | 1 | T006 | COMPLETED | HIGH |
 | 1 | T007 | COMPLETED | HIGH |
 | 1 | T008 | COMPLETED | HIGH |
-| 2 | T009 | COMPLETED | MEDIUM |
-| 2 | T010 | COMPLETED | MEDIUM |
+| 2 | T009 | OPEN | MEDIUM |
+| 2 | T010 | OPEN | MEDIUM |
 | 3 | T011 | COMPLETED | MEDIUM |
 | 3 | T012 | COMPLETED | MEDIUM |
-| 3 | T013 | COMPLETED | LOW |
+| 3 | T013 | PARTIAL | LOW |
 | 3 | T014 | COMPLETED | MEDIUM |
-| 3 | T015 | COMPLETED | MEDIUM |
-| 3 | T016 | COMPLETED | HIGH |
+| 3 | T015 | PARTIAL | MEDIUM |
+| 3 | T016 | PARTIAL | HIGH |
 
 ---
 
@@ -372,8 +379,9 @@ validate through the real `rate=1` WS path.
 ### P2.2 — Content rendering
 - [x] **W3** `render/transcript.js`: live final + partial draft; global speaker
   identity label/color (FR11); CJK text; per-segment align unit count.
-- [x] **W4** `render/timeline.js`: canvas lanes for diarization (by `speaker_id`),
-  ASR, VAD, and **align units** (FR12); shared time axis, zoom/pan retained.
+- [ ] **W4** Restore a graphical shared-time-axis view for diarization, ASR,
+  VAD, business speaker, and **align units** (FR12). Current
+  `render/timeline.js` intentionally displays authoritative formatted JSON.
 - [x] **W5** `render/observability.js`: per-pipeline RTF gauge + sparkline,
   scheduling class/priority/active, backlog `pending_sec`, starvation warning
   (FR13).
@@ -387,8 +395,19 @@ validate through the real `rate=1` WS path.
   speaker palette; module script tags.
 
 ### P2.4 — Validation
-- [x] **W9** Module graph bundles cleanly (bun, 9 modules); data layer validated
-  on real captured run (per-pipeline RTF/backlog, 4 tracks, global identity);
-  all 30 DOM ids resolve; static server serves `/js/*` as
-  `application/javascript`. `web/README.md` updated. Browser context review +
-  PROJECT_STATE/commit pending live confirmation.
+- [x] **W9** Module graph bundles cleanly (bun, 11 modules); real Chromium
+  served-module flow passed with no unexpected console/page errors; desktop and
+  mobile screenshots retained. `web/README.md` matches current code.
+
+## Phase 3 — Spec 013 contract hardening
+
+- [x] **W10** Emit self-describing live diarization and VAD evidence only after
+  typed-track commit; preserve compatible protocol payload fields.
+- [x] **W11** Make `model.js` converge revision-before-final, partial/final,
+  alignment, terminal, loaded-session, and reconnect state by stable `text_id`.
+- [x] **W12** Route live diar/VAD events, infer types from protocol envelopes,
+  surface raw RPC errors, and restore reconnect scheduling after WS errors.
+- [x] **W13** Add and register dependency-free JavaScript contract tests.
+- [~] **W14** Real Chromium passed real WebSocket file audio, reconnect, exact
+  session load/export, and fake-device microphone capture. Physical microphone
+  input and non-Chromium browsers remain acceptance work.

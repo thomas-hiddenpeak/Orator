@@ -2,6 +2,12 @@
 
 ## Architecture Overview
 
+Sections 1-13 record the original design proposal. Section 14 describes the
+implemented modular client, and Section 15 records current Spec 013 hardening.
+Where the original proposal mentions a graphical Canvas timeline, that remains
+an open requirement: the current main timeline renderer displays authoritative
+formatted JSON.
+
 ### Frontend–Backend Boundary
 
 The UI is a **single-page application (SPA)** served as static files from a dedicated HTTP port. WebSocket streaming remains on the existing WS port. No client-side state is persisted; all application state lives in:
@@ -392,7 +398,7 @@ web/
                           #   (id→color/name), telemetry ring buffers
     audio.js              # mic capture + file decode → int16LE 16k framing
     render/transcript.js  # live transcript + partial draft + per-unit (align)
-    render/timeline.js    # canvas: diar(by speaker_id)/asr/vad/align lanes
+    render/timeline.js    # authoritative live/terminal formatted JSON
     render/observability.js # per-pipeline RTF gauge+sparkline, class/priority,
                           #   backlog (pending_sec), starvation warning
     render/sessions.js    # list/load/download
@@ -404,8 +410,9 @@ WS frame ─ ws.js(envelope decode) ─ router ─ model.js(update) ─ render/*
 ```
 - `ws.js` is the single ingress; it unwraps the Spec 004 envelope, dispatches by
   inner `type`, and never drops a known message. Unknown topics are logged.
-- `model.js` holds the authoritative client state; renderers are pure consumers
-  scheduled on `requestAnimationFrame` (viewport-clipped canvas, as in the MVP).
+- `model.js` holds the authoritative client state; renderers are consumers
+  scheduled on `requestAnimationFrame`. Observability uses small Canvas
+  sparklines; the main timeline is currently formatted JSON.
 - Speaker identity: a registry maps `speaker_id`→stable color + display name,
   shared by transcript, comprehensive and timeline (FR11).
 - Observability: `gpu_telemetry`/`cursor_progress` feed per-pipeline ring buffers
@@ -422,3 +429,35 @@ WS frame ─ ws.js(envelope decode) ─ router ─ model.js(update) ─ render/*
   (logged inventory), align lane + speaker identity + observability panel
   populate, comprehensive view updates live from `revision`, final `timeline`
   reconciles. Streaming stays ~1.0× real-time. Context review, not a script.
+
+---
+
+## 15. Phase 3 contract hardening — Spec 013
+
+The server keeps typed tracks authoritative. Diarization and VAD sinks mirror
+their committed evidence to both protocol storage and live WebSocket events.
+Protocol payloads remain backward compatible while adding explicit `type` and
+`text_id` fields where applicable.
+
+The browser model treats live events as provisional and a terminal or loaded
+timeline as an authoritative snapshot. Applying that snapshot clears stale ASR,
+alignment, raw-track, draft, and business-turn state before rebuilding all maps
+from stable IDs. The model separately retains business revisions so a revision
+that arrives before its final ASR event is not lost. A new WebSocket `ready`
+message starts a clean browser session because the backend resets the stream on
+every connection open.
+
+Validation has two levels:
+1. A dependency-free Node/Bun contract test covers deterministic message and
+   model transitions and is registered in CTest when Node is available.
+2. A real server/browser run verifies the served module graph, live diar/VAD,
+   partial/final/revision/align convergence, reconnect reset, loaded sessions,
+   and exact JSON export. The browser result is required before FR15 closes.
+
+On 2026-07-13, a 12 s real Chromium run passed file upload, live transcript,
+flush/end, terminal contract checks, exact JSON download, saved-session lookup
+and exact reload, deliberate server restart with clean reconnect, fake-device
+microphone start/stop, and desktop/mobile screenshots. The file-stream test also
+found and fixed whole-backing-buffer retransmission, and the session test found
+and fixed `audio_sec` metadata parsing. Physical microphone and Firefox/Safari
+evidence remain open.

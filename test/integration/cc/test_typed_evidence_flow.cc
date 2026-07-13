@@ -1,4 +1,5 @@
 #include <cstdio>
+#include <mutex>
 #include <string>
 #include <utility>
 #include <vector>
@@ -21,6 +22,26 @@ int failures = 0;
       ++failures;                         \
     }                                     \
   } while (0)
+
+class OneShotVad final : public orator::core::IVad {
+ public:
+  void Initialize(const orator::core::VadConfig&) override {}
+  void LoadWeights(const std::string&) override {}
+  void Reset() override { drained_ = false; }
+  std::string name() const override { return "one_shot_vad"; }
+  void Push(const float*, int) override {}
+  void DrainSegments(
+      bool, std::vector<orator::core::VadSegmentResult>* segments) override {
+    if (drained_) return;
+    segments->push_back({1600, 3200});
+    drained_ = true;
+  }
+  bool is_in_speech() const override { return false; }
+  double compute_sec() const override { return 0.0; }
+
+ private:
+  bool drained_ = false;
+};
 
 }  // namespace
 
@@ -82,15 +103,19 @@ int main() {
 
   bool final_mirrored_after_commit = false;
   int partial_mirrors = 0;
+  std::string final_protocol_data;
+  std::string partial_protocol_data;
   protocol.SubscribeInternal(
       TopicPattern{"asr/+"},
-      [&typed_final_committed, &final_mirrored_after_commit,
-       &partial_mirrors](const Message& message) {
+      [&typed_final_committed, &final_mirrored_after_commit, &partial_mirrors,
+       &final_protocol_data, &partial_protocol_data](const Message& message) {
         if (message.topic == orator::protocol::kAsrTranscript.to_string()) {
           final_mirrored_after_commit = typed_final_committed;
+          final_protocol_data = message.data;
         } else if (message.topic ==
                    orator::protocol::kAsrTranscriptPartial.to_string()) {
           ++partial_mirrors;
+          partial_protocol_data = message.data;
         }
       });
 
@@ -102,6 +127,9 @@ int main() {
         "typed ASR subscriber receives the original record");
   CHECK(final_mirrored_after_commit,
         "protocol ASR final is mirrored after typed commit");
+  CHECK(final_protocol_data.find("\"type\":\"asr\"") != std::string::npos &&
+            final_protocol_data.find("\"text_id\":4") != std::string::npos,
+        "protocol ASR final is self-describing and keeps text_id");
   CHECK(evidence.SnapshotTracks().asr.size() == 1,
         "typed ASR track contains one final");
   CHECK(business_mirrored_after_commit,
@@ -110,6 +138,10 @@ int main() {
   orator::pipeline::HandleTextSink(evidence, &protocol, asr_handle.get(), 5,
                                    2.0, 2.5, "partial", false);
   CHECK(partial_mirrors == 1, "ASR partial remains available on protocol");
+  CHECK(partial_protocol_data.find("\"type\":\"asr_partial\"") !=
+                std::string::npos &&
+            partial_protocol_data.find("\"text_id\":5") != std::string::npos,
+        "protocol ASR partial is self-describing and keeps text_id");
   CHECK(evidence.SnapshotTracks().asr.size() == 1,
         "ASR partial does not enter the finalized typed track");
 
@@ -120,12 +152,15 @@ int main() {
   auto align_handle = protocol.RegisterPipeline(std::move(align_descriptor));
 
   bool align_mirrored_after_commit = false;
+  std::string align_protocol_data;
   protocol.SubscribeInternal(
       TopicPattern{orator::protocol::kAlignUnits.to_string()},
-      [&evidence, &align_mirrored_after_commit](const Message&) {
+      [&evidence, &align_mirrored_after_commit,
+       &align_protocol_data](const Message& message) {
         const auto tracks = evidence.SnapshotTracks();
         align_mirrored_after_commit =
             tracks.align.size() == 1 && tracks.align[0].text_id == 4;
+        align_protocol_data = message.data;
       });
 
   const std::vector<orator::core::AlignUnit> units = {{"f", 1.0, 1.4},
@@ -139,6 +174,41 @@ int main() {
         "alignment retains the source ASR text ID");
   CHECK(align_mirrored_after_commit,
         "protocol alignment is mirrored after typed commit");
+  CHECK(align_protocol_data.find("\"type\":\"align\"") != std::string::npos &&
+            align_protocol_data.find("\"text_id\":4") != std::string::npos,
+        "protocol alignment is self-describing and keeps text_id");
+
+  PipelineDescriptor diar_descriptor;
+  diar_descriptor.name = "diar";
+  diar_descriptor.version = "1.0.0";
+  diar_descriptor.produces = {orator::protocol::kDiarSpeakerSegment};
+  auto diar_handle = protocol.RegisterPipeline(std::move(diar_descriptor));
+  std::mutex state_mutex;
+  std::vector<orator::core::DiarSegment> last_segments;
+  const std::vector<orator::core::DiarSegment> diar_segments = {
+      {0.1, 0.2, 2, "spk_2", 0.9f}};
+  orator::pipeline::HandleSpeakerSink(evidence, state_mutex, last_segments,
+                                      &protocol, diar_handle.get(), emit,
+                                      diar_segments);
+  CHECK(evidence.SnapshotTracks().diarization.size() == 1,
+        "diarization commits to the typed track");
+  CHECK(events.back().find("\"type\":\"diar\"") != std::string::npos,
+        "diarization emits a self-describing live event");
+
+  PipelineDescriptor vad_descriptor;
+  vad_descriptor.name = "vad";
+  vad_descriptor.version = "1.0.0";
+  vad_descriptor.produces = {orator::protocol::kVadSpeechSegment};
+  auto vad_handle = protocol.RegisterPipeline(std::move(vad_descriptor));
+  OneShotVad vad;
+  std::vector<orator::core::VadSegmentResult> vad_segments;
+  orator::pipeline::HandleVadDrain(&vad, evidence, &protocol, vad_handle.get(),
+                                   emit, orator::core::TimeBase(16000),
+                                   &vad_segments, false);
+  CHECK(evidence.SnapshotTracks().vad.size() == 1,
+        "VAD commits to the typed track");
+  CHECK(events.back().find("\"type\":\"vad\"") != std::string::npos,
+        "VAD emits a self-describing live event");
 
   if (failures == 0) {
     std::printf("test_typed_evidence_flow PASSED\n");

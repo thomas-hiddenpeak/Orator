@@ -84,7 +84,8 @@ export class TranscriptView {
     // Sort diar segments by start time.
     const sorted = diarSegs
       .map((s, idx) => ({ ...s, _idx: idx }))
-      .sort((a, b) => (a.start_sec || 0) - (b.start_sec || 0));
+      .sort((a, b) => (a.start ?? a.start_sec ?? 0) -
+        (b.start ?? b.start_sec ?? 0));
 
     const activeIndices = new Set(sorted.map((s) => s._idx));
 
@@ -116,8 +117,8 @@ export class TranscriptView {
 
   // Find comprehensive turns overlapping a diar segment and concatenate text.
   _textForDiarSegment(seg, turns, model) {
-    const ds = seg.start_sec || 0;
-    const de = seg.end_sec || 0;
+    const ds = seg.start ?? seg.start_sec ?? 0;
+    const de = seg.end ?? seg.end_sec ?? 0;
     let text = "";
     let supportEntry = null;
     let weakestRank = -1;
@@ -148,17 +149,19 @@ export class TranscriptView {
   }
 
   _updateEntry(el, seg, text, model, supportEntry = null) {
-    // Speaker identity: use speaker_id (global) or local_speaker.
-    const key = seg.speaker_id || `speaker_${seg.local_speaker}`;
+    const localSpeaker = seg.speaker ?? seg.local_speaker ?? -1;
+    const start = seg.start ?? seg.start_sec ?? 0;
+    const end = seg.end ?? seg.end_sec ?? 0;
+    const key = seg.speaker_id || `speaker_${localSpeaker}`;
     const color = colorForKey(key);
 
     el.style.borderLeftColor = color;
     el.querySelector(".live-row-time").textContent =
-      `${fmtTime(seg.start_sec)} – ${fmtTime(seg.end_sec)}`;
+      `${fmtTime(start)} – ${fmtTime(end)}`;
 
     const spk = el.querySelector(".live-row-speaker");
     const entry = {
-      speaker: seg.local_speaker,
+      speaker: localSpeaker,
       speaker_id: seg.speaker_id || undefined,
     };
     spk.textContent = model.labelFor(entry);

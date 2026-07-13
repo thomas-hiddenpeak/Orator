@@ -7,18 +7,38 @@
 //   { "topic","pipeline","msg_id","ts","qos","schema_version",
 //     "data": "<original JSON string>" }
 // Raw RPC responses (error/sessions/reset_ok/describe) carry no "topic" key.
+const TOPIC_TYPES = new Map([
+  ["asr/transcript", "asr"],
+  ["asr/transcript_partial", "asr_partial"],
+  ["align/units", "align"],
+  ["business/speaker_revision", "revision"],
+  ["diar/speaker_segment", "diar"],
+  ["vad/speech_segment", "vad"],
+  ["vad/progress", "vad_progress"],
+]);
+
+function normalizeMessage(message, topic = "") {
+  if (!message || typeof message !== "object" || Array.isArray(message)) {
+    return null;
+  }
+  if (message.type) return message;
+  const inferred = TOPIC_TYPES.get(topic) || (message.error ? "error" : "");
+  return inferred ? { ...message, type: inferred } : message;
+}
+
 export function unwrapEnvelope(raw) {
   if (typeof raw !== "string") return null;
   let obj;
   try { obj = JSON.parse(raw); } catch (_) { return null; }
   if (!obj || typeof obj !== "object") return null;
   if (obj.topic && obj.data !== undefined) {
+    let data = obj.data;
     if (typeof obj.data === "string") {
-      try { return JSON.parse(obj.data); } catch (_) { return null; }
+      try { data = JSON.parse(obj.data); } catch (_) { return null; }
     }
-    return obj.data;
+    return normalizeMessage(data, obj.topic);
   }
-  return obj; // legacy / raw RPC
+  return normalizeMessage(obj); // legacy / raw RPC
 }
 
 // Infer the WS url from the page: WS port = HTTP UI port - 1 (server convention).
@@ -37,6 +57,7 @@ export class OratorWs {
     this.reconnectTimer = null;
     this.reconnectAttempt = 0;
     this.lastError = "";
+    this.closedByClient = false;
     this.url = defaultWsUrl();
   }
 
@@ -47,6 +68,7 @@ export class OratorWs {
   connect() {
     if (this.ws && (this.ws.readyState === WebSocket.OPEN ||
                     this.ws.readyState === WebSocket.CONNECTING)) return;
+    this.closedByClient = false;
     this.ws = new WebSocket(this.url);
     this.ws.onopen = () => {
       this.reconnectAttempt = 0;
@@ -55,7 +77,7 @@ export class OratorWs {
     };
     this.ws.onclose = (evt) => {
       if (this.h.onClose) this.h.onClose(evt);
-      if (!this.lastError) this._scheduleReconnect();
+      if (!this.closedByClient) this._scheduleReconnect();
     };
     this.ws.onerror = (evt) => {
       this.lastError = "WebSocket connection error";
@@ -72,8 +94,9 @@ export class OratorWs {
   _route(msg) {
     // Every known type is routed; unknown topics are reported, never dropped.
     const known = new Set([
-      "ready", "asr_partial", "asr", "revision", "align", "vad_state",
-      "diar", "vad", "timeline", "gpu_telemetry", "cursor_progress",
+      "ready", "asr_partial", "asr_retract", "asr", "revision", "align",
+      "vad_state", "diar", "vad", "vad_progress", "timeline",
+      "gpu_telemetry", "cursor_progress",
       "sessions", "speakers", "reset_ok", "describe", "error",
     ]);
     if (known.has(msg.type)) {
@@ -91,6 +114,15 @@ export class OratorWs {
       this.reconnectTimer = null;
       this.connect();
     }, delay);
+  }
+
+  close() {
+    this.closedByClient = true;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    if (this.ws) this.ws.close();
   }
 
   // Command forms validated against the substring-matching server command parser.

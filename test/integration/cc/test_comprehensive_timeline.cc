@@ -116,6 +116,7 @@ int main() {
 
   timeline.DepositVad({2.0, 2.5});
   timeline.AdvanceVadHorizon(3.0);
+  timeline.UpdateVadState(true, 2.75);
   const auto first_vad = timeline.SnapshotVadEvidence();
   timeline.DepositVad({3.0, 3.5});
   timeline.AdvanceVadHorizon(2.0);
@@ -126,6 +127,8 @@ int main() {
         "latest VAD snapshot contains both segments");
   CHECK(second_vad.horizon == 3.0,
         "VAD decision horizon advances monotonically");
+  CHECK(second_vad.in_speech && second_vad.state_observed_at == 2.75,
+        "VAD activity state is available as typed evidence");
 
   timeline.UnsubscribeAsrFinals(final_subscription);
   timeline.Clear();

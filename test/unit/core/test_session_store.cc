@@ -100,7 +100,7 @@ static void test_list_sessions() {
 
   // Save two sessions with different wall clock times.
   const std::string json_a =
-      R"({"session_start_wall_sec": 2000.0, "audio_duration": 10.0})";
+      R"({"session_start_wall_sec": 2000.0, "audio_sec": 10.0})";
   const std::string json_b =
       R"({"session_start_wall_sec": 1000.0, "audio_duration": 20.0})";
 
@@ -112,15 +112,16 @@ static void test_list_sessions() {
 
   // Sorted by wall_clock_sec descending (newest first).
   CHECK(list[0].session_id == "session_a", "first entry is session_a (newer)");
+  CHECK(list[0].wall_clock_sec == 2000.0,
+        "session_a wall clock metadata parsed");
+  CHECK(list[0].audio_sec == 10.0, "session_a audio metadata parsed");
   CHECK(list[0].file_size > 0, "file_size > 0 for session_a");
 
   CHECK(list[1].session_id == "session_b", "second entry is session_b (older)");
+  CHECK(list[1].wall_clock_sec == 1000.0,
+        "session_b wall clock metadata parsed");
+  CHECK(list[1].audio_sec == 20.0, "legacy session_b audio metadata parsed");
   CHECK(list[1].file_size > 0, "file_size > 0 for session_b");
-
-  // NOTE: wall_clock_sec and audio_sec parsing via ExtractDouble has a
-  // pre-existing bug (does not skip the colon after the key), so these
-  // fields currently return 0.0. Once that is fixed, add checks like:
-  //   CHECK(list[0].wall_clock_sec == 2000.0, ...);
 
   // Load nonexistent session.
   std::string loaded = store.Load("nonexistent");

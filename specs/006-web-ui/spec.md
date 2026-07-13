@@ -1,9 +1,13 @@
 # Spec 006 — Web UI Client for Real-Time Dual-Pipeline Transcription
 
-- **Status**: Revised (2026-07-01) — MVP implemented (16/16, dual-pipeline era);
-  **Phase 2 rebuild implemented** (modular ES client: full WS coverage, global
-  speaker identity, forced-alignment lane, live observability panel). Data layer
-  validated on real captured telemetry; browser context review pending. See §4b.
+- **Status**: In progress (updated 2026-07-13). The modular ES client, complete
+  typed-event routing, live observability, stable-ID convergence, session
+  persistence/load, exact export, reconnect reset, and file/microphone input
+  paths are implemented. A real Chromium + real WebSocket 12 s run passed file
+  upload, live rows, terminal reconciliation, export, reload, restart/reconnect,
+  responsive screenshots, and fake-device microphone capture. The requested
+  graphical multi-track timeline/zoom controls, physical microphone evidence,
+  and non-Chromium compatibility evidence remain open. See §4b and §4c.
 - **Created**: 2026-06-18
 - **Owner**: project owner
 
@@ -147,6 +151,29 @@ telemetry (Spec 011). The rebuild adds:
   events (not only the final `timeline`), each turn labelled by global identity
   and carrying its text; the final `timeline` reconciles the full view.
 
+## 4c. Functional requirements — Phase 3 contract hardening
+
+### FR15 — Stable session and evidence convergence
+- Diarization and VAD evidence committed to the typed server timeline must also
+  be emitted as self-describing live WebSocket events and update their browser
+  tracks without changing the raw evidence.
+- Partial ASR, final ASR, alignment, business revisions, terminal tracks,
+  loaded-session state, and downloaded JSON must preserve the same `text_id`.
+- A terminal or loaded `timeline` is authoritative: the browser rebuilds ASR,
+  alignment, raw tracks, and business turns from that document and removes
+  stale live-only state.
+- Because the server starts a fresh session on every WebSocket open, reconnect
+  must clear prior session state before accepting IDs that restart at zero.
+- Revision-before-final-ASR ordering must retain speaker evidence and apply it
+  when the matching ASR row arrives.
+
+### FR16 — Contract validation
+- Dependency-free JavaScript tests must cover envelope inference, raw errors,
+  revision-before-final ordering, partial/final replacement, terminal rebuild,
+  live diar/VAD updates, and reconnect reset.
+- Final acceptance still requires the real browser, real WebSocket, microphone,
+  reconnect, and JSON export path; module tests alone are not browser evidence.
+
 ---
 
 ## 5. UI Layout & Components
@@ -206,6 +233,8 @@ telemetry (Spec 011). The rebuild adds:
 - **Copy/export**: Ability to select and copy text, or export as plain text or JSON.
 
 #### Timeline Visualization
+- **Current implementation**: authoritative live/terminal JSON inspection. The
+  graphical controls below are acceptance requirements, not current features.
 - **Horizontal scrollbar**: Pan across long recordings.
 - **Zoom controls**: Zoom in/out on time axis.
 - **Playback sync** (optional, future): Seek and replay audio at selected position.
@@ -226,14 +255,17 @@ telemetry (Spec 011). The rebuild adds:
 - **HTML5 + CSS3** (no CSS framework required; custom CSS for layout).
 - **Vanilla JavaScript** (no jQuery or framework; Web APIs only).
 - **Web Audio API**: Microphone access, client-side audio processing.
-- **Canvas or SVG**: Timeline rendering.
+- **Canvas**: telemetry sparklines only; the main timeline is currently a
+  formatted JSON view.
 - **WebSocket API**: Real-time communication with server.
 
 **Key Modules**:
-- `ws_client.js`: WebSocket connection, event dispatch.
-- `ui_controller.js`: DOM updates, state management.
-- `timeline_renderer.js`: Canvas/SVG rendering of diarization/ASR tracks.
-- `audio_input.js`: Microphone and file upload handlers.
+- `js/ws.js`: connection, reconnect, protocol-envelope decode, typed routing.
+- `js/model.js`: authoritative browser session state and terminal convergence.
+- `js/app.js`: controls, lifecycle, and render scheduling.
+- `js/audio.js`: microphone/file input and exact PCM framing.
+- `js/render/*.js`: transcript, telemetry, speakers, sessions, developer status,
+  and formatted timeline JSON.
 
 ### 6.2 Backend (C++)
 
@@ -247,12 +279,15 @@ telemetry (Spec 011). The rebuild adds:
 **File Structure**:
 ```
 web/
-  ├── index.html       (main UI page)
-  ├── style.css        (layout, theming)
-  ├── ui_controller.js (state, DOM updates)
-  ├── ws_client.js     (WebSocket handler)
-  ├── timeline_renderer.js (canvas rendering)
-  └── audio_input.js   (microphone, file upload)
+  |-- index.html
+  |-- style.css
+  `-- js/
+      |-- app.js
+      |-- audio.js
+      |-- format.js
+      |-- model.js
+      |-- ws.js
+      `-- render/
 ```
 
 ---
@@ -351,6 +386,9 @@ web/
 - Upon flush/end, the final `{"type":"timeline",...}` is parsed and rendered.
 - Diarization and ASR tracks are visible and synchronized on a shared time axis.
 - Speaker segments are distinct (color or pattern).
+
+**Current status**: open. The final document is parsed and displayed exactly,
+but no synchronized graphical time-axis view is present.
 
 ### AC4 — File Upload
 - User can drag-and-drop or select an audio file.

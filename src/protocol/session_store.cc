@@ -1,6 +1,7 @@
 #include "protocol/session_store.h"
 
 #include <algorithm>
+#include <cstdlib>
 #include <cstdio>
 #include <cstring>
 #include <ctime>
@@ -22,23 +23,22 @@ namespace protocol {
 namespace {
 
 // Extract a double value from a JSON key:value pair.
-// Example: ExtractDouble(json, "\"session_start_wall_sec\":") -> 1234.567
+// Example: ExtractDouble(json, "\"session_start_wall_sec\"") -> 1234.567
 // Returns 0.0 if not found.
 double ExtractDouble(const std::string& json, const std::string& key) {
   auto pos = json.find(key);
   if (pos == std::string::npos) return 0.0;
   pos += key.size();
-  // Skip whitespace and optional decimal point/comma
+  while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\t')) ++pos;
+  if (pos >= json.size() || json[pos] != ':') return 0.0;
+  ++pos;
   while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\t')) ++pos;
   if (pos >= json.size()) return 0.0;
-  // Skip commas
-  if (json[pos] == ',') ++pos;
-  while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\t')) ++pos;
-  // Parse number
+
   char* end = nullptr;
-  double val = std::strtod(json.data() + pos, &end);
-  (void)end;
-  return val;
+  const char* begin = json.data() + pos;
+  const double value = std::strtod(begin, &end);
+  return end == begin ? 0.0 : value;
 }
 
 // Ensure directory exists; create if missing.
@@ -182,7 +182,12 @@ SessionInfo SessionStore::ParseInfo(const std::string& session_id,
   SessionInfo info;
   info.session_id = session_id;
   info.wall_clock_sec = ExtractDouble(json, "\"session_start_wall_sec\"");
-  info.audio_sec = ExtractDouble(json, "\"audio_duration\"");
+  info.audio_sec = ExtractDouble(json, "\"audio_sec\"");
+  if (info.audio_sec == 0.0) {
+    // Preserve metadata for sessions written before audio_sec became the
+    // canonical timeline field.
+    info.audio_sec = ExtractDouble(json, "\"audio_duration\"");
+  }
   return info;
 }
 

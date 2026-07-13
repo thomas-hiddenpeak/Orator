@@ -23,6 +23,8 @@ orator_add_test(test_speaker_db  unit/core/test_speaker_db.cc)
 orator_add_test(test_audio       unit/core/test_audio.cc)
 orator_add_test(test_reference   unit/core/test_reference.cc)
 orator_add_test(test_safetensors unit/core/test_safetensors.cc)
+target_compile_definitions(test_safetensors PRIVATE
+  ORATOR_TEST_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 orator_add_test(test_bpe         unit/core/test_bpe.cc)
 orator_add_test(test_config      unit/core/test_config.cc)
 orator_add_test(test_json        unit/core/test_json.cc)
@@ -118,25 +120,38 @@ set_property(TARGET orator_eval PROPERTY CUDA_ARCHITECTURES native)
 target_link_libraries(orator_eval PRIVATE orator_core)
 target_include_directories(orator_eval PRIVATE ${TEST_UTILS_DIR})
 
-# ---------------------------------------------------------------------------
-# Python integration tests registered as CTest tests.
-# Each runs via cmake -P with working directory set to repo root so
-# relative model/ paths resolve.
-# ---------------------------------------------------------------------------
+# Real-WebSocket integration uses the one authoritative Python socket client.
+# The runner only owns process lifecycle and test isolation; it never opens a
+# WebSocket itself.
 find_program(Python3_EXECUTABLE python3)
 if(Python3_EXECUTABLE)
-  function(orator_add_py_test name script)
-    # Uses run_py_test.py wrapper which starts/shuts down orator_ws
-    # automatically around the test.
-    add_test(NAME ${name}
-      COMMAND ${Python3_EXECUTABLE}
-        ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/run_py_test.py
-        ${script}
-    )
-    set_tests_properties(${name} PROPERTIES
-      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-      TIMEOUT 180
-      LABELS "python;integration"
-    )
-  endfunction()
+  add_test(NAME test_ws_contract
+    COMMAND ${Python3_EXECUTABLE}
+      ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/run_ws_integration.py
+      --repo ${CMAKE_SOURCE_DIR}
+      --server $<TARGET_FILE:orator_ws>
+      --client ${CMAKE_SOURCE_DIR}/tools/verify/py/ws_unified_test.py
+      --config ${CMAKE_SOURCE_DIR}/orator.toml
+      --audio ${CMAKE_SOURCE_DIR}/test/data/audio/test.mp3
+      --artifacts ${CMAKE_BINARY_DIR}/test-artifacts/ws_contract)
+  set_tests_properties(test_ws_contract PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    TIMEOUT 240
+    RUN_SERIAL TRUE
+    SKIP_RETURN_CODE 77
+    LABELS "python;integration;websocket")
+endif()
+
+# Browser-state contract tests use only Node's standard test runner. The Web UI
+# remains dependency-free and is still served as raw ES modules.
+find_program(Node_EXECUTABLE node)
+if(Node_EXECUTABLE)
+  add_test(NAME test_web_model
+    COMMAND ${Node_EXECUTABLE}
+      --test
+      ${CMAKE_CURRENT_SOURCE_DIR}/web/model_contract.test.mjs)
+  set_tests_properties(test_web_model PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    TIMEOUT 30
+    LABELS "javascript;unit")
 endif()

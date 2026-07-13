@@ -1,111 +1,87 @@
 # Orator Web UI
 
-A browser-based real-time transcription interface for the Orator auditory
-pipeline. Served as an integrated HTTP server by the `orator_ws` binary.
+The browser UI is served directly by `orator_ws`. It uses plain ES modules,
+browser APIs, and no runtime frontend dependency or build step.
+
+## Current Surface
+
+- microphone capture and browser-side audio-file decoding to mono int16LE 16 kHz;
+- live ASR partial/final rows, speaker revisions, diarization, VAD, and alignment;
+- terminal and loaded-session reconciliation by stable `text_id`;
+- per-pipeline RTF, scheduling, backlog, GPU usage, VRAM, and power telemetry;
+- developer status and command-copy controls;
+- speaker naming plus saved-session list/load;
+- exact terminal timeline JSON inspection and download.
+
+The main timeline panel currently shows the authoritative JSON document. A
+graphical multi-track timeline, zoom, pan, and seek controls are not present in
+the current implementation and remain open Spec 006 work.
 
 ## Architecture
 
-Plain ES modules — no framework, no build step (served as-is by the static
-server). Spec 006 Phase 2 rebuild (replaces the MVP's single `app.js`).
-
-```
+```text
 web/
-├── index.html            — SPA shell (controls, transcript/metrics, timeline,
-│                           observability, sessions); <script type="module">
-├── style.css             — dark theme, grid layout, observability panel styles
-├── js/
-│   ├── app.js            — bootstrap: wire model+ws+views+controls, render loop
-│   ├── ws.js             — connection, reconnect, Spec 004 envelope decode,
-│   │                       message router (every type), command helpers
-│   ├── model.js          — normalized client state (tracks, comprehensive
-│   │                       turns, align units, speaker registry, telemetry
-│   │                       ring buffers)
-│   ├── audio.js          — mic capture + file decode → int16LE 16k frames
-│   ├── format.js         — time/RTF formatters + speaker-identity color/label
-│   └── render/
-│       ├── transcript.js    — live transcript + partial draft + identity
-│       ├── timeline.js      — canvas: diar/asr/vad/align lanes, zoom/pan
-│       ├── observability.js — per-pipeline RTF/backlog sparklines + warnings
-│       └── sessions.js      — saved-session list + load
-└── README.md
+|-- index.html
+|-- style.css
+`-- js/
+    |-- app.js                 # lifecycle, controls, render scheduling
+    |-- audio.js               # microphone/file input and exact PCM framing
+    |-- format.js              # time, RTF, and speaker display helpers
+    |-- model.js               # authoritative browser session state
+    |-- ws.js                  # reconnect, envelope decode, typed routing
+    `-- render/
+        |-- dev_status.js
+        |-- observability.js
+        |-- sessions.js
+        |-- speakers.js
+        |-- timeline.js        # formatted authoritative JSON view
+        `-- transcript.js
 ```
 
-## Data flow
+Data flow:
 
-```
-orator_ws (WebSocket)
-    ↓  Spec 004 envelope {topic, pipeline, data:"<inner json>"}
-ws.js → unwrapEnvelope() → router(type, msg)
-    ↓
-model.js (single source of truth: applyAsr/applyRevision/applyAlign/
-          applyGpuTelemetry/applyCursorProgress/applyTimeline)
-    ↓  requestAnimationFrame (coalesced)
-render/* (transcript · timeline canvas · observability · sessions)
+```text
+orator_ws -> ws.js -> model.js -> requestAnimationFrame -> render/*
 ```
 
-Every server message type is consumed (FR10): `ready`, `asr_partial`, `asr`,
-`revision`, `align`, `vad_state`, `timeline`, `gpu_telemetry`, `cursor_progress`,
-`sessions`, `reset_ok`, `describe`, `error`. Unknown topics are logged, not
-dropped.
+Live state is provisional. A terminal or loaded `timeline` clears stale live
+state and rebuilds ASR, alignment, business-speaker turns, and raw tracks from
+the server document. A new `ready` event starts a clean browser session because
+server IDs restart at zero after reconnect.
 
-## Canvas timeline
+Known routed messages are `ready`, `asr_partial`, `asr_retract`, `asr`,
+`revision`, `align`, `diar`, `vad`, `vad_progress`, `vad_state`, `timeline`,
+`gpu_telemetry`, `cursor_progress`, `sessions`, `speakers`, `reset_ok`,
+`describe`, and `error`. Protocol envelopes without an inner `type` are typed
+from their topic. Unknown messages are reported instead of silently discarded.
 
-The `#timelineCanvas` renders four horizontal lanes on a shared time axis:
+## Validation
 
-- **Diarization** — blocks colored by **global speaker identity** (`spk_N`,
-  Spec 010), labelled with the display name when present
-- **ASR** — transcript blocks with truncated text labels
-- **VAD** — speech-activity blocks
-- **Align** — forced-alignment per-unit ticks (Spec 009)
+```bash
+# Registered dependency-free browser-model contract test
+node --test test/web/model_contract.test.mjs
 
-### Interaction
+# Real browser + real server/WebSocket flow (Playwright is tools-only)
+python3 tools/verify/py/ws_ui_integration_test.py \
+  --audio /tmp/orator_test_12s.wav
 
-| Input | Action |
-|-------|--------|
-| Mouse wheel | Zoom toward cursor |
-| Click-drag | Pan left/right |
-| + / − buttons | Zoom in / out |
-| ⟲ button | Fit to window |
-| ← → arrow keys | Pan (when canvas focused) |
-| + / - keys | Zoom in / out (when canvas focused) |
-| Home key | Reset zoom (when canvas focused) |
-
-### Performance
-
-- **rAF scheduler**: all `renderTimeline()` calls are batched via
-  `_scheduleRender()` → `requestAnimationFrame`
-- **Viewport pre-filter**: entries outside the visible time range are skipped
-  when total entries exceed 200 per track
-- **Transcript pruning**: DOM limited to `MAX_TRANSCRIPT_ROWS = 500` entries;
-  oldest rows are removed when exceeded
-
-## Development
-
-### Prerequisites
-- Running `orator_ws` server (port 8765 by default, UI on 8766)
-- Modern browser (Chrome 120+, Firefox 121+, Safari 17+)
-
-### Testing
-```
-# Integration test (end-to-end with real server):
-python3 tools/ws_ui_integration_test.py --models-dir /path/to/models
-
-# Manual test:
-open http://localhost:8766    # after starting orator_ws
+# Complete configured test suite, including the real-WebSocket speech/silence gate
+ctest --test-dir build --output-on-failure
 ```
 
-### Accessibility
-- All buttons have `aria-label` attributes
-- Dynamic regions use `aria-live="polite"` / `role="status"`
-- Canvas supports keyboard navigation (arrow keys, +/-, Home)
-- Focus indicators via `:focus-visible` (blue outline)
-- Touch targets ≥44px per WCAG 2.2
+The Playwright flow verifies file upload, live rows, terminal reconciliation,
+exact JSON download, session persistence/load, deliberate disconnect and
+automatic reconnect, desktop/mobile layout, and the browser microphone capture
+path with a fake media device. A physical microphone and non-Chromium browsers
+still require manual acceptance evidence.
 
-## Files to know for modifications
+## Editing Guide
 
-- `app.js` — single-file state machine (~1050 lines). Entry: `connect()` at
-  bottom. Timeline rendering: `renderTimeline()`. WebSocket handlers map
-  directly to topic types. Canvas zoom/pan: `zoomTimeline()`, `fitTimeline()`.
-- `style.css` — CSS custom properties in `:root` for the color palette.
-  Dark theme only. Single responsive breakpoint at 900px.
-- `index.html` — Static shell; all dynamic content is generated by `app.js`.
+- Change protocol parsing only in `js/ws.js`.
+- Change browser state convergence only in `js/model.js`.
+- Keep renderers as consumers of `Model`; do not infer new speaker decisions in
+  the browser.
+- Preserve exact byte coverage in `audio.js::copyPcmFrame`; a typed-array view's
+  backing buffer may contain more bytes than the view.
+- Add deterministic state transitions to `test/web/model_contract.test.mjs` and
+  repeat the real-browser flow for user-visible changes.

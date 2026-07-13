@@ -19,12 +19,15 @@ namespace {
 struct VadSnapshot {
   std::shared_ptr<const std::vector<ComprehensiveTimeline::VadSeg>> segments;
   double horizon = -1e9;
+  bool in_speech = false;
+  double state_observed_at = -1e9;
 };
 
 VadSnapshot ReadVadSnapshot(const ComprehensiveTimeline* timeline) {
   if (timeline == nullptr) return {};
   const auto evidence = timeline->SnapshotVadEvidence();
-  return {evidence.segments, evidence.horizon};
+  return {evidence.segments, evidence.horizon, evidence.in_speech,
+          evidence.state_observed_at};
 }
 
 double VadOverlapSec(
@@ -37,6 +40,13 @@ double VadOverlapSec(
     if (b > a) overlap += b - a;
   }
   return overlap;
+}
+
+bool VadSupportsLiveText(double start, double end, const VadSnapshot& vad) {
+  if (vad.segments && VadOverlapSec(start, end, *vad.segments) > 0.0) {
+    return true;
+  }
+  return vad.in_speech && vad.state_observed_at + 1e-9 >= start;
 }
 
 }  // namespace
@@ -153,12 +163,12 @@ void AsrWorker::ProcessGateSubSpan(const float* sub, int sub_n) {
     return;
   }
 
-  // VAD speech endpoint (horizon-independent). A silence sub-span whose distance
-  // from the last speech end has reached the trailing window is a real
-  // utterance endpoint -> close the open segment now. This is the fix that makes
-  // ASR honor VAD speech endpoints in real time: the confirmed/horizon test
-  // below gates only the GPU *skip* of silence, and must NOT gate the *close*.
-  // In steady real-time the ASR head runs in lockstep with VAD, so
+  // VAD speech endpoint (horizon-independent). A silence sub-span whose
+  // distance from the last speech end has reached the trailing window is a real
+  // utterance endpoint -> close the open segment now. This is the fix that
+  // makes ASR honor VAD speech endpoints in real time: the confirmed/horizon
+  // test below gates only the GPU *skip* of silence, and must NOT gate the
+  // *close*. In steady real-time the ASR head runs in lockstep with VAD, so
   // `end_sec <= horizon` (which needs ASR to lag VAD by the 0.3 s guard)
   // essentially never holds; relying on it left segments to close only at the
   // time cap, ignoring every VAD endpoint.
@@ -348,6 +358,12 @@ void AsrWorker::EmitIncrementalChunk(const float* samples, int n,
       }
     }
     if (!keep) {
+      if (emit_ && !inc_delivered_text_.empty()) {
+        emit_(
+            "{\"type\":\"asr_retract\",\"source\":\"qwen3_asr\","
+            "\"text_id\":" +
+            std::to_string(inc_text_id_) + "}");
+      }
       inc_live_text_.clear();
       inc_delivered_text_.clear();
     } else {
@@ -373,13 +389,20 @@ void AsrWorker::EmitIncrementalChunk(const float* samples, int n,
       inc_live_text_.clear();
     }
   } else if (inc_in_segment_) {
-    if (text_sink_ && inc_live_text_ != inc_delivered_text_) {
+    bool expose_partial = true;
+    if (params_.asr_vad_gate && timeline_) {
+      const VadSnapshot vad = ReadVadSnapshot(timeline_);
+      expose_partial =
+          VadSupportsLiveText(tb_.SecondsAt(inc_seg_start_sample_),
+                              tb_.SecondsAt(inc_seg_end_sample_), vad);
+    }
+    if (expose_partial && text_sink_ && inc_live_text_ != inc_delivered_text_) {
       text_sink_(inc_text_id_, tb_.SecondsAt(inc_seg_start_sample_),
                  tb_.SecondsAt(inc_seg_end_sample_), inc_live_text_,
                  /*is_final=*/false);
       inc_delivered_text_ = inc_live_text_;
     }
-    if (emit_ && !inc_live_text_.empty()) {
+    if (expose_partial && emit_ && !inc_live_text_.empty()) {
       char buf[192];
       std::snprintf(buf, sizeof(buf),
                     "{\"type\":\"asr_partial\",\"source\":\"qwen3_asr\","

@@ -180,8 +180,8 @@ class Reader(threading.Thread):
             kind = raw.get("type")
             with self._condition:
                 self.messages.append(raw)
-                if kind in ("asr_partial", "asr", "revision", "align",
-                            "diar", "vad", "vad_state"):
+                if kind in ("asr_partial", "asr_retract", "asr", "revision",
+                            "align", "diar", "vad", "vad_state"):
                     self.events.append(raw)
                 elif kind == "timeline":
                     self.timelines.append(raw)
@@ -318,13 +318,25 @@ def validate_terminal_contract(events, timeline):
         asr_by_id[text_id] = entry
 
     live_asr = {}
+    active_partials = {}
     for event in events:
+        if event.get("type") == "asr_partial":
+            active_partials[event.get("text_id")] = event
+            continue
+        if event.get("type") == "asr_retract":
+            active_partials.pop(event.get("text_id"), None)
+            continue
         if event.get("type") != "asr":
             continue
         text_id = event.get("text_id")
+        active_partials.pop(text_id, None)
         if text_id in live_asr:
             issues.append(f"duplicate live final ASR text_id: {text_id}")
         live_asr[text_id] = event
+    if active_partials:
+        issues.append(
+            "unresolved live ASR partial IDs: "
+            f"{sorted(active_partials)}")
     if set(live_asr) != set(asr_by_id):
         issues.append(
             "live/terminal ASR ID mismatch: "
@@ -343,6 +355,8 @@ def validate_terminal_contract(events, timeline):
     align_track = tracks.get("align")
     if align_track is not None:
         align_entries = align_track.get("entries", [])
+        align_by_id = {
+            entry.get("text_id"): entry for entry in align_entries}
         align_ids = [entry.get("text_id") for entry in align_entries]
         if len(align_ids) != len(set(align_ids)):
             issues.append("duplicate alignment text_id")
@@ -370,6 +384,61 @@ def validate_terminal_contract(events, timeline):
                     break
                 previous_start = start
                 previous_end = end
+
+        live_align = {}
+        for event in events:
+            if event.get("type") != "align":
+                continue
+            text_id = event.get("text_id", event.get("id"))
+            if text_id in live_align:
+                issues.append(f"duplicate live alignment text_id: {text_id}")
+            live_align[text_id] = event
+        if set(live_align) != set(align_by_id):
+            issues.append(
+                "live/terminal alignment ID mismatch: "
+                f"live={sorted(live_align)} terminal={sorted(align_by_id)}")
+        for text_id in set(live_align) & set(align_by_id):
+            live = live_align[text_id]
+            final = align_by_id[text_id]
+            if live.get("units") != final.get("units"):
+                issues.append(
+                    f"live/terminal alignment units mismatch: {text_id}")
+
+    diar_entries = tracks.get("diarization", {}).get("entries", [])
+    diar_events = [
+        event for event in events if event.get("type") == "diar"]
+    if diar_entries or diar_events:
+        if not diar_events:
+            issues.append("terminal diarization has no live snapshot")
+        else:
+            def normalize_diar(entry):
+                speaker = entry.get("speaker")
+                if isinstance(speaker, str) and speaker.startswith("speaker_"):
+                    try:
+                        speaker = int(speaker[8:])
+                    except ValueError:
+                        speaker = -1
+                return {
+                    "start": entry.get("start"),
+                    "end": entry.get("end"),
+                    "speaker": speaker,
+                    "speaker_id": entry.get("speaker_id"),
+                    "confidence": entry.get("confidence"),
+                }
+
+            live_diar = [
+                normalize_diar(entry)
+                for entry in diar_events[-1].get("segments", [])]
+            final_diar = [normalize_diar(entry) for entry in diar_entries]
+            if live_diar != final_diar:
+                issues.append("latest live diarization differs from terminal track")
+
+    vad_entries = tracks.get("vad", {}).get("entries", [])
+    live_vad = [
+        {"start": event.get("start"), "end": event.get("end")}
+        for event in events if event.get("type") == "vad"]
+    if live_vad != vad_entries:
+        issues.append("live VAD segments differ from terminal track")
 
     business = tracks.get("business_speaker", {}).get("entries", [])
     comprehensive = timeline.get("comprehensive", [])

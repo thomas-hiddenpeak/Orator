@@ -29,10 +29,9 @@
   `business_speaker` pipeline and keep raw tracks immutable.
 - [x] T016 Fix finalized ASR `text_id` allocation/emission order and serialize IDs
   explicitly in the ASR terminal track.
-- [ ] T017 Add ID-convergence tests across partial/final events, align groups,
-  revisions, terminal tracks, export, reconnect, and Web UI state. The unified
-  client now gates final events, align groups, business revisions, and terminal
-  tracks; partial replacement, export, reconnect, and Web UI state remain open.
+- [x] T017 Add ID-convergence tests across partial/final events, align groups,
+  revisions, terminal tracks, export, reconnect, and Web UI state. Node model
+  tests, the unified client, and the real Chromium flow cover the full chain.
 - [ ] T018 Correct configuration precedence and migrate/remove every behavioral
   environment-only switch. Precedence and timeline gap-fill are corrected;
   remaining lower-level switches are still open.
@@ -55,9 +54,11 @@
 
 ## Phase 3: Reproducible Baseline
 
-- [ ] T040 Restore and register real-WebSocket Python integration tests in CTest.
-- [ ] T041 Add silence, endpoint, time-base, track-immutability, stable-ID, and
-  Web UI model tests.
+- [x] T040 Restore and register the real-WebSocket Python integration gate in
+  CTest using the sole unified socket client plus a process-only runner.
+- [x] T041 Add silence, endpoint, time-base, track-immutability, stable-ID, and
+  Web UI model tests. The registered gate runs 12 s canonical speech and 30 s
+  generated silence with isolated TOML storage.
 - [ ] T042 Run clean build, warning check, full CTest, JavaScript checks, and
   selected sanitizer/CUDA memory checks.
 - [ ] T043 Run 120 s, 360 s, and 600 s real-WebSocket tests with committed TOML.

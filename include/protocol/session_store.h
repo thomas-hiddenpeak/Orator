@@ -6,7 +6,7 @@
 //   <session_dir>/<session_id>.json
 //
 // The JSON file contains the full timeline output from Serialize(), which
-// includes session_start_wall_sec, audio_duration, segments, and text.
+// includes session_start_wall_sec, audio_sec, segments, and text.
 //
 // A lightweight metadata index is built on the fly by reading file headers.
 // For Phase 1 this is O(n) on List() — acceptable for < 1000 sessions.
@@ -21,7 +21,7 @@ namespace protocol {
 struct SessionInfo {
   std::string session_id;
   double wall_clock_sec = 0.0;  // session_start_wall_sec from timeline
-  double audio_sec = 0.0;       // audio duration in seconds
+  double audio_sec = 0.0;       // audio_sec from the timeline
   size_t file_size = 0;         // JSON file size in bytes
 };
 
@@ -51,7 +51,7 @@ class SessionStore {
 
  private:
   // Build a SessionInfo from a session ID and its JSON content (parses
-  // wall_clock_sec and audio_duration from the first ~1 KB).
+  // wall_clock_sec and audio_sec from the first ~2 KB).
   static SessionInfo ParseInfo(const std::string& session_id,
                                const std::string& json);
 
