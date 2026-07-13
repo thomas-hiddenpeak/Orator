@@ -133,6 +133,14 @@ if(Python3_EXECUTABLE)
     TIMEOUT 30
     LABELS "python;unit;reproducibility")
 
+  add_test(NAME test_closing_ledger
+    COMMAND ${Python3_EXECUTABLE}
+      ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/test_closing_ledger.py)
+  set_tests_properties(test_closing_ledger PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    TIMEOUT 30
+    LABELS "python;unit;manual-review")
+
   add_test(NAME test_ws_contract
     COMMAND ${Python3_EXECUTABLE}
       ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/run_ws_integration.py

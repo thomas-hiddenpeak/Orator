@@ -44,7 +44,7 @@
 
 ## Phase 2: Reference Ledger
 
-- [ ] T030 Define the immutable ledger schema and manual judgment categories.
+- [x] T030 Define the immutable ledger schema and manual judgment categories.
 - [ ] T031 Adjudicate all 556 reference turns in chronological order against the
   audio, including exact speech intervals and overlaps.
 - [ ] T032 Classify critical turns before candidate-output review.
