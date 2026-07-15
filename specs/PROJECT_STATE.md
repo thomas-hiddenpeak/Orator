@@ -144,6 +144,14 @@ the deprecated v2 weight is absent. The v2 checkpoint and its obsolete CTest
 were deleted; only historical reports and hashes remain. This selects the model
 line for closing work; it does not accept the current 74.2806 percent result.
 
+**Reference-ledger start (2026-07-15)**: commit `43523ba` now has a fresh,
+hash-validated 556-row ledger for the canonical 3615.12-second input. All rows
+remain unsigned. A mechanical source audit found 22 duplicate-timestamp groups,
+25 non-positive provisional intervals, and one backward timestamp pair. The
+seven continuous work batches cover all 556 rows; no script judgment or
+provisional boundary is accepted as manual adjudication. See
+[reference-ledger-v21-2026-07-15.md](013-industrial-closing-validation/reference-ledger-v21-2026-07-15.md).
+
 ## 3. Component status
 
 | Component | Status | Notes |

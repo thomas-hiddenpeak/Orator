@@ -48,7 +48,11 @@
 
 - [x] T030 Define the immutable ledger schema and manual judgment categories.
 - [ ] T031 Adjudicate all 556 reference turns in chronological order against the
-  audio, including exact speech intervals and overlaps.
+  audio, including exact speech intervals and overlaps. The v2.1 commit
+  `43523ba` ledger is initialized and hash-validated at 556 rows; all 556 remain
+  unsigned. Seven continuous work batches cover all rows as 93 / 84 / 80 / 80 /
+  129 / 87 / 3 across the six 600-second blocks and final partial block. See
+  `reference-ledger-v21-2026-07-15.md`.
 - [ ] T032 Classify critical turns before candidate-output review.
 - [ ] T033 Perform a second complete review in reversed 600-second block order.
 - [ ] T034 Resolve every disagreement and record ambiguous reference rows without
