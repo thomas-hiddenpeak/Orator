@@ -9,6 +9,12 @@ new contextual regression, raising the full 556-turn diagnostic from 413 to
 the policy is not integrated into the runtime and receives no real-WebSocket
 acceptance claim.
 
+The candidate generator is reference-free and does not evaluate results. No
+code, script, test, notebook, formula, query, metric, or algorithm may assign
+correctness, calculate accuracy, compare/rank candidates, select the policy, or
+issue a verdict. The historical judgments below were made by reading adjacent
+conversational context and manually deriving the reported totals.
+
 ## Evidence Contract
 
 The tool reads the captured v2.1 timeline, native TitaNet scores, and a dedicated
@@ -54,7 +60,8 @@ rolling duration.
 
 The display-only changed packet was read in adjacent conversational context.
 All other rows retain the completed inherited-profile manual judgment because
-their speaker assignment is unchanged. No script assigned a label.
+their speaker assignment is unchanged. No code or executable automation assigned
+a label, total, ranking, policy choice, or verdict.
 
 | Reference row | Manual result | Reason |
 |---|---|---|

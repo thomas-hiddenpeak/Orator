@@ -6,10 +6,10 @@ by tools/verify/py/ws_unified_test.py, keeps all captured pipeline tracks
 immutable, and writes a candidate comprehensive timeline derived from the frozen
 ASR, diarization, VAD, and forced-alignment tracks.
 
-The script is intentionally conservative: it does not score semantic accuracy.
-It only organizes evidence and reports mechanical consistency issues. Final
-accuracy review remains the constitutional context-aware comparison against the
-reference transcript.
+The script only organizes evidence and reports mechanical consistency issues.
+It does not assign correctness, calculate accuracy, rank/select a candidate, or
+issue a verdict. Complete contextual semantic review with manual result
+verification is the only result-evaluation method.
 """
 
 from __future__ import annotations

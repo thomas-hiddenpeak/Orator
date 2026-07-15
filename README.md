@@ -90,7 +90,8 @@ cmake --build build -j
 - `asr_testmp3`、`asr_stream_test`：ASR / 流式验证工具。
 - `asr_stream_window_probe`、`asr_encoder_chunk_probe`、
   `asr_stream_incremental_probe`：ASR 流式策略探针。
-- `orator_eval`：手动评估工具，不作为 CTest 测试运行。
+- `orator_eval`：历史机械投影诊断工具，不作为 CTest 运行，也不得用于结果
+  准确率、候选比较、参数选择或验收结论。
 
 ## 运行
 
@@ -337,8 +338,13 @@ python3 tools/verify/py/ws_unified_test.py --duration 120 --port 8765 --test-obs
 - 流式行为必须通过真实 WebSocket 增量输入验证。
 - 性能结果只能来自真实流式路径。
 - Jetson 设备指标通过 `tegrastats` 观察。
-- ASR 准确性使用语义比较，不使用字符级脚本指标。
-- 说话人分离评估需要说明时间块、偏移和指标含义。
+- ASR、说话人归属、端点、幻觉和综合时间线的结果评估，只允许逐项读取完整
+  对话上下文并进行语义比对。
+- 任何形式的代码、测试、脚本、Notebook、公式、查询、自动指标或算法，都
+  不得判定正确/错误、汇总准确率、排名或选择候选、输出通过/失败结论。
+- 自动化仅可运行和观测系统、验证机械/数值合同、采集并展示未判定证据；
+  CER、DER、字符匹配、时间重叠和时长映射都不是准确率结论。
+- 说话人分离人工语义评估还需要记录时间块、偏移和指标含义。
 - 全局只维护一个 WebSocket 测试客户端：
   [tools/verify/py/ws_unified_test.py](tools/verify/py/ws_unified_test.py)。
 

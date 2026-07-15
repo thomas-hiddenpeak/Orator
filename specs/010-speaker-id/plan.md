@@ -82,8 +82,10 @@ unaffected). GPU scheduling follows the diar pipeline's existing stream/lock.
 
 Each phase gates on build clean + ctest + (A) oracle + (D) real-WS 600 s.
 Phase H additionally gates on full-length real WebSocket validation and
-context-aware comparison under the Test Review Protocol before any accuracy
-claim is accepted.
+complete context-semantic comparison under the Test Review Protocol before any
+accuracy claim is accepted. No code, script, test, metric, formula, query, or
+algorithm may assign judgments, total accuracy, rank/select a candidate, or
+issue that verdict.
 
 ## 5. Risks / open details (refined while building)
 

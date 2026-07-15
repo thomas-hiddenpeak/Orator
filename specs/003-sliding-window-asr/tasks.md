@@ -3,7 +3,7 @@
 - **Feature**: `003-sliding-window-asr`
 - **Spec**: [spec.md](spec.md) · **Plan**: [plan.md](plan.md)
 - **Status**: Implemented (incremental KV cache); verified + committed (8cc31ab)
-- **Constitution**: v1.1.0
+- **Constitution**: v1.7.0
 
 > Ordered, independently verifiable steps. Foundational numeric equivalence is
 > verified BEFORE any worker change. Parameter defaults come from the sweep
@@ -15,7 +15,8 @@
 - [x] **T000** `tools/cer.py` exists. FAIR baseline = production Silero-VAD
   pipeline on the same span (energy-VAD 30.2% is a dead lower bound). Measured on
   120 s of `test.mp3`: Silero-VAD CER 30.8% / ASR RTF 3.27x. This is the bar
-  AC3/AC4 must hold.
+  originally used for AC3/AC4. The CER result is now historical diagnostic
+  evidence only and cannot evaluate accuracy or select a configuration.
 
 ## Phase 1 — Foundational primitives + numeric equivalence (verify before wiring)
 - [x] **T010** Add decoder primitives to `AsrTextDecoder`: `PrefillAt(embeds, T,
@@ -65,11 +66,14 @@
   feed_sec and segment_cap_sec. Outputs per-step timing, VmRSS, and RTF.*
 - [x] **T040** CER (AC3): `tools/cer.py` on the incremental output vs gold
   less-or-equal the Silero-VAD baseline on the same span. MEASURED: incremental
-  17.6% vs Silero-VAD 30.8% on 120 s (-13.2pp). *(Verify: AC3 met.)*
+  17.6% vs Silero-VAD 30.8% on 120 s (-13.2pp). This records the historical
+  implementation step; it no longer satisfies AC3 under Constitution 1.7.0.
 - [x] **T050** Sweep `chunk_sec` in {1,2}, `unfixed_token_num` in {3,5,8},
   `endpoint_sec` in {0.6,1.0}, `max_segment_sec` in {20,30}; record RTF + CER;
   choose defaults (CER <= baseline, highest sustained RTF). *(Verify: sweep table
   recorded; defaults set; refined 2026-06-17 for Web UI partial streaming.)*
+  This is retained as historical parameter-selection evidence only; no future
+  default may be selected by CER, a sweep script, or another code-derived score.
 
   **Initial sweep range**: `chunk_sec` ∈ {8, 16}, `unfixed_token_num` ∈ {3, 5, 8}.
   **Refined production defaults (2026-06-17)**:

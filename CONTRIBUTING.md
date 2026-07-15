@@ -103,6 +103,15 @@ protocol/  net/
 
 ## Testing
 
+Product-result evaluation is governed by Constitution 1.7.0 Article VI and
+`.specify/test-review-protocol.md`. No compiled code, test, script, notebook,
+formula, query, automated metric, or algorithm may assign correctness,
+calculate accuracy, rank/select a candidate, or issue a product verdict.
+Automation may execute the system, validate mechanical/numerical contracts, and
+display unjudged evidence only. ASR, speaker, endpoint, hallucination, and final
+business-view results require complete item-by-item contextual semantic review,
+including the required second pass and manual result verification.
+
 ### Running Tests
 ```bash
 # Run all tests

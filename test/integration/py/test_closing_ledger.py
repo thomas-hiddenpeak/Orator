@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
+import contextlib
 import importlib.util
-import json
+import io
 import pathlib
 import sys
 import tempfile
@@ -86,83 +87,11 @@ class ClosingLedgerTest(unittest.TestCase):
             closing_ledger.validate_judgment(
                 judgment, "ref-0001", 1.0, 2.0, set())
 
-    def test_summary_splits_speaker_time_at_fixed_block_boundary(self):
-        def judgment(result, intervals, confident_wrong, start_offset,
-                     end_offset, boundary_notes=""):
-            value = closing_ledger.fresh_judgment()
-            value.update({
-                "result": result,
-                "speaker_eval": (
-                    "accurate" if result == "correct" else
-                    "major_confusion"),
-                "correct_speaker_intervals": intervals,
-                "confident_wrong": confident_wrong,
-                "uncertain_output": False,
-                "boundary_start_offset_sec": start_offset,
-                "boundary_end_offset_sec": end_offset,
-                "boundary_offset_notes": boundary_notes,
-                "context_notes": "manual context judgment",
-                "reviewer": "reviewer",
-                "reviewed_utc": "2026-07-14T00:00:00+00:00",
-            })
-            return value
-
-        ledger = {
-            "audio": {"duration_sec": 650.0},
-            "entries": [
-                {
-                    "reference_id": "ref-0001",
-                    "adjudication": {
-                        "audible_start_sec": 590.0,
-                        "audible_end_sec": 610.0,
-                        "canonical_speaker": "A",
-                        "criticality": "critical",
-                    },
-                },
-                {
-                    "reference_id": "ref-0002",
-                    "adjudication": {
-                        "audible_start_sec": 620.0,
-                        "audible_end_sec": 630.0,
-                        "canonical_speaker": "B",
-                        "criticality": "noncritical",
-                    },
-                },
-            ],
-        }
-        first = judgment(
-            "correct", [[595.0, 605.0]], False, 0.1, 0.2)
-        second = judgment(
-            "incorrect", [[620.0, 622.0]], True, 0.3, 1.2,
-            "late terminal boundary")
-        review = {"entries": [
-            {"chronological_pass": first,
-             "reverse_block_pass": first,
-             "final": first},
-            {"chronological_pass": second,
-             "reverse_block_pass": second,
-             "final": second},
-        ]}
-        result = closing_ledger.summarize_validated(review, ledger)
-        self.assertAlmostEqual(result["natural_turn_accuracy"], 0.5)
-        self.assertAlmostEqual(result["blocks"]["0"]["speaker_time_sec"],
-                               10.0)
-        self.assertAlmostEqual(
-            result["blocks"]["0"]["correct_speaker_time_sec"], 5.0)
-        self.assertAlmostEqual(result["blocks"]["1"]["speaker_time_sec"],
-                               20.0)
-        self.assertAlmostEqual(
-            result["blocks"]["1"]["correct_speaker_time_sec"], 7.0)
-        self.assertTrue(result["blocks"]["0"]["full_600_sec_block"])
-        self.assertFalse(result["blocks"]["1"]["full_600_sec_block"])
-        self.assertAlmostEqual(
-            result["speakers"]["A"]["speaker_time_accuracy"], 0.5)
-        self.assertAlmostEqual(
-            result["boundary_offsets"]["median_absolute_offset_sec"], 0.25)
-        self.assertAlmostEqual(
-            result["boundary_offsets"]["p95_absolute_offset_sec"], 1.2)
-        self.assertFalse(
-            result["speaker_acceptance_gates"]["all_pass"])
+    def test_automated_summary_command_is_not_available(self):
+        with contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit) as raised:
+                closing_ledger.main(["summary"])
+        self.assertEqual(raised.exception.code, 2)
 
 
 if __name__ == "__main__":

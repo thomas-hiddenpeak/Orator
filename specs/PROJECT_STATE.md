@@ -14,13 +14,19 @@ work is specified under [specs/](.).
 > pass is the consistency proof. Status lines advance to `Implemented` in the
 > same change that lands the code, with the commit reference.
 
-- **Last updated**: 2026-07-15 (clean v2.1 full written-context review)
+- **Last updated**: 2026-07-15 (Constitution 1.7.0 context-only result evaluation)
 - **Branch**: `master`
-- **Constitution**: v1.6.0
+- **Constitution**: v1.7.0
 - **Product closure**: **OPEN / NOT ACCEPTED**. No current artifact proves the
   Spec 013 full-session 90 percent business-accuracy gates. Historical
   "closing" runs remain component stability and numerical-fidelity evidence,
   not product acceptance.
+- **Result-evaluation rule**: product accuracy and candidate decisions may be
+  produced only by complete item-by-item contextual semantic review. No code,
+  test, script, notebook, formula, query, automated metric, or algorithm may
+  assign correctness, aggregate an accuracy result, rank/select a candidate, or
+  issue a product verdict. Automation is limited to execution, capture,
+  mechanical/numerical validation, and display of unjudged evidence.
 
 ---
 
@@ -165,8 +171,9 @@ as the clean closing-baseline result.
 hash-validated 556-row ledger for the canonical 3615.12-second input. All rows
 remain unsigned. A mechanical source audit found 22 duplicate-timestamp groups,
 25 non-positive provisional intervals, and one backward timestamp pair. The
-seven continuous work batches cover all 556 rows; no script judgment or
-provisional boundary is accepted as manual adjudication. See
+seven continuous work batches cover all 556 rows; no code-based judgment or
+provisional boundary is accepted as manual adjudication. No code may assign or
+aggregate a result. See
 [reference-ledger-v21-2026-07-15.md](013-industrial-closing-validation/reference-ledger-v21-2026-07-15.md).
 
 **Full closing-baseline capture (2026-07-15)**: clean commit `3b40245` streamed
@@ -189,7 +196,9 @@ is a prefix repeatability check, not the two-full-run acceptance requirement.
 This completes T044 system evidence. A subsequent complete chronological and
 reverse-block manual review of all 556 written-context rows records 443 correct,
 112 incorrect, and one ambiguous contribution (`79.6763%`). Tools only arranged
-the evidence and did not assign judgments. The result fails the full-session
+the evidence; no code assigned judgments, calculated the result, ranked a
+candidate, or issued the verdict. The reviewer manually derived and checked the
+totals. The result fails the full-session
 gate and five fixed 600-second block gates. The audible ledger, speaker-time,
 offset, criticality, and independent totals remain unsigned, so T045 and product
 closure remain open. See
@@ -243,11 +252,11 @@ review without changing a frozen track.
 | Revisable comprehensive timeline (Spec 004) | Container/fusion ownership corrected; acceptance open | `ComprehensiveTimeline` stores typed diarization, ASR, VAD, alignment, and business tracks and publishes immutable snapshots/typed updates. `BusinessSpeakerPipeline` owns align-aware projection, gap fill, speaker-support diagnostics, and a structured selected/rejected candidate audit. Live revisions, the terminal business track, the `comprehensive` compatibility alias, and the Web UI preserve the same decision object. Full contextual acceptance remains open. |
 | Reusable common time base (Spec 004) | Session ownership and final reconciliation implemented; acceptance open | `AuditoryStream` owns one immutable `TimeBase` and injects it into every active private cache, worker, and retained audio store. Finalization reconciles exact sample extents for input, diarization, speaker identity, ASR, VAD, alignment, and business speaker; focused tests and the 2026-07-13 120 s real-WebSocket run reported zero gaps. Full-session repeatability remains open under Spec 013. |
 | Pipeline protocol layer (Spec 004) | ✅ Implemented | Phases 7–12 complete: data types (topic.h, schema.h), pipeline registry, topic router, storage layer (MEMORY + DISK), ProtocolTimeline integration, WS v2 envelope with describe command, --storage-disk-path flag. 25/25 tests pass. |
-| Streaming validation | Registered gate strengthened; closing runs open | `ws_unified_test.py` has one socket reader, captures source/config/binary pre/post hashes, continuous `tegrastats`, and runtime telemetry, and rejects source drift, sparse telemetry, mechanical live/final, typed-track, ID, alignment, VAD/diar, and extent violations. `test_ws_contract` runs canonical speech plus generated silence through the real server. Structural checks never assign semantic accuracy; clean 360/600/full contextual gates remain open. |
+| Streaming validation | Registered gate strengthened; closing runs open | `ws_unified_test.py` has one socket reader, captures source/config/binary pre/post hashes, continuous `tegrastats`, and runtime telemetry, and rejects source drift, sparse telemetry, mechanical live/final, typed-track, ID, alignment, VAD/diar, and extent violations. `test_ws_contract` runs canonical speech plus generated silence through the real server. Structural checks never assign correctness, aggregate accuracy, rank candidates, or issue a product verdict; clean 360/600/full contextual gates remain open. |
 | Logging system | ✅ Include-level `core/log.h` | Level-based macros (`LOG_DEBUG`/`INFO`/`WARN`/`ERROR`) with compile-time floor (`ORATOR_LOG_LEVEL`) and runtime env-var gate. All 14 `fprintf(stderr)` calls in src/ replaced. |
 | CUDA kernel unit tests | ✅ `test_kernels`: 13/13 passed | GPU kernel operations (Add, Multiply, NormalizeVector, CosineSimilarity, BatchCosineSimilarity) validated against CPU reference; includes edge cases (zero, single-element, large 1M vectors). |
 | CI pipeline | ✅ GitHub Actions | `.github/workflows/ci.yml`: CUDA 12.5, CMake build + ctest + warning check + Python syntax verification. Triggered on push/PR to master. |
-| Test suite | 65 configured CTest entries | The suite contains 55 C++ tests, nine Python tests, and `test_web_model`. The active async Sortformer gate is bound to v2.1, with distinct inherited, official-high, official-low, and synchronous numerical guards. The obsolete v2 model gate was removed with its local checkpoint. Other gates cover short-block batched GEMM, source-stable manifests and telemetry cadence, the strict closing ledger, frozen speaker evidence, decision replay, sequence and multi-scale voiceprint candidates, and review-packet integrity. The complete 2026-07-15 run passes 65/65. Playwright and physical-microphone acceptance remain outside CTest, and no automated result substitutes for the signed audible-boundary ledger. |
+| Test suite | 65 configured CTest entries | The suite contains 55 C++ tests, nine Python tests, and `test_web_model`. The active async Sortformer gate is bound to v2.1, with distinct inherited, official-high, official-low, and synchronous numerical guards. The obsolete v2 model gate was removed with its local checkpoint. Other gates cover short-block batched GEMM, source-stable manifests and telemetry cadence, the strict closing ledger, frozen speaker evidence, decision replay, sequence and multi-scale voiceprint candidates, and review-packet integrity. The complete 2026-07-15 run passes 65/65. Playwright and physical-microphone acceptance remain outside CTest. No automated result may assign correctness, aggregate accuracy, rank/select a candidate, or produce product acceptance. |
 | Diar tail parameter experiments | ❌ No accepted fix | 2026-07-10 TOML experiments used `diar_evidence_probe` on full `test.mp3` for strict onset/offset, `min_dur_on=1.2`, `min_dur_on=2.0`, `chunk_left_context=2`, `chunk_right_context=0`, and `left2_right0`. Threshold/min-duration changes deleted evidence without recovering the correct speaker; context variants did not solve 3270-3304 s and some removed the small local-2 hint at 3299.76 s. NeMo full-length reference on the same audio produced the same hard-window spk3 bias (`3270-3304.5`: spk3 313/431 frames; `3240-3360`: spk3 1013/1500 frames). The historical v2 numerical gate passed at that time; its checkpoint and CTest have since been removed. See Spec 012 `diar-tail-toml-experiments-2026-07-10.md`. |
 | TitaNet tail voiceprint review | ❌ No accepted override | 2026-07-10 orthogonal speaker-embedding review used `speaker_embedding_probe` on full `test.mp3` with 600 s, 60 s, and 30 s buckets. The hard-window `L3@3270-3300` bucket remains closest to historical L3 (`L3@3300-3330=0.762`, historical L3 up to 0.724) while best non-L3 alternatives are lower (`L0=0.440`, `L1=0.424`, `L2=0.321`). This rejects direct TitaNet override for 3270-3304 s. See Spec 012 `titanet-tail-evidence-2026-07-10.md`. |
 | OnText protocol matching | ✅ Fixed | Substring `text.find("end")` → JSON key `text.find("\"end\"")` to prevent false positives on partial matches. Same for reset/flush. |
@@ -300,7 +309,7 @@ Full 3615 s of `test.mp3` pushed through the real WebSocket at max push rate
 | VAD segments | 972 |
 | Total messages | ~1253 (comprehensive entries) |
 
-**Historical finding (2026-06-25)**: the then-current protocol subscription plus local VAD cache eliminated the O(N²) `Replay()` calls on the ASR hot path. **Wall time ≈ audio duration (3616s vs 3615s)**. Diar track accuracy was 77.3% (diar track) / 67.0% (comprehensive view); the 600 s evaluation reported 92.8% diar track accuracy. This describes the measured implementation at that date, not the current evidence-flow architecture.
+**Historical finding (2026-06-25)**: the then-current protocol subscription plus local VAD cache eliminated the O(N²) `Replay()` calls on the ASR hot path. **Wall time ≈ audio duration (3616s vs 3615s)**. Code-derived duration mappings reported 77.3% (diar track), 67.0% (comprehensive view), and 92.8% for 600 s. These are historical mechanical records, not accuracy evaluations, candidate evidence, or the current evidence-flow architecture.
 
 **Current implementation**: ASR reads an immutable typed VAD snapshot and monotonic processed horizon from `ComprehensiveTimeline`. Protocol messages mirror the committed VAD evidence and are not a private runtime data bus.
 
@@ -333,14 +342,14 @@ proved one-hour speaker-cache degradation was not supported by the required
 full contextual review. The 2026-07-15 exact FIFO correction changes
 assignments across 464/556 reference intervals, and the remaining written-
 context failures are distributed across the session rather than confined to
-the tail. The figures in this subsection are retained only as old script
+  the tail. The figures in this subsection are retained only as old code
 diagnostics and must not be used as a causal or acceptance result.
 
 > **Note (superseded methodology)**: the 92.8% / 77.3% figures above are
-> duration-weighted *script* metrics over the diarizer's per-window LOCAL slots
+> duration-weighted code metrics over the diarizer's per-window LOCAL slots
 > (an optimal-mapping upper bound, not a deployable identity). Speaker accuracy is
-> now judged by **context-aware per-segment semantic comparison** (Test Review
-> Protocol), not scripts. The long-session diar degradation is mitigated by the
+> now judged only by **complete contextual semantic comparison** (Test Review
+> Protocol), never by code. The long-session diar degradation is mitigated by the
 > periodic diarizer reset (commit 7507748) and the cross-session GLOBAL identity
 > layer finalized in Spec 010 (see "cross-session identity finalized" below): the
 > full 60-min stream now yields exactly 4 stable global speakers.
@@ -386,7 +395,7 @@ Findings:
 
 ## 6. SDD artifacts
 
-- [.specify/memory/constitution.md](../.specify/memory/constitution.md) — v1.6.0 (one canonical session clock; supplemental test provenance)
+- [.specify/memory/constitution.md](../.specify/memory/constitution.md) — v1.7.0 (one canonical session clock; supplemental test provenance; context-only product-result evaluation)
 - [specs/001-streaming-pipeline/spec.md](001-streaming-pipeline/spec.md) — implemented
 - [specs/001-streaming-pipeline/plan.md](001-streaming-pipeline/plan.md) — implemented
 - [specs/001-streaming-pipeline/tasks.md](001-streaming-pipeline/tasks.md) — implemented
@@ -400,7 +409,7 @@ Findings:
 - [specs/006-web-ui/tasks.md](006-web-ui/tasks.md) — implemented
 - [specs/011-observability/spec.md](011-observability/spec.md) — **Implemented** (2026-06-30): offline [rerun](https://rerun.io) visualization, kept entirely in `tools/` (no runtime third-party dep, Art. I). **Phase 1**: `tools/verify/py/ws_unified_test.py` captures the runtime's periodic `gpu_telemetry`/cursor WS samples into a `telemetry` array; `tools/observability/timeline_to_rerun.py` keys diarization/comprehensive lanes by the global `speaker_id` (`spk_N`) + per-pipeline RTF lanes. **Phase 2 (comprehensive dashboard)**: `TegraSampler` records a continuous `device_series`; the exporter renders six namespaced dimensions on one `audio_time` axis — `pipelines/*`, `comprehensive/<id>` swimlanes, `scheduler/<pipe>/{rtf,compute_sec,active,cuda_priority}`, `cursors/<pipe>/{position_sec,pending_sec}`, `device/{mem,cpu,gpu,temp,power}/*` (extended tegrastats parse; Orin `GR3D_FREQ` optional, omitted on Thor), and `session/summary` — laid out by a `rerun.blueprint` persisted in the `.rrd`. Methodology + best practices in `tools/observability/README.md`. **Config fix**: nested `[telemetry.cursor]` was never read (`config["telemetry.cursor"]` literal-key lookup) → now `config["telemetry"]["cursor"]`, with a `test_config` regression. Validated on a `rate=1` 120 s run: 125 gpu + 125 cursor + 126 device samples, six dimensions populated, stream_rt 0.964×, ctest 47/47, zero warnings. Follow-ups: live WS→rerun consumer, full-hour acceptance recording.
 - [specs/010-speaker-id/spec.md](010-speaker-id/spec.md) — **Implemented, with Phase H experiment not accepted as accuracy fix; local-diar operating profile restored**: speaker identity (TitaNet-Large voiceprint enrollment / re-identification as a post-diarization stage inside the diar pipeline, Art. III). **Phase A complete & committed**: A1 acquire+convert weights → `models/speaker/titanet_large.safetensors` (108 tensors); A2 NeMo oracle (`tools/reference/titanet_oracle.py`, isolated `tools/.venv-nemo`); A3 pure C++/CUDA `model::TitaNetEmbedder` (`include/model/titanet_embedder.h` + `src/model/titanet_embedder.cu`, time-major [T,C]: mel+per_feature → 5-block ContextNet encoder → attentive statistics pooling → 192-d, F32 weights); A4 `test_titanet` validated vs NeMo oracle (**span cosine 1.000000/0.999999/1.000000, cross-span matrix to 4 decimals; ctest 46/46, no warnings**). **Phase B complete & committed**: `pipeline::SpeakerIdentityStage` (clean-segment gate + per-local embed/match/enroll via `SpeakerDatabase` + revisable local→global map), wired into the diar pipeline behind a `DiarizationWorker` segment-processor hook + `[speaker]` config; diar message/track expose a backward-compatible `speaker_id` field. **2026-07-06 validation**: Phase H conservative cross-session candidate (`/tmp/orator_phaseh_full.json`) was rejected by context review [local-diar-review-2026-07-06.md](010-speaker-id/local-diar-review-2026-07-06.md): it reduced wrong late globals into local-only gaps but did not restore attribution. Follow-up restored Sortformer local-diar runtime tuning to the async/no-reset profile (`spkcache_update_period=188`, `chunk_right_context=1`, `spkcache_sil_frames=3`) in `orator.toml`; lower-level `SortformerConfig` defaults remain tied to the existing NeMo oracle fixture. Full-length real WS `/tmp/orator_full_async_default_20260706.json`: 3615 s audio, 3618.487 s wall, stream RT 0.999x, diar 773, ASR 288, VAD 972, 3611 tegrastats samples, stable 4 global ids and no local-only gaps; context review [local-diar-default-188-review-2026-07-06.md](010-speaker-id/local-diar-default-188-review-2026-07-06.md) accepts the stable operating profile but records residual rapid-turn fragmentation in 3000-3615 s and an ASR repeat burst at 1927-1944 s.
-- [specs/012-evidence-fusion-timeline/spec.md](012-evidence-fusion-timeline/spec.md) — **Runtime candidate validated (2026-07-08); tail evidence reviewed and support diagnostics added (2026-07-09)**: evidence-first comprehensive timeline fusion plus TOML-gated runtime adoption. `tools/verify/py/fusion_audit.py` and `speaker_business_review_packet.py` read frozen `ws_unified_test.py` JSON packages, audit ASR/diar/VAD/align consistency, and emit candidate/business-turn views without mutating captured tracks. After the 2026-07-07 review showed forced alignment alone did not recover speaker-business accuracy, 2026-07-08 fixes added local-speaker drift/competing-identity split and backfill, per-entry comprehensive `speaker_id`, and `[timeline]` align-run split parameters. Full-length real WS run `/tmp/orator_timelinefusion_full_20260708.json`: 3615.0 s audio, 3618.74 s wall, stream RT 0.999x, diar 773, ASR 288, align 288/288. Fusion audit `/tmp/orator_timelinefusion_full_20260708_fusion_bt_timeline.json`: business_turns=728, unknown 171.860 s (4.75%), no mechanical audit issues. Context-aware review [drift-epoch-review-2026-07-08.md](012-evidence-fusion-timeline/drift-epoch-review-2026-07-08.md) follows [speaker-business-method.md](012-evidence-fusion-timeline/speaker-business-method.md): major known full-length speaker-business regressions are materially recovered, with residual short-boundary artifacts and conservative unknown spans. Follow-up full-length candidates [refresh0-context-review-2026-07-08.md](012-evidence-fusion-timeline/refresh0-context-review-2026-07-08.md) rejected `spkcache_refresh_rate=0`, `histctx 300/40/5`, and a context low-support speaker inheritance heuristic: refresh-0 did not materially improve the tail, and the inheritance rule fixed 3270-3304 s while regressing 1200-1320 s. Tail evidence review [tail-evidence-review-2026-07-09.md](012-evidence-fusion-timeline/tail-evidence-review-2026-07-09.md) added `diar_evidence_probe` and confirmed that 3270-3304 s is a bottom-diarization hard spot already present in older closing packages; `reset_period_sec=600/120/60`, `use_silence_profile=true`, coverage-to-unknown, and gap-fill limits are not accepted fixes. Follow-up [speaker-support-diagnostics-2026-07-09.md](012-evidence-fusion-timeline/speaker-support-diagnostics-2026-07-09.md) implements the recommended uncertainty-aware direction by surfacing per-entry speaker-support metrics in runtime JSON and Web UI without changing attribution. Follow-up [titanet-tail-evidence-2026-07-10.md](012-evidence-fusion-timeline/titanet-tail-evidence-2026-07-10.md) tested orthogonal TitaNet voiceprint evidence and rejected a direct override for 3270-3304 s because 600 s, 60 s, and 30 s bucket views all keep the target L3 spans closest to historical L3. Diar-only or script-derived percentages remain diagnostics, not acceptance results.
+- [specs/012-evidence-fusion-timeline/spec.md](012-evidence-fusion-timeline/spec.md) — **Runtime candidate validated (2026-07-08); tail evidence reviewed and support diagnostics added (2026-07-09)**: evidence-first comprehensive timeline fusion plus TOML-gated runtime adoption. `tools/verify/py/fusion_audit.py` and `speaker_business_review_packet.py` read frozen `ws_unified_test.py` JSON packages, audit ASR/diar/VAD/align consistency, and emit candidate/business-turn views without mutating captured tracks. After the 2026-07-07 context review showed forced alignment alone did not recover speaker-business accuracy, 2026-07-08 fixes added local-speaker drift/competing-identity split and backfill, per-entry comprehensive `speaker_id`, and `[timeline]` align-run split parameters. Full-length real WS run `/tmp/orator_timelinefusion_full_20260708.json`: 3615.0 s audio, 3618.74 s wall, stream RT 0.999x, diar 773, ASR 288, align 288/288. Fusion audit `/tmp/orator_timelinefusion_full_20260708_fusion_bt_timeline.json`: business_turns=728, unknown 171.860 s (4.75%), no mechanical audit issues. Complete contextual review [drift-epoch-review-2026-07-08.md](012-evidence-fusion-timeline/drift-epoch-review-2026-07-08.md) follows [speaker-business-method.md](012-evidence-fusion-timeline/speaker-business-method.md). Follow-up candidate decisions are historical context-review records. All code-derived percentages and evidence scores in Spec 012 are mechanical records only; they may not evaluate accuracy, rank/select a candidate, or issue a product verdict under Constitution 1.7.0.
 - [specs/013-industrial-closing-validation/spec.md](013-industrial-closing-validation/spec.md) — **In progress, approved 2026-07-13**: defines the 90 percent full business-view gates, complete 556-turn reference ledger, architecture/configuration remediation, frozen-evidence upper-bound decision, two repeat full runs, and the distinction between canonical-scene acceptance and a broader industrial-readiness claim. No closing status is implied until all tasks and gates are completed.
 
 ## 7. Immediate next step
@@ -447,7 +456,7 @@ measurement records; none independently satisfies Spec 013 acceptance.
   comprehensive entries but is not yet an accepted accuracy fix; acceptance
   still requires a full-length real WebSocket run and context-aware review under
   `speaker-business-method.md`.
-- **Spec 010 speaker identity — cross-session identity finalized** (commits 38cdf51, 9c02862, 17f8d92, 06875c3, 5f301ba). The voiceprint stage now assigns a persistent GLOBAL id to every diar segment. Design corrections, all validated through the REAL streaming path (rate=1) and judged by **context-aware per-segment semantic comparison vs `test.txt`** (Test Review Protocol — accuracy is NOT taken from script metrics):
+- **Spec 010 speaker identity — cross-session identity finalized** (commits 38cdf51, 9c02862, 17f8d92, 06875c3, 5f301ba). The voiceprint stage now assigns a persistent GLOBAL id to every diar segment. Design corrections were validated through the REAL streaming path (rate=1) and judged by complete contextual semantic comparison vs `test.txt`. Under Constitution 1.7.0, no code or metric may assign accuracy, rank/select a candidate, or issue the verdict:
   - **Trust the diarizer's within-session separation**: each local slot resolves to its own global id; same-session slots can never collapse to one id (`SpeakerDatabase::MatchExcluding`). Per-segment re-matching was removed (it collapses similar voices to the dominant centroid).
   - **Cross-session strengthening**: each global's centroid is the mean of the best references of all slots mapped to it across sessions, so a returning speaker re-matches reliably (match cosine ~0.55 → 0.7–0.87).
   - **Registry-level de-duplication, uncapped**: `MergeReconcile` merges two globals only when their centroids are confidently the same person (cosine > 0.70; a stricter 0.85 for two globals that ever co-occurred in one session, since the diarizer judged them distinct), and `SpeakerDatabase::Remove` deletes the duplicate so the registry holds exactly one entry per real speaker. The registry is never capped — it is designed to recognise many speakers (≥200) across sessions.
@@ -485,6 +494,7 @@ measurement records; none independently satisfies Spec 013 acceptance.
   omission of FIFO embeddings from subsequent model inputs and loss of old
   FIFO frames before cache transfer. The corrected dual sync/async path now
   passes independently regenerated exact-profile fixtures at `1e-5` tolerance.
-  Historical 600 s script metrics and 39-test evidence remain records of that
-  build only; they do not establish current business accuracy. See Spec 013
+  Historical 600 s code metrics and 39-test evidence remain mechanical records
+  of that build only; they do not evaluate current business accuracy, compare
+  candidates, or support a verdict. See Spec 013
   [sortformer-oracle-2026-07-15.md](013-industrial-closing-validation/sortformer-oracle-2026-07-15.md).

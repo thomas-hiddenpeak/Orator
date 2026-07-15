@@ -9,8 +9,11 @@ The closing review uses two signed JSON documents:
 2. `orator_run_review`: mechanically selected raw-track evidence plus two manual
    review passes and one reconciled final judgment for the exact run artifact.
 
-`closing_ledger.py` may parse, align, display, validate, and total signed manual
-judgments. It must never infer whether a speaker assignment is correct.
+`closing_ledger.py` may parse source data, select evidence by time for display,
+and validate hashes/schema/signature presence. It must never infer whether a
+speaker assignment is correct, total judgments, calculate a percentage, compare
+a threshold, rank candidates, or emit an acceptance result. A structurally
+valid ledger is not an evaluated result.
 
 ## Reference entry
 
@@ -54,19 +57,20 @@ validate.
 
 ## Totals
 
-Natural-turn accuracy counts only final `correct` rows over all 556 rows.
-Speaker-time accuracy sums only manually selected correct intervals over all
-adjudicated audible durations. Speaker time crossing a fixed 600-second
-boundary is clipped into both blocks; turn accuracy uses the block containing
-the audible start. The final partial 15.12-second block is reported separately
-and is not treated as a full 600-second gate.
+The reviewer manually counts final `correct` rows over all 556 rows for
+natural-turn accuracy. The reviewer manually sums selected correct intervals
+over all adjudicated audible durations for speaker-time accuracy. Speaker time
+crossing a fixed 600-second boundary is manually clipped into both blocks; turn
+accuracy uses the block containing the audible start. The final partial
+15.12-second block is reported separately and is not treated as a full
+600-second gate.
 
-The summary reports full-session, fixed-block, and per-canonical-speaker turn
-and speaker-time recall; critical-turn accuracy; critical and overall confident
-wrong attribution; and median/P95 absolute boundary offsets. It emits explicit
-speaker acceptance booleans but does not infer any row judgment. The summary
-command refuses incomplete, stale-timeline, unknown-evidence, unsigned, or
-hash-mismatched ledgers.
+The signed manual report records full-session, fixed-block, and
+per-canonical-speaker turn and speaker-time recall; critical-turn accuracy;
+critical and overall confident-wrong attribution; and median/P95 absolute
+boundary offsets. A second reviewer pass manually reproduces every total and
+gate decision. No summary command, spreadsheet formula, query, script, or other
+code may produce these values or acceptance booleans.
 
 ## Commands
 
@@ -85,7 +89,8 @@ python3 tools/verify/py/closing_ledger.py validate \
   --ledger /path/reference-ledger.json \
   --review /path/full-run-review.json --require-complete
 
-python3 tools/verify/py/closing_ledger.py summary \
-  --ledger /path/reference-ledger.json \
-  --review /path/full-run-review.json
 ```
+
+The commands above initialize/display evidence and validate structural
+completeness only. They do not evaluate accuracy. There is intentionally no
+authorized command for labels, totals, percentages, ranking, or acceptance.

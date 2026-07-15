@@ -22,11 +22,12 @@
   many speakers, ≥200). Validated on the full 60-min real WebSocket stream (rate=1):
   4 real speakers → exactly 4 stable global ids across all 6 reset sessions, judged
   by context-aware per-segment semantic comparison vs `test.txt` (Test Review
-  Protocol — accuracy is NOT derived from script metrics). Commits 38cdf51, 9c02862,
+  Protocol — no code or automated metric may derive accuracy, rank a candidate,
+  or issue a verdict). Commits 38cdf51, 9c02862,
   17f8d92, 06875c3, 5f301ba.
 - **Created**: 2026-06-28
 - **Owner**: project owner
-- **Constitution**: v1.5.0
+- **Constitution**: v1.7.0
 
 > WHAT a speaker-identity layer must provide and WHY. Architecture, data flow,
 > threading, and phasing are in `plan.md`; ordered work is in `tasks.md`.
@@ -106,9 +107,12 @@ global id is injected into the comprehensive timeline (revisably), so the
 - Build clean `-Wall -Wextra`; `ctest` green.
 - Phase H acceptance requires a full-length real WebSocket run with `test.mp3`,
   `tegrastats` observation, and context-aware per-segment comparison against
-  `test.txt`. Script-derived speaker percentages are diagnostic only and cannot
-  be used as the acceptance conclusion.
+  `test.txt`. No code, script, test, metric, formula, query, or algorithm may
+  assign correctness, calculate speaker accuracy, rank/select a candidate, or
+  issue the acceptance conclusion. Historical code-derived percentages are
+  retained as non-authoritative mechanical diagnostics only.
 - Local-diar recovery acceptance requires the same full-length real WebSocket
   path and must prove stable global identity coverage without sacrificing the
   Test Review Protocol's context-aware speaker-turn judgment. Structural JQ
-  diagnostics are allowed only to select review windows.
+  diagnostics may display evidence but may not select evaluation windows;
+  every in-scope turn must be reviewed in full context.

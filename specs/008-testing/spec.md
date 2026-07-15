@@ -4,7 +4,7 @@
 - **Status**: Draft
 - **Created**: 2026-06-22
 - **Owner**: project owner
-- **Constitution**: v1.4.0
+- **Constitution**: v1.7.0
 
 > WHAT system-level testing means, HOW it is executed, and WHY the evaluation
 > methodology is semantic comparison against a reference transcript rather than
@@ -27,7 +27,8 @@ This spec defines the system-level testing methodology:
   timestamps, and semantic text
 - **Speed**: 1× real-time (simulates microphone input — no burst pushing)
 - **Scope**: Three durations — 120s (L1), 600s (L2), Full (L3)
-- **Evaluation**: AI-conducted semantic comparison against reference
+- **Evaluation**: complete AI-conducted contextual semantic comparison against
+  the reference; no code-based result evaluation
 - **Criteria**: ASR accuracy, speaker attribution accuracy, timing precision,
   comprehensive view coherence
 
@@ -112,6 +113,14 @@ level, not the character level.
 ---
 
 ## 4. Evaluation Dimensions
+
+Every dimension below is judged item by item by an AI or human reviewer reading
+the surrounding conversation. No compiled code, test, script, notebook,
+formula, query, metric, or algorithm may assign a result label, aggregate an
+accuracy value, rank/select a candidate, or issue the verdict. Automation may
+capture and arrange unjudged evidence and verify mechanical/numerical contracts
+only. Mechanical timing and health values remain separate evidence and never
+become a semantic accuracy proxy.
 
 ### 4.1 ASR Text Accuracy
 
@@ -207,10 +216,13 @@ tl = collect_timeline(ws, timeout)
 
 ### 5.4 Evaluation
 
-The evaluator (AI) reads `test.txt` and the timeline JSON, then produces a
-structured report covering all dimensions in §4. The evaluation is **manual**
-(conducted by the AI) — not scripted — because semantic comparison requires
-understanding of context, reference normalization, and domain knowledge.
+The evaluator reads `test.txt` and the timeline JSON, then produces a structured
+report covering every in-scope item in §4. The evaluator must read adjacent
+turns, interruptions, corrections, and speaker positions before assigning a
+judgment. A second complete pass is required for closing evaluation, followed by
+manual reconciliation and manual tally verification. Code-based labels,
+percentages, rankings, and verdicts are invalid even when code consumes
+reviewer-entered labels.
 
 ---
 
@@ -228,13 +240,13 @@ Each test level produces a structured report:
 - VAD: N segments, X.XXs compute
 
 ### ASR Text Accuracy
-- Semantic match rate: N/N utterances (XX%)
+- Manually reviewed semantic result: N/N utterances (XX%, manually tallied and checked)
 - Entities correct: ...
 - Hallucinations: ...
 - Omissions: ...
 
 ### Speaker Attribution
-- Correct speaker: N/N entries
+- Manually reviewed correct speaker: N/N entries (manually tallied and checked)
 - Speaker_-1 fraction: XX%
 - Notable boundary errors: ...
 
@@ -258,9 +270,10 @@ Each test level produces a structured report:
 | L2 (600s) | Extended stability | Before release |
 | L3 (full) | Production qualification | Before deployment |
 
-The C++ tests and integration test are automated in CI. L1–L3 are
-AI-conducted evaluations that require human-readable output and are triggered
-on demand.
+The C++ tests and integration test are automated engineering gates in CI.
+L1-L3 product evaluations are context-semantic reviews performed item by item
+and triggered on demand. Automated gates cannot produce or contribute an
+accuracy or acceptance result.
 
 ---
 

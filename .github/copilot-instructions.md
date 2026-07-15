@@ -44,6 +44,11 @@ rework. Enforce these every session:
 ## Constitutional hard rules
 - Runtime dependency policy: production runtime is pure C++20/CUDA only. No new runtime third-party libraries.
 - Accuracy first: do not trade measurable quality for speed unless explicitly approved and validated.
+- Result evaluation is context-only: no compiled code, test, script, notebook,
+  formula, query, automated metric, or algorithm may assign correctness,
+  aggregate accuracy, rank/select a candidate, or issue a product verdict.
+  Automation may capture and display unjudged evidence and verify mechanical or
+  numerical contracts only.
 - Dual pipeline model: diarization and ASR are independent pipelines sharing only input audio and one absolute time base.
 - Streaming validation: validate through the real WebSocket streaming path, not whole-file shortcut runs.
 - Engineering quality is mandatory: readability, layering, RAII, race-free concurrency, small focused functions.
@@ -64,7 +69,12 @@ rework. Enforce these every session:
 - Build is clean with no new warnings under `-Wall -Wextra`.
 - Relevant tests pass (`ctest --output-on-failure`).
 - For streaming behavior/perf claims: run through WebSocket path and report measured numbers with units and conditions.
-- For accuracy-sensitive changes: compare against reference/oracle outputs and report tolerance or quality metrics.
+- For model implementation changes: compare numerically against the trusted
+  oracle and report tolerances as component evidence only.
+- For product accuracy: manually review every in-scope item against the
+  reference in surrounding conversational context, perform the required second
+  pass, and manually derive/check the result. Do not use code-generated labels,
+  totals, percentages, rankings, or pass/fail decisions.
 - Output contract compatibility is preserved unless the spec explicitly changes it.
 - State docs match the code: `PROJECT_STATE.md` and the affected spec/tasks status lines are updated to reality with commit references (Constitution Article VIII).
 

@@ -1,5 +1,11 @@
 # Tasks: Evidence-First Comprehensive Timeline Fusion
 
+Under Constitution 1.7.0, every accuracy or candidate decision named below is
+valid only when produced by complete contextual semantic review with manually
+verified totals. Code and automated metrics may capture/display mechanical
+evidence but may not assign correctness, calculate accuracy, rank/select a
+candidate, or issue a verdict.
+
 - [x] T001 Enable forced alignment in `orator.toml` for all-pipeline evidence
   capture.
 - [x] T002 Add an offline fusion/audit tool under `tools/verify/py/`.

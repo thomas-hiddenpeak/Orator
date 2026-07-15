@@ -138,7 +138,10 @@ The source log has no error, fatal, failed, exception, timeout, OOM, or
 out-of-memory record. All run processes were stopped after artifact capture.
 The review files are `review/by-reference.md` and `review/reverse-blocks.md`
 under the same artifact directory. They cover all 556 rows and only arrange
-time-overlapping evidence; they contain no script-assigned judgment.
+time-overlapping evidence. No code, script, test, metric, formula, query, or
+algorithm may use them to assign correctness, total accuracy, compare
+candidates, or issue a verdict; those actions require complete contextual
+semantic review and manual result verification.
 
 ## Decision
 

@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Ground-truth speaker-identity evaluation on test.mp3 / test.txt.
+"""Legacy speaker-identity diagnostic on test.mp3 / test.txt.
+
+Under Constitution 1.7.0 this code may not evaluate product accuracy,
+rank/select a candidate, choose a parameter, or issue a verdict. Historical
+identification and equal-error-rate values are component diagnostics only;
+current result evaluation requires complete contextual semantic review.
 
 The reference transcript (test/data/reference/test.txt) carries timestamped,
 NAMED speaker turns, so it is a real ground truth for speaker identity. This

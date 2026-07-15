@@ -4,6 +4,7 @@
 **Created**: 2026-07-13
 **Scope**: Re-establish a truthful product baseline, recover full-session business
 accuracy, and define the evidence required before Orator may be declared closed.
+**Constitution**: v1.7.0
 
 ## 1. Objective
 
@@ -181,13 +182,19 @@ subject to the complete acceptance gates in this spec.
 ### 4.3 Reference and evaluation
 
 - **FR9**: The reference turn ledger must cover all 556 timestamped turns. No
-  sampling, selected-window substitution, or script-inferred correctness is
+  sampling, selected-window substitution, or code-inferred correctness is
   permitted.
 - **FR10**: Accuracy judgments must be made item by item in conversational
-  context. Tools may capture, index, and present evidence, but may not assign
-  correctness labels or select the winning configuration.
-- **FR11**: Every reported percentage must be reproducible from signed ledger
-  rows. Boundary offsets and overlapping speech must remain visible.
+  context. No compiled program, C++/CUDA test, Python/shell/JavaScript script,
+  notebook, spreadsheet formula, query, metric, algorithm, or temporary command
+  may assign correctness, infer semantic equivalence, aggregate accuracy,
+  rank/select a candidate, or issue a promotion/acceptance verdict. Tools may
+  capture, verify mechanical contracts, index, and present unjudged evidence
+  only.
+- **FR11**: Every reported percentage must be manually derived and manually
+  cross-checked from signed contextual ledger rows. Automated counting,
+  percentage calculation, threshold comparison, and acceptance booleans are
+  prohibited. Boundary offsets and overlapping speech must remain visible.
 - **FR12**: Diagnostic model metrics, including local-slot mapping scores,
   diarization error rate, character error rate, unknown duration, and embedding
   similarity, must not replace the final business-view gates.
@@ -294,7 +301,8 @@ industrial audio.
 - Previous numerical-oracle and stability evidence is not discarded; it remains
   component evidence and must be rechecked where the accepted candidate changes
   behavior.
-- Script-derived rankings do not choose model parameters.
+- Code-derived labels, totals, percentages, rankings, and acceptance decisions
+  are prohibited; they do not choose model parameters.
 - Text content, speaker identities, or reference-specific lexical rules are not
   hardcoded for `test.mp3`.
 - Accuracy is not improved by converting wrong attribution to `unknown`; that
@@ -310,9 +318,11 @@ industrial audio.
   acceptance.
 - **Article IV**: every acceptance result comes from incremental WebSocket input
   and the terminal comprehensive document.
-- **Article VI**: full item-by-item contextual review is mandatory. Supplemental
-  safety and locked holdout recordings follow the 1.6.0 provenance rules and do
-  not replace `test.mp3`.
+- **Article VI**: full item-by-item contextual semantic review is the only
+  result-evaluation method. Automation stops at mechanical/numerical validation
+  and unjudged evidence display. Supplemental safety and locked holdout
+  recordings follow the 1.7.0 provenance and evaluation rules and do not replace
+  `test.mp3`.
 - **Article IX**: runtime parameter changes are TOML-only, and the implementation
   loading order must be corrected to defaults, TOML, environment, then CLI.
 - **Articles X-XI**: this spec, its plan/tasks, code, tests, and project state must

@@ -1,8 +1,10 @@
 # Tail Evidence Review - 2026-07-09
 
-This review follows the project test-review protocol: script outputs below are
-diagnostics only. Speaker-business acceptance remains the context-aware review
-against `test/data/reference/test.txt`.
+Under Constitution 1.7.0, no code or executable automation may assign
+correctness, calculate accuracy, rank/select a candidate, or issue a verdict.
+Code output below is mechanical evidence only. Speaker-business evaluation
+requires complete contextual semantic review against
+`test/data/reference/test.txt` and manual result verification.
 
 ## Question
 

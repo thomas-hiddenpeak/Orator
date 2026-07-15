@@ -14,6 +14,12 @@ either removed or left disabled with an explicit experimental status. After
 three failed solution families with the same root limitation, work returns to
 the last accepted commit and the model strategy is reconsidered.
 
+All product-result evaluation is performed only through complete contextual
+semantic review. Code may execute/capture runs, validate mechanical and
+numerical contracts, generate reference-free candidate views, and display
+unjudged evidence. It may not assign labels, aggregate an accuracy result,
+compare or rank candidates, select parameters, or issue a gate verdict.
+
 ## 2. Phase 0: Governance and Baseline Reset
 
 1. Review and approve Spec 013 before runtime implementation.
@@ -139,8 +145,10 @@ reference row is removed to simplify scoring. Empty, duplicate, or ambiguous
 source rows remain in an adjudication log.
 
 The review tools may seek audio and display system tracks beside a ledger row.
-They do not assign correctness. Acceptance totals are derived only from the
-signed manual judgments and independently checked against the ledger.
+They do not assign correctness, total results, calculate percentages, compare
+thresholds, rank candidates, or emit acceptance booleans. Reviewers manually
+derive all totals from signed contextual judgments, and a separate manual pass
+independently checks those totals against the ledger.
 
 ## 5. Phase 3: Establish the Reproducible v2.1 Closing Baseline
 
@@ -159,7 +167,8 @@ findings. They cannot enter candidate selection or acceptance totals.
    continuous `tegrastats`.
 5. Perform the full 556-row contextual review on the final business view.
 6. Publish the baseline score by full session, fixed 600-second block, speaker,
-   criticality, boundary offset, uncertainty, and confident-wrong attribution.
+   criticality, boundary offset, uncertainty, and confident-wrong attribution;
+   manually tally and independently verify every value without code.
 
 This v2.1 baseline replaces every earlier selected-window, v2, or script-derived
 accuracy claim for closing purposes. The earlier `413/556` result belongs to a
@@ -313,10 +322,12 @@ or score accuracy.
 
 ### 6.3 Decision gate
 
-The frozen candidate must reach at least 93 percent on both speaker-time and
-natural-turn measures, retain 100 percent critical-turn correctness, and avoid
-regression in every fixed 600-second block. If it does, its policy and TOML
-parameters are frozen for runtime implementation.
+The contextual reviewers must manually establish that the frozen candidate
+reaches at least 93 percent on both speaker-time and natural-turn measures,
+retains 100 percent critical-turn correctness, and avoids regression in every
+fixed 600-second block. No program performs the comparison or gate decision. If
+the signed manual review passes, its policy and TOML parameters are frozen for
+runtime implementation.
 
 If it does not, stop policy and threshold tuning. First compare every already
 ported, deployable streaming checkpoint under the same profile against trusted
@@ -352,6 +363,9 @@ next layer is changed. A tolerance is never widened to accept the implementation
 ## 8. Phase 6: Validation Pyramid
 
 ### 8.1 Automated and numerical gates
+
+These gates validate implementation and execution contracts only. They neither
+contribute to nor calculate a product accuracy result or promotion verdict.
 
 - clean configure/build under `-Wall -Wextra` with no warnings;
 - all C++ tests and registered Python real-WebSocket tests;

@@ -12,8 +12,9 @@
 //
 // The speaker evidence is derived from the reference itself, not from
 // Sortformer output. Therefore the percentage below is a mechanical policy
-// diagnostic only. It is not model accuracy and cannot satisfy the contextual
-// semantic review required by the Test Review Protocol and Spec 013.
+// diagnostic only. Under Constitution 1.7.0, code may not evaluate model or
+// product accuracy, rank/select a candidate, or issue a verdict. Only complete
+// contextual semantic review can satisfy the Test Review Protocol and Spec 013.
 
 #include <iostream>
 #include <string>

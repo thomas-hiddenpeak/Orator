@@ -1,7 +1,8 @@
-# Model Validation — Accuracy Verification Against Reference Oracles
+# Model Validation — Numerical Oracles and Contextual Product Review
 
 **Domain:** ASR (Qwen3-ASR) vs PyTorch, diarization (Sortformer) vs NeMo, numerical equivalence
-**Triggers:** new model implementation, precision change, kernel fusion, "verify ASR accuracy", CER/DER measurement
+**Triggers:** new model implementation, precision change, kernel fusion,
+"verify ASR accuracy", speaker/ASR result review
 
 ---
 
@@ -10,7 +11,7 @@
 - Implementing a new model stage (encoder layer, decoder, feature extractor)
 - Any numerical change: precision reduction (bf16→int8), kernel fusion, approximation
 - Before merging any change that touches model output values
-- When asked: "is the ASR output correct?", "verify against oracle", "measure CER"
+- When asked: "is the ASR output correct?" or "verify against oracle"
 - Constitution Art. II mandates validation for EVERY model stage before "done"
 
 ---
@@ -51,24 +52,25 @@ Validation criteria:
 - **Kernels**: element-wise relative error < 1e-5 for float32, < 1e-2 for bf16-equivalent
 - **Transcript output**: token-level argmax match (exact string match for greedy decode)
 
-### Step 4 — End-to-end CER measurement
+### Step 4 — End-to-end contextual semantic review
 
-Through real WebSocket streaming path:
-```bash
-# Record timeline
-python3 tools/ws_stream_client.py --url ws://localhost:8765 --input /tmp/test.pcm --output /tmp/timeline.json
+Capture the exact real-WebSocket terminal artifact and arrange its unjudged
+evidence beside `test.txt`. Then read every in-scope item with its surrounding
+conversation, assign the semantic/speaker judgment directly, complete the
+required reverse-order second pass, reconcile disagreements, and manually
+derive/check every reported result.
 
-# Measure CER against reference transcript
-python3 tools/measure_cer.py --ref test.txt --hyp /tmp/timeline.json
-```
-
-Report: CER%, audio duration, RTF, conditions (GPU clock, pipeline config).
+No code, script, test, notebook, formula, query, metric, or algorithm may assign
+correctness, calculate accuracy, rank/select a candidate, or issue a product
+verdict. CER, DER, string distance, timestamp overlap, duration mapping, and
+embedding scores are not product-evaluation methods.
 
 ### Step 5 — Document and gate
 
 - Record validated tolerances in the relevant `spec.md` acceptance criteria
 - If tolerance drifts: investigate root cause before proceeding. Do NOT adjust tolerance to pass.
-- If accuracy degrades: the change is rejected by default (Art. II). Exception requires explicit approval.
+- If the contextual semantic review shows degradation, the change is rejected
+  by default (Art. II). Exception requires explicit approval.
 
 ---
 
@@ -78,6 +80,8 @@ Report: CER%, audio duration, RTF, conditions (GPU clock, pipeline config).
 - **Adjusting tolerances post-hoc** — tolerances are set by oracle measurement, not by what passes
 - **Whole-file shortcut for streaming accuracy** — must validate through streaming path (Art. IV)
 - **Using GPU results as self-reference** — CPU oracle or PyTorch reference required
+- **Code-based product evaluation** — numerical tests validate implementation
+  parity only; they never label, total, rank, select, or accept business results
 
 ---
 

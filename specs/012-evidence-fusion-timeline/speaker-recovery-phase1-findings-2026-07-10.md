@@ -1,5 +1,11 @@
 # Spec 012 Speaker-Recovery Phase 1 Findings - 2026-07-10
 
+> **Evaluation governance:** Under Constitution 1.7.0, no code or executable
+> automation may assign correctness, calculate accuracy, rank/select a
+> candidate, or issue a verdict. Automated values below are mechanical evidence
+> only; product results require complete contextual semantic review and manual
+> result verification.
+
 ## Scope
 
 This is the first execution of
@@ -46,8 +52,9 @@ python3 tools/verify/py/speaker_business_review_packet.py \
   --out /tmp/orator_support_diag_fusion_business_tail_packet_20260710.md
 ```
 
-The diagnostic overlap script was also run to locate changed windows. Its
-percentages are not acceptance results.
+The historical overlap script was run to display changed windows. Its
+percentages are mechanical records only and may not evaluate, compare, rank, or
+select a result.
 
 ## Mechanical Results
 

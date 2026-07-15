@@ -1,6 +1,18 @@
 # Orator Tools
 
-This directory contains various tools for verification, testing, conversion, and evaluation.
+This directory contains tools for verification, testing, conversion, evidence
+capture, and historical diagnostics. Tools do not evaluate product results.
+
+## Result-Evaluation Prohibition
+
+Under Constitution 1.7.0 Article VI, no tool in this directory may assign
+correctness, calculate or estimate product accuracy, rank/select candidates, or
+issue pass/fail or promotion decisions. This includes compiled tools, Python,
+shell and JavaScript scripts, notebooks, formulas, queries, and algorithms.
+Tools may verify numerical-oracle parity and mechanical contracts, or capture,
+index, and display unjudged evidence. Product evaluation is performed only by a
+reviewer reading every item in complete conversational context and manually
+deriving and checking the result.
 
 ## Directory Structure
 
@@ -78,8 +90,10 @@ Use to dump activations, operations, or streaming data for analysis:
 python3 tools/dump/dump_activations.py
 ```
 
-### Evaluation Tools
-Use to evaluate speaker accuracy or CER:
+### Legacy Diagnostic Tools
+The files under `tools/eval/` may reproduce historical lexical or duration
+diagnostics. Their output is not an accuracy result, cannot compare candidates,
+and cannot be used for configuration or acceptance decisions:
 ```bash
 python3 tools/eval/eval_speaker_acc.py
 ```

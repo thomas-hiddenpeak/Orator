@@ -1,5 +1,11 @@
 # Spec 012 Speaker-Recovery Validation Plan - 2026-07-10
 
+> **Evaluation governance:** Under Constitution 1.7.0, no code or executable
+> automation may assign correctness, calculate accuracy, rank/select a
+> candidate, or issue a verdict. Automation may display unjudged evidence only;
+> product results require complete contextual semantic review and manual result
+> verification.
+
 ## Purpose
 
 The current full-session comprehensive timeline exposes weak speaker-support
@@ -16,13 +22,15 @@ context-aware review.
 - Use `orator.toml` for runtime parameters. Command-line flags may capture
   audio and choose output files, but accepted runtime behavior must be
   represented in TOML and code.
-- Scripts may locate windows, package evidence, and report mechanical
-  consistency. They do not decide accuracy acceptance.
+- Code may package and display unjudged evidence and report mechanical
+  consistency. It may not select evaluation windows, assign judgments, total
+  accuracy, rank candidates, or decide acceptance.
 - Accuracy acceptance requires review against `/home/rm01/test/test.txt` in
   context, using `speaker-business-method.md` and
   `.specify/test-review-protocol.md`.
 - The comprehensive timeline is the reviewed business output. Standalone diar
-  percentages are diagnostic only.
+  percentages are historical mechanical diagnostics only and cannot evaluate
+  the result.
 - Existing pipeline tracks remain immutable evidence. Any business-view rewrite
   must preserve raw track data and record the reason for uncertainty or
   attribution.
@@ -127,7 +135,7 @@ Acceptance requires:
 - successful full-length real WebSocket run;
 - device metrics observed through `tegrastats` when performing the run;
 - no build or CTest regression;
-- final review explicitly separates script diagnostics from contextual
+- final review explicitly separates mechanical code diagnostics from contextual
   speaker-business judgment.
 
 ## Current Working Hypothesis

@@ -1,7 +1,13 @@
 # Spec 012 Refresh-Rate and Context-Fusion Review - 2026-07-08
 
+> **Evaluation governance:** Under Constitution 1.7.0, no code or executable
+> automation may assign correctness, calculate accuracy, rank/select a
+> candidate, or issue a verdict. Automated values below are mechanical evidence
+> only; product results require complete contextual semantic review and manual
+> result verification.
+
 This review follows `.specify/test-review-protocol.md` and
-`speaker-business-method.md`. Script output below is diagnostic only; the
+`speaker-business-method.md`. Code output below is mechanical evidence only; the
 acceptance object is the context-aware speaker-business view against
 `test/data/reference/test.txt`.
 

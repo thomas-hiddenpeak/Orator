@@ -9,14 +9,12 @@ import json
 import math
 import os
 import re
-import statistics
 import subprocess
 import sys
 
 
 TIMESTAMP_RE = re.compile(r"^(\d{2}):(\d{2}):(\d{2})\s+(.+?)\s*$")
 EXPECTED_REFERENCE_ENTRIES = 556
-BLOCK_SEC = 600.0
 JUDGMENT_TEMPLATE = {
     "result": "unreviewed",
     "speaker_eval": "unreviewed",
@@ -527,241 +525,12 @@ def validate_review(review, ledger, require_complete):
                     f"{reference_id}: pass disagreement is not reconciled")
 
 
-def ratio(numerator, denominator):
-    return numerator / denominator if denominator else None
-
-
-def nearest_rank_percentile(values, percentile):
-    if not values:
-        return None
-    ordered = sorted(values)
-    index = max(0, math.ceil(percentile * len(ordered)) - 1)
-    return ordered[index]
-
-
-def make_bucket(start, end, full_block=None):
-    bucket = {
-        "start_sec": start,
-        "end_sec": end,
-        "total_turns": 0,
-        "correct_turns": 0,
-        "speaker_time_sec": 0.0,
-        "correct_speaker_time_sec": 0.0,
-    }
-    if full_block is not None:
-        bucket["full_600_sec_block"] = full_block
-    return bucket
-
-
-def finish_bucket(bucket):
-    bucket["turn_accuracy"] = ratio(
-        bucket["correct_turns"], bucket["total_turns"])
-    bucket["speaker_time_accuracy"] = ratio(
-        bucket["correct_speaker_time_sec"], bucket["speaker_time_sec"])
-
-
-def overlap_duration(intervals, start, end):
-    return sum(
-        max(0.0, min(right, end) - max(left, start))
-        for left, right in intervals)
-
-
-def summarize_validated(review, ledger):
-    audio_end = float(ledger["audio"]["duration_sec"])
-    block_count = max(1, math.ceil(audio_end / BLOCK_SEC))
-    blocks = {
-        str(index): make_bucket(
-            index * BLOCK_SEC,
-            min(audio_end, (index + 1) * BLOCK_SEC),
-            (index + 1) * BLOCK_SEC <= audio_end)
-        for index in range(block_count)
-    }
-    speakers = {}
-    total_turns = len(ledger["entries"])
-    correct_turns = 0
-    critical_total = 0
-    critical_correct = 0
-    critical_confident_wrong = 0
-    confident_wrong = 0
-    uncertain_output = 0
-    total_sec = 0.0
-    correct_sec = 0.0
-    boundary_offsets = []
-    missing_boundary_offsets = 0
-    unannotated_large_offsets = []
-    pass_disagreement_rows = []
-
-    for ref, row in zip(ledger["entries"], review["entries"]):
-        adjudication = ref["adjudication"]
-        judgment = row["final"]
-        if (judgment_decision_signature(row["chronological_pass"]) !=
-                judgment_decision_signature(row["reverse_block_pass"])):
-            pass_disagreement_rows.append(ref["reference_id"])
-        start = float(adjudication["audible_start_sec"])
-        end = float(adjudication["audible_end_sec"])
-        duration = end - start
-        intervals = normalize_intervals(
-            judgment["correct_speaker_intervals"], start, end)
-        correct_duration = sum(right - left for left, right in intervals)
-        is_correct = judgment["result"] == "correct"
-        is_critical = adjudication["criticality"] == "critical"
-        is_confident_wrong = judgment["confident_wrong"]
-        is_uncertain_output = judgment["uncertain_output"]
-        speaker = adjudication["canonical_speaker"]
-
-        total_sec += duration
-        correct_sec += correct_duration
-        correct_turns += int(is_correct)
-        critical_total += int(is_critical)
-        critical_correct += int(is_critical and is_correct)
-        confident_wrong += int(is_confident_wrong)
-        uncertain_output += int(is_uncertain_output)
-        critical_confident_wrong += int(is_critical and is_confident_wrong)
-
-        speaker_bucket = speakers.setdefault(
-            speaker, make_bucket(0.0, audio_end))
-        speaker_bucket["total_turns"] += 1
-        speaker_bucket["correct_turns"] += int(is_correct)
-        speaker_bucket["speaker_time_sec"] += duration
-        speaker_bucket["correct_speaker_time_sec"] += correct_duration
-
-        turn_block = min(int(start // BLOCK_SEC), block_count - 1)
-        blocks[str(turn_block)]["total_turns"] += 1
-        blocks[str(turn_block)]["correct_turns"] += int(is_correct)
-        first_block = max(0, int(start // BLOCK_SEC))
-        last_block = min(block_count - 1, int(math.nextafter(
-            end, -math.inf) // BLOCK_SEC))
-        for block_index in range(first_block, last_block + 1):
-            bucket = blocks[str(block_index)]
-            bucket["speaker_time_sec"] += max(
-                0.0, min(end, bucket["end_sec"]) -
-                max(start, bucket["start_sec"]))
-            bucket["correct_speaker_time_sec"] += overlap_duration(
-                intervals, bucket["start_sec"], bucket["end_sec"])
-
-        for field in (
-                "boundary_start_offset_sec", "boundary_end_offset_sec"):
-            offset = judgment[field]
-            if offset is None:
-                missing_boundary_offsets += 1
-                continue
-            absolute = abs(float(offset))
-            boundary_offsets.append(absolute)
-            if (absolute > 1.0 and
-                    not judgment["boundary_offset_notes"].strip()):
-                unannotated_large_offsets.append({
-                    "reference_id": ref["reference_id"],
-                    "field": field,
-                    "absolute_offset_sec": absolute,
-                })
-
-    for bucket in blocks.values():
-        finish_bucket(bucket)
-    for bucket in speakers.values():
-        finish_bucket(bucket)
-
-    natural_turn_accuracy = ratio(correct_turns, total_turns)
-    speaker_time_accuracy = ratio(correct_sec, total_sec)
-    critical_accuracy = ratio(critical_correct, critical_total)
-    confident_wrong_rate = ratio(confident_wrong, total_turns)
-    boundary = {
-        "offset_count": len(boundary_offsets),
-        "missing_offset_count": missing_boundary_offsets,
-        "median_absolute_offset_sec": (
-            statistics.median(boundary_offsets)
-            if boundary_offsets else None),
-        "p95_absolute_offset_sec": (
-            nearest_rank_percentile(boundary_offsets, 0.95)),
-        "over_1_sec_count": sum(
-            value > 1.0 for value in boundary_offsets),
-        "unannotated_over_1_sec": unannotated_large_offsets,
-    }
-
-    full_blocks = [
-        bucket for bucket in blocks.values()
-        if bucket["full_600_sec_block"]
-    ]
-    speaker_gates = {
-        "natural_turn_accuracy_at_least_90": (
-            natural_turn_accuracy is not None and
-            natural_turn_accuracy >= 0.90),
-        "speaker_time_accuracy_at_least_90": (
-            speaker_time_accuracy is not None and
-            speaker_time_accuracy >= 0.90),
-        "every_full_600_sec_block_at_least_90": all(
-            bucket["turn_accuracy"] is not None and
-            bucket["speaker_time_accuracy"] is not None and
-            bucket["turn_accuracy"] >= 0.90 and
-            bucket["speaker_time_accuracy"] >= 0.90
-            for bucket in full_blocks),
-        "every_speaker_recall_at_least_90": all(
-            bucket["turn_accuracy"] is not None and
-            bucket["speaker_time_accuracy"] is not None and
-            bucket["turn_accuracy"] >= 0.90 and
-            bucket["speaker_time_accuracy"] >= 0.90
-            for bucket in speakers.values()),
-        "critical_turns_100_percent": (
-            critical_accuracy is not None and critical_accuracy == 1.0),
-        "critical_confident_wrong_zero": critical_confident_wrong == 0,
-        "confident_wrong_at_most_2_percent": (
-            confident_wrong_rate is not None and
-            confident_wrong_rate <= 0.02),
-        "boundary_offsets_complete": missing_boundary_offsets == 0,
-        "boundary_median_at_most_0_25_sec": (
-            boundary["median_absolute_offset_sec"] is not None and
-            boundary["median_absolute_offset_sec"] <= 0.25),
-        "boundary_p95_at_most_0_80_sec": (
-            boundary["p95_absolute_offset_sec"] is not None and
-            boundary["p95_absolute_offset_sec"] <= 0.80),
-        "boundary_over_1_sec_annotated": not unannotated_large_offsets,
-    }
-    speaker_gates["all_pass"] = all(speaker_gates.values())
-
-    return {
-        "turns": total_turns,
-        "correct_turns": correct_turns,
-        "natural_turn_accuracy": natural_turn_accuracy,
-        "speaker_time_sec": total_sec,
-        "correct_speaker_time_sec": correct_sec,
-        "speaker_time_accuracy": speaker_time_accuracy,
-        "critical_turns": critical_total,
-        "critical_correct": critical_correct,
-        "critical_accuracy": critical_accuracy,
-        "critical_confident_wrong_turns": critical_confident_wrong,
-        "confident_wrong_turns": confident_wrong,
-        "confident_wrong_rate": confident_wrong_rate,
-        "uncertain_output_turns": uncertain_output,
-        "pass_disagreement_count": len(pass_disagreement_rows),
-        "pass_disagreement_reference_ids": pass_disagreement_rows,
-        "blocks": blocks,
-        "speakers": speakers,
-        "boundary_offsets": boundary,
-        "speaker_acceptance_gates": speaker_gates,
-        "notes": {
-            "turn_block_assignment": "audible start block",
-            "speaker_time_block_assignment": "exact interval clipping",
-            "final_partial_block_is_reported_not_gated": True,
-        },
-    }
-
-
-def summarize(review, ledger):
-    validate_ledger(ledger, require_complete=True)
-    validate_review(review, ledger, require_complete=True)
-    return summarize_validated(review, ledger)
-
-
 def command_validate(args):
     ledger = load_json(args.ledger)
     validate_ledger(ledger, args.require_complete)
     if args.review:
         review = load_json(args.review)
         validate_review(review, ledger, args.require_complete)
-
-
-def command_summary(args):
-    result = summarize(load_json(args.review), load_json(args.ledger))
-    print(json.dumps(result, ensure_ascii=False, indent=2))
 
 
 def add_common_paths(parser):
@@ -793,10 +562,6 @@ def main(argv=None):
     add_common_paths(validate)
     validate.add_argument("--require-complete", action="store_true")
     validate.set_defaults(func=command_validate)
-
-    summary = subparsers.add_parser("summary")
-    add_common_paths(summary)
-    summary.set_defaults(func=command_summary)
 
     args = parser.parse_args(argv)
     args.func(args)

@@ -140,13 +140,16 @@ Full 60 min real-WS run (after the embed-window OOM fix + `--timeline-timeout
   audio's overlapped late segments, not a fixable code bug. Closing on this
   60 min 4-speaker meeting is bounded by the model+audio, not the port.
 
-## Phase G — Cross-session GLOBAL identity (supersedes Phase F's script verdict)
-Phase F judged accuracy from a *script* metric (`speaker_attrib_eval.py`) that, on
+## Phase G — Cross-session GLOBAL identity (supersedes Phase F's code verdict)
+Phase F incorrectly judged accuracy from a code metric
+(`speaker_attrib_eval.py`) that, on
 a run whose `speaker_id` fields were empty, silently fell back to the diarizer's
 per-window LOCAL slots with an optimal mapping — i.e. it never measured the
 voiceprint at all. Re-evaluated per the Test Review Protocol (context-aware
 per-segment semantic comparison vs `test.txt`), the speaker layer had two real
-defects, both fixed; accuracy is now judged by reading, not scripts.
+defects, both fixed. Under Constitution 1.7.0, accuracy is judged only by
+complete contextual semantic reading; no code may label, aggregate, rank, or
+issue a verdict.
 - [x] **G1** Trust the diarizer's within-session separation: each local slot
   resolves to its own global id; same-session slots never collapse to one id
   (`SpeakerDatabase::MatchExcluding`). Removed per-segment re-matching (it

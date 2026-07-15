@@ -1,6 +1,8 @@
 # Spec 010 Local Diarization Default-188 Review - 2026-07-06
 
-This review follows `.specify/test-review-protocol.md`. Script/JQ summaries are
+This review follows `.specify/test-review-protocol.md`. Under Constitution
+1.7.0, no code may assign correctness, calculate accuracy, rank/select a
+candidate, or issue a verdict. Historical script/JQ summaries are
 diagnostic only; acceptance is based on context-aware reading against
 `test/data/reference/test.txt`.
 

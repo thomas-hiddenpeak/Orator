@@ -8,6 +8,12 @@ classification, uncertainty, text projection, raw track, or checked-in TOML.
 It is not an accuracy result and does not replace the unsigned 556-row audible
 ledger.
 
+The mechanical counts in this report describe evidence structure only. No code,
+script, test, notebook, formula, query, metric, or algorithm may convert them
+into correctness labels, accuracy, candidate ranking, policy selection, or a
+product verdict. Those require complete contextual semantic review and manual
+result verification.
+
 ## Frozen-Evidence Finding
 
 The source-stable v2.1 full artifact from clean commit `3b40245` retains 755 raw

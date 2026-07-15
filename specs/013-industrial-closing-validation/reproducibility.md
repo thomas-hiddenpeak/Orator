@@ -70,3 +70,10 @@ The static fixture manifest hash is copied into the review record for every run.
 Any missing hash, missing `resolved_config`, pre/post source drift, dirty-path
 mismatch, or unrecorded override invalidates an accuracy or performance
 comparison.
+
+Reproducibility automation establishes artifact identity and execution
+conditions only. No manifest, WebSocket client, validator, script, test,
+notebook, formula, query, or algorithm may evaluate semantic/speaker results,
+calculate accuracy, rank candidates, or issue an acceptance verdict. Those
+results require complete contextual semantic review plus manual tally and
+manual independent verification under Constitution 1.7.0 Article VI.

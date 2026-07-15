@@ -123,6 +123,13 @@ Dates in `YYYY-MM-DD` format.
   (125 gpu_telemetry samples, stream_rt 0.964×, exported `.rrd`).
 
 ### Changed
+- Evaluation governance is upgraded to Constitution 1.7.0. Product accuracy,
+  semantic/speaker correctness, candidate ranking/selection, and product
+  verdicts may be produced only by complete contextual semantic review with
+  manually derived and independently verified results. Code and automation are
+  limited to execution, capture, mechanical/numerical validation, and display
+  of unjudged evidence. The automated `closing_ledger.py summary` accuracy and
+  acceptance path is removed.
 - Speaker identity (Spec 010) — cross-session GLOBAL identity finalized. The
   voiceprint stage now assigns a persistent global id to every diarization
   segment, validated through the real `rate=1` WebSocket stream and judged by

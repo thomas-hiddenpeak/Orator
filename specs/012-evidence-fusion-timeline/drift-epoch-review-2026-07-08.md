@@ -1,5 +1,11 @@
 # Spec 012 Drift-Epoch and Runtime Fusion Review - 2026-07-08
 
+> **Evaluation governance:** Under Constitution 1.7.0, no code or executable
+> automation may assign correctness, calculate accuracy, rank/select a
+> candidate, or issue a verdict. Automated values below are mechanical evidence
+> only; product results require complete contextual semantic review and manual
+> result verification.
+
 ## Test Summary
 
 | Item | Content |
@@ -89,7 +95,7 @@ Results:
 ## Context-Aware Speaker Business Review
 
 The following windows were reviewed against `test/data/reference/test.txt` using
-`speaker-business-method.md`. Script counts below are supporting diagnostics
+`speaker-business-method.md`. Historical code counts below are mechanical records
 only; acceptance is based on context-aware reading of who said what.
 
 | Window | Reference context | Final-view observation | Judgment |

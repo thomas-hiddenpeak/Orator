@@ -6,6 +6,9 @@ This record closes Spec 013 T042 for clean build, warnings, complete registered
 tests, JavaScript, selected host sanitizers, and selected CUDA dynamic checks.
 It establishes engineering integrity only. It does not score speaker or ASR
 accuracy and does not replace the full real-WebSocket and manual-review gates.
+No automated gate, compiled test, script, metric, formula, query, or algorithm
+may convert this evidence into product accuracy, candidate ranking, or a product
+verdict; only complete contextual semantic review may do so.
 
 The checked source was clean `master` at `ce388a7`. All evidence is retained
 outside Git under `/tmp/orator-spec013/closing-gates-ce388a7/`.

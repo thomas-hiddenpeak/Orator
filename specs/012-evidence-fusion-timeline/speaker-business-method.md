@@ -22,15 +22,20 @@ speaker ownership is only meaningful in the context of what was being said.
 
 ## Non-authoritative Diagnostics
 
-Scripts may prepare review packets and report mechanical consistency:
+Code may prepare review packets and report mechanical facts:
 
 - track counts and coverage;
 - align coverage and time-base issues;
 - overlap summaries;
 - candidate/current view diffs.
 
-Script-derived percentages are diagnostics only. They cannot replace
-context-aware review against `test/data/reference/test.txt`.
+No code, script, test, notebook, formula, query, metric, or algorithm may assign
+a speaker-business label, calculate an accuracy percentage, rank/select a
+candidate, or issue a verdict. Historical code-derived percentages are retained
+only as non-authoritative mechanical diagnostics. Result evaluation is valid
+only when the reviewer reads every item against
+`test/data/reference/test.txt` in its surrounding conversational context,
+performs the required second pass, and manually derives/checks the report.
 
 ## Review Unit
 
@@ -69,4 +74,6 @@ Every speaker-business review must include:
   business judgment, and issues;
 - final speaker business accuracy band;
 - explicit distinction between mechanical diagnostics and constitutional
-  context-aware judgment.
+  context-aware judgment;
+- an explicit statement that no code generated labels, totals, percentages,
+  candidate rankings, or the verdict.

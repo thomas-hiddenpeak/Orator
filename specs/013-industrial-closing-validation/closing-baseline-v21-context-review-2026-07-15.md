@@ -6,8 +6,10 @@ This is the complete written-context speaker review of the clean v2.1 closing
 baseline. The reviewer read all 556 reference contributions in chronological
 order, then reviewed the same evidence again by fixed 600-second block in
 reverse block order. Tools only captured and arranged time-overlapping evidence;
-no script assigned correctness, resolved ambiguity, selected a candidate, or
-computed a semantic score.
+no compiled code, test, script, notebook, formula, query, metric, or algorithm
+assigned correctness, resolved ambiguity, calculated or estimated accuracy,
+ranked/selected a candidate, or issued the verdict. The reviewer manually
+derived and checked every count and percentage after both context passes.
 
 The review answers one question: whether the final `business_speaker` view
 attributes each contextually complete contribution to the correct business
@@ -69,8 +71,9 @@ the session and are not a tail-only regression.
 
 ## Incorrect and Ambiguous Rows
 
-The following labels are the reviewer's reconciled semantic judgments, not
-generated classifications.
+The following labels, totals, percentages, and verdict are the reviewer's
+manually reconciled semantic judgments, not generated classifications or
+automated aggregation.
 
 **0-600 s, 18 incorrect**
 

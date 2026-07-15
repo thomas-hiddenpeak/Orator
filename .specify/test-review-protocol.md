@@ -2,9 +2,14 @@
 
 ## Overview
 
-This document defines the default AI-conducted manual-style test evaluation protocol for Orator. It is not a feature spec but an engineering governance artifact (process) that applies across all feature specs (Specs 001–005+).
+This document defines the mandatory context-semantic test evaluation protocol
+for Orator. It is not a feature spec but an engineering governance artifact
+that applies across all feature specs.
 
-The protocol exists to ensure consistent, context-aware quality judgments for real streaming regressions, supplementing the automated gates (ctest, oracle metrics).
+The protocol exists to ensure consistent, context-aware quality judgments for
+real streaming regressions. Automated gates such as CTest and numerical-oracle
+comparisons establish engineering facts only; they never evaluate product
+accuracy.
 
 ## Scope
 
@@ -17,6 +22,23 @@ Does not replace:
 - Unit test gates (`ctest`)
 - Oracle numeric comparisons
 - Runtime metric measurement
+
+## Absolute Evaluation Boundary
+
+Result evaluation is performed only by a human or AI reviewer reading the
+reference and system evidence in complete conversational context. No form of
+code may assign a semantic or speaker judgment, calculate or estimate an
+accuracy result, rank candidates, choose parameters, or issue a pass/fail or
+promotion decision. The prohibition covers compiled programs, C++/CUDA tests,
+Python, shell and JavaScript scripts, notebooks, spreadsheet formulas, queries,
+algorithms, and temporary command-line code.
+
+Automation may execute and observe the system, capture immutable output, verify
+hashes/schemas/time-base/transport/numerical parity, and arrange unjudged
+evidence for reading. It must stop before correctness judgment and result
+aggregation. CER, DER, lexical matching, timestamp overlap, duration mapping,
+embedding scores, and similar mechanical values are diagnostics only and may
+not be converted into an accuracy conclusion.
 
 ## 1. Required Review Inputs
 
@@ -39,7 +61,8 @@ Each review MUST read:
 5. **AI manual comparison**
    - Read reference and model output
    - Perform context-aware per-segment comparison
-   - Do NOT derive conclusions from script metrics alone
+   - Assign every correctness judgment directly from conversational meaning
+   - Do NOT use code or automated aggregation for any result conclusion
    - Do NOT substitute "recommend manual review" for actual review
 
 ## 2. Output Structure
@@ -124,6 +147,10 @@ Focus on:
 - **Test result**: Pass / Conditional pass / Fail
 - **Proceed to next optimization**: Yes / No
 
+Every value and verdict in this block is manually derived from the reviewed
+rows and manually cross-checked. A program-generated count, percentage, band,
+ranking, or acceptance flag is invalid even when its inputs are manual labels.
+
 ## 3. Default Judgment Order
 
 1. **Stability first**: Crash / no result => Fail immediately
@@ -136,7 +163,8 @@ Focus on:
 
 - **Default**: AI completes context ingestion, per-segment comparison, conclusion synthesis
 - **Human involvement**: Only when explicitly requested
-- **Constraint**: Never replace actual comparison with metric-only summary
+- **Constraint**: Never replace actual comparison with code, metrics, rules, or
+  automated summaries. The reviewer owns every label, total, and verdict.
 
 ## 5. Template
 
@@ -173,4 +201,7 @@ Focus on:
 
 ## 6. Project Convention
 
-Starting from this document's adoption, any completed real test with known reference text defaults to this protocol's output format unless explicitly overridden.
+Starting from this document's adoption, every result evaluation with known
+reference text uses this protocol. It cannot be overridden by a feature spec,
+tool, test, report template, or command-line option because Constitution 1.7.0
+Article VI is authoritative.

@@ -11,6 +11,13 @@ and 377/556 in full contextual screening. Neither official profile qualifies
 for a real-WebSocket acceptance run. The inherited profile is now the sole
 v2.1 closing baseline, not an accepted product configuration.
 
+All natural-turn judgments recorded here came from contextual reading; no code
+is authorized to regenerate, total, compare, or promote these results. Under
+Constitution 1.7.0, compiled programs, tests, scripts, notebooks, formulas,
+queries, metrics, and algorithms may only validate mechanical/numerical facts or
+display unjudged evidence. Candidate ranking and product verdicts require a
+complete contextual semantic review with manual totals and verification.
+
 ## Recovered Context
 
 The repository contains two converted streaming checkpoints:
@@ -283,7 +290,8 @@ Evidence:
 The display-only packet contains all 556 reference rows and was reviewed twice:
 first in chronological order, then in fixed reverse block order
 `3000-3615`, `2400-3000`, `1800-2400`, `1200-1800`, `600-1200`, and
-`0-600`. No script assigned correctness.
+`0-600`. No code or executable automation assigned correctness, calculated the
+result, ranked the profiles, or issued the verdict.
 
 - chronological packet:
   `/tmp/orator-spec013/runtime-v21/full-01/review/by-reference.md`;

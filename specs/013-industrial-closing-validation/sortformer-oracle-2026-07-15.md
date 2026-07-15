@@ -7,6 +7,12 @@ independently regenerated NeMo output, and a multi-update C++ numerical gate.
 This closes the implementation-parity defect; it does not close speaker
 business accuracy or Spec 013 product acceptance.
 
+Numerical-oracle and mechanical values in this report are component evidence
+only. No code, script, test, notebook, formula, query, metric, or algorithm may
+use them to evaluate semantic/speaker accuracy, rank candidates, select a
+configuration, or issue a product verdict. Those decisions require complete
+contextual semantic review and manual result verification.
+
 ## Pinned model and profile
 
 - NVIDIA source revision:

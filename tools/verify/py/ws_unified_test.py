@@ -8,10 +8,13 @@ responses for comparison with reference files.
 Testing Principles:
 1. All tests except unit tests MUST use test.mp3 as the audio source and test.txt as reference
 2. Actual pipeline testing MAY use different speeds for testing (120s, 360s, 600s, full-length)
-3. Test results MUST be compared item by item with the reference file by placing them in context
+3. This client MUST NOT evaluate results; a reviewer compares every item with
+   the reference in complete conversational context
 4. Device metrics (power, CPU, GPU, RAM) MUST be observed using tegrastats on Jetson devices
-5. ASR accuracy comparison MUST use semantic comparison, not character-level comparison
-6. Speaker diarization accuracy MUST provide total comparison of speaker segmentation time blocks
+5. No code, script, test, metric, formula, query, or algorithm may assign
+   correctness, calculate accuracy, rank/select candidates, or issue a verdict
+6. ASR and speaker results require contextual semantic review plus manual result
+   derivation and verification under Constitution 1.7.0
 
 Supported WebSocket Interfaces:
 - Binary data: PCM audio (int16 and float32 formats)

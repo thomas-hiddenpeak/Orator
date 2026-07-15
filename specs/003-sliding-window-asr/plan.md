@@ -3,7 +3,7 @@
 - **Feature**: `003-sliding-window-asr`
 - **Spec**: [spec.md](spec.md)
 - **Status**: Revised (incremental KV cache + windowed encoder)
-- **Constitution**: v1.1.0
+- **Constitution**: v1.7.0
 
 > HOW to satisfy [spec.md](spec.md). Standard terminology.
 
@@ -130,10 +130,12 @@ cap) (FR5, AC5).
   `processed_samples`, `compute_sec`, `Emit`) unchanged so the controller and WS
   handler need no change.
 
-### 2.5 CER measurement (existing offline tool)
-- `tools/cer.py` (standard library only) already computes character error rate
-  between a hypothesis transcript and `asrTest2Final.txt` over the same span
-  after normalization. Reused unchanged.
+### 2.5 Historical CER diagnostic
+- `tools/cer.py` reproduces the historical character error rate between a
+  hypothesis transcript and `asrTest2Final.txt`. Under Constitution 1.7.0 it is
+  not an accuracy evaluator and cannot compare candidates, choose defaults, or
+  issue a verdict. Current product evaluation uses complete contextual semantic
+  review only.
 
 ## 3. Validation
 
@@ -145,9 +147,10 @@ cap) (FR5, AC5).
   bound of an early step (not linearly growing).
 - **RTF (AC4)**: measure streaming RTF on 120 s, compare to the Silero-VAD
   baseline (3.27x ASR compute). Measured incremental seg-reset: 4.51x.
-- **Accuracy (AC3)**: run `tools/cer.py` on the incremental-streaming output and
-  on the Silero-VAD output against the gold; require CER(incremental) <=
-  CER(Silero) on the same span. Measured: incremental 17.6% vs Silero 30.8%.
+- **Accuracy (AC3)**: manually review every in-scope reference contribution and
+  both outputs in complete conversational context, perform the second pass, and
+  manually verify the result. The historical incremental 17.6% and Silero 30.8%
+  CER values are diagnostics only and cannot decide AC3.
 - **Determinism (AC7)**: two runs produce identical committed text.
 - **Memory + bounded cost (AC5)**: VmRSS and per-step time bounded over a long
   run with boundary resets.

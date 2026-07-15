@@ -106,6 +106,11 @@ pipeline and net, not as an outermost layer above them.
 - **Speculative features / unrelated refactors** — make only the requested change (Art. V §6).
 - **Stale state docs** — verify against code before trusting (Art. VIII).
 - **Shotgun debugging** — fix root cause, not symptoms. Revert to last known good state after 3 failures.
+- **Code-based result evaluation** — no compiled code, script, notebook,
+  formula, query, metric, or algorithm may assign correctness, aggregate an
+  accuracy result, rank/select a candidate, or issue an acceptance verdict.
+  Only complete contextual semantic review may evaluate ASR, diarization,
+  speaker attribution, endpoint, hallucination, or comprehensive-view results.
 
 ---
 
@@ -160,6 +165,10 @@ This project follows **Spec-Driven Development (SDD)** adapted from spec-kit. Th
 ### Constitutional hard rules
 - **Zero runtime deps** (C++20/CUDA only, Art. I)
 - **Accuracy first** (Art. II) — no quality trade-off without explicit approval
+- **Context-only result evaluation** (Art. VI) — automation may capture,
+  validate mechanical contracts, and display raw evidence only; every product
+  accuracy label, total, comparison, and verdict is manually derived from
+  complete conversational context, never from code
 - **Common time base + independent pipelines** (Art. III)
 - **Streaming validation through real WebSocket** (Art. IV)
 - **Engineering quality mandatory** (Art. V) — readability, RAII, race-free, small functions

@@ -36,10 +36,13 @@ It must use each pipeline for the evidence it is best suited to provide:
 - **FR5 — Boundary evidence**: VAD pauses and alignment-unit gaps are strong
   boundaries. Diarization boundaries are speaker evidence and shall be treated
   as soft boundaries unless supported by pause/unit timing evidence.
-- **FR6 — Evaluation governance**: scripts may organize evidence and candidate
-  views, but ASR and diarization accuracy conclusions shall still follow
-  `.specify/test-review-protocol.md` with context-aware reading against
-  `test/data/reference/test.txt`.
+- **FR6 — Evaluation governance**: code may generate reference-free candidate
+  views and organize unjudged evidence, but no compiled program, script, test,
+  notebook, formula, query, metric, or algorithm may assign correctness,
+  calculate accuracy, rank/select a candidate, or issue a verdict. ASR and
+  speaker results are evaluated only by complete context-semantic reading
+  against `test/data/reference/test.txt` under
+  `.specify/test-review-protocol.md`.
 - **FR7 — Speaker business view**: speaker accuracy shall be judged on the final
   business-facing view ("who said what in context") using all pipeline evidence
   together. Isolated diarization-track percentages are diagnostics only.
@@ -51,8 +54,9 @@ It must use each pipeline for the evidence it is best suited to provide:
 
 - Do not change ASR, diarization, VAD, or forced-alignment model math in this
   spec.
-- Do not use character-error-rate or script-derived scores as the acceptance
-  result.
+- Do not use character error rate, diarization error rate, timestamp overlap,
+  duration mapping, embedding similarity, or any code-derived score to evaluate
+  a result or make an acceptance decision.
 - Do not bypass the real WebSocket path for the evidence package capture.
 
 ## 4. Acceptance

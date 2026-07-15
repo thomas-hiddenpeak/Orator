@@ -1,5 +1,11 @@
 # Spec 012 Full-Length Evidence Fusion Review - 2026-07-07
 
+> **Evaluation governance:** Under Constitution 1.7.0, no code or executable
+> automation may assign correctness, calculate accuracy, rank/select a
+> candidate, or issue a verdict. Automated values below are mechanical evidence
+> only; product results require complete contextual semantic review and manual
+> result verification.
+
 ## Test Summary
 
 | Item | Content |
@@ -29,8 +35,8 @@ context?
 ASR literal accuracy is not scored here. ASR text is still read as the system's
 content claim and as context for speaker attribution; forced alignment and VAD
 provide phrase/pause boundaries; diarization and speaker identity provide
-ownership evidence. Script-derived attribution percentages below are diagnostic
-only and cannot replace this context-aware judgment.
+ownership evidence. Historical code-derived attribution percentages below are
+non-authoritative mechanical records and may not evaluate or explain the result.
 
 ## Mechanical Evidence
 
@@ -40,8 +46,8 @@ only and cannot replace this context-aware judgment.
   - `pause_sec=0.25`: 1553 candidate entries, unknown speaker 22.120 s.
   - `pause_sec=0.40`: 1278 candidate entries, unknown speaker 19.920 s.
 - Current comprehensive has 723 entries. The candidate has more entries because it uses forced-alignment unit runs and drops silent gaps from ASR spans.
-- Diagnostic `speaker_attrib_eval.py` is not the final authority, but it helps
-  explain why the business-view review does not reach closing grade:
+- Historical `speaker_attrib_eval.py` output is retained only as a mechanical
+  record and does not explain, compare, or decide business-view accuracy:
   - Current comprehensive: 73.4% duration-weighted attribution over 3064 s, 3/4 reference names covered by global mapping.
   - Fusion candidate: 73.3% over 2048 s, 3/4 reference names covered.
   - The candidate changes boundary granularity more than it changes speaker identity correctness.

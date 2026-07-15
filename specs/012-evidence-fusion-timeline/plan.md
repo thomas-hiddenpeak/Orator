@@ -73,9 +73,10 @@ The offline tool shall report:
 - Full capture: 3615 s real WebSocket run using `test.mp3`.
 - Tool validation: Python syntax check and a run over the smoke/full evidence
   package.
-- Accuracy validation: manual context-aware review of the final candidate
-  business view ("who said what in context"). Script summaries and diar-only
-  percentages are diagnostics only.
+- Accuracy validation: complete manual context-semantic review of every in-scope
+  item in the final candidate business view ("who said what in context"), with a
+  second pass and manually verified totals. No code, summary, metric, formula,
+  query, or algorithm may label, total, rank/select, or issue the verdict.
 - Runtime validation: `cmake --build build -j`,
   `cd build && ctest --output-on-failure`, warning/error grep, and a full
   3615 s real WebSocket run after the C++ comprehensive-view changes.

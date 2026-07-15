@@ -7,6 +7,10 @@
 - [x] T001 Review and approve Spec 013 requirements, thresholds, and terminology.
 - [x] T002 Submit the common-clock/private-cache and supplemental-test
   Constitution amendment as a separate governance commit.
+- [x] T002A Amend Constitution Article VI to prohibit every form of code-based
+  result evaluation and require complete contextual semantic review, manual
+  result derivation, and manual verification. Landed as Constitution 1.7.0 in
+  governance commit `03bb22a`.
 - [ ] T003 Correct all remaining closure and implementation claims in
   `PROJECT_STATE.md`, active specs, READMEs, and code comments.
 - [x] T004 Define the reproducibility manifest and artifact naming convention.
@@ -54,6 +58,10 @@
   the unified client must persist its hash in the artifact sidecar.
 - [x] T020 Remove the misleading parameter-matrix mode from the unified test
   client and retain execution/capture responsibilities only.
+- [x] T020A Remove the `closing_ledger.py summary` command, automated accuracy
+  aggregation, threshold comparisons, acceptance booleans, and their test. Keep
+  only initialization, unjudged evidence preparation, and structural/hash/
+  signature validation under Constitution 1.7.0.
 
 ## Phase 2: Reference Ledger
 
@@ -69,7 +77,7 @@
 - [ ] T034 Resolve every disagreement and record ambiguous reference rows without
   deleting them.
 - [ ] T035 Independently verify the manual time, turn, speaker, criticality, and
-  offset totals.
+  offset totals without code, formulas, queries, or automated aggregation.
 
 ## Phase 3: Reproducible Baseline
 
@@ -94,7 +102,7 @@
   See `closing-baseline-v21-2026-07-15.md`. This completes system evidence only;
   the unsigned audible ledger keeps T045 and all accuracy gates open.
 - [ ] T045 Complete the 556-row baseline context review and publish all required
-  score breakdowns without script-inferred judgments. The exact clean
+  score breakdowns without any code-inferred judgment or automated total. The exact clean
   935-entry artifact has now received complete chronological and reverse-block
   manual written-context review: 443 correct / 112 incorrect / 1 ambiguous
   (`79.6763%`). Tools only arranged evidence. T045 remains open because audible
@@ -122,8 +130,9 @@
   base.
 - [x] T053 Build an auditable constrained speaker-decision candidate over frozen
   tracks without reference-specific runtime inputs.
-- [ ] T054 Perform the complete contextual review of the candidate and evaluate
-  the 93 percent development gate in every fixed block. A complete provisional
+- [ ] T054 Perform the complete contextual review of the candidate and manually
+  evaluate the 93 percent development gate in every fixed block without code,
+  automated totals, ranking, or acceptance flags. A complete provisional
   text-context pass now covers all 556 rows and is sufficient to reject the
   candidate's natural-turn gate; audible-boundary adjudication, the reversed
   pass, and signed speaker-time totals remain open.
@@ -229,8 +238,10 @@
   and report. They duplicate the role of the manually adjudicated `test.txt`
   and cannot produce a deployed runtime candidate. Retain only NeMo fixtures
   for same-checkpoint v2.1 numerical parity.
-- [ ] T061 Select a model only when its frozen-evidence result exceeds the 93
-  percent gate without a fixed-block or critical-turn regression.
+- [ ] T061 Select a model only after complete contextual semantic review manually
+  establishes that its frozen-evidence result exceeds the 93 percent gate
+  without a fixed-block or critical-turn regression. No code-derived ranking or
+  gate decision is permitted.
 - [ ] T062 Write model-specific SDD artifacts and trusted-oracle tolerances before
   any C++/CUDA port.
 - [ ] T063 Port and validate each selected model stage numerically before runtime
@@ -265,8 +276,10 @@
 - [ ] T082 Restart the process and run full v2.1 acceptance B with the frozen
   enrolled-registry fixture.
 - [ ] T083 Complete the full 556-row context and semantic review for run B.
-- [ ] T084 Verify every Spec 013 accuracy, boundary, alignment, latency,
-  telemetry, stability, and repeatability gate independently for both runs.
+- [ ] T084 Verify every Spec 013 accuracy and business-result gate manually from
+  complete contextual semantics, and verify mechanical boundary, alignment,
+  latency, telemetry, stability, and repeatability evidence separately for both
+  runs. No code may aggregate these into a product verdict.
 - [ ] T085 Execute the supplemental locked holdout suite after the Constitution
   amendment if an industrial-readiness claim is requested.
 - [ ] T086 Write the final closing report with manifests, hashes, complete ledger,

@@ -29,8 +29,10 @@ Mechanical inspection, without assigning any correctness judgment, found:
   `ref-0447` is stamped 2932 seconds.
 
 These rows remain in the denominator. Their exact audible intervals and overlap
-relationships must be decided by listening in conversational context; scripts
-must not repair or reorder them.
+relationships must be decided by listening in conversational context; no code,
+script, test, notebook, formula, query, metric, or algorithm may repair/reorder
+them, assign a judgment, aggregate accuracy, rank candidates, or issue a
+verdict.
 
 ## Review Batches
 
@@ -57,4 +59,6 @@ the 2400-3000-second block at SHA-256
 
 All seven batches remain `unreviewed`. VAD, forced alignment, and existing
 v2.1 timeline data may be displayed as evidence, but none may assign an audible
-boundary, overlap, criticality, ambiguity, or signature.
+boundary, overlap, criticality, ambiguity, signature, total, percentage, or gate
+decision. Every result requires complete contextual semantic review and manual
+verification under Constitution 1.7.0.

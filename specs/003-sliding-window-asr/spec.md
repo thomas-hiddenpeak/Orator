@@ -5,10 +5,17 @@
 - **Created**: 2026-06-12
 - **Revised**: 2026-06-15 (pivot), 2026-06-17 (parameter refinement), 2026-06-17 (VAD gating + trailing window), 2026-06-18 (VAD decoupling)
 - **Owner**: project owner
-- **Constitution**: v1.2.1
+- **Constitution**: v1.7.0
 
 > This spec describes WHAT to change and WHY. The incremental decode design and
 > parameters are in `plan.md`. Terminology is standard.
+
+> **Current evaluation governance:** Historical character error rate (CER)
+> values in this document are retained as implementation history only. Under
+> Constitution 1.7.0, no code, script, metric, formula, or algorithm may use
+> CER or any other mechanical value to evaluate product accuracy, compare
+> candidates, or choose parameters. Current ASR result evaluation requires
+> complete item-by-item contextual semantic review.
 
 ---
 
@@ -90,9 +97,10 @@ it bounded for an arbitrarily long stream.
 - **G3** Total context (audio KV + cache length) is bounded by resetting the
   cache on a natural boundary (speech endpoint / speaker turn), so per-step cost
   does not trend upward over a long stream.
-- **G4** Transcription accuracy is at least as good as the Silero-VAD baseline,
-  measured as CER against the gold transcript on the same span, and is expected
-  to improve from the retained cross-chunk context.
+- **G4** Transcription semantics are at least as good as the Silero-VAD baseline
+  on the same span, established only by complete contextual semantic review.
+  Historical CER values remain implementation diagnostics and do not evaluate
+  accuracy or select parameters.
 - **G5** The pipeline remains independent of diarization and emits onto the same
   comprehensive timeline; the output contract is unchanged.
 
@@ -128,8 +136,10 @@ it bounded for an arbitrarily long stream.
   (speaker-attributed) view SHALL be built as before.
 - **FR7 — Finalize**: On end of stream the session SHALL decode and commit the
   remaining tail so no audio is left untranscribed.
-- **FR8 — Accuracy measurement**: A CER measurement against the gold transcript
-  SHALL be available for the streamed output of `test.mp3`.
+- **FR8 — Accuracy evaluation**: The streamed output of `test.mp3` SHALL receive
+  complete item-by-item contextual semantic review. No code, script, test,
+  metric, formula, query, or algorithm may assign judgments, calculate
+  accuracy, compare/select parameters, or issue the verdict.
 
 ## 6. Acceptance Criteria
 
@@ -140,10 +150,10 @@ it bounded for an arbitrarily long stream.
 - **AC2** Chunk-local encode equivalence: encoding the full audio and encoding
   chunk-by-chunk-and-appending produce token embeddings whose maximum absolute
   difference is within tolerance over the earlier (frozen) tokens. (FR4, G2)
-- **AC3** CER of the incremental-streaming transcript against the gold is less
-  than or equal to the Silero-VAD baseline on the same span (measured 30.8% on
-  120 s); the measured incremental result is 17.6% (toward the unbounded-window
-  27.0%). (G4, FR8)
+- **AC3** Complete contextual semantic review establishes no regression against
+  the Silero-VAD baseline on the same span. The historical 30.8%, 17.6%, and
+  27.0% CER values are retained only as records of the original implementation
+  process and cannot satisfy this current acceptance criterion. (G4, FR8)
 - **AC4** Sustained streaming real-time factor on 120 s is at least the
   Silero-VAD baseline (3.27x ASR compute); the measured incremental seg-reset
   result is 4.51x. The number is measured and reported honestly. (G1, G3)
@@ -158,7 +168,8 @@ it bounded for an arbitrarily long stream.
 ## 7. Constitution Check
 
 - **Art. I (no dependencies)**: only existing CUDA + standard library.
-- **Art. II (accuracy)**: AC3 requires no CER regression; numerics unchanged.
+- **Art. II (accuracy)**: AC3 requires no contextual semantic regression;
+  numerical parity remains separate component evidence.
 - **Art. III (independent pipelines, comprehensive timeline)**: unchanged; only
   the ASR worker's internal method changes.
 - **Art. IV (streaming validation)**: measured through the real streaming path;
@@ -185,7 +196,7 @@ it bounded for an arbitrarily long stream.
 - **R4** Committed-text rollback: only the last K tokens of the running output
   are \"unfixed\" and re-decoded as more audio arrives; the rest is committed into
   the suffix prefix. The rollback must not cut a multi-byte UTF-8 character\n  (mirror the official `\\ufffd` guard). Validated by AC3/AC7.
-- **R5** Gold alignment for CER: the gold transcript covers a known span; the
+- **R5** Historical CER alignment: the gold transcript covers a known span; the
   CER harness compares normalized text over the same span. Defined in `plan.md`.
 
 ## 9. Parameter Refinement (2026-06-17)

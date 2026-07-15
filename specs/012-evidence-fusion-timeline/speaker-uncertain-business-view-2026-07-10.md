@@ -1,5 +1,11 @@
 # Spec 012 Speaker-Uncertain Business View - 2026-07-10
 
+> **Evaluation governance:** Under Constitution 1.7.0, no code or executable
+> automation may assign correctness, calculate accuracy, rank/select a
+> candidate, or issue a verdict. Automated values below are mechanical evidence
+> only; product results require complete contextual semantic review and manual
+> result verification.
+
 ## Purpose
 
 Phase 1 found two late-session failure classes:

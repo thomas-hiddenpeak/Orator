@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Diagnostic speaker-attribution overlap report.
+"""Legacy mechanical speaker-attribution overlap report.
 
-Constitutional acceptance for Orator speaker quality is context-aware review
-against test/data/reference/test.txt, not this script's aggregate percentage.
-This utility only helps locate changed windows and quantify overlap drift. It
+Under Constitution 1.7.0 this utility is prohibited from evaluating accuracy,
+ranking/selecting candidates, choosing parameters, or issuing a verdict. Its
+historical overlap values are mechanical records only. This utility
 reads a timeline JSON produced by ws_unified_test.py and reports:
   - mapping spk_<n> -> ground-truth name (by max overlap),
-  - duration-weighted attribution overlap of the comprehensive view,
+  - duration-weighted mechanical overlap of the comprehensive view,
   - per-reference-turn dominant speaker_id.
 
 Usage: python speaker_attrib_eval.py /tmp/out.json [--txt test/.../test.txt]
