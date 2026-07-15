@@ -8,6 +8,54 @@
 
 namespace orator {
 namespace pipeline {
+namespace {
+
+int SpeakerIndex(const std::string& speaker) {
+  if (speaker.rfind("speaker_", 0) != 0) return -1;
+  try {
+    return std::stoi(speaker.substr(8));
+  } catch (const std::invalid_argument&) {
+    return -1;
+  } catch (const std::out_of_range&) {
+    return -1;
+  }
+}
+
+}  // namespace
+
+std::string SerializeSpeakerDecisionToJson(
+    const ComprehensiveTimeline::SpeakerDecisionAudit& decision) {
+  char buf[256];
+  std::string out = ",\"speaker_decision\":{";
+  out += "\"speaker_source\":\"" + JsonEscape(decision.speaker_source) +
+         "\",\"text_projection_source\":\"" +
+         JsonEscape(decision.text_projection_source) + "\",\"reason\":\"" +
+         JsonEscape(decision.reason) + "\"";
+  std::snprintf(buf, sizeof(buf),
+                ",\"overlap_margin_sec\":%.3f,"
+                "\"confidence_margin\":%.6f,\"candidates\":[",
+                decision.overlap_margin_sec, decision.confidence_margin);
+  out += buf;
+  for (std::size_t i = 0; i < decision.candidates.size(); ++i) {
+    const auto& candidate = decision.candidates[i];
+    std::snprintf(buf, sizeof(buf),
+                  "{\"speaker\":%d,\"overlap_sec\":%.3f,"
+                  "\"coverage_ratio\":%.6f,\"confidence\":%.6f,"
+                  "\"island_count\":%d,\"selected\":%s",
+                  SpeakerIndex(candidate.speaker), candidate.overlap_sec,
+                  candidate.coverage_ratio, candidate.confidence,
+                  candidate.island_count,
+                  candidate.selected ? "true" : "false");
+    out += buf;
+    if (!candidate.speaker_id.empty()) {
+      out += ",\"speaker_id\":\"" + JsonEscape(candidate.speaker_id) + "\"";
+    }
+    out += "}";
+    if (i + 1 < decision.candidates.size()) out += ",";
+  }
+  out += "]}";
+  return out;
+}
 
 std::string SerializeRevisionToJson(const ComprehensiveTimeline::Revision& r,
                                     const char* source) {
@@ -55,6 +103,7 @@ std::string SerializeRevisionToJson(const ComprehensiveTimeline::Revision& r,
         e.diar_overlap_sec, e.diar_total_overlap_sec, e.diar_coverage_ratio,
         e.diar_total_coverage_ratio, e.diar_max_gap_sec, e.diar_island_count);
     out += buf;
+    out += SerializeSpeakerDecisionToJson(e.speaker_decision);
     out += ",\"text\":\"" + JsonEscape(e.text) + "\"}";
     if (i + 1 < r.entries.size()) out += ",";
   }

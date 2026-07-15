@@ -136,8 +136,33 @@ bool EntriesEqual(const std::vector<ComprehensiveTimeline::Entry>& a,
         !NearEqual(a[i].diar_max_gap_sec, b[i].diar_max_gap_sec) ||
         a[i].diar_island_count != b[i].diar_island_count ||
         a[i].speaker_support != b[i].speaker_support ||
-        a[i].speaker_uncertain != b[i].speaker_uncertain) {
+        a[i].speaker_uncertain != b[i].speaker_uncertain ||
+        a[i].speaker_decision.speaker_source !=
+            b[i].speaker_decision.speaker_source ||
+        a[i].speaker_decision.text_projection_source !=
+            b[i].speaker_decision.text_projection_source ||
+        a[i].speaker_decision.reason != b[i].speaker_decision.reason ||
+        !NearEqual(a[i].speaker_decision.overlap_margin_sec,
+                   b[i].speaker_decision.overlap_margin_sec) ||
+        !NearEqual(a[i].speaker_decision.confidence_margin,
+                   b[i].speaker_decision.confidence_margin) ||
+        a[i].speaker_decision.candidates.size() !=
+            b[i].speaker_decision.candidates.size()) {
       return false;
+    }
+    for (std::size_t candidate = 0;
+         candidate < a[i].speaker_decision.candidates.size(); ++candidate) {
+      const auto& left = a[i].speaker_decision.candidates[candidate];
+      const auto& right = b[i].speaker_decision.candidates[candidate];
+      if (left.speaker != right.speaker ||
+          left.speaker_id != right.speaker_id ||
+          !NearEqual(left.overlap_sec, right.overlap_sec) ||
+          !NearEqual(left.coverage_ratio, right.coverage_ratio) ||
+          !NearEqual(left.confidence, right.confidence) ||
+          left.island_count != right.island_count ||
+          left.selected != right.selected) {
+        return false;
+      }
     }
   }
   return true;
@@ -419,9 +444,103 @@ BusinessSpeakerPipeline::ComputeSpeakerSupport(
   return support;
 }
 
+BusinessSpeakerPipeline::SpeakerDecisionAudit
+BusinessSpeakerPipeline::ComputeSpeakerDecision(
+    double start, double end, const std::string& speaker,
+    const std::string& speaker_id,
+    const std::string& text_projection_source) const {
+  struct CandidateAccumulator {
+    std::vector<std::pair<double, double>> intervals;
+    double confidence_weighted_sum = 0.0;
+    double confidence_weight = 0.0;
+  };
+
+  using CandidateKey = std::pair<std::string, std::string>;
+  std::map<CandidateKey, CandidateAccumulator> accumulated;
+  for (const auto& segment : speakers_) {
+    const double overlap = Overlap(start, end, segment.start, segment.end);
+    if (overlap <= 0.0) continue;
+    auto& candidate = accumulated[{segment.speaker, segment.speaker_id}];
+    candidate.intervals.push_back(
+        {std::max(start, segment.start), std::min(end, segment.end)});
+    candidate.confidence_weighted_sum += segment.conf * overlap;
+    candidate.confidence_weight += overlap;
+  }
+
+  SpeakerDecisionAudit decision;
+  decision.text_projection_source = text_projection_source;
+  const double duration = std::max(0.0, end - start);
+  decision.candidates.reserve(accumulated.size());
+  for (auto& [key, accumulator] : accumulated) {
+    auto intervals = MergeIntervals(std::move(accumulator.intervals));
+    ComprehensiveTimeline::SpeakerCandidateEvidence candidate;
+    candidate.speaker = key.first;
+    candidate.speaker_id = key.second;
+    candidate.overlap_sec = CoveredDuration(intervals);
+    candidate.coverage_ratio =
+        duration > 1e-9 ? std::min(1.0, candidate.overlap_sec / duration) : 0.0;
+    candidate.confidence = accumulator.confidence_weight > 1e-9
+                               ? accumulator.confidence_weighted_sum /
+                                     accumulator.confidence_weight
+                               : 0.0;
+    candidate.island_count = static_cast<int>(intervals.size());
+    candidate.selected =
+        candidate.speaker == speaker && candidate.speaker_id == speaker_id;
+    decision.candidates.push_back(std::move(candidate));
+  }
+
+  std::sort(decision.candidates.begin(), decision.candidates.end(),
+            [](const auto& left, const auto& right) {
+              if (left.selected != right.selected) return left.selected;
+              if (!NearEqual(left.overlap_sec, right.overlap_sec)) {
+                return left.overlap_sec > right.overlap_sec;
+              }
+              if (!NearEqual(left.confidence, right.confidence)) {
+                return left.confidence > right.confidence;
+              }
+              if (left.speaker != right.speaker) {
+                return left.speaker < right.speaker;
+              }
+              return left.speaker_id < right.speaker_id;
+            });
+
+  const ComprehensiveTimeline::SpeakerCandidateEvidence* selected = nullptr;
+  const ComprehensiveTimeline::SpeakerCandidateEvidence* best_rejected =
+      nullptr;
+  for (const auto& candidate : decision.candidates) {
+    if (candidate.selected) {
+      selected = &candidate;
+      continue;
+    }
+    if (best_rejected == nullptr ||
+        candidate.overlap_sec > best_rejected->overlap_sec + 1e-9 ||
+        (NearEqual(candidate.overlap_sec, best_rejected->overlap_sec) &&
+         candidate.confidence > best_rejected->confidence)) {
+      best_rejected = &candidate;
+    }
+  }
+
+  if (selected == nullptr) {
+    decision.reason = "no_diar_support";
+  } else if (best_rejected != nullptr) {
+    decision.reason = "competing_diar_interval_policy";
+    decision.overlap_margin_sec =
+        selected->overlap_sec - best_rejected->overlap_sec;
+    decision.confidence_margin =
+        selected->confidence - best_rejected->confidence;
+  } else if (config_.gap_fill_enabled && selected->island_count > 1 &&
+             selected->coverage_ratio < 1.0 - 1e-9) {
+    decision.reason = "same_speaker_gap_fill";
+  } else {
+    decision.reason = "sole_diar_support";
+  }
+  return decision;
+}
+
 BusinessSpeakerPipeline::Entry BusinessSpeakerPipeline::MakeEntry(
     double start, double end, const std::string& speaker,
-    const std::string& speaker_id, std::string text, long text_id) const {
+    const std::string& speaker_id, std::string text, long text_id,
+    const std::string& text_projection_source) const {
   Entry entry;
   entry.start = start;
   entry.end = end;
@@ -439,6 +558,8 @@ BusinessSpeakerPipeline::Entry BusinessSpeakerPipeline::MakeEntry(
   entry.diar_island_count = support.island_count;
   entry.speaker_support = support.level;
   entry.speaker_uncertain = entry.speaker_support != "strong";
+  entry.speaker_decision = ComputeSpeakerDecision(
+      start, end, speaker, speaker_id, text_projection_source);
   return entry;
 }
 
@@ -554,11 +675,12 @@ BusinessSpeakerPipeline::SplitTextByDiar(const TextSeg& text) const {
   }
 
   if (turns.empty()) {
-    return {MakeEntry(text.start, text.end, "unknown", "", text.text, text.id)};
+    return {MakeEntry(text.start, text.end, "unknown", "", text.text, text.id,
+                      "asr_exact")};
   }
   if (turns.size() == 1) {
     return {MakeEntry(turns[0].start, turns[0].end, turns[0].speaker,
-                      turns[0].speaker_id, text.text, text.id)};
+                      turns[0].speaker_id, text.text, text.id, "asr_exact")};
   }
 
   const auto alignment = align_.find(text.id);
@@ -617,7 +739,8 @@ BusinessSpeakerPipeline::SplitTextByDiar(const TextSeg& text) const {
         if ((*slices)[turn].empty()) continue;
         entries.push_back(MakeEntry(turns[turn].start, turns[turn].end,
                                     turns[turn].speaker, turns[turn].speaker_id,
-                                    (*slices)[turn], text.id));
+                                    (*slices)[turn], text.id,
+                                    "forced_alignment"));
       }
       if (!entries.empty()) return entries;
     }
@@ -642,7 +765,7 @@ BusinessSpeakerPipeline::SplitTextByDiar(const TextSeg& text) const {
         text.text.substr(offsets[used], offsets[end] - offsets[used]);
     entries.push_back(MakeEntry(turns[turn].start, turns[turn].end,
                                 turns[turn].speaker, turns[turn].speaker_id,
-                                std::move(slice), text.id));
+                                std::move(slice), text.id, "asr_proportional"));
     used = end;
   }
   return entries;

@@ -460,6 +460,8 @@ std::string AuditoryStream::Serialize() {
                   entry.diar_coverage_ratio, entry.diar_total_coverage_ratio,
                   entry.diar_max_gap_sec, entry.diar_island_count);
     business_entries_json += buf;
+    business_entries_json +=
+        SerializeSpeakerDecisionToJson(entry.speaker_decision);
     business_entries_json += ",\"text\":\"" + JsonEscape(entry.text) + "\"}";
     if (i + 1 < comp_view.size()) business_entries_json += ",";
   }

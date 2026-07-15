@@ -16,7 +16,13 @@ function supportTitle(entry) {
     ? `${entry.diar_max_gap_sec.toFixed(2)}s`
     : "-";
   const islands = entry.diar_island_count ?? "-";
-  return `speaker support: ${entry.speaker_support}; coverage ${pct}; max gap ${gap}; islands ${islands}`;
+  const decision = entry.speaker_decision;
+  const rejected = Array.isArray(decision?.candidates)
+    ? decision.candidates.filter((candidate) => !candidate.selected).length
+    : 0;
+  const reason = decision?.reason ? `; decision ${decision.reason}` : "";
+  const alternatives = rejected > 0 ? `; rejected alternatives ${rejected}` : "";
+  return `speaker support: ${entry.speaker_support}; coverage ${pct}; max gap ${gap}; islands ${islands}${reason}${alternatives}`;
 }
 
 function applySpeakerSupport(el, speakerEl, entry) {

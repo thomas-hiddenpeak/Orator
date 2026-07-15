@@ -376,6 +376,12 @@ export class Model {
       diar_total_coverage_ratio: entry.diar_total_coverage_ratio,
       diar_max_gap_sec: entry.diar_max_gap_sec,
       diar_island_count: entry.diar_island_count,
+      speaker_decision: entry.speaker_decision ? {
+        ...entry.speaker_decision,
+        candidates: Array.isArray(entry.speaker_decision.candidates)
+          ? entry.speaker_decision.candidates.map((candidate) => ({ ...candidate }))
+          : [],
+      } : undefined,
       text: entry.text || "",
     };
   }
@@ -392,6 +398,7 @@ export class Model {
     delete row.speaker_name;
     delete row.speaker_support;
     delete row.speaker_uncertain;
+    delete row.speaker_decision;
     delete row.speakerMixed;
     if (turns.length === 0) return;
 
@@ -415,5 +422,6 @@ export class Model {
     row.diar_total_coverage_ratio = representative.diar_total_coverage_ratio;
     row.diar_max_gap_sec = representative.diar_max_gap_sec;
     row.diar_island_count = representative.diar_island_count;
+    row.speaker_decision = representative.speaker_decision;
   }
 }

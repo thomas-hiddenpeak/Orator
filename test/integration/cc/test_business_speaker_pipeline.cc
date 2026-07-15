@@ -1,4 +1,5 @@
 #include <cassert>
+#include <cmath>
 #include <cstdio>
 #include <string>
 
@@ -74,6 +75,23 @@ int main() {
     if (r1.size() == 1 && !r1[0].entries.empty()) {
       CHECK(r1[0].entries[0].speaker == "speaker_1",
             "attribution revised to speaker_1 (tighter segment wins on tie)");
+      const auto& decision = r1[0].entries[0].speaker_decision;
+      CHECK(decision.reason == "competing_diar_interval_policy",
+            "overlapping decision records its tie policy");
+      CHECK(decision.candidates.size() == 2,
+            "selected and rejected diar candidates are retained");
+      if (decision.candidates.size() == 2) {
+        CHECK(decision.candidates[0].selected &&
+                  decision.candidates[0].speaker == "speaker_1",
+              "selected candidate is explicit and ordered first");
+        CHECK(!decision.candidates[1].selected &&
+                  decision.candidates[1].speaker == "speaker_0",
+              "rejected overlapping candidate remains auditable");
+      }
+      CHECK(decision.overlap_margin_sec == 0.0,
+            "equal-overlap candidates expose a zero overlap margin");
+      CHECK(std::abs(decision.confidence_margin - 0.35) < 1e-6,
+            "selected-versus-rejected confidence margin is recorded");
       CHECK(r1[0].dirty_start == 4.0 && r1[0].dirty_end == 6.0,
             "revision dirty range matches the text span");
     }
@@ -146,13 +164,21 @@ int main() {
     // First diar view: one speaker covering everything -> both texts -> spk0.
     auto r1 = tl.ReplaceSpeakers({{0.0, 10.0, "speaker_0", 0.8f}});
     CHECK(r1.size() == 2, "ReplaceSpeakers re-projects both texts (new->spk0)");
-    // Refined diar view: spk1 owns [5,10) -> text 1 flips, text 0 unchanged.
+    // Refined diar view: spk1 owns [5,10). Text 1 flips; text 0 keeps its
+    // speaker but receives revised confidence evidence.
     auto r2 = tl.ReplaceSpeakers(
         {{0.0, 5.0, "speaker_0", 0.9f}, {5.0, 10.0, "speaker_1", 0.9f}});
-    CHECK(r2.size() == 1, "refined diar view revises only the changed text");
-    if (r2.size() == 1 && !r2[0].entries.empty())
-      CHECK(r2[0].entries[0].speaker == "speaker_1",
-            "text 1 re-attributed to speaker_1 after diar refinement");
+    CHECK(r2.size() == 2,
+          "refined diar view revises changed attribution and audit evidence");
+    bool found_reattribution = false;
+    for (const auto& revision : r2) {
+      if (!revision.entries.empty() && revision.entries[0].text_id == 1 &&
+          revision.entries[0].speaker == "speaker_1") {
+        found_reattribution = true;
+      }
+    }
+    CHECK(found_reattribution,
+          "text 1 re-attributed to speaker_1 after diar refinement");
   }
 
   // ---- 7. Interleaved convergence: immutable ASR and revisable diar evidence
@@ -269,6 +295,11 @@ int main() {
             "pre-gap text remains with first speaker");
       CHECK(snap[1].speaker_id == "spk_0" && snap[1].text == "DEF",
             "post-gap text moves to second speaker");
+      CHECK(snap[0].speaker_decision.text_projection_source ==
+                    "forced_alignment" &&
+                snap[1].speaker_decision.text_projection_source ==
+                    "forced_alignment",
+            "speaker decisions identify forced-alignment text projection");
     }
   }
 
@@ -296,6 +327,11 @@ int main() {
             "selected-speaker overlap is measured in seconds");
       CHECK(snap[0].diar_max_gap_sec == 3.0,
             "largest selected-speaker evidence gap is exposed");
+      CHECK(snap[0].speaker_decision.reason == "same_speaker_gap_fill",
+            "gap-filled attribution records its decision reason");
+      CHECK(snap[0].speaker_decision.candidates.size() == 1 &&
+                snap[0].speaker_decision.candidates[0].island_count == 2,
+            "gap-fill audit retains both selected evidence islands");
     }
   }
 

@@ -274,6 +274,23 @@ No transcript phrase, real speaker name, known timestamp, or reference label is
 part of runtime logic. Each output includes an audit record containing source
 evidence, chosen speaker, rejected alternatives, confidence margin, and reason.
 
+The first runtime audit increment is attribution-neutral. Each
+`business_speaker` entry receives a structured `speaker_decision` object with:
+
+- `speaker_source` and `text_projection_source`;
+- a decision `reason` that distinguishes no support, sole support, same-speaker
+  gap fill, and competing diar support;
+- all local/global diar candidates, with union overlap, entry coverage,
+  overlap-weighted confidence, island count, and a selected flag;
+- selected-versus-best-rejected overlap and confidence margins.
+
+The object is computed only from immutable typed evidence on the common clock.
+It is serialized identically in live revisions and terminal output, retained by
+the browser model/export path, and included in convergence checks. This step
+does not change attribution, support thresholds, uncertainty, or raw tracks. A
+later decision-policy experiment may use the audit only after its own frozen
+TOML policy and complete contextual review are defined.
+
 ### 6.3 Decision gate
 
 The frozen candidate must reach at least 93 percent on both speaker-time and

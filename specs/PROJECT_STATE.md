@@ -14,7 +14,7 @@ work is specified under [specs/](.).
 > pass is the consistency proof. Status lines advance to `Implemented` in the
 > same change that lands the code, with the commit reference.
 
-- **Last updated**: 2026-07-15 (v2.1 full closing-baseline system capture)
+- **Last updated**: 2026-07-15 (business-speaker decision audit contract)
 - **Branch**: `master`
 - **Constitution**: v1.6.0
 - **Product closure**: **OPEN / NOT ACCEPTED**. No current artifact proves the
@@ -200,6 +200,19 @@ when sanitizer instrumentation exceeded approximately 79 GiB host memory and is
 not claimed as a pass. T042 is complete; no accuracy claim follows. See
 [engineering-gates-2026-07-15.md](013-industrial-closing-validation/engineering-gates-2026-07-15.md).
 
+**Business-speaker audit contract (2026-07-15)**: every live and terminal
+`business_speaker` entry now carries a structured, reference-free
+`speaker_decision` containing evidence/projection sources, reason, selected and
+rejected diar candidates, overlap/coverage/confidence/islands, and decision
+margins. The selection policy and raw tracks are unchanged. The complete 64/64
+suite passed; a 120-second 1x real-WebSocket run preserved the prior frozen
+terminal result exactly after removing only the new field, and a real Chromium
+run proved rendered/downloaded/persisted equality, reconnect, fake-microphone,
+telemetry, and desktop/mobile rendering. This closes T071 only; physical
+microphone, attribution-changing T072 validation, promotion durations, and the
+signed 556-row context review remain open. See
+[speaker-decision-audit-2026-07-15.md](013-industrial-closing-validation/speaker-decision-audit-2026-07-15.md).
+
 ## 3. Component status
 
 | Component | Status | Notes |
@@ -214,7 +227,7 @@ not claimed as a pass. T042 is complete; no accuracy claim follows. See
 | WebSocket server (libwebsockets v4.3.3) | ✅ Refactored | Replaced hand-rolled POSIX WS with libwebsockets (multi-client, RFC 6455/7692). One connection owns audio production while browser and diagnostic observers receive the same broadcast stream without resetting it; concurrent producer bytes are rejected. Eliminated file-scope static variables (`serve_server`, `serve_factory`, `pss_list_head`) → instance members via `lws_context_user`. Thread-safe `SendText` with wakeup/cancel-service. ServeOnce mode for unit tests. |
 | ASR + WS integration | Implemented; full-session acceptance open | `AuditoryStream` owns one private `PipelineAudioCache` per active producer and uses separate worker threads. One session-owned `TimeBase` is injected into all active stores and workers. Final ASR live emission and its typed sink reuse one `text_id`; partial rejection emits a matching retract, and the terminal ASR track serializes the ID. ASR reads immutable VAD evidence snapshots from `ComprehensiveTimeline`; forced alignment consumes finalized ASR records there. Registered WS/Node tests and a real Chromium run verify short-path revision/export/reconnect/UI convergence. Full repeatability and contextual accuracy remain open. |
 | Incremental KV-cache ASR streaming (Spec 003) | ✅ Implemented, verified, committed (8cc31ab); params refined 2026-07-03 | Persistent KV cache + prefix caching + chunk-local windowed encoder; partial-emission every 1 s via WebSocket. Full 1hr CER 16.1% / 6.22x; beats production Silero-VAD at every scale. **Current params**: `kStreamWindowMel=100` (1 s), `max_new_tokens=32`, `unfixed_chunks=2`, `unfixed_tokens=15`, `segment_sec=24.0`, `vad_min_overlap_sec=0.12`. 2026-07-03 real WS `test.mp3` 600 s A/B after the VAD-overlap filter: `segment_sec=24` produced 49 ASR finals vs 67 at 12 s, with the same final comprehensive count (115) and better `To C` wording; default restored to 24 s for ASR semantic stability. |
-| Revisable comprehensive timeline (Spec 004) | Container/fusion ownership corrected; acceptance open | `ComprehensiveTimeline` stores typed diarization, ASR, VAD, alignment, and business tracks and publishes immutable snapshots/typed updates. `BusinessSpeakerPipeline` owns align-aware projection, gap fill, and speaker-support diagnostics. The terminal `comprehensive` field is a compatibility alias serialized from the exact stored `business_speaker` entries. Full contextual acceptance remains open. |
+| Revisable comprehensive timeline (Spec 004) | Container/fusion ownership corrected; acceptance open | `ComprehensiveTimeline` stores typed diarization, ASR, VAD, alignment, and business tracks and publishes immutable snapshots/typed updates. `BusinessSpeakerPipeline` owns align-aware projection, gap fill, speaker-support diagnostics, and a structured selected/rejected candidate audit. Live revisions, the terminal business track, the `comprehensive` compatibility alias, and the Web UI preserve the same decision object. Full contextual acceptance remains open. |
 | Reusable common time base (Spec 004) | Session ownership and final reconciliation implemented; acceptance open | `AuditoryStream` owns one immutable `TimeBase` and injects it into every active private cache, worker, and retained audio store. Finalization reconciles exact sample extents for input, diarization, speaker identity, ASR, VAD, alignment, and business speaker; focused tests and the 2026-07-13 120 s real-WebSocket run reported zero gaps. Full-session repeatability remains open under Spec 013. |
 | Pipeline protocol layer (Spec 004) | ✅ Implemented | Phases 7–12 complete: data types (topic.h, schema.h), pipeline registry, topic router, storage layer (MEMORY + DISK), ProtocolTimeline integration, WS v2 envelope with describe command, --storage-disk-path flag. 25/25 tests pass. |
 | Streaming validation | Registered gate strengthened; closing runs open | `ws_unified_test.py` has one socket reader, captures source/config/binary pre/post hashes, continuous `tegrastats`, and runtime telemetry, and rejects source drift, sparse telemetry, mechanical live/final, typed-track, ID, alignment, VAD/diar, and extent violations. `test_ws_contract` runs canonical speech plus generated silence through the real server. Structural checks never assign semantic accuracy; clean 360/600/full contextual gates remain open. |

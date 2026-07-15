@@ -151,6 +151,14 @@ subject to the complete acceptance gates in this spec.
   immutable. `ComprehensiveTimeline` remains a container/alignment layer.
 - **FR8**: ASR final, forced-alignment group, revision, terminal ASR track, final
   business view, and Web UI state must use the same stable `text_id`.
+- **FR21**: Every `business_speaker` entry must carry a reference-free,
+  structured speaker-decision audit. The audit records the speaker evidence
+  source, text-projection source, decision reason, selected candidate, every
+  rejected overlapping candidate, candidate overlap/coverage/confidence, and
+  selected-versus-best-alternative overlap and confidence margins. Live
+  revisions, terminal tracks, the compatibility alias, and Web UI state must
+  preserve the same audit object. Adding or revising audit evidence must not
+  change a raw track or silently change the selected speaker.
 
 ### 4.3 Reference and evaluation
 

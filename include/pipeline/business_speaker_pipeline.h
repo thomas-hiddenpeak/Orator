@@ -56,6 +56,7 @@ class BusinessSpeakerPipeline {
   using AlignGroup = ComprehensiveTimeline::AlignGroup;
   using Entry = ComprehensiveTimeline::Entry;
   using RawTextSeg = ComprehensiveTimeline::RawTextSeg;
+  using SpeakerDecisionAudit = ComprehensiveTimeline::SpeakerDecisionAudit;
   using SpeakerInput = ComprehensiveTimeline::SpeakerInput;
 
   struct SpeakerSeg {
@@ -103,9 +104,13 @@ class BusinessSpeakerPipeline {
   SpeakerSupport ComputeSpeakerSupport(double start, double end,
                                        const std::string& speaker,
                                        const std::string& speaker_id) const;
+  SpeakerDecisionAudit ComputeSpeakerDecision(
+      double start, double end, const std::string& speaker,
+      const std::string& speaker_id,
+      const std::string& text_projection_source) const;
   Entry MakeEntry(double start, double end, const std::string& speaker,
-                  const std::string& speaker_id, std::string text,
-                  long text_id) const;
+                  const std::string& speaker_id, std::string text, long text_id,
+                  const std::string& text_projection_source) const;
   void MergeEntrySupport(Entry* dst, const Entry& src) const;
   std::vector<Entry> SplitTextByDiar(const TextSeg& text) const;
   void ReprojectText(const TextSeg& text, std::vector<Revision>* revisions);

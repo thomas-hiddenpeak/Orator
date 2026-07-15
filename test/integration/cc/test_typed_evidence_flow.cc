@@ -74,12 +74,15 @@ int main() {
       protocol.RegisterPipeline(std::move(business_descriptor));
 
   bool business_mirrored_after_commit = false;
+  std::string business_protocol_data;
   protocol.SubscribeInternal(
       TopicPattern{orator::protocol::kBusinessSpeakerRevision.to_string()},
-      [&evidence, &business_mirrored_after_commit](const Message&) {
+      [&evidence, &business_mirrored_after_commit,
+       &business_protocol_data](const Message& message) {
         const auto tracks = evidence.SnapshotTracks();
         business_mirrored_after_commit =
             tracks.asr.size() == 1 && tracks.business_speaker.size() == 1;
+        business_protocol_data = message.data;
       });
 
   orator::pipeline::BusinessSpeakerPipeline business(
@@ -134,6 +137,11 @@ int main() {
         "typed ASR track contains one final");
   CHECK(business_mirrored_after_commit,
         "business revision mirrors only after its typed track commits");
+  CHECK(business_protocol_data.find("\"speaker_decision\":{") !=
+                std::string::npos &&
+            business_protocol_data.find("\"reason\":\"no_diar_support\"") !=
+                std::string::npos,
+        "business revision serializes structured speaker-decision evidence");
 
   orator::pipeline::HandleTextSink(evidence, &protocol, asr_handle.get(), 5,
                                    2.0, 2.5, "partial", false);

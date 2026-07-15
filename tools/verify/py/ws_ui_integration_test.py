@@ -89,6 +89,19 @@ def assert_terminal_contract(timeline):
         raise AssertionError("terminal ASR/alignment IDs differ")
     if business != timeline.get("comprehensive", []):
         raise AssertionError("business track differs from comprehensive alias")
+    for entry in business:
+        decision = entry.get("speaker_decision")
+        if not isinstance(decision, dict):
+            raise AssertionError("business entry lacks speaker_decision audit")
+        candidates = decision.get("candidates")
+        if not isinstance(candidates, list):
+            raise AssertionError("speaker_decision candidates are not an array")
+        selected = [candidate for candidate in candidates
+                    if candidate.get("selected") is True]
+        expected_selected = 0 if entry.get("speaker") == -1 else 1
+        if len(selected) != expected_selected:
+            raise AssertionError(
+                "speaker_decision selected candidate count is inconsistent")
     if not timeline.get("timebase_reconciled") or not timeline.get("timebase_ok"):
         raise AssertionError("terminal time-base reconciliation failed")
     if any(extent.get("gap_samples") != 0
@@ -312,6 +325,9 @@ def run_browser(args, log_file):
         "asr_entries": len(next(
             (track.get("entries", []) for track in terminal.get("tracks", [])
              if track.get("kind") == "asr"), [])),
+        "speaker_decisions": len(next(
+            (track.get("entries", []) for track in terminal.get("tracks", [])
+             if track.get("kind") == "business_speaker"), [])),
         "session_id": session_id,
         "desktop_screenshot": args.desktop_screenshot,
         "mobile_screenshot": args.mobile_screenshot,

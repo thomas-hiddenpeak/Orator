@@ -486,6 +486,7 @@ def main():
                 "speaker_support": entry.get("speaker_support"),
                 "speaker_uncertain": bool(
                     entry.get("speaker_uncertain", False)),
+                "speaker_decision": entry.get("speaker_decision"),
             },
             "sortformer": summarize_frames(
                 frames, frame_times, frame_period, start, end, onset),
@@ -498,7 +499,7 @@ def main():
         })
 
     output = {
-        "schema_version": 3,
+        "schema_version": 4,
         "kind": "orator_frozen_speaker_evidence",
         "sources": {
             "timeline": {

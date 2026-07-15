@@ -20,6 +20,25 @@ namespace pipeline {
 
 class ComprehensiveTimeline {
  public:
+  struct SpeakerCandidateEvidence {
+    std::string speaker;
+    std::string speaker_id;
+    double overlap_sec = 0.0;
+    double coverage_ratio = 0.0;
+    double confidence = 0.0;
+    int island_count = 0;
+    bool selected = false;
+  };
+
+  struct SpeakerDecisionAudit {
+    std::string speaker_source = "sortformer_diarization";
+    std::string text_projection_source = "asr_exact";
+    std::string reason = "no_diar_support";
+    double overlap_margin_sec = 0.0;
+    double confidence_margin = 0.0;
+    std::vector<SpeakerCandidateEvidence> candidates;
+  };
+
   struct Entry {
     double start = 0.0;
     double end = 0.0;
@@ -35,6 +54,7 @@ class ComprehensiveTimeline {
     int diar_island_count = 0;
     std::string speaker_support = "none";
     bool speaker_uncertain = true;
+    SpeakerDecisionAudit speaker_decision;
   };
 
   // A business-speaker pipeline revision replaces all entries with the same

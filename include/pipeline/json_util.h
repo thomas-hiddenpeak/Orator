@@ -51,5 +51,10 @@ inline std::string JsonEscape(const std::string& s) {
 std::string SerializeRevisionToJson(
     const ComprehensiveTimeline::Revision& revision, const char* source);
 
+// Serialize the structured attribution audit shared by live revisions and the
+// terminal business-speaker track. The returned fragment starts with a comma.
+std::string SerializeSpeakerDecisionToJson(
+    const ComprehensiveTimeline::SpeakerDecisionAudit& decision);
+
 }  // namespace pipeline
 }  // namespace orator

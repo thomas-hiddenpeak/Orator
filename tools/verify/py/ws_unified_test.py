@@ -796,7 +796,8 @@ def validate_terminal_contract(events, timeline):
 
     def projection(entries):
         fields = ("start", "end", "text_id", "speaker", "speaker_id",
-                  "text", "speaker_support", "speaker_uncertain")
+                  "text", "speaker_support", "speaker_uncertain",
+                  "speaker_decision")
         return [{field: entry.get(field) for field in fields}
                 for entry in entries]
 

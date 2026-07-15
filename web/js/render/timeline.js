@@ -54,6 +54,7 @@ export class TimelineView {
             diar_total_coverage_ratio: t.diar_total_coverage_ratio,
             diar_max_gap_sec: t.diar_max_gap_sec,
             diar_island_count: t.diar_island_count,
+            speaker_decision: t.speaker_decision,
             text: t.text,
           });
         }

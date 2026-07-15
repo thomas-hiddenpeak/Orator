@@ -62,6 +62,17 @@ test("revision before ASR final converges on one stable text ID", () => {
         end: 1.5,
         speaker: 2,
         speaker_id: "spk_2",
+        speaker_decision: {
+          speaker_source: "sortformer_diarization",
+          text_projection_source: "forced_alignment",
+          reason: "competing_diar_interval_policy",
+          overlap_margin_sec: 0,
+          confidence_margin: 0.2,
+          candidates: [
+            { speaker: 2, speaker_id: "spk_2", selected: true },
+            { speaker: 1, speaker_id: "spk_1", selected: false },
+          ],
+        },
         text: "hello",
       },
       {
@@ -84,6 +95,10 @@ test("revision before ASR final converges on one stable text ID", () => {
   assert.deepEqual(model.asrOrder, [0]);
   assert.equal(model.asr.get(0).speaker_id, "spk_2");
   assert.equal(model.asr.get(0).speakerSegments.length, 2);
+  assert.equal(model.asr.get(0).speakerSegments[0].speaker_decision.reason,
+               "competing_diar_interval_policy");
+  assert.equal(model.asr.get(0).speakerSegments[0]
+    .speaker_decision.candidates[1].selected, false);
   assert.equal(model.asr.get(0).status, "confirmed");
   assert.equal(model.draft, null);
   assert.deepEqual(model.tracks.asr, [

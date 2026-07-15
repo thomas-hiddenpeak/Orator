@@ -234,7 +234,11 @@
 
 - [ ] T070 Implement the frozen speaker-evidence and fusion contracts behind
   typed TOML fields.
-- [ ] T071 Add complete audit evidence to each business-speaker decision.
+- [x] T071 Add complete audit evidence to each business-speaker decision. The
+  attribution-neutral increment records structured source/projection/reason,
+  all selected and rejected diar candidates, overlap/coverage/confidence, and
+  overlap/confidence margins; live, terminal, alias, and browser representations
+  converge exactly. See `speaker-decision-audit-2026-07-15.md`.
 - [ ] T072 Validate that raw ASR, diarization, VAD, align, and voiceprint tracks
   remain unchanged by fusion revisions.
 - [ ] T073 Complete Web UI live/final convergence, microphone, reconnect,
