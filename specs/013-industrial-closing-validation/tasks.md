@@ -94,7 +94,13 @@
   See `closing-baseline-v21-2026-07-15.md`. This completes system evidence only;
   the unsigned audible ledger keeps T045 and all accuracy gates open.
 - [ ] T045 Complete the 556-row baseline context review and publish all required
-  score breakdowns without script-inferred judgments.
+  score breakdowns without script-inferred judgments. The exact clean
+  935-entry artifact has now received complete chronological and reverse-block
+  manual written-context review: 443 correct / 112 incorrect / 1 ambiguous
+  (`79.6763%`). Tools only arranged evidence. T045 remains open because audible
+  boundaries, overlap, criticality, speaker-time, offset, uncertainty,
+  per-speaker, and independently verified totals are not signed. See
+  `closing-baseline-v21-context-review-2026-07-15.md`.
 - [x] T046 Canonicalize equal-start overlapping diarization records before the
   typed/live split and retain strict live/terminal equality validation. The
   full `ee0dd82` diagnostic package exposed three order-only mismatches;

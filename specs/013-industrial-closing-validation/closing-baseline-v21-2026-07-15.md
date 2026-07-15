@@ -4,9 +4,12 @@
 
 This record closes T044's reproducible full-capture requirement. It establishes
 transport, common-clock, telemetry, persistence, and Web UI evidence for the
-sole v2.1 closing baseline. It does not assign speaker correctness and does not
-close T031 or T045. The 556-row audible reference ledger remains unsigned, so
-no constitutional natural-turn or speaker-time accuracy follows from this run.
+sole v2.1 closing baseline. The subsequent complete manual written-context
+review assigns natural-turn correctness in
+`closing-baseline-v21-context-review-2026-07-15.md`; this capture record itself
+does not. The 556-row audible reference ledger remains unsigned, so no
+constitutional speaker-time accuracy or closing acceptance follows from this
+run.
 
 ## Frozen Source
 
@@ -140,8 +143,12 @@ time-overlapping evidence; they contain no script-assigned judgment.
 ## Decision
 
 T044 is complete as reproducible system evidence. Accuracy promotion is still
-blocked: all 556 reference rows require audible boundary, overlap, criticality,
-ambiguity, chronological-pass, reverse-block-pass, reconciliation, and reviewer
-signatures. Until that work closes T031-T035 and T045, the previously reported
-74.2806 percent written-context diagnostic remains historical only, and this
-run has no constitutional accuracy percentage.
+blocked. The complete chronological and reverse-block written-context review of
+this exact clean package records 443 correct, 112 incorrect, and one ambiguous
+natural contribution (`79.6763%`), which fails the full-session gate and five
+fixed 600-second block gates. See
+`closing-baseline-v21-context-review-2026-07-15.md`. Exact audible boundaries,
+overlap, criticality, speaker-time, offsets, and independent totals still
+require signed evidence under T031-T035 and T045. The earlier 74.2806 percent
+result remains a historical diagnostic for a different 936-entry artifact; no
+constitutional speaker-time percentage or closing result is claimed here.

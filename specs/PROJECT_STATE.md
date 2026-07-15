@@ -14,7 +14,7 @@ work is specified under [specs/](.).
 > pass is the consistency proof. Status lines advance to `Implemented` in the
 > same change that lands the code, with the commit reference.
 
-- **Last updated**: 2026-07-15 (business-speaker decision audit contract)
+- **Last updated**: 2026-07-15 (clean v2.1 full written-context review)
 - **Branch**: `master`
 - **Constitution**: v1.6.0
 - **Product closure**: **OPEN / NOT ACCEPTED**. No current artifact proves the
@@ -158,7 +158,8 @@ compile-time default and `orator.toml` now select the same v2.1 weight file, and
 `test_config` prevents either from silently reverting to v2 and verifies that
 the deprecated v2 weight is absent. The v2 checkpoint and its obsolete CTest
 were deleted; only historical reports and hashes remain. This selects the model
-line for closing work; it does not accept the current 74.2806 percent result.
+line for closing work; it does not accept any historical contextual diagnostic
+as the clean closing-baseline result.
 
 **Reference-ledger start (2026-07-15)**: commit `43523ba` now has a fresh,
 hash-validated 556-row ledger for the canonical 3615.12-second input. All rows
@@ -185,9 +186,14 @@ Two subsequent source-stable 120-second runs on the current binary produced
 exactly equal entry arrays in all five terminal tracks and in the comprehensive
 view; only the wall-clock anchor and cold/warm compute metadata differed. This
 is a prefix repeatability check, not the two-full-run acceptance requirement.
-This completes T044 system evidence only. The 556-row audible ledger and the
-baseline context review remain unsigned, so this run has no constitutional
-accuracy percentage and product closure remains open.
+This completes T044 system evidence. A subsequent complete chronological and
+reverse-block manual review of all 556 written-context rows records 443 correct,
+112 incorrect, and one ambiguous contribution (`79.6763%`). Tools only arranged
+the evidence and did not assign judgments. The result fails the full-session
+gate and five fixed 600-second block gates. The audible ledger, speaker-time,
+offset, criticality, and independent totals remain unsigned, so T045 and product
+closure remain open. See
+[closing-baseline-v21-context-review-2026-07-15.md](013-industrial-closing-validation/closing-baseline-v21-context-review-2026-07-15.md).
 
 **Engineering closing gates (2026-07-15)**: clean `ce388a7` passed a warning-free
 Release build and the complete 64/64 CTest suite, including JavaScript and the
@@ -224,7 +230,7 @@ review without changing a frozen track.
 
 | Component | Status | Notes |
 |---|---|---|
-| Streaming diarization (Sortformer) | v2.1 is the sole closing baseline; acceptance open | Compile-time defaults and the checked-in TOML select streaming v2.1 under the inherited async `340/1/188/188` profile (chunk/right/FIFO/update). Its source-stable full 3615.12 s 1x real-WebSocket run passed mechanical, common-time-base, and telemetry contracts, but full contextual review recorded only 413 correct / 142 incorrect / 1 ambiguous natural turns (`74.2806%`). NVIDIA's official high `340/40/40/300` and low `6/7/188/144` profiles pass separate 1502-frame NeMo/C++ numerical gates; full native-diar contextual screening records 385 / 170 / 1 (`69.2446%`) and 377 / 178 / 1 (`67.8058%`). The low profile exposed and fixed a Conformer scratch-buffer overflow for short chunks. Neither official profile advances to a real-WebSocket acceptance run. The v2 checkpoint and obsolete gate are removed; no result is an exact speaker-time acceptance score. |
+| Streaming diarization (Sortformer) | v2.1 is the sole closing baseline; acceptance open | Compile-time defaults and the checked-in TOML select streaming v2.1 under the inherited async `340/1/188/188` profile (chunk/right/FIFO/update). Its exact clean 935-entry, 3615.12 s 1x real-WebSocket artifact passed mechanical, common-time-base, and telemetry contracts. Complete chronological and reverse-block manual written-context review records 443 correct / 112 incorrect / 1 ambiguous natural contributions (`79.6763%`); the historical 413 / 142 / 1 result belongs to a different 936-entry artifact and used a cut-oriented diagnostic rubric. NVIDIA's official high `340/40/40/300` and low `6/7/188/144` profiles pass separate 1502-frame NeMo/C++ numerical gates; their historical full native-diar contextual diagnostics record 385 / 170 / 1 (`69.2446%`) and 377 / 178 / 1 (`67.8058%`). Neither official profile advances to a real-WebSocket acceptance run. The v2 checkpoint and obsolete gate are removed; no result is an exact speaker-time acceptance score. |
 | Multi-scale TitaNet fusion screening | Frozen experiment complete; runtime integration rejected | A reference-free TOML policy pairs native 3 s and 5 s TitaNet windows by absolute centre time, restricts ranking to active session identities, requires independent score/margin agreement, and permits candidate-strength rewrites only at forced-alignment pauses. From 7,224 spans it retained 1,166 points and 239 runs, changing nine of 936 business entries. Manual contextual review of all 11 affected reference rows found five repairs and no regression, raising the frozen result to 418 / 137 / 1 (`75.1799%`). This fails the 93 percent implementation gate, so policy tuning stops and no runtime/real-WebSocket claim follows. See [speaker-sliding-v21-2026-07-15.md](013-industrial-closing-validation/speaker-sliding-v21-2026-07-15.md). |
 | Native Qwen3-ASR engine | Numerical oracle verified; semantic closure open | Stored stage fixtures report mel 3.9e-3, encoder 1.3e-3, and decoder argmax parity. These numerical gates do not establish the Spec 013 full contextual semantic or silence-hallucination gates. Pure bf16 compute. |
 | Forced alignment (Qwen3-ForcedAligner-0.6B, Spec 009) | Implemented; numerical and prior WS evidence recorded | The registered `AlignWorker` consumes typed finalized ASR records from `ComprehensiveTimeline`, reads the matching retained audio span, deposits a typed alignment group, then mirrors `align/units` to protocol and WebSocket. Partials are never aligned. Stage-level torch-oracle checks and the 2026-06-30 60-minute real-WebSocket run reported 119/119 segment coverage, 13,594 units, no bounds/monotonicity failures, and no crash after the CUDA grid-stride fix. These historical results establish the aligner implementation, not current Spec 013 product closure; repeatable full-session acceptance remains open. |
@@ -402,19 +408,22 @@ Findings:
 Continue [Spec 013](013-industrial-closing-validation/spec.md) exclusively on
 streaming v2.1 under the inherited `340/1/188/188` profile. Its completed
 3615.12-second
-1x real-WebSocket diagnostic remains the strongest deployable result at 413/556
-correct natural turns (`74.2806%`). Exact numerical and full contextual gates
-are now complete for NVIDIA's official high `340/40/40/300` and low
+1x real-WebSocket clean baseline has a complete manual written-context result
+of 443/556 correct natural contributions (`79.6763%`). It fails the 90 percent
+full-session gate and five fixed 600-second block gates. Exact numerical and
+historical contextual diagnostics are complete for NVIDIA's official high
+`340/40/40/300` and low
 `6/7/188/144` profiles; their 385/556 and 377/556 results reject both before
 another integrated run. Offline-only diarization models are outside the
 selection path because `test.txt` already supplies business truth and they do
 not supply a deployable runtime path.
-The reference-free multi-scale TitaNet candidate is also complete: it reaches
-only 418/556 (`75.1799%`) after five repairs and no regression, so Spec 013
-requires policy tuning and runtime integration to stop. No currently available
-streaming model or fusion candidate qualifies for T061's 93 percent selection
-gate. The next closing work is to complete the signed audible ledger and use
-the frozen v2.1 evidence to address root causes in the deployable pipeline;
+The reference-free multi-scale TitaNet candidate is also complete as a
+historical diagnostic; it reached only 418/556 (`75.1799%`) on the different
+936-entry source after five repairs and no regression, so it was not integrated.
+No currently available streaming model or fusion candidate qualifies for
+T061's 93 percent selection gate. The next closing work is to complete the
+signed audible ledger and use the exact clean frozen v2.1 evidence to address
+root causes in the deployable pipeline;
 another parameter sweep or offline reference is not a valid next step. A
 candidate can enter runtime only after its v2.1-based frozen result passes the
 93 percent gate. Product closure also remains blocked on the signed 556-row

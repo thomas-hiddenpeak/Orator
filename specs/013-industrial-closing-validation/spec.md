@@ -104,13 +104,14 @@ subject to the complete acceptance gates in this spec.
    CTest were removed after v2.1 became the sole closing baseline.
 8. **v2.1 selected as the sole closing baseline; product gate still open**: the
    compile-time default and checked-in TOML select streaming v2.1. Its inherited
-   asynchronous profile passed the exact
-   multi-chunk NeMo gate and completed a full real-WebSocket review at 413 / 142
-   / 1 natural turns. NVIDIA's official high- and low-latency profiles also
-   passed separate numerical gates, but full contextual screening recorded only
-   385 / 170 / 1 and 377 / 178 / 1. Neither official profile proceeds to
-   transport acceptance. The inherited v2.1 profile is the fixed starting point
-   for closing work and remains below the 90 percent product gate.
+   asynchronous profile passed the exact multi-chunk NeMo gate. An earlier
+   936-entry full real-WebSocket artifact recorded a cut-oriented written-context
+   diagnostic of 413 / 142 / 1 natural turns. NVIDIA's official high- and
+   low-latency profiles also passed separate numerical gates, but historical
+   full contextual diagnostics recorded only 385 / 170 / 1 and 377 / 178 / 1.
+   Neither official profile proceeds to transport acceptance. The inherited
+   v2.1 profile is the fixed starting point for closing work and remains below
+   the 90 percent product gate.
 9. Previous full-length reviews used coarse 10-minute summaries and selected
    regression windows. They did not adjudicate and sign off every reference
    turn, so they cannot supply the denominator for a 90 percent claim.
@@ -121,6 +122,15 @@ subject to the complete acceptance gates in this spec.
     equality. This closes the capture requirement in T044. It does not close
     T031 or T045 because all 556 audible ledger rows remain unsigned. See
     `closing-baseline-v21-2026-07-15.md`.
+11. **Clean closing-baseline written-context review complete; audible review
+    open**: the exact 935-entry clean package received a full chronological
+    manual pass and a reverse fixed-block manual pass. The reconciled result is
+    443 correct / 112 incorrect / 1 ambiguous (`79.6763%`). Tools only arranged
+    evidence and did not assign correctness. The result fails the full-session
+    gate and five fixed 600-second block gates. Exact audible boundaries,
+    speaker-time, offsets, criticality, and independent totals remain unsigned,
+    so this is not a constitutional closing score. See
+    `closing-baseline-v21-context-review-2026-07-15.md`.
 
 ## 4. Requirements
 

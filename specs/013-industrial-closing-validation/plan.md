@@ -162,8 +162,11 @@ findings. They cannot enter candidate selection or acceptance totals.
    criticality, boundary offset, uncertainty, and confident-wrong attribution.
 
 This v2.1 baseline replaces every earlier selected-window, v2, or script-derived
-accuracy claim for closing purposes. The existing `413/556` contextual result
-is the starting diagnostic, not an accepted score.
+accuracy claim for closing purposes. The earlier `413/556` result belongs to a
+different 936-entry artifact and remains a historical cut-oriented diagnostic.
+The exact clean 935-entry package has a complete manual written-context result
+of `443/556`; it still is not an accepted speaker-time or closing score because
+the audible ledger and required breakdowns remain unsigned.
 
 ## 6. Phase 4: Determine the Existing-Model Upper Bound
 
