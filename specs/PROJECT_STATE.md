@@ -181,6 +181,10 @@ updates. Persisted-session replay then proved exact producer, rendered Web UI,
 and downloaded JSON equality at desktop and 390-pixel mobile sizes with no
 browser errors or horizontal overflow. See
 [closing-baseline-v21-2026-07-15.md](013-industrial-closing-validation/closing-baseline-v21-2026-07-15.md).
+Two subsequent source-stable 120-second runs on the current binary produced
+exactly equal entry arrays in all five terminal tracks and in the comprehensive
+view; only the wall-clock anchor and cold/warm compute metadata differed. This
+is a prefix repeatability check, not the two-full-run acceptance requirement.
 This completes T044 system evidence only. The 556-row audible ledger and the
 baseline context review remain unsigned, so this run has no constitutional
 accuracy percentage and product closure remains open.

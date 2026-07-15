@@ -99,6 +99,21 @@ equality on the same connection. Together these artifacts satisfy T044's
 full-capture browser evidence. The broader physical-microphone and reconnect
 acceptance in T073 remains open.
 
+## Controlled 120-Second Repeatability
+
+After the full capture was recorded, clean commit `028f2fe` ran the same first
+120 seconds twice at 1x through one current server binary and the same checked-in
+TOML. Both runs completed in 120.80 seconds with source-stable manifests, no
+contract issue, and complete telemetry. The terminal entry arrays were exactly
+equal in every track: 23 diarization, ten ASR, 39 VAD, ten forced-alignment, and
+28 business-speaker entries. The `comprehensive` arrays were also exactly equal.
+
+Expected runtime metadata was not equal: each session has a different wall-clock
+anchor, and cold/warm execution changes `compute_sec` and reported RTF. This
+check establishes deterministic terminal business content for the controlled
+120-second prefix on the current binary. It is not the two-full-run acceptance
+requirement in T080-T084.
+
 ## Evidence Paths and Hashes
 
 Artifacts are retained outside Git under
