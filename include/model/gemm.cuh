@@ -22,6 +22,7 @@
 #include <cuda_bf16.h>
 #include <mma.h>
 
+#include <cstdint>
 
 namespace orator {
 namespace gemm {

@@ -94,6 +94,8 @@ def run_client(args, port, pcm, duration, output):
         "--rate", "0",
         "--port", str(port),
         "--out", str(output),
+        "--config-path", str(args.artifacts / "orator.generated.toml"),
+        "--server-binary", str(args.server),
         "--timeline-timeout", "120",
         "--max-total-time", "180",
     ]

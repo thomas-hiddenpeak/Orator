@@ -1,6 +1,6 @@
 # Spec 013: Industrial Closing Validation
 
-**Status**: In progress - approved 2026-07-13
+**Status**: In progress - v2.1 closing baseline selected 2026-07-15
 **Created**: 2026-07-13
 **Scope**: Re-establish a truthful product baseline, recover full-session business
 accuracy, and define the evidence required before Orator may be declared closed.
@@ -24,6 +24,17 @@ Passing the canonical scene is mandatory and cannot be replaced by a simpler
 recording. It is necessary, but by itself it is not sufficient evidence for a
 general industrial-readiness claim.
 
+### 1.1 Closing baseline decision
+
+All remaining work in this spec uses streaming Sortformer v2.1 with the
+checked-in `340/1/188/188` profile (chunk/right-context/FIFO/cache-update) as
+the sole closing baseline. The v2 checkpoint and its CTest gate have been
+removed; only prior reports and hashes remain as historical evidence. A v2
+artifact cannot be selected for a new candidate, used for an acceptance run, or
+satisfy any Phase 3-7 gate. This decision fixes the model line on which accuracy
+recovery and formal validation continue; it does not accept the current v2.1
+output.
+
 ## 2. Definitions
 
 - **Final business view**: the terminal user-facing track that states who said
@@ -45,6 +56,10 @@ general industrial-readiness claim.
 - **Uncertain output**: an output marked `unknown`, `speaker_uncertain`, or an
   equivalent state. It is safer than a confident wrong attribution, but it does
   not count as correct for the 90 percent gate.
+- **Closing baseline**: the exact v2.1 model file and `340/1/188/188` streaming
+  profile resolved from the checked-in `orator.toml`. Experiments use separate
+  TOML files and do not change the closing baseline until they pass every
+  promotion gate.
 
 ## 3. Verified Baseline Defects and Remediation Status
 
@@ -75,14 +90,28 @@ subject to the complete acceptance gates in this spec.
    partial/final/retract, alignment, business revision, terminal track, exact
    export/load, and reconnect convergence. Full-session repeatability remains
    open.
-6. The configured CTest suite contains 53 tests: 51 C++ tests, one registered
-   real-WebSocket speech/silence integration gate, and one dependency-free Node
-   browser-model gate. The browser acceptance tool remains manual because
+6. **Expanded 2026-07-15**: the configured CTest suite contains 64 tests: 55
+   C++ tests, eight Python unit/integration gates, and one dependency-free Node
+   browser-model gate. The complete suite passes, including the real-WebSocket
+   contract, official v2.1 numerical profiles, short-block GEMM, and multi-scale
+   voiceprint evidence. The browser acceptance tool remains manual because
    Playwright is a tools-only dependency.
-7. `test_diar_stream` verifies a short stored NeMo fixture using lower-level
-   defaults. It does not establish numerical parity for the accepted full
-   runtime TOML profile over the complete session.
-8. Previous full-length reviews used coarse 10-minute summaries and selected
+7. **Historical defect-isolation evidence only**: a pinned NVIDIA v2 NeMo oracle
+   crosses five runtime chunks and repeated FIFO/cache updates. The
+   regenerated 1502-frame fixture matches C++ at `max_abs=1.43051e-6` and
+   1502/1502 argmax. This proved the FIFO implementation correction but cannot
+   satisfy a current model or acceptance gate. Its model file and obsolete
+   CTest were removed after v2.1 became the sole closing baseline.
+8. **v2.1 selected as the sole closing baseline; product gate still open**: the
+   compile-time default and checked-in TOML select streaming v2.1. Its inherited
+   asynchronous profile passed the exact
+   multi-chunk NeMo gate and completed a full real-WebSocket review at 413 / 142
+   / 1 natural turns. NVIDIA's official high- and low-latency profiles also
+   passed separate numerical gates, but full contextual screening recorded only
+   385 / 170 / 1 and 377 / 178 / 1. Neither official profile proceeds to
+   transport acceptance. The inherited v2.1 profile is the fixed starting point
+   for closing work and remains below the 90 percent product gate.
+9. Previous full-length reviews used coarse 10-minute summaries and selected
    regression windows. They did not adjudicate and sign off every reference
    turn, so they cannot supply the denominator for a 90 percent claim.
 
@@ -133,16 +162,29 @@ subject to the complete acceptance gates in this spec.
 ### 4.4 Model and pipeline validation
 
 - **FR13**: Every model stage affected by a candidate must pass its trusted
-  oracle gate. The exact accepted Sortformer runtime profile must be compared
-  with NeMo; TitaNet and ASR/align changes must be compared with their PyTorch or
-  NeMo references.
+  oracle gate. The exact accepted Sortformer model file and runtime profile must
+  be compared with NeMo; the source checkpoint revision, source and converted
+  model hashes, TOML hash, and oracle-fixture hash are part of that gate.
+  TitaNet and ASR/align changes must be compared with their PyTorch or NeMo
+  references. An asynchronous Sortformer profile must exercise at least three
+  chunks, include output produced after cache compression, and compare FIFO
+  inclusion, overflow transfer, cache compression, and frame probabilities. A
+  synchronous `fifo_len = 0` fixture or a different Sortformer checkpoint does
+  not validate an asynchronous runtime profile. Every Phase 3-7 closing run
+  must resolve the v2.1 model and `340/1/188/188` baseline from TOML; a v2 run
+  is historical evidence and is ineligible for promotion.
 - **FR14**: Before another full model run, frozen evidence must be used to
   measure the best attainable speaker decision from independent Sortformer,
   TitaNet, VAD, ASR, and forced-alignment evidence. Reference labels may score a
   candidate but may never enter runtime decisions.
 - **FR15**: If the frozen-evidence development candidate cannot reach 93 percent
-  on both speaker-time and natural-turn measures, parameter tuning stops and the
-  next action is model augmentation or replacement validated offline first.
+  on both speaker-time and natural-turn measures, parameter tuning stops. Every
+  locally available, deployable streaming model revision must be evaluated under
+  the same runtime profile. Offline-only diarization models are excluded from
+  candidate selection because the manually adjudicated `test.txt` already
+  supplies business truth and an offline result cannot become the deployed
+  runtime. This does not remove the same-checkpoint NeMo numerical oracle
+  required by FR13.
 - **FR16**: Silence, endpoint, and hallucination behavior must be tested through
   the real WebSocket path. No substantive final ASR text may be emitted for
   confirmed silence.

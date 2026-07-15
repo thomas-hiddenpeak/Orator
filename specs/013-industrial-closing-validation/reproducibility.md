@@ -42,10 +42,31 @@ the capture first, hashes it, and then writes `<capture>.manifest.json` with:
 
 - capture, source-container, and streamed-PCM SHA-256 values;
 - the complete resolved configuration and its canonical SHA-256;
-- commit and dirty paths observed by the client;
+- configuration file, Git commit/worktree-content, and server-binary SHA-256
+  snapshots taken before streaming and again after the terminal timeline; the
+  worktree digest includes tracked diffs and every unignored untracked file, so
+  changing an already-dirty file is detectable;
+- an explicit consistency result requiring the resolved configuration path and
+  all three pre/post snapshots to match;
 - client `ORATOR_*` values and invocation parameters;
 - host, Jetson release, power mode, and clock state.
 
+For 1x runs of at least 120 seconds, the same client requires at least 95
+percent coverage for GPU utilization, memory, system power, CPU, RAM, and
+temperature fields and for both runtime/device sample cadence. Field presence
+does not compensate for missing time samples.
+
+Manual runs pass the same files used to launch the server:
+
+```bash
+python3 tools/verify/py/ws_unified_test.py \
+  --config-path orator.toml --server-binary build/orator_ws \
+  --pcm test/data/audio/test.mp3 --duration 3615.12 --rate 1.0 \
+  --require-telemetry \
+  --out /path/orator-baseline-<timestamp>-<commit12>-full-01.json
+```
+
 The static fixture manifest hash is copied into the review record for every run.
-Any missing hash, missing `resolved_config`, dirty-path mismatch, or unrecorded
-override invalidates an accuracy or performance comparison.
+Any missing hash, missing `resolved_config`, pre/post source drift, dirty-path
+mismatch, or unrecorded override invalidates an accuracy or performance
+comparison.

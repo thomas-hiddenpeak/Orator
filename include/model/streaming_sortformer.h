@@ -3,7 +3,7 @@
 // Streaming Sortformer diarizer.
 //
 // Implements core::IDiarizer. Configuration and streaming-state fields mirror
-// NVIDIA's `diar_streaming_sortformer_4spk-v2` (see
+// NVIDIA's `diar_streaming_sortformer_4spk-v2` and v2.1 checkpoints (see
 // third_party/streaming_sortformer/research_notes.txt). The full CUDA forward
 // pass is implemented (mel -> pre_encode -> 17 Conformer layers -> encoder_proj
 // + 18 transformer layers -> speaker head -> sigmoid) and verified numerically
@@ -39,8 +39,6 @@ struct SortformerTuning {
   int chunk_left_context = -1;
   int chunk_right_context = -1;
   int spkcache_sil_frames = -1;
-  int spkcache_refresh_rate = -1;
-  int use_silence_profile = -1;
   int fifo_len = -1;
   int show_progress = -1;
 };
@@ -69,8 +67,6 @@ struct SortformerConfig {
   int chunk_left_context = 1;
   int chunk_right_context = 40;
   int spkcache_sil_frames_per_spk = 3;
-  int spkcache_refresh_rate = 0;
-  bool use_silence_profile = false;
   bool show_progress = false;
 
   bool Validate() const;
@@ -80,8 +76,7 @@ struct SortformerConfig {
   }
 };
 
-// Host-side streaming state for the synchronous streaming update path
-// (mirrors NeMo StreamingSortformerState; fifo_len=0 so no persistent FIFO).
+// Host-side state mirroring NeMo StreamingSortformerState.
 // Tensors here are tiny (<=188*512 floats), inherently sequential control data,
 // so they live on the CPU while the heavy encoder/decoder run on the GPU.
 struct HostStreamState {
@@ -91,11 +86,9 @@ struct HostStreamState {
   bool spkcache_preds_valid = false;  // mirrors "spkcache_preds is not None"
   std::vector<float> mean_sil_emb;    // [fc_d_model]
   long n_sil_frames = 0;
-  // FIFO for async streaming (NeMo streaming_update_async). When fifo_len > 0,
-  // new chunk-center frames are appended to fifo_embs/fifo_preds, and
-  // pop_out_len frames are drained to spkcache each step. When fifo_len == 0,
-  // frames go directly to spkcache (sync path). Both capacities are sized by
-  // config_.fifo_len; fifo_count tracks the current occupancy.
+  // FIFO for async streaming. Valid FIFO frames are included between spkcache
+  // and the current chunk on every forward. Overflow transfers the oldest
+  // frames to spkcache without discarding current-chunk evidence.
   std::vector<float> fifo_embs;   // [fifo_max_len * fc_d_model]
   std::vector<float> fifo_preds;  // [fifo_max_len * n_spk]
   int fifo_max_len = 0;

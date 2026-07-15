@@ -53,7 +53,7 @@ All system-level tests MUST activate all three pipelines:
 
 | Pipeline | Model | Required |
 |---|---|---|
-| Diarization | `models/sortformer_4spk_v2.safetensors` | Yes |
+| Diarization | `models/sortformer_4spk_v2.1.safetensors` | Yes |
 | ASR | `models/asr/Qwen/Qwen3-ASR-1.7B` | Yes |
 | VAD | `models/vad/silero_vad.safetensors` | Yes |
 
@@ -171,9 +171,7 @@ For each ASR utterance with a corresponding reference timestamp:
 ```bash
 # Clean start
 pkill -f orator_ws
-./build/orator_ws 8765 \
-  "models/sortformer_4spk_v2.safetensors" \
-  "models/asr/Qwen/Qwen3-ASR-1.7B" &
+ORATOR_CONFIG=orator.toml ./build/orator_ws &
 sleep 15  # wait for model loading
 
 # Verify ready

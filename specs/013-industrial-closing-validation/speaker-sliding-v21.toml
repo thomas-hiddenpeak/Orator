@@ -1,0 +1,35 @@
+[sliding_voiceprint]
+# Native TitaNet windows are paired by absolute centre time. Both scales must
+# independently agree before a point becomes evidence.
+window_sec = [3.0, 5.0]
+step_sec = 1.0
+round_digits = 3
+min_scale_agreement = 2
+
+# A one-point dropout may be bridged; longer gaps split the evidence run.
+max_center_gap_sec = 2.0
+min_run_sec = 2.0
+
+[sliding_voiceprint.projection]
+# Unknown business spans may be filled by an independently passing whole-span
+# voiceprint. Rewriting an existing identity additionally requires a sustained
+# rolling run for the same identity.
+unknown_fill_enabled = true
+known_override_enabled = true
+known_override_min_rolling_sec = 2.0
+known_override_min_rolling_ratio = 0.25
+known_override_max_competing_rolling_sec = 0.5
+
+# Candidate-strength whole-span embeddings may only rewrite the time covered by
+# the confirming rolling run. New edges expand to a forced-alignment pause;
+# strong whole-span embeddings retain the captured business-span boundaries.
+candidate_override_clip_to_rolling = true
+align_pause_min_sec = 0.12
+boundary_snap_tolerance_sec = 1.0
+boundary_snap_inward_tolerance_sec = 0.08
+
+# Preserve a short baseline island when the candidate identity already appears
+# immediately on both sides; long-window embeddings can otherwise absorb a
+# genuine rapid interjection into its neighbours.
+reject_selected_neighbor_sandwich = true
+neighbor_gap_sec = 2.0

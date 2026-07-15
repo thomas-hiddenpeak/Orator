@@ -26,7 +26,7 @@ using namespace orator;
 int main(int argc, char** argv) {
   std::string mp3 = argc > 1 ? argv[1] : "test.mp3";
   std::string weights =
-      argc > 2 ? argv[2] : "models/sortformer_4spk_v2.safetensors";
+      argc > 2 ? argv[2] : "models/sortformer_4spk_v2.1.safetensors";
   double max_sec = argc > 3 ? std::atof(argv[3]) : 180.0;
   int chunk_ms = argc > 4 ? std::atoi(argv[4]) : 320;
 

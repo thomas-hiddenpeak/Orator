@@ -31,7 +31,7 @@ int main(int argc, char** argv) {
   cfg.sample_rate = 16000;
   cfg.max_speakers = 4;
   diar.Initialize(cfg);
-  diar.LoadWeights("models/sortformer_4spk_v2.safetensors");
+  diar.LoadWeights("models/sortformer_4spk_v2.1.safetensors");
 
   core::AudioChunk chunk;
   chunk.samples = wav.data();

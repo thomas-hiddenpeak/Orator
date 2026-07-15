@@ -20,12 +20,14 @@ fields are never edited. Its `adjudication` is completed while listening in
 context and before viewing a candidate:
 
 - exact audible start/end on the common audio clock;
-- overlap participants;
+- overlap participants plus their exact intervals within the reference turn;
 - `critical` or `noncritical` classification;
 - reference ambiguity: `none`, `timestamp`, `speaker`, `text`, `audio`, or
   `overlap`;
-- acceptable speakers/semantic equivalents, context summary, notes, reviewer,
-  and UTC signature.
+- one canonical real speaker for per-speaker recall, plus acceptable speakers
+  for genuinely ambiguous evidence;
+- acceptable semantic equivalents, context summary, notes, reviewer, and UTC
+  signature.
 
 Ambiguous or duplicate rows remain in the 556-row denominator. They are
 adjudicated rather than deleted.
@@ -41,16 +43,30 @@ reconciliation. A complete record requires:
 - protocol speaker rubric category;
 - system speaker labels and evidence IDs actually read;
 - manually selected intervals where the business speaker is correct;
-- manually judged boundary offsets and confident-wrong state;
+- manually judged boundary offsets, uncertain-output state, and
+  confident-wrong state;
+- a dedicated boundary note whenever either absolute offset exceeds one second;
 - contextual notes, reviewer, and UTC signature.
+
+When the chronological and reverse-block pass differ on any scored field, the
+row also requires explicit reconciliation notes before the final judgment can
+validate.
 
 ## Totals
 
 Natural-turn accuracy counts only final `correct` rows over all 556 rows.
 Speaker-time accuracy sums only manually selected correct intervals over all
-adjudicated audible durations. Critical accuracy, confident-wrong count, and
-fixed 600-second block totals are conjunctive gates. The summary command refuses
-incomplete or hash-mismatched ledgers.
+adjudicated audible durations. Speaker time crossing a fixed 600-second
+boundary is clipped into both blocks; turn accuracy uses the block containing
+the audible start. The final partial 15.12-second block is reported separately
+and is not treated as a full 600-second gate.
+
+The summary reports full-session, fixed-block, and per-canonical-speaker turn
+and speaker-time recall; critical-turn accuracy; critical and overall confident
+wrong attribution; and median/P95 absolute boundary offsets. It emits explicit
+speaker acceptance booleans but does not infer any row judgment. The summary
+command refuses incomplete, stale-timeline, unknown-evidence, unsigned, or
+hash-mismatched ledgers.
 
 ## Commands
 

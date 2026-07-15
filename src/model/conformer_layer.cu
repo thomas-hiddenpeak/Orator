@@ -2,6 +2,7 @@
 
 #include <cuda_runtime.h>
 
+#include <algorithm>
 #include <cmath>
 #include <stdexcept>
 
@@ -336,6 +337,7 @@ void ConformerLayer::Scratch::Ensure(int T, int D, int Dff, int H) {
   const int P = 2 * T - 1;
   const size_t htt = static_cast<size_t>(H) * T * T * sizeof(float);
   const size_t htp = static_cast<size_t>(H) * T * P * sizeof(float);
+  const size_t htdk = td;
   ln = gpu::UnifiedBuffer(td);
   ff = gpu::UnifiedBuffer(tff);
   tmp = gpu::UnifiedBuffer(td);
@@ -353,7 +355,8 @@ void ConformerLayer::Scratch::Ensure(int T, int D, int Dff, int H) {
   kh = gpu::UnifiedBuffer(td);
   vt = gpu::UnifiedBuffer(td);
   ph = gpu::UnifiedBuffer(pd);
-  ac = gpu::UnifiedBuffer(htt);
+  // Reused first for AC scores [H,T,T], then for context [H,T,D/H].
+  ac = gpu::UnifiedBuffer(std::max(htt, htdk));
   bd = gpu::UnifiedBuffer(htp);
   sc = gpu::UnifiedBuffer(htt);
   cap_T = T;

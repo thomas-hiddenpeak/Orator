@@ -191,9 +191,13 @@ std::optional<GpuUtilization> ReadGpuUtilization() {
     }
   }
 
-  const auto tegrastats = ReadTegrastatsGpuUtilizationPct();
-  if (tegrastats) return tegrastats;
-  return ReadNvidiaSmiGpuUtilizationPct();
+  // Thor's tegrastats omits GR3D/GPU utilization while nvidia-smi reports it;
+  // Orin commonly exposes utilization through sysfs above. Query nvidia-smi
+  // before starting a timed tegrastats subprocess, then retain tegrastats as
+  // the final compatibility fallback.
+  const auto nvidia_smi = ReadNvidiaSmiGpuUtilizationPct();
+  if (nvidia_smi) return nvidia_smi;
+  return ReadTegrastatsGpuUtilizationPct();
 }
 
 std::optional<double> ReadGpuFreqMhz() {
@@ -239,8 +243,15 @@ std::vector<PowerRail> ReadPowerRails() {
       const auto microwatts = ReadDoubleFile(f.path());
       if (!microwatts || *microwatts <= 0.0) continue;
       PowerRail rail;
-      rail.name =
-          hwmon_name.empty() ? hwmon.path().filename().string() : hwmon_name;
+      const std::string prefix =
+          fn.substr(0, fn.size() - std::string("_input").size());
+      rail.name = ReadFirstLine(hwmon.path() / (prefix + "_label"))
+                      .value_or(ReadFirstLine(hwmon.path() / "label")
+                                    .value_or(hwmon_name.empty()
+                                                  ? hwmon.path()
+                                                        .filename()
+                                                        .string()
+                                                  : hwmon_name));
       rail.watts = *microwatts / 1000000.0;
       rails.push_back(rail);
       has_power_input = true;

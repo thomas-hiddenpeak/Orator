@@ -230,8 +230,10 @@ speech_pad_ms = 60
 # Diarization — speaker separation pipeline
 # ══════════════════════════════════════════════════════════════════════════════
 [diarizer]
-# Model weights path (CLI arg overrides). Empty = disable diarization
-model_weights = "models/sortformer_4spk_v2.safetensors"
+# Spec 013 closing baseline. The deprecated v2 checkpoint has been removed.
+# CLI overrides invalidate an acceptance run unless the resolved configuration
+# is explicitly re-approved.
+model_weights = "models/sortformer_4spk_v2.1.safetensors"
 
 # Maximum number of speakers
 max_speakers = 4
@@ -247,13 +249,17 @@ deliver_interval_sec = 1.0
 
 # Sortformer streaming tuning — affects speaker segmentation quality
 # Speaker cache length (frames). Larger = more stable speaker identity, slower adaptation. (default 188)
-# NOTE: this is the speaker-cache size the model was TRAINED with; it also sets
-# the transformer sequence length T = spkcache_len + chunk (~381). The encoder
-# attention scratch is O(T^2) across all 17 conformer layers, so oversizing this
-# (e.g. 5000) makes T ~5400 and needs tens of GB of GPU/unified memory and stalls
-# the stream. Keep at the model default unless you have measured both accuracy
-# and memory.
+# NOTE: this is the speaker-cache size declared by the checkpoint. In async
+# mode the attention sequence also includes the occupied FIFO and current chunk;
+# its scratch scales as O(T^2). Oversizing this value can therefore exhaust
+# GPU/unified memory and stall the stream. Keep the checkpoint value unless both
+# numerical parity and full-session resource behavior are revalidated.
 spkcache_len = 188
+# Processing chunk length in diarization frames. The NVIDIA streaming v2.1 checkpoint
+# declares 188; 340 is Orator's current v2.1 closing baseline and is covered by
+# the exact-profile NeMo oracle rather than treated as a checkpoint default.
+# Experiments must use a separate TOML and cannot alter acceptance evidence.
+chunk_len = 340
 # Cache update interval (frames). Keep this at the model-trained default unless
 # a dedicated full-stream accuracy review accepts a different value.
 spkcache_update_period = 188
@@ -262,18 +268,16 @@ chunk_left_context = 1
 # Right context chunks. Keep at the model-trained default; high values were a
 # transitional experiment and degraded local diar review quality.
 chunk_right_context = 1
-# Silent frames before resetting speaker cache. Keep at the model-trained
-# default unless a full-stream review accepts a different value.
+# Mean-silence placeholder frames retained per speaker during cache
+# compression. This is the NVIDIA streaming v2.1 checkpoint value; it does not reset the
+# cache or apply a separate silence-similarity penalty.
 spkcache_sil_frames = 3
 
-# FIFO buffer length for async streaming (NeMo streaming_update_async). 0=off (sync mode).
+# FIFO length for NeMo's asynchronous streaming update. The checkpoint declares
+# 0 (synchronous evaluation); 188 is the current v2.1 closing baseline and is
+# covered by the exact model/profile oracle. Set to 0 only in a separate
+# diagnostic TOML.
 fifo_len = 188
-
-# Speaker cache refresh cadence. 0=drain all FIFO after each chunk. Used only with fifo_len>0.
-spkcache_refresh_rate = 100
-
-# Use silence profile in speaker cache compression (v2.1 model only).
-use_silence_profile = false
 
 # Onset/offset double-threshold post-processing (NeMo-style, default 0.45/0.35)
 # onset: probability to START a segment. Higher = fewer, more confident segments.
@@ -297,11 +301,10 @@ min_dur_off = 1.0
 # cache saturates over a long continuous session; it chopped the stream into
 # fixed windows and re-stitched speaker slots across them with the voiceprint
 # stage, which over-creates global ids (one real speaker fragments into several).
-# The ASYNC path (fifo_len=188 above) refreshes the spkcache continuously and
-# does NOT saturate, so the reset is disabled: the diarizer keeps stable speaker
-# slots for the whole meeting and each slot resolves to ONE global identity
-# (measured: 4 speakers -> exactly 4 stable ids). Leave at 0 unless you run the
-# sync path (fifo_len = 0).
+# The asynchronous path transfers FIFO overflow into the compressed speaker
+# cache continuously, so the periodic reset remains disabled. Full-session
+# speaker acceptance is still governed by Spec 013; this setting is not itself
+# an accuracy claim. Leave at 0 unless a separately reviewed TOML says otherwise.
 reset_period_sec = 0
 
 # ══════════════════════════════════════════════════════════════════════════════

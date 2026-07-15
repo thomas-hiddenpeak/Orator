@@ -198,6 +198,17 @@ set_property(TARGET speaker_embedding_probe PROPERTY CUDA_ARCHITECTURES native)
 target_link_libraries(speaker_embedding_probe PRIVATE orator_core)
 
 # ---------------------------------------------------------------------------
+# speaker_turn_evidence_probe: independently embed each frozen business-turn
+# interval and report its cosine against every enrolled registry identity. It
+# never reads diarizer labels or reference annotations.
+# ---------------------------------------------------------------------------
+add_executable(speaker_turn_evidence_probe
+  tools/probes/speaker_turn_evidence_probe.cc)
+set_property(TARGET speaker_turn_evidence_probe
+  PROPERTY CUDA_ARCHITECTURES native)
+target_link_libraries(speaker_turn_evidence_probe PRIVATE orator_core)
+
+# ---------------------------------------------------------------------------
 # diar_evidence_probe: offline frame-level Sortformer evidence dump. It reads
 # orator.toml and writes CSV diagnostics outside the runtime path.
 # ---------------------------------------------------------------------------

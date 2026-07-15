@@ -22,7 +22,8 @@ static bool ShapeEq(const std::vector<int64_t>& a,
 }
 
 int main(int argc, char** argv) {
-  std::string path = argc > 1 ? argv[1] : "models/sortformer_4spk_v2.safetensors";
+  std::string path =
+      argc > 1 ? argv[1] : "models/sortformer_4spk_v2.1.safetensors";
   std::cout << "Loading real weights: " << path << std::endl;
 
   io::SafeTensorReader reader(path);

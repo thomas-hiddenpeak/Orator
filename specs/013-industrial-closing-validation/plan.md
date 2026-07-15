@@ -131,7 +131,13 @@ The review tools may seek audio and display system tracks beside a ledger row.
 They do not assign correctness. Acceptance totals are derived only from the
 signed manual judgments and independently checked against the ledger.
 
-## 5. Phase 3: Establish the Reproducible Current Baseline
+## 5. Phase 3: Establish the Reproducible v2.1 Closing Baseline
+
+The closing line is fixed to streaming Sortformer v2.1 with the checked-in
+`340/1/188/188` profile. Compile-time defaults and `orator.toml` select the same
+weight file and profile. The v2 checkpoint and its obsolete CTest are removed;
+only prior reports and hashes remain to explain historical implementation
+findings. They cannot enter candidate selection or acceptance totals.
 
 1. Correct and register real-WebSocket integration tests in CTest.
 2. Run a clean build, warning check, all CTest tests, JavaScript syntax checks,
@@ -144,13 +150,64 @@ signed manual judgments and independently checked against the ledger.
 6. Publish the baseline score by full session, fixed 600-second block, speaker,
    criticality, boundary offset, uncertainty, and confident-wrong attribution.
 
-This baseline replaces every earlier selected-window or script-derived accuracy
-claim for comparison purposes.
+This v2.1 baseline replaces every earlier selected-window, v2, or script-derived
+accuracy claim for closing purposes. The existing `413/556` contextual result
+is the starting diagnostic, not an accepted score.
 
 ## 6. Phase 4: Determine the Existing-Model Upper Bound
 
-All candidate work uses the frozen baseline package until a runtime candidate is
-selected.
+All candidate work uses the frozen v2.1 baseline package until a runtime
+candidate is selected. Evidence from v2 may explain a regression but cannot
+decide a candidate.
+
+Before comparing business candidates, the exact Sortformer execution profile is
+checked against NeMo. The gate binds the source checkpoint revision and hash,
+converted runtime weight hash, TOML hash, processed-input hash, and output
+fixture hash. For an asynchronous profile, the oracle fixture crosses at least
+three chunks, retains output produced after repeated cache compression, and
+verifies that model input is
+`speaker cache + FIFO + current chunk`, that no frame is discarded before FIFO
+overflow transfer, and that the official cache-update period controls the
+transfer. A mismatch is a model-port defect and is corrected before threshold
+tuning or model replacement continues.
+
+The 2026-07-15 correction first isolated an implementation defect with NVIDIA
+v2. The exact v2 runtime profile now passes a five-chunk NeMo oracle at
+`max_abs=1.43051e-6`; unsupported local cache controls were removed, and stale
+TOMLs containing them fail loading. The corresponding full-session diagnostic
+changed assignments throughout the recording without improving the frozen
+written-context candidate, so model/fusion escalation continues without
+treating FIFO parity as an accuracy fix. This is historical remediation
+evidence, not the closing model gate. See
+`sortformer-oracle-2026-07-15.md`.
+
+The first v2.1 comparison changed only the model weights and retained the legacy
+Orator asynchronous profile (`188/340/188`, FIFO `188`, context `1+1`). This is
+useful for isolating checkpoint differences, but it is not the v2.1 deployment
+upper bound. NVIDIA's published v2.1 model card recommends two different
+streaming profiles, all values in 80 ms frames:
+
+- high latency: chunk/right/FIFO/update `340/40/40/300`;
+- low latency: chunk/right/FIFO/update `6/7/188/144`.
+
+Both official profiles must receive separate multi-chunk NeMo/C++ numerical
+gates and full-session frozen diar evidence before another integrated
+real-WebSocket run. The high-latency profile is an accuracy diagnostic unless
+its 30.4-second input-buffer latency is explicitly accepted; the 1.04-second
+low-latency profile is the deployment candidate when its compute throughput and
+contextual accuracy pass. The checkpoint-native synchronous profile remains a
+separate diagnostic and cannot validate either asynchronous candidate.
+
+The 2026-07-15 screening completed these gates. High latency passed numerical
+parity but recorded 385 / 170 / 1 natural turns; low latency passed numerical
+parity but recorded 377 / 178 / 1. Both are below the inherited v2.1
+real-WebSocket diagnostic of 413 / 142 / 1 and below the 90 percent gate, so
+neither official profile advances to another integrated run. Work returns to
+reference-free multi-pipeline evidence fusion on the active inherited v2.1
+profile. The owner decision on 2026-07-15 designates that profile as the sole
+closing baseline because it is the strongest deployable v2.1 result. This does
+not waive the 90 percent product gate or the 93 percent frozen-candidate
+promotion gate.
 
 ### 6.1 Independent evidence extraction
 
@@ -168,6 +225,13 @@ For every natural turn candidate, preserve these inputs separately:
 
 TitaNet evidence must not be grouped by the Sortformer label it is intended to
 check. This avoids making the second model repeat the first model's assignment.
+Before runtime integration, generate a reference-free rolling TitaNet track at
+multiple TOML-defined window sizes. Windows are paired by their absolute centre
+time, ranked only against identities active in the captured session, and
+accepted only when the configured number of scales agree and independently
+pass the configured score and margin gates. The resulting points and runs are
+evidence only: they do not read `test.txt`, assign correctness, or mutate any
+captured pipeline track.
 
 ### 6.2 Candidate decision model
 
@@ -180,6 +244,21 @@ The first candidate is a constrained sequence decision over natural turns:
 - temporal continuity is used only when current acoustic evidence supports it;
 - low-evidence cases remain uncertain instead of inheriting a neighbour.
 
+Rolling voiceprint transitions may split or rewrite the business view only at
+VAD or forced-alignment boundaries on the same session clock. Known-speaker
+overrides require sustained multi-scale evidence; filling an unknown span may
+use a separately configured lower gate. A boundary that cannot be supported by
+the alignment/VAD tracks remains unchanged.
+
+The 2026-07-15 T059G frozen experiment implements this decision model with
+3-second and 5-second native TitaNet windows at a 1-second step. Existing
+business-span edges are preserved for whole-span decisions; candidate-strength
+partial rewrites require a forced-alignment pause. The policy changes nine of
+936 source entries. Full contextual review of all 11 affected reference rows
+finds five repairs and no regression, for 418 / 137 / 1 (`75.1799%`). This fails
+the 93 percent gate below, so the experiment is not integrated and no further
+policy tuning is permitted. See `speaker-sliding-v21-2026-07-15.md`.
+
 No transcript phrase, real speaker name, known timestamp, or reference label is
 part of runtime logic. Each output includes an audit record containing source
 evidence, chosen speaker, rejected alternatives, confidence margin, and reason.
@@ -191,10 +270,21 @@ natural-turn measures, retain 100 percent critical-turn correctness, and avoid
 regression in every fixed 600-second block. If it does, its policy and TOML
 parameters are frozen for runtime implementation.
 
-If it does not, stop policy and threshold tuning. Compare stronger
-overlap-aware diarization or speaker-verification models offline against trusted
-oracles and the same ledger. A model is ported to C++/CUDA only when the offline
-candidate exceeds the 93 percent gate and has a stage-by-stage validation plan.
+If it does not, stop policy and threshold tuning. First compare every already
+ported, deployable streaming checkpoint under the same profile against trusted
+oracles and the same ledger. A replacement model is considered only when it has
+a feasible native deployment path, exceeds the 93 percent gate, and has a
+stage-by-stage validation plan. Offline-only diarization models are excluded
+from the model-selection path; the manually adjudicated reference already
+supplies acceptance truth.
+Model escalation is also paused whenever the current runtime profile fails its
+trusted oracle, because an unfaithful port cannot establish the existing-model
+upper bound.
+
+The 2026-07-15 owner review removed an exploratory offline Sortformer/Pyannote
+branch from the work product. It duplicated the role of `test.txt` and could
+not produce a native streaming deployment candidate. NeMo remains only as the
+same-checkpoint numerical oracle required to validate the v2.1 C++/CUDA port.
 
 ## 7. Phase 5: Implement and Validate the Selected Candidate
 

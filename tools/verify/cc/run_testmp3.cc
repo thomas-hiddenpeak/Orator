@@ -50,7 +50,7 @@ static std::vector<RefTurn> ParseRef(const std::string& path) {
 int main(int argc, char** argv) {
   std::string mp3 = argc > 1 ? argv[1] : "test.mp3";
   std::string weights =
-      argc > 2 ? argv[2] : "models/sortformer_4spk_v2.safetensors";
+      argc > 2 ? argv[2] : "models/sortformer_4spk_v2.1.safetensors";
   std::string ref_path = argc > 3 ? argv[3] : "asrTest2Final.txt";
 
   std::cout << ">> decoding " << mp3 << " ..." << std::endl;

@@ -16,7 +16,7 @@ int main() {
   std::cout << "Testing safetensors reader (zero-copy mmap)..." << std::endl;
 
   const std::string sortformer_path = std::string(ORATOR_TEST_SOURCE_DIR) +
-                                      "/models/sortformer_4spk_v2.safetensors";
+                                      "/models/sortformer_4spk_v2.1.safetensors";
 
   io::SafeTensorReader reader(sortformer_path);
   std::cout << "Loaded sortformer (" << reader.GetWeightNames().size()

@@ -25,6 +25,19 @@ bool ApplyTomlConfig(const std::string& path,
     return false;
   }
 
+  if (auto* diarizer = config["diarizer"].as_table()) {
+    constexpr const char* kUnsupportedDiarizerKeys[] = {
+        "spkcache_refresh_rate", "use_silence_profile"};
+    for (const char* unsupported : kUnsupportedDiarizerKeys) {
+      if (diarizer->contains(unsupported)) {
+        std::cerr << "[config] unsupported [diarizer]." << unsupported
+                  << " in " << path
+                  << "; this non-NeMo control has been removed" << std::endl;
+        return false;
+      }
+    }
+  }
+
   // ── [server] ──────────────────────────────────────────────────────
   if (auto* sec = config["server"].as_table()) {
     if (auto v = sec->get("port")) {
@@ -308,12 +321,6 @@ bool ApplyTomlConfig(const std::string& path,
     }
     if (auto v = sec->get("fifo_len")) {
       if (auto n = v->value<int>()) cfg.diar_fifo_len = *n;
-    }
-    if (auto v = sec->get("spkcache_refresh_rate")) {
-      if (auto n = v->value<int>()) cfg.diar_spkcache_refresh_rate = *n;
-    }
-    if (auto v = sec->get("use_silence_profile")) {
-      if (auto b = v->value<bool>()) cfg.diar_use_silence_profile = *b;
     }
     if (auto v = sec->get("onset")) {
       if (auto d = v->value<double>()) cfg.diar_onset = *d;

@@ -1,6 +1,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -43,6 +44,46 @@ static std::string WriteTemp(const char* content) {
 
 int main() {
   std::printf("=== ConfigReader unit tests ===\n\n");
+
+  // Spec 013: both fallback startup and the checked-in acceptance config use
+  // the same v2.1 closing baseline. The removed v2 checkpoint must not return.
+  std::printf("-- v2.1 closing baseline --\n");
+  {
+    pipeline::AuditoryStream::Config defaults;
+    CHECK(defaults.diarizer_weights ==
+              "models/sortformer_4spk_v2.1.safetensors",
+          "compile-time diarizer default is v2.1");
+    CHECK(defaults.diar_chunk_len == 340,
+          "compile-time v2.1 chunk length is 340");
+    CHECK(defaults.diar_chunk_right_context == 1,
+          "compile-time v2.1 right context is 1");
+    CHECK(defaults.diar_fifo_len == 188,
+          "compile-time v2.1 FIFO length is 188");
+    CHECK(defaults.diar_spkcache_update_period == 188,
+          "compile-time v2.1 cache update period is 188");
+
+    pipeline::AuditoryStream::Config checked_in;
+    const std::string config_path =
+        std::string(ORATOR_TEST_SOURCE_DIR) + "/orator.toml";
+    CHECK(io::ApplyTomlConfig(config_path, checked_in),
+          "checked-in orator.toml loads");
+    CHECK(checked_in.diarizer_weights ==
+              "models/sortformer_4spk_v2.1.safetensors",
+          "checked-in diarizer is v2.1");
+    CHECK(checked_in.diar_chunk_len == 340,
+          "checked-in v2.1 chunk length is 340");
+    CHECK(checked_in.diar_chunk_right_context == 1,
+          "checked-in v2.1 right context is 1");
+    CHECK(checked_in.diar_fifo_len == 188,
+          "checked-in v2.1 FIFO length is 188");
+    CHECK(checked_in.diar_spkcache_update_period == 188,
+          "checked-in v2.1 cache update period is 188");
+    const std::string removed_v2_path =
+        std::string(ORATOR_TEST_SOURCE_DIR) +
+        "/models/sortformer_4spk_v2.safetensors";
+    CHECK(!std::filesystem::exists(removed_v2_path),
+          "deprecated v2 checkpoint is absent");
+  }
 
   // ── Valid TOML file ─────────────────────────────────────────────────
   std::printf("-- Valid TOML --\n");
@@ -389,6 +430,28 @@ port = 7777
     // Fields not in the TOML should retain their original values
     CHECK(cfg.asr_vad_gate == true,
           "cfg.asr_vad_gate unchanged (not in partial TOML)");
+
+    std::remove(path.c_str());
+  }
+
+  // ── Removed non-NeMo controls fail instead of being ignored ─────────
+  std::printf("\n-- Removed diarizer controls --\n");
+  {
+    const char* removed = R"(
+[server]
+port = 7777
+
+[diarizer]
+spkcache_refresh_rate = 100
+)";
+    std::string path = WriteTemp(removed);
+
+    pipeline::AuditoryStream::Config cfg;
+    cfg.port = 1234;
+    bool ok = io::ApplyTomlConfig(path, cfg);
+    CHECK(!ok, "removed diarizer control is rejected");
+    CHECK(cfg.port == 1234,
+          "config remains unchanged when removed control is present");
 
     std::remove(path.c_str());
   }

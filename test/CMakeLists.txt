@@ -27,6 +27,8 @@ target_compile_definitions(test_safetensors PRIVATE
   ORATOR_TEST_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 orator_add_test(test_bpe         unit/core/test_bpe.cc)
 orator_add_test(test_config      unit/core/test_config.cc)
+target_compile_definitions(test_config PRIVATE
+  ORATOR_TEST_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 orator_add_test(test_json        unit/core/test_json.cc)
 orator_add_test(test_storage     unit/core/test_storage.cc)
 orator_add_test(test_session_store unit/core/test_session_store.cc)
@@ -50,6 +52,7 @@ orator_add_test(test_mel         unit/model/test_mel.cc)
 orator_add_test(test_preprocessor unit/model/test_preprocessor.cc)
 orator_add_test(test_qwen3       unit/model/test_qwen3.cc)
 orator_add_test(test_kernels     unit/model/test_kernels.cc)
+orator_add_test(test_gemm_batched unit/model/test_gemm_batched.cu)
 
 # Pipeline unit tests
 add_executable(test_vad unit/pipeline/test_vad.cc utils/asr_vad_cpu.cc)
@@ -58,7 +61,18 @@ target_link_libraries(test_vad PRIVATE orator_core)
 target_include_directories(test_vad PRIVATE ${TEST_UTILS_DIR})
 add_test(NAME test_vad COMMAND test_vad)
 
-orator_add_test(test_diar_stream unit/pipeline/test_diar_stream.cc)
+orator_add_test(test_diar_sync_v21 unit/pipeline/test_diar_sync_v21.cc)
+orator_add_test(test_diar_async_stream unit/pipeline/test_diar_async_stream.cc)
+add_test(NAME test_diar_async_stream_v21_high
+  COMMAND test_diar_async_stream
+    ${CMAKE_SOURCE_DIR}/specs/013-industrial-closing-validation/sortformer-v21-high-latency.toml
+    ${CMAKE_SOURCE_DIR}/models/reference/ref_stream_async_v21_high_official_long.f32
+    3)
+add_test(NAME test_diar_async_stream_v21_low
+  COMMAND test_diar_async_stream
+    ${CMAKE_SOURCE_DIR}/specs/013-industrial-closing-validation/sortformer-v21-low-latency.toml
+    ${CMAKE_SOURCE_DIR}/models/reference/ref_stream_async_v21_low_official_long.f32
+    3)
 orator_add_test(test_auditory_stream unit/pipeline/test_auditory_stream.cc)
 target_link_libraries(test_auditory_stream PRIVATE pthread)
 
@@ -111,8 +125,17 @@ set_tests_properties(test_bpe PROPERTIES
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_vad PROPERTIES
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
-set_tests_properties(test_diar_stream PROPERTIES
+set_tests_properties(test_diar_sync_v21 PROPERTIES
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_diar_async_stream PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(
+    test_diar_async_stream_v21_high
+    test_diar_async_stream_v21_low
+  PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    TIMEOUT 120
+    LABELS "cuda;unit;model-parity")
 
 # Manual evaluation tool (not a ctest): runs against a real reference file.
 add_executable(orator_eval ${CMAKE_CURRENT_SOURCE_DIR}/eval_reference.cc)
@@ -133,10 +156,50 @@ if(Python3_EXECUTABLE)
     TIMEOUT 30
     LABELS "python;unit;reproducibility")
 
+  add_test(NAME test_ws_unified_manifest
+    COMMAND ${Python3_EXECUTABLE}
+      ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/test_ws_unified_manifest.py)
+  set_tests_properties(test_ws_unified_manifest PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    TIMEOUT 30
+    LABELS "python;unit;reproducibility")
+
   add_test(NAME test_closing_ledger
     COMMAND ${Python3_EXECUTABLE}
       ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/test_closing_ledger.py)
   set_tests_properties(test_closing_ledger PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    TIMEOUT 30
+    LABELS "python;unit;manual-review")
+
+  add_test(NAME test_speaker_frozen_evidence
+    COMMAND ${Python3_EXECUTABLE}
+      ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/test_speaker_frozen_evidence.py)
+  set_tests_properties(test_speaker_frozen_evidence PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    TIMEOUT 30
+    LABELS "python;unit;model-evidence")
+
+  add_test(NAME test_speaker_sequence_candidate
+    COMMAND ${Python3_EXECUTABLE}
+      ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/test_speaker_sequence_candidate.py)
+  set_tests_properties(test_speaker_sequence_candidate PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    TIMEOUT 30
+    LABELS "python;unit;model-evidence")
+
+  add_test(NAME test_speaker_sliding_voiceprint
+    COMMAND ${Python3_EXECUTABLE}
+      ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/test_speaker_sliding_voiceprint.py)
+  set_tests_properties(test_speaker_sliding_voiceprint PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    TIMEOUT 30
+    LABELS "python;unit;model-evidence")
+
+  add_test(NAME test_speaker_business_review_packet
+    COMMAND ${Python3_EXECUTABLE}
+      ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/test_speaker_business_review_packet.py)
+  set_tests_properties(test_speaker_business_review_packet PROPERTIES
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
     TIMEOUT 30
     LABELS "python;unit;manual-review")

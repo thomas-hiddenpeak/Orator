@@ -1,9 +1,9 @@
 // Offline evidence dump for Sortformer diarization.
 //
 // Reads runtime parameters from orator.toml, runs the current Sortformer
-// configuration over an audio file, and writes frame-level speaker probabilities
-// plus the current onset/offset segment view. This is a diagnostic probe only;
-// it does not change the runtime path.
+// configuration over an audio file, and writes frame-level speaker
+// probabilities plus the current onset/offset segment view. This is a
+// diagnostic probe only; it does not change the runtime path.
 
 #include <algorithm>
 #include <chrono>
@@ -81,8 +81,6 @@ void ApplyDiarTuning(const AuditoryStream::Config& cfg,
   tuning.chunk_left_context = cfg.diar_chunk_left_context;
   tuning.chunk_right_context = cfg.diar_chunk_right_context;
   tuning.spkcache_sil_frames = cfg.diar_spkcache_sil_frames;
-  tuning.spkcache_refresh_rate = cfg.diar_spkcache_refresh_rate;
-  tuning.use_silence_profile = cfg.diar_use_silence_profile ? 1 : 0;
   tuning.fifo_len = cfg.diar_fifo_len;
   diar->ApplyStreamingTuning(tuning);
 }
@@ -170,8 +168,7 @@ int main(int argc, char** argv) {
             << " chunk_len=" << cfg.diar_chunk_len
             << " left=" << cfg.diar_chunk_left_context
             << " right=" << cfg.diar_chunk_right_context
-            << " fifo_len=" << cfg.diar_fifo_len
-            << " refresh=" << cfg.diar_spkcache_refresh_rate << "\n";
+            << " fifo_len=" << cfg.diar_fifo_len << "\n";
   std::cout << "onset=" << cfg.diar_onset << " offset=" << cfg.diar_offset
             << " min_dur_on=" << cfg.diar_min_dur_on
             << " min_dur_off=" << cfg.diar_min_dur_off
@@ -179,18 +176,17 @@ int main(int argc, char** argv) {
 
   orator::io::AudioData audio =
       orator::io::LoadAudioMono(audio_path, cfg.sample_rate);
-  std::cout << "samples=" << audio.samples.size() << " sr="
-            << audio.sample_rate << " duration=" << audio.DurationSec()
-            << "s\n";
+  std::cout << "samples=" << audio.samples.size() << " sr=" << audio.sample_rate
+            << " duration=" << audio.DurationSec() << "s\n";
 
   orator::model::SortformerDiarizer diar;
   orator::core::DiarizationConfig dc;
   dc.sample_rate = cfg.sample_rate;
   dc.max_speakers = cfg.max_speakers;
   dc.activity_threshold = cfg.diar_threshold;
+  ApplyDiarTuning(cfg, &diar);
   diar.Initialize(dc);
   diar.LoadWeights(cfg.diarizer_weights);
-  ApplyDiarTuning(cfg, &diar);
 
   const auto t0 = std::chrono::steady_clock::now();
   std::vector<FrameRow> rows;
@@ -204,8 +200,8 @@ int main(int argc, char** argv) {
     chunk.samples = audio.samples.data() + offset_samples;
     chunk.num_samples = static_cast<int>(count_samples);
     chunk.sample_rate = audio.sample_rate;
-    chunk.t_start_sec =
-        static_cast<double>(offset_samples) / static_cast<double>(audio.sample_rate);
+    chunk.t_start_sec = static_cast<double>(offset_samples) /
+                        static_cast<double>(audio.sample_rate);
     DiarizationFrames frames = diar.ProcessChunk(chunk);
     AppendFrameRows(frames, session, &rows);
     std::vector<orator::core::DiarSegment> part =
@@ -243,8 +239,9 @@ int main(int argc, char** argv) {
   WriteSegmentCsv(segment_csv, rows, speakers_per_session, segs);
 
   const double audio_sec = audio.DurationSec();
-  std::cout << "frames=" << rows.size() << " speakers_per_session="
-            << speakers_per_session << " sessions=" << session_count << "\n";
+  std::cout << "frames=" << rows.size()
+            << " speakers_per_session=" << speakers_per_session
+            << " sessions=" << session_count << "\n";
   std::cout << "segments=" << segs.size() << "\n";
   std::cout << "compute_sec=" << compute_sec
             << " rtf=" << (compute_sec > 0.0 ? compute_sec / audio_sec : 0.0)

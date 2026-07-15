@@ -43,7 +43,7 @@ int main(int argc, char** argv) {
   auto conf = ReadF32(dir + "/ref_conf_l16_out.f32");  // [126,512] decoder input
   auto ref_preds = ReadF32(dir + "/ref_preds.f32");    // [126,4]
 
-  io::SafeTensorReader reader("models/sortformer_4spk_v2.safetensors");
+  io::SafeTensorReader reader("models/sortformer_4spk_v2.1.safetensors");
   model::SortformerDecoder dec;
   dec.LoadWeights(reader);
 

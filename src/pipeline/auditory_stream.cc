@@ -143,14 +143,8 @@ void AuditoryStream::Start() {
   if (!config_.diarizer_weights.empty()) {
     diarizer_ =
         core::Registry<core::IDiarizer>::Instance().Create("sortformer");
-    core::DiarizationConfig dc;
-    dc.sample_rate = config_.sample_rate;
-    dc.max_speakers = config_.max_speakers;
-    dc.activity_threshold = config_.diar_threshold;
-    dc.show_progress = config_.stream_progress;
-    diarizer_->Initialize(dc);
-    diarizer_->LoadWeights(config_.diarizer_weights);
-    // Apply streaming tuning parameters from config.
+    // Streaming capacities are part of model construction. Apply the complete
+    // typed profile before Initialize allocates state for those capacities.
     model::SortformerTuning tuning;
     tuning.spkcache_len = config_.diar_spkcache_len;
     tuning.chunk_len = config_.diar_chunk_len;
@@ -158,12 +152,17 @@ void AuditoryStream::Start() {
     tuning.chunk_left_context = config_.diar_chunk_left_context;
     tuning.chunk_right_context = config_.diar_chunk_right_context;
     tuning.spkcache_sil_frames = config_.diar_spkcache_sil_frames;
-    tuning.spkcache_refresh_rate = config_.diar_spkcache_refresh_rate;
-    tuning.use_silence_profile = config_.diar_use_silence_profile ? 1 : 0;
     tuning.fifo_len = config_.diar_fifo_len;
     tuning.show_progress = config_.stream_progress ? 1 : 0;
     static_cast<model::SortformerDiarizer*>(diarizer_.get())
         ->ApplyStreamingTuning(tuning);
+    core::DiarizationConfig dc;
+    dc.sample_rate = config_.sample_rate;
+    dc.max_speakers = config_.max_speakers;
+    dc.activity_threshold = config_.diar_threshold;
+    dc.show_progress = config_.stream_progress;
+    diarizer_->Initialize(dc);
+    diarizer_->LoadWeights(config_.diarizer_weights);
     diar_stream_ = scheduler_.Register("diarization", /*priority_index=*/0,
                                        /*background=*/false,
                                        /*create_stream=*/true);

@@ -44,14 +44,18 @@ import base64
 import datetime
 import hashlib
 import json
+import math
 import os
 import platform
+import re
 import socket
+import statistics
 import struct
 import subprocess
 import sys
 import threading
 import time
+from collections import Counter
 
 GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 SAMPLE_RATE = 16000
@@ -75,6 +79,39 @@ def sha256_file(path: str):
     return digest.hexdigest()
 
 
+def config_snapshot(path):
+    resolved_path = os.path.realpath(os.path.abspath(path)) if path else None
+    return {
+        "path": resolved_path,
+        "sha256": sha256_file(resolved_path),
+        "bytes": (
+            os.path.getsize(resolved_path)
+            if resolved_path and os.path.isfile(resolved_path) else None),
+    }
+
+
+def config_provenance(start_snapshot, timeline):
+    resolved = timeline.get("resolved_config")
+    source_path = (
+        resolved.get("config_source_path")
+        if isinstance(resolved, dict) else None)
+    end_snapshot = config_snapshot(source_path)
+    path_matches = (
+        bool(start_snapshot.get("path")) and
+        start_snapshot.get("path") == end_snapshot.get("path"))
+    unchanged = (
+        bool(start_snapshot.get("sha256")) and
+        start_snapshot.get("sha256") == end_snapshot.get("sha256"))
+    return {
+        "client_pre_stream": start_snapshot,
+        "client_post_stream": end_snapshot,
+        "server_resolved_path": source_path,
+        "path_matches": path_matches,
+        "unchanged_during_client_run": unchanged,
+        "acceptance_consistent": path_matches and unchanged,
+    }
+
+
 def command_output(command):
     try:
         result = subprocess.run(
@@ -87,30 +124,192 @@ def command_output(command):
     return result.stdout.strip()
 
 
+def git_workspace_sha256():
+    root = command_output(["git", "rev-parse", "--show-toplevel"])
+    if not root:
+        return None
+    try:
+        diff = subprocess.run(
+            ["git", "diff", "--binary", "--no-ext-diff", "HEAD", "--"],
+            cwd=root, capture_output=True, check=False, timeout=30)
+        untracked = subprocess.run(
+            ["git", "ls-files", "--others", "--exclude-standard", "-z"],
+            cwd=root, capture_output=True, check=False, timeout=10)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if diff.returncode != 0 or untracked.returncode != 0:
+        return None
+
+    digest = hashlib.sha256()
+    digest.update(b"tracked\0")
+    digest.update(diff.stdout)
+    digest.update(b"untracked\0")
+    for relative_bytes in sorted(filter(None, untracked.stdout.split(b"\0"))):
+        relative = os.fsdecode(relative_bytes)
+        path = os.path.join(root, relative)
+        digest.update(relative_bytes)
+        digest.update(b"\0")
+        try:
+            if os.path.islink(path):
+                digest.update(b"symlink\0")
+                digest.update(os.fsencode(os.readlink(path)))
+            else:
+                digest.update(b"file\0")
+                with open(path, "rb") as source:
+                    for chunk in iter(lambda: source.read(1024 * 1024), b""):
+                        digest.update(chunk)
+        except OSError:
+            return None
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
+def numeric_summary(values):
+    finite = [float(value) for value in values
+              if isinstance(value, (int, float)) and
+              not isinstance(value, bool) and math.isfinite(value)]
+    if not finite:
+        return None
+    ordered = sorted(finite)
+    p95_index = max(0, math.ceil(0.95 * len(ordered)) - 1)
+    return {
+        "count": len(ordered),
+        "min": ordered[0],
+        "mean": statistics.fmean(ordered),
+        "p95": ordered[p95_index],
+        "max": ordered[-1],
+    }
+
+
+def parse_tegrastats_line(line):
+    values = {}
+    match = re.search(r"RAM (\d+)/(\d+)MB", line)
+    if match:
+        values["ram_used_mb"] = float(match.group(1))
+    match = re.search(r"CPU \[([^\]]*)\]", line)
+    if match:
+        cores = [int(value) for value in re.findall(
+            r"(\d+)%@", match.group(1))]
+        if cores:
+            values["cpu_pct"] = statistics.fmean(cores)
+    match = re.search(r"GR3D_FREQ (\d+)%", line)
+    if match:
+        values["tegrastats_gpu_pct"] = float(match.group(1))
+    temperatures = [float(value) for value in re.findall(
+        r"@[\s]*([\d.]+)C", line)]
+    if temperatures:
+        values["max_temp_c"] = max(temperatures)
+    for pattern, key in (
+            (r"VDD_GPU\S* (\d+)mW", "gpu_power_w"),
+            (r"(?:^| )VIN (\d+)mW", "system_power_w")):
+        match = re.search(pattern, line)
+        if match:
+            values[key] = float(match.group(1)) / 1000.0
+    return values
+
+
+def telemetry_summary(messages, device_series, duration_sec=None,
+                      gpu_interval_sec=None, device_interval_sec=1.0):
+    runtime_devices = [
+        item["device"] for item in messages
+        if isinstance(item, dict) and item.get("type") == "gpu_telemetry" and
+        isinstance(item.get("device"), dict)
+    ]
+    tegra_lines = [
+        item.get("line", "") for item in device_series
+        if isinstance(item, dict) and item.get("line")
+    ]
+    tegra_values = [parse_tegrastats_line(line) for line in tegra_lines]
+
+    runtime_fields = (
+        "gpu_utilization_pct", "gpu_mem_used_mb", "gpu_mem_used_pct",
+        "gpu_freq_mhz", "system_power_w")
+    tegra_fields = (
+        "cpu_pct", "ram_used_mb", "max_temp_c", "tegrastats_gpu_pct",
+        "gpu_power_w", "system_power_w")
+    runtime_metrics = {
+        field: numeric_summary([item.get(field) for item in runtime_devices])
+        for field in runtime_fields
+    }
+    tegra_metrics = {
+        field: numeric_summary([item.get(field) for item in tegra_values])
+        for field in tegra_fields
+    }
+
+    def coverage(metrics, field, total):
+        summary = metrics.get(field)
+        return (summary["count"] / total
+                if summary is not None and total else 0.0)
+
+    def cadence_coverage(sample_count, interval_sec):
+        if (not isinstance(duration_sec, (int, float)) or
+                duration_sec <= 0.0 or
+                not isinstance(interval_sec, (int, float)) or
+                interval_sec <= 0.0):
+            return None
+        expected = max(1, math.floor(duration_sec / interval_sec))
+        return min(1.0, sample_count / expected)
+
+    required_coverage = {
+        "gpu_utilization_pct": coverage(
+            runtime_metrics, "gpu_utilization_pct", len(runtime_devices)),
+        "gpu_mem_used_mb": coverage(
+            runtime_metrics, "gpu_mem_used_mb", len(runtime_devices)),
+        "system_power_w": coverage(
+            runtime_metrics, "system_power_w", len(runtime_devices)),
+        "cpu_pct": coverage(tegra_metrics, "cpu_pct", len(tegra_values)),
+        "ram_used_mb": coverage(
+            tegra_metrics, "ram_used_mb", len(tegra_values)),
+        "max_temp_c": coverage(
+            tegra_metrics, "max_temp_c", len(tegra_values)),
+    }
+    runtime_cadence = cadence_coverage(
+        len(runtime_devices), gpu_interval_sec)
+    tegrastats_cadence = cadence_coverage(
+        len(tegra_lines), device_interval_sec)
+    if runtime_cadence is not None:
+        required_coverage["runtime_sample_cadence"] = runtime_cadence
+    if tegrastats_cadence is not None:
+        required_coverage["tegrastats_sample_cadence"] = tegrastats_cadence
+    return {
+        "runtime_sample_count": len(runtime_devices),
+        "tegrastats_sample_count": len(tegra_lines),
+        "gpu_utilization_sources": dict(Counter(
+            str(item.get("gpu_utilization_source"))
+            for item in runtime_devices
+            if item.get("gpu_utilization_source") is not None)),
+        "runtime": runtime_metrics,
+        "tegrastats": tegra_metrics,
+        "required_field_coverage": required_coverage,
+        "required_fields_at_least_95_percent": (
+            bool(runtime_devices) and bool(tegra_values) and
+            all(value >= 0.95 for value in required_coverage.values())),
+    }
+
+
 def git_metadata():
     commit = command_output(["git", "rev-parse", "HEAD"])
     status = command_output(
-        ["git", "status", "--porcelain", "--untracked-files=normal"])
+        ["git", "status", "--porcelain", "--untracked-files=all"])
     return {
         "commit": commit,
         "dirty": bool(status),
         "status": status.splitlines() if status else [],
+        "workspace_sha256": git_workspace_sha256(),
     }
 
 
-def write_run_manifest(args, timeline, pcm, artifact_path):
+def write_run_manifest(args, timeline, pcm, artifact_path,
+                       source_evidence):
     resolved = timeline.get("resolved_config")
     generated = datetime.datetime.now(datetime.timezone.utc)
-    commit = git_metadata()
-    short_commit = (commit.get("commit") or "unknown")[:12]
+    start_git = source_evidence["git"]["client_pre_stream"]
+    short_commit = (start_git.get("commit") or "unknown")[:12]
     duration_label = f"{len(pcm) // BYTES_PER_SAMPLE / SAMPLE_RATE:.3f}s"
     artifact_id = (
         f"orator-{generated.strftime('%Y%m%dT%H%M%SZ')}-"
         f"{short_commit}-{duration_label}")
 
-    config_path = None
-    if isinstance(resolved, dict):
-        config_path = resolved.get("config_source_path")
     jetson_release = None
     try:
         with open("/etc/nv_tegra_release", encoding="utf-8") as release_file:
@@ -137,11 +336,15 @@ def write_run_manifest(args, timeline, pcm, artifact_path):
         "resolved_config_sha256": (
             canonical_json_sha256(resolved)
             if isinstance(resolved, dict) else None),
-        "config_source": {
-            "path": os.path.abspath(config_path) if config_path else None,
-            "sha256": sha256_file(config_path),
-        },
-        "git": commit,
+        "config_source": source_evidence["config"]["client_pre_stream"],
+        "config_source_end": source_evidence["config"]["client_post_stream"],
+        "config_source_provenance": source_evidence["config"],
+        "git": start_git,
+        "git_end": source_evidence["git"]["client_post_stream"],
+        "git_provenance": source_evidence["git"],
+        "server_binary": source_evidence["server_binary"],
+        "source_stable_during_run": source_evidence[
+            "acceptance_consistent"],
         "client_environment_overrides": {
             key: value for key, value in sorted(os.environ.items())
             if key.startswith("ORATOR_")
@@ -616,6 +819,12 @@ def validate_terminal_contract(events, timeline):
 
 
 def main(args):
+    configured_path = (
+        args.config_path or os.environ.get("ORATOR_CONFIG") or
+        "orator.toml")
+    start_config_snapshot = config_snapshot(configured_path)
+    start_git_snapshot = git_metadata()
+    start_binary_snapshot = config_snapshot(args.server_binary)
     # Parse audio file (handles MP3, WAV, FLAC, and PCM formats)
     pcm = parse_audio_file(args.pcm, args.duration)
     total_samples = len(pcm) // BYTES_PER_SAMPLE
@@ -748,6 +957,54 @@ def main(args):
     diar_compute = diar.get("compute_sec")
     asr_compute = asr.get("compute_sec")
     contract_issues = validate_terminal_contract(reader.events, tl)
+    config_evidence = config_provenance(start_config_snapshot, tl)
+    if not config_evidence["acceptance_consistent"]:
+        contract_issues.append(
+            "configuration source path/hash changed or did not match "
+            "the server resolved path")
+    end_git_snapshot = git_metadata()
+    git_stable = start_git_snapshot == end_git_snapshot
+    end_binary_snapshot = config_snapshot(args.server_binary)
+    binary_stable = (
+        bool(start_binary_snapshot.get("sha256")) and
+        start_binary_snapshot.get("path") == end_binary_snapshot.get("path") and
+        start_binary_snapshot.get("sha256") ==
+        end_binary_snapshot.get("sha256"))
+    if not git_stable:
+        contract_issues.append("Git commit or worktree changed during run")
+    if not binary_stable:
+        contract_issues.append("server binary path/hash changed during run")
+    source_evidence = {
+        "config": config_evidence,
+        "git": {
+            "client_pre_stream": start_git_snapshot,
+            "client_post_stream": end_git_snapshot,
+            "unchanged_during_client_run": git_stable,
+        },
+        "server_binary": {
+            "client_pre_stream": start_binary_snapshot,
+            "client_post_stream": end_binary_snapshot,
+            "unchanged_during_client_run": binary_stable,
+        },
+        "acceptance_consistent": (
+            config_evidence["acceptance_consistent"] and
+            git_stable and binary_stable),
+    }
+    resolved_telemetry = (
+        tl.get("resolved_config", {}).get("telemetry", {})
+        if isinstance(tl.get("resolved_config"), dict) else {})
+    gpu_interval_sec = resolved_telemetry.get("gpu_interval_sec")
+    telemetry_report = telemetry_summary(
+        reader.telemetry, device_series, audio_sec, gpu_interval_sec, 1.0)
+    telemetry_required = (
+        args.require_telemetry or
+        (args.rate == 1.0 and audio_sec >= 120.0))
+    telemetry_report["required_for_contract"] = telemetry_required
+    if (telemetry_required and
+            not telemetry_report["required_fields_at_least_95_percent"]):
+        contract_issues.append(
+            "required GPU/memory/power/CPU/RAM/temperature telemetry fields "
+            "are below 95% coverage")
     
     first_device_line = device_series[0]["line"] if device_series else None
     last_device_line = device_series[-1]["line"] if device_series else None
@@ -770,6 +1027,8 @@ def main(args):
             "resolved_config_sha256": (
                 canonical_json_sha256(tl.get("resolved_config"))
                 if isinstance(tl.get("resolved_config"), dict) else None),
+            "source_provenance": source_evidence,
+            "telemetry_summary": telemetry_report,
         },
         "tegrastats": {
             "before": first_device_line,
@@ -777,6 +1036,7 @@ def main(args):
             "final": last_device_line,
         },
         "device_series": device_series,
+        "telemetry_summary": telemetry_report,
         "command_responses": command_responses,
         "events": reader.events,
         "telemetry": reader.telemetry,
@@ -785,7 +1045,8 @@ def main(args):
     
     with open(args.out, "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, indent=2)
-    manifest_path, _ = write_run_manifest(args, tl, pcm, args.out)
+    manifest_path, _ = write_run_manifest(
+        args, tl, pcm, args.out, source_evidence)
 
     if getattr(args, "rrd", None):
         import os
@@ -831,8 +1092,22 @@ if __name__ == "__main__":
                     help="Push speed x real-time; 1.0 = real-time, 0 = max (no pacing)")
     ap.add_argument("--frame-ms", type=int, default=100)
     ap.add_argument("--out", help="Output JSON file path")
+    ap.add_argument(
+        "--config-path",
+        help="server TOML path for pre/post-run provenance capture; defaults "
+             "to ORATOR_CONFIG or orator.toml",
+    )
+    ap.add_argument(
+        "--server-binary", default="build/orator_ws",
+        help="server executable path for pre/post-run hash capture",
+    )
     ap.add_argument("--rrd", help="Also export the timeline to a rerun .rrd "
                     "recording (offline observability; needs rerun-sdk)")
+    ap.add_argument(
+        "--require-telemetry", action="store_true",
+        help="fail unless required telemetry fields cover at least 95%% of "
+             "captured samples",
+    )
     ap.add_argument("--timeline-timeout", type=float, default=600.0,
                     help="Seconds to wait for final timeline after sending end")
     ap.add_argument("--test-describe", action="store_true", help="Test describe command")

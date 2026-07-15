@@ -56,6 +56,10 @@ ctest --test-dir build -R test_web_model --output-on-failure
 按 `.specify/test-review-protocol.md` 和 Spec 013 走真实 WebSocket、全长音频与全量
 上下文语义审核；CTest 或脚本结构指标不能代替该结论。
 
+当前收官基线是流式 Sortformer v2.1 `340/1/188/188`。v2 权重及其旧
+`test_diar_stream` 已删除；当前模型门禁由 `test_diar_async_stream` 及
+v2.1 高/低延迟配置测试承担。
+
 ## 添加测试
 
 1. C++ 测试放入对应分层，并在 `test/CMakeLists.txt` 用

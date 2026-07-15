@@ -67,7 +67,8 @@ class AuditoryStream {
  public:
   struct Config {
     // ── Model paths ──────────────────────────────────────────────────
-    std::string diarizer_weights = "models/sortformer_4spk_v2.safetensors";
+    // Spec 013 closing baseline. The deprecated v2 checkpoint was removed.
+    std::string diarizer_weights = "models/sortformer_4spk_v2.1.safetensors";
     std::string asr_model_dir = "models/asr/Qwen/Qwen3-ASR-1.7B";
     std::string vad_model = "models/vad/silero_vad.safetensors";
 
@@ -132,17 +133,8 @@ class AuditoryStream {
     int diar_spkcache_update_period = 188;  // cache update interval (frames)
     int diar_chunk_left_context = 1;        // left context chunks
     int diar_chunk_right_context = 1;       // right context chunks
-    int diar_spkcache_sil_frames = 3;       // silent frames before cache reset
-    int diar_fifo_len =
-        188;  // FIFO length for async streaming (0=off). Async
-              // (NeMo streaming_update_async) keeps the 188-frame
-              // spkcache from saturating over a long continuous
-              // session, so speaker slots stay stable for the
-              // whole meeting and no periodic reset is needed.
-    int diar_spkcache_refresh_rate =
-        100;  // cache refresh cadence (0=drain all)
-    bool diar_use_silence_profile =
-        false;  // v2.1: use silence profile in cache
+    int diar_spkcache_sil_frames = 3;  // mean-silence cache slots per speaker
+    int diar_fifo_len = 188;  // async FIFO length; 0 selects sync mode
     // Onset/offset post-processing (NeMo-style double threshold)
     double diar_onset = 0.45;  // probability to START a segment
     double diar_offset =

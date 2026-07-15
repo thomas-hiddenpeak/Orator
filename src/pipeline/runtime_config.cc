@@ -139,8 +139,6 @@ std::string SerializeResolvedConfig(const AuditoryStream::Config& c) {
   diar.Add("chunk_right_context", c.diar_chunk_right_context);
   diar.Add("spkcache_sil_frames", c.diar_spkcache_sil_frames);
   diar.Add("fifo_len", c.diar_fifo_len);
-  diar.Add("spkcache_refresh_rate", c.diar_spkcache_refresh_rate);
-  diar.Add("use_silence_profile", c.diar_use_silence_profile);
   diar.Add("onset", c.diar_onset);
   diar.Add("offset", c.diar_offset);
   diar.Add("pad_onset", c.diar_pad_onset);
