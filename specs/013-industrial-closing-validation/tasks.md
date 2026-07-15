@@ -78,8 +78,13 @@
 - [x] T041 Add silence, endpoint, time-base, track-immutability, stable-ID, and
   Web UI model tests. The registered gate runs 12 s canonical speech and 30 s
   generated silence with isolated TOML storage.
-- [ ] T042 Run clean build, warning check, full CTest, JavaScript checks, and
-  selected sanitizer/CUDA memory checks.
+- [x] T042 Run clean build, warning check, full CTest, JavaScript checks, and
+  selected sanitizer/CUDA memory checks. Clean `ce388a7` passed the warning-free
+  Release build and 64/64 CTest suite, 25/25 selected ASan/UBSan tests, full
+  inherited-v2.1 memcheck/initcheck, and public-kernel/GEMM
+  memcheck/racecheck/synccheck with zero errors. The instrumentation-limited
+  full-model racecheck is explicitly unclaimed. See
+  `engineering-gates-2026-07-15.md`.
 - [x] T043 Run 120 s, 360 s, and 600 s real-WebSocket tests with committed TOML.
 - [x] T044 Run one full v2.1 closing-baseline WebSocket capture with continuous
   `tegrastats` and browser evidence. Clean commit `3b40245` completed 3615.12 s

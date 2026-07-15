@@ -189,6 +189,17 @@ This completes T044 system evidence only. The 556-row audible ledger and the
 baseline context review remain unsigned, so this run has no constitutional
 accuracy percentage and product closure remains open.
 
+**Engineering closing gates (2026-07-15)**: clean `ce388a7` passed a warning-free
+Release build and the complete 64/64 CTest suite, including JavaScript and the
+real-WebSocket observer gate. A separate ASan/UBSan Debug build passed 25/25
+selected host, threading, transport, timeline, identity, and fusion tests.
+Compute Sanitizer reported zero errors for full inherited-v2.1 memcheck and
+initcheck, public-kernel racecheck/memcheck/synccheck, batched SGEMM memcheck,
+and ASR GEMM memcheck. The attempted 1502-frame full-model racecheck was stopped
+when sanitizer instrumentation exceeded approximately 79 GiB host memory and is
+not claimed as a pass. T042 is complete; no accuracy claim follows. See
+[engineering-gates-2026-07-15.md](013-industrial-closing-validation/engineering-gates-2026-07-15.md).
+
 ## 3. Component status
 
 | Component | Status | Notes |
