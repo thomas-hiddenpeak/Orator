@@ -6,9 +6,9 @@ conflicts with the Constitution, the Constitution takes precedence. Amending it
 is a deliberate, recorded action (see *Amendment Process*), not an undocumented
 change.
 
-- **Version**: 1.6.0
+- **Version**: 1.7.0
 - **Ratified**: 2026-06-12
-- **Last amended**: 2026-07-13
+- **Last amended**: 2026-07-15
 
 ---
 
@@ -187,11 +187,29 @@ acceptance criteria, enforced in review:
    canonical `test.mp3` result.
 4. Actual pipeline testing MAY use different input pacing speeds, but acceptance
    reports state the speed and include real-time pacing where required.
-5. When comparing accuracy results, NO script analysis MUST assign correctness
-   or select a candidate, and NO temporary command-line scripts may be created
-   for that purpose. Results MUST be compared item by item with the reference in
-   conversational context. Tools may capture, index, and display evidence, but
-   they do not make the accuracy judgment.
+5. **No code-based result evaluation is permitted.** For ASR, diarization,
+   speaker attribution, endpoint, hallucination, comprehensive-timeline, and
+   candidate-comparison results, no executable automation of any kind may
+   assign `correct`/`incorrect`/`ambiguous` labels, infer semantic equivalence,
+   calculate or estimate an accuracy result, rank candidates, select a
+   configuration, or issue a promotion, acceptance, pass, or fail judgment.
+   This prohibition includes compiled programs, C++/CUDA test code, Python,
+   shell or JavaScript scripts, notebooks, spreadsheet formulas, queries,
+   algorithms, and temporary command-line code.
+6. **Contextual semantic comparison is the only permitted result-evaluation
+   method.** A human or AI reviewer MUST read every in-scope reference item and
+   the system evidence in its surrounding conversational context, assign each
+   judgment directly, perform the required second context pass, reconcile
+   disagreements, and manually derive and verify every reported result. No
+   sampling, isolated string comparison, timestamp-overlap rule, duration
+   mapping, lexical metric, or automated aggregation may substitute for that
+   review.
+7. Automation MAY execute the system; capture immutable raw outputs; verify
+   hashes, schemas, transport, timing, numerical-oracle parity, and engineering
+   invariants; and index or display unjudged evidence for the reviewer. It MUST
+   stop before semantic judgment or result aggregation. Automated numerical
+   parity and mechanical contract checks are component evidence only and MUST
+   NOT be represented as product accuracy or acceptance evidence.
 
 ### 6.2 — Test Levels and Device Metrics
 
@@ -372,4 +390,4 @@ state claim:
 - When guidance is silent, Articles II (accuracy) and V (quality) take
   precedence over other considerations.
 
-**Version 1.6.0 · Ratified 2026-06-12 · Last amended 2026-07-13**
+**Version 1.7.0 · Ratified 2026-06-12 · Last amended 2026-07-15**
