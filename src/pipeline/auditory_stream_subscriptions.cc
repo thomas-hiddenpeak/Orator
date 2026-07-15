@@ -77,12 +77,12 @@ void HandleSpeakerSink(ComprehensiveTimeline& comp, std::mutex& state_mutex,
     if (s.speaker_id.empty()) {
       std::snprintf(b, sizeof(b),
                     "{\"start\":%.3f,\"end\":%.3f,\"speaker\":\"%s\","
-                    "\"confidence\":%.3f}",
+                    "\"confidence\":%.9g}",
                     s.start_sec, s.end_sec, label.c_str(), s.confidence);
     } else {
       std::snprintf(b, sizeof(b),
                     "{\"start\":%.3f,\"end\":%.3f,\"speaker\":\"%s\","
-                    "\"speaker_id\":\"%s\",\"confidence\":%.3f}",
+                    "\"speaker_id\":\"%s\",\"confidence\":%.9g}",
                     s.start_sec, s.end_sec, label.c_str(), s.speaker_id.c_str(),
                     s.confidence);
     }

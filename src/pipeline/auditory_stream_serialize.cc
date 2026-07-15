@@ -521,7 +521,7 @@ std::string AuditoryStream::Serialize() {
           speaker_db_ ? speaker_db_->DisplayName(s.speaker_id) : std::string();
       if (!nm.empty()) out += ",\"speaker_name\":\"" + JsonEscape(nm) + "\"";
     }
-    std::snprintf(buf, sizeof(buf), ",\"confidence\":%.3f}", s.conf);
+    std::snprintf(buf, sizeof(buf), ",\"confidence\":%.9g}", s.conf);
     out += buf;
     if (i + 1 < diar_view.size()) out += ",";
   }

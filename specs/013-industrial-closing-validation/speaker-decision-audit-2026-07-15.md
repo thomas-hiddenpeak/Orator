@@ -15,9 +15,10 @@ diarization segments. It contains 445 cross-speaker overlap pairs whose overlap
 union covers 378.64 seconds. Of 935 terminal business entries, 347 overlap at
 least one rejected diar candidate; 336 of those entries were still summarized
 as strong support, 154 had a zero selected-versus-best-alternative overlap
-margin, and 249 selected a candidate whose confidence was below an overlapping
-alternative. These are auditability findings, not proof that another selection
-policy is more accurate.
+margin, 247 selected a lower-confidence candidate than the runtime-ordered best
+rejected candidate, and 253 were below at least one rejected candidate. These
+are auditability findings, not proof that another selection policy is more
+accurate.
 
 The previous scalar support fields described only the selected candidate and
 the union of any diar evidence. They could not expose a rejected candidate or
@@ -68,3 +69,24 @@ overflow.
 T072 remains open for an attribution-changing fusion candidate, and T073 still
 requires physical-microphone evidence. No 360-second, 600-second, full-length,
 or signed contextual accuracy gate follows from this attribution-neutral run.
+
+## Legacy Full Replay
+
+T071A adds `speaker_decision_evidence.py`, a reference-free tools-only replay
+for terminal packages that predate `speaker_decision`. The tool requires exact
+candidate identity, selected flags, order, reason, text-projection source, and
+island structure. Historical diar confidence is available only to three
+decimal places and all timeline boundaries are available to milliseconds, so
+the tool validates continuous fields against explicit confidence- and
+time-quantization envelopes instead of inventing missing precision. Current
+live and terminal diar output now retains round-trip float confidence.
+
+The replayed clean-`3b40245` full artifact contains all 935 business entries:
+534 sole-support, 347 competing-support, 40 no-support, and 14 same-speaker
+gap-fill decisions. Its raw 755-entry diar track contains 445 cross-speaker
+overlap pairs, 419.52 pair-overlap seconds, and a 378.64-second contested union.
+The source-hashed output is
+`/tmp/orator-spec013/speaker-decision-evidence/full-v21-3b40245.json`, SHA-256
+`d03eeca3929b1118a44d0f72fbc536299de69c3114dc62f66cd439357996867e`.
+This package contains no correctness labels and does not change the frozen
+timeline.

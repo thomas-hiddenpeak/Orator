@@ -159,6 +159,14 @@ subject to the complete acceptance gates in this spec.
   revisions, terminal tracks, the compatibility alias, and Web UI state must
   preserve the same audit object. Adding or revising audit evidence must not
   change a raw track or silently change the selected speaker.
+- **FR22**: Frozen legacy timeline packages that predate FR21 may reconstruct
+  the same audit object from their immutable diarization and business tracks.
+  The reconstruction tool must not read reference annotations, alter an input
+  track, or assign correctness. Discrete fields must match exactly. Legacy
+  three-decimal confidence and millisecond timeline fields may use only their
+  declared quantization envelopes; any runtime value outside those bounds must
+  fail. New artifacts must retain round-trip raw confidence precision, while
+  millisecond time-derived fields remain explicitly bounded.
 
 ### 4.3 Reference and evaluation
 

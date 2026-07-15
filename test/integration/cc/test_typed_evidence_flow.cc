@@ -196,7 +196,7 @@ int main() {
   const std::vector<orator::core::DiarSegment> diar_segments = {
       {1.0, 2.0, 2, "spk_2", 0.9f},
       {0.1, 0.2, 3, "spk_3", 0.8f},
-      {1.0, 1.5, 1, "spk_1", 0.7f},
+      {1.0, 1.5, 1, "spk_1", 0.700123429f},
       {1.0, 1.5, 0, "spk_0", 0.6f},
   };
   orator::pipeline::HandleSpeakerSink(evidence, state_mutex, last_segments,
@@ -219,6 +219,8 @@ int main() {
   CHECK(events.back().find("\"type\":\"diar\"") != std::string::npos,
         "diarization emits a self-describing live event");
   const std::string& diar_event = events.back();
+  CHECK(diar_event.find("\"confidence\":0.700123429") != std::string::npos,
+        "live diarization retains round-trip float confidence precision");
   const auto first = diar_event.find("\"start\":0.100");
   const auto overlap_zero = diar_event.find(
       "\"start\":1.000,\"end\":1.500,\"speaker\":\"speaker_0\"");

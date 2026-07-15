@@ -239,6 +239,11 @@
   all selected and rejected diar candidates, overlap/coverage/confidence, and
   overlap/confidence margins; live, terminal, alias, and browser representations
   converge exactly. See `speaker-decision-audit-2026-07-15.md`.
+- [x] T071A Reconstruct FR21 decisions for legacy frozen timelines using only
+  immutable raw/business tracks, fail on structural or declared confidence-
+  and time-envelope mismatch, preserve round-trip confidence in new artifacts,
+  and emit a source-hashed full-session decision-evidence package without
+  correctness labels. See `speaker-decision-audit-2026-07-15.md`.
 - [ ] T072 Validate that raw ASR, diarization, VAD, align, and voiceprint tracks
   remain unchanged by fusion revisions.
 - [ ] T073 Complete Web UI live/final convergence, microphone, reconnect,

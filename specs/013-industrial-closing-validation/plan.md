@@ -291,6 +291,23 @@ does not change attribution, support thresholds, uncertainty, or raw tracks. A
 later decision-policy experiment may use the audit only after its own frozen
 TOML policy and complete contextual review are defined.
 
+Legacy frozen packages are replayed without another model run. A tools-only
+decision-evidence utility consumes the terminal diarization and
+`business_speaker` tracks, reconstructs the runtime audit with the same
+candidate grouping, interval union, confidence weighting, deterministic order,
+reason classification, and JSON precision, and emits a source-hashed package.
+If an input already contains runtime decisions, every structural field must be
+equal. Historical diar confidence was serialized to three decimal places, so
+legacy confidence replay is accepted only inside the proven +/-0.0005 candidate
+and +/-0.001 margin envelopes. Historical and current timeline boundaries are
+serialized to milliseconds, so overlap, coverage, and overlap-margin checks use
+duration/island-count bounds derived from that quantum. Candidate identity,
+selection, ordering, reason, projection source, and island count remain strict.
+Current live and terminal diar serialization retains round-trip confidence.
+Every bounded result is marked as quantized. This is a parity and evidence-
+indexing step only: the utility does not read `test.txt`, choose a new speaker,
+or score accuracy.
+
 ### 6.3 Decision gate
 
 The frozen candidate must reach at least 93 percent on both speaker-time and

@@ -212,6 +212,13 @@ telemetry, and desktop/mobile rendering. This closes T071 only; physical
 microphone, attribution-changing T072 validation, promotion durations, and the
 signed 556-row context review remain open. See
 [speaker-decision-audit-2026-07-15.md](013-industrial-closing-validation/speaker-decision-audit-2026-07-15.md).
+The follow-up T071A utility replays the same decision structure for legacy
+terminal packages without a model run or reference labels. It preserves exact
+discrete evidence and declares bounded uncertainty for historical three-decimal
+confidence and millisecond boundaries; new diar output retains round-trip
+confidence. The clean-`3b40245` full package replayed all 935 business entries
+and isolated 347 competing-support decisions for later contextual candidate
+review without changing a frozen track.
 
 ## 3. Component status
 
@@ -234,7 +241,7 @@ signed 556-row context review remain open. See
 | Logging system | ✅ Include-level `core/log.h` | Level-based macros (`LOG_DEBUG`/`INFO`/`WARN`/`ERROR`) with compile-time floor (`ORATOR_LOG_LEVEL`) and runtime env-var gate. All 14 `fprintf(stderr)` calls in src/ replaced. |
 | CUDA kernel unit tests | ✅ `test_kernels`: 13/13 passed | GPU kernel operations (Add, Multiply, NormalizeVector, CosineSimilarity, BatchCosineSimilarity) validated against CPU reference; includes edge cases (zero, single-element, large 1M vectors). |
 | CI pipeline | ✅ GitHub Actions | `.github/workflows/ci.yml`: CUDA 12.5, CMake build + ctest + warning check + Python syntax verification. Triggered on push/PR to master. |
-| Test suite | 64 configured CTest entries | The suite contains 55 C++ tests, eight Python tests, and `test_web_model`. The active async Sortformer gate is bound to v2.1, with distinct inherited, official-high, official-low, and synchronous numerical guards. The obsolete v2 model gate was removed with its local checkpoint. Other gates cover short-block batched GEMM, source-stable manifests and telemetry cadence, the strict closing ledger, frozen speaker evidence, sequence and multi-scale voiceprint candidates, and review-packet integrity. The complete 2026-07-15 run passed 64/64. Playwright and physical-microphone acceptance remain outside CTest, and no automated result substitutes for the signed audible-boundary ledger. |
+| Test suite | 65 configured CTest entries | The suite contains 55 C++ tests, nine Python tests, and `test_web_model`. The active async Sortformer gate is bound to v2.1, with distinct inherited, official-high, official-low, and synchronous numerical guards. The obsolete v2 model gate was removed with its local checkpoint. Other gates cover short-block batched GEMM, source-stable manifests and telemetry cadence, the strict closing ledger, frozen speaker evidence, decision replay, sequence and multi-scale voiceprint candidates, and review-packet integrity. The complete 2026-07-15 run passes 65/65. Playwright and physical-microphone acceptance remain outside CTest, and no automated result substitutes for the signed audible-boundary ledger. |
 | Diar tail parameter experiments | ❌ No accepted fix | 2026-07-10 TOML experiments used `diar_evidence_probe` on full `test.mp3` for strict onset/offset, `min_dur_on=1.2`, `min_dur_on=2.0`, `chunk_left_context=2`, `chunk_right_context=0`, and `left2_right0`. Threshold/min-duration changes deleted evidence without recovering the correct speaker; context variants did not solve 3270-3304 s and some removed the small local-2 hint at 3299.76 s. NeMo full-length reference on the same audio produced the same hard-window spk3 bias (`3270-3304.5`: spk3 313/431 frames; `3240-3360`: spk3 1013/1500 frames). The historical v2 numerical gate passed at that time; its checkpoint and CTest have since been removed. See Spec 012 `diar-tail-toml-experiments-2026-07-10.md`. |
 | TitaNet tail voiceprint review | ❌ No accepted override | 2026-07-10 orthogonal speaker-embedding review used `speaker_embedding_probe` on full `test.mp3` with 600 s, 60 s, and 30 s buckets. The hard-window `L3@3270-3300` bucket remains closest to historical L3 (`L3@3300-3330=0.762`, historical L3 up to 0.724) while best non-L3 alternatives are lower (`L0=0.440`, `L1=0.424`, `L2=0.321`). This rejects direct TitaNet override for 3270-3304 s. See Spec 012 `titanet-tail-evidence-2026-07-10.md`. |
 | OnText protocol matching | ✅ Fixed | Substring `text.find("end")` → JSON key `text.find("\"end\"")` to prevent false positives on partial matches. Same for reset/flush. |
