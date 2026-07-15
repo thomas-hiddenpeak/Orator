@@ -128,9 +128,14 @@ Artifacts are retained outside Git under
 | Browser download | `a83ef6c7f20671a2f5e1237e9216dfc573130737638131cc9c175825ec5c02e4` |
 | Desktop final screenshot | `2282ddaf0590e2d783c57324c4452b6449f32bfb45eba4e2ed5b62b1aa03123d` |
 | Mobile final screenshot | `261ddc5656df756720050609f731a27d57294e56080b02197834369bc4077304` |
+| 556-row review worksheet | `2beae2a101d0dd5cddc112144292270d30d13b00c45a3f74042c8dade0f81316` |
+| Reverse-block review packet | `17cc04b8979ec1006bf3e2cc1d6a53ad1be540deb07f7a958c18071d5b9124ca` |
 
 The source log has no error, fatal, failed, exception, timeout, OOM, or
 out-of-memory record. All run processes were stopped after artifact capture.
+The review files are `review/by-reference.md` and `review/reverse-blocks.md`
+under the same artifact directory. They cover all 556 rows and only arrange
+time-overlapping evidence; they contain no script-assigned judgment.
 
 ## Decision
 
