@@ -81,8 +81,13 @@
 - [ ] T042 Run clean build, warning check, full CTest, JavaScript checks, and
   selected sanitizer/CUDA memory checks.
 - [x] T043 Run 120 s, 360 s, and 600 s real-WebSocket tests with committed TOML.
-- [ ] T044 Run one full v2.1 closing-baseline WebSocket capture with continuous
-  `tegrastats` and browser evidence.
+- [x] T044 Run one full v2.1 closing-baseline WebSocket capture with continuous
+  `tegrastats` and browser evidence. Clean commit `3b40245` completed 3615.12 s
+  in 3616.442 s at 1x with zero mechanical issues, 3,441 runtime and 3,606
+  `tegrastats` samples, seven exact zero-gap extents, and exact producer /
+  persisted-session / Chromium-rendered / browser-download terminal equality.
+  See `closing-baseline-v21-2026-07-15.md`. This completes system evidence only;
+  the unsigned audible ledger keeps T045 and all accuracy gates open.
 - [ ] T045 Complete the 556-row baseline context review and publish all required
   score breakdowns without script-inferred judgments.
 - [x] T046 Canonicalize equal-start overlapping diarization records before the

@@ -114,6 +114,13 @@ subject to the complete acceptance gates in this spec.
 9. Previous full-length reviews used coarse 10-minute summaries and selected
    regression windows. They did not adjudicate and sign off every reference
    turn, so they cannot supply the denominator for a 90 percent claim.
+10. **Full closing-baseline system capture complete; accuracy review open**:
+    clean commit `3b40245` completed the 3615.12-second v2.1 stream in 3616.442
+    seconds with exact seven-pipeline extents, zero mechanical issues,
+    continuous telemetry, and exact producer/persisted/Web UI/download terminal
+    equality. This closes the capture requirement in T044. It does not close
+    T031 or T045 because all 556 audible ledger rows remain unsigned. See
+    `closing-baseline-v21-2026-07-15.md`.
 
 ## 4. Requirements
 

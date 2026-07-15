@@ -14,7 +14,7 @@ work is specified under [specs/](.).
 > pass is the consistency proof. Status lines advance to `Implemented` in the
 > same change that lands the code, with the commit reference.
 
-- **Last updated**: 2026-07-15 (v2.1 selected as the sole closing baseline)
+- **Last updated**: 2026-07-15 (v2.1 full closing-baseline system capture)
 - **Branch**: `master`
 - **Constitution**: v1.6.0
 - **Product closure**: **OPEN / NOT ACCEPTED**. No current artifact proves the
@@ -167,6 +167,23 @@ remain unsigned. A mechanical source audit found 22 duplicate-timestamp groups,
 seven continuous work batches cover all 556 rows; no script judgment or
 provisional boundary is accepted as manual adjudication. See
 [reference-ledger-v21-2026-07-15.md](013-industrial-closing-validation/reference-ledger-v21-2026-07-15.md).
+
+**Full closing-baseline capture (2026-07-15)**: clean commit `3b40245` streamed
+the complete 3615.12-second canonical audio through the real WebSocket path in
+3616.442 seconds at 1x. All seven pipeline extents reached 57,841,920 samples
+with zero gap; `timebase_ok`, `timebase_reconciled`, and `wall_clock_ok` are
+true. The package contains 755 diarization, 287 ASR, 972 VAD, 287 forced-align,
+and 935 business-speaker entries, with 287/287 align coverage and no mechanical
+fusion issue. Continuous evidence contains 3,441 runtime and 3,606 `tegrastats`
+samples; every required field and cadence exceeds 95 percent coverage. A browser
+connected during the producer run showed live text, GPU, video-memory, and power
+updates. Persisted-session replay then proved exact producer, rendered Web UI,
+and downloaded JSON equality at desktop and 390-pixel mobile sizes with no
+browser errors or horizontal overflow. See
+[closing-baseline-v21-2026-07-15.md](013-industrial-closing-validation/closing-baseline-v21-2026-07-15.md).
+This completes T044 system evidence only. The 556-row audible ledger and the
+baseline context review remain unsigned, so this run has no constitutional
+accuracy percentage and product closure remains open.
 
 ## 3. Component status
 
