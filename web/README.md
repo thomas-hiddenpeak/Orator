@@ -44,6 +44,12 @@ Data flow:
 orator_ws -> ws.js -> model.js -> requestAnimationFrame -> render/*
 ```
 
+The server permits one audio-producing connection per session and broadcasts
+the resulting events to browser and diagnostic observers. Opening or closing
+the UI does not reset an external producer. A connection that attempts to send
+audio while another producer is active receives an error and remains an
+observer.
+
 Live state is provisional. A terminal or loaded `timeline` clears stale live
 state and rebuilds ASR, alignment, business-speaker turns, and raw tracks from
 the server document. A new `ready` event starts a clean browser session because
@@ -61,19 +67,17 @@ from their topic. Unknown messages are reported instead of silently discarded.
 # Registered dependency-free browser-model contract test
 node --test test/web/model_contract.test.mjs
 
-# Real browser + real server/WebSocket flow (Playwright is tools-only)
-python3 tools/verify/py/ws_ui_integration_test.py \
-  --audio /tmp/orator_test_12s.wav
-
 # Complete configured test suite, including the real-WebSocket speech/silence gate
 ctest --test-dir build --output-on-failure
 ```
 
-The Playwright flow verifies file upload, live rows, terminal reconciliation,
-exact JSON download, session persistence/load, deliberate disconnect and
-automatic reconnect, desktop/mobile layout, and the browser microphone capture
-path with a fake media device. A physical microphone and non-Chromium browsers
-still require manual acceptance evidence.
+The registered real-WebSocket gate uses the sole unified client with early,
+transient, and late observer connections. Playwright remains a tools-only
+manual acceptance dependency; real-browser checks cover live rows, terminal
+reconciliation, exact parsed JSON content, session persistence/load,
+desktop/mobile layout, and the browser microphone path with a fake media
+device. A physical microphone and non-Chromium browsers still require manual
+acceptance evidence.
 
 ## Editing Guide
 

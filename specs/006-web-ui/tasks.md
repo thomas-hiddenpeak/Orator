@@ -141,22 +141,26 @@ live/terminal JSON document)
 
 ### T008 — Integration test: Full MVP flow (basic)
 **Status**: ✅ COMPLETED
-**Test script**: `tools/ws_ui_integration_test.py` (stdlib-only, HTTP + WS full flow)
+**Registered tests**: `test_ws_contract` through the sole
+`tools/verify/py/ws_unified_test.py` client, plus `test_web_model`. Real Chromium
+acceptance remains a tools-only manual run.
 **Goal**: End-to-end test: start server, send audio via WebSocket, verify UI updates.
 **Steps**:
-1. Start `./build/orator_ws 8765 <models>...`.
-2. Open `http://localhost:8766` in browser.
-3. Verify page loads, connection status shows "Ready".
-4. Use existing `ws_client_test.py` or a new minimal Python client to send PCM frames.
-5. Observe transcript panel updates in real time (utterances appear as they arrive).
-6. Send `{"end"}` from Python client.
-7. Verify timeline renders in browser.
-8. Verify metrics match server output (compare with server logs or `verify_streaming.cc` output).
+1. Start `orator_ws` from a TOML configuration.
+2. Open the served UI as an observer before the audio producer connects.
+3. Verify page load, WebSocket connection, developer status, and telemetry.
+4. Use only `ws_unified_test.py` to send incremental PCM frames.
+5. Observe live transcript and telemetry updates without resetting the producer.
+6. End the producer session and wait for the browser's terminal timeline.
+7. Verify the downloaded browser timeline equals the producer's parsed terminal
+   document and check desktop/mobile screenshots.
 **Verification**:
-- Page never crashes; all messages logged.
+- Page never crashes and has no unexpected console or page errors.
 - Transcript updates visible in < 500 ms per utterance.
-- Timeline renders correctly (diarization + ASR).
+- Timeline renders correctly (diarization, ASR, VAD, align, and business view).
 - Metrics (RTF, audio_sec) match server-side calculations within 1% tolerance.
+- Observer connect/disconnect does not change the common time base or terminal
+  result; a second producer is rejected.
 
 ---
 

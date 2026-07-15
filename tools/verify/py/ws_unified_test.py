@@ -37,6 +37,10 @@ Usage:
   # Test all WebSocket interfaces:
   python3 tools/verify/py/ws_unified_test.py --duration 120 --port 8765 --out test.json \
     --test-describe --test-reset --test-sessions --test-load-session session_id
+
+  # Verify one producer with observers connected before and during streaming:
+  python3 tools/verify/py/ws_unified_test.py --duration 120 --port 8765 \
+    --out test_observer.json --test-observer
 """
 
 import argparse
@@ -447,9 +451,10 @@ def handshake(sock, host, port):
 class Reader(threading.Thread):
     """The single socket reader for live events, commands, and timelines."""
 
-    def __init__(self, sock):
+    def __init__(self, sock, verbose=True):
         super().__init__(daemon=True)
         self.sock = sock
+        self.verbose = verbose
         self.events = []
         self.timelines = []
         self.ready = None
@@ -507,16 +512,24 @@ class Reader(threading.Thread):
                     self.telemetry.append(raw)
                 self._condition.notify_all()
 
-            if kind == "asr":
+            if self.verbose and kind == "asr":
                 t = raw.get("text", "")
                 print(f"  [stream] asr [{raw.get('start'):.2f}-{raw.get('end'):.2f}] {t}")
-            elif kind == "align":
+            elif self.verbose and kind == "align":
                 units = raw.get("units", [])
                 preview = " ".join(
                     f"{unit.get('text')}[{unit.get('start'):.2f}-{unit.get('end'):.2f}]"
                     for unit in units[:8])
                 print(f"  [stream] align [{raw.get('start'):.2f}-{raw.get('end'):.2f}] "
                       f"({len(units)} units) {preview}")
+
+
+def open_reader(host, port, verbose=True):
+    sock = socket.create_connection((host, port))
+    handshake(sock, host, port)
+    reader = Reader(sock, verbose=verbose)
+    reader.start()
+    return sock, reader
 
 
 def parse_audio_file(audio_path: str, duration_sec: float = None) -> bytes:
@@ -831,10 +844,20 @@ def main(args):
     audio_sec = total_samples / SAMPLE_RATE
     frame_bytes = int(SAMPLE_RATE * args.frame_ms / 1000) * BYTES_PER_SAMPLE
 
-    sock = socket.create_connection((args.host, args.port))
-    handshake(sock, args.host, args.port)
-    reader = Reader(sock)
-    reader.start()
+    observer_sock = None
+    observer_reader = None
+    late_observer_sock = None
+    late_observer_reader = None
+    if args.test_observer:
+        observer_sock, observer_reader = open_reader(
+            args.host, args.port, verbose=False)
+        observer_ready = observer_reader.wait_for(
+            lambda message: message.get("type") == "ready",
+            timeout=args.command_timeout)
+        if observer_ready is None:
+            raise RuntimeError("no ready response for observer connection")
+
+    sock, reader = open_reader(args.host, args.port)
 
     ready = reader.wait_for(
         lambda message: message.get("type") == "ready",
@@ -844,6 +867,8 @@ def main(args):
     print(f"connected; streaming {audio_sec:.2f}s of audio "
           f"({'max rate' if args.rate == 0 else str(args.rate) + 'x'}, "
           f"{args.frame_ms}ms frames)")
+    if observer_reader is not None:
+        print("  [observer] connected before audio producer")
 
     command_responses = {}
 
@@ -902,11 +927,49 @@ def main(args):
     t0 = time.monotonic()
     tegra_sampler = TegraSampler(t0, interval_ms=1000)
     tegra_sampler.start()
+    final_timeline = None
+    observer_final_timeline = None
+    late_observer_final_timeline = None
+    contender_error = None
     try:
         sent = 0
         for off in range(0, len(pcm), frame_bytes):
             sock.sendall(mask_frame(0x2, pcm[off:off + frame_bytes]))
             sent += 1
+            if args.test_observer and sent == 10:
+                transient_sock, transient_reader = open_reader(
+                    args.host, args.port, verbose=False)
+                transient_ready = transient_reader.wait_for(
+                    lambda message: message.get("type") == "ready",
+                    timeout=args.command_timeout)
+                if transient_ready is None:
+                    raise RuntimeError(
+                        "no ready response for transient observer connection")
+                conflict_index = transient_reader.message_index()
+                transient_sock.sendall(mask_frame(0x2, pcm[:frame_bytes]))
+                conflict = transient_reader.wait_for(
+                    lambda message: message.get("type") == "error",
+                    after_index=conflict_index,
+                    timeout=args.command_timeout)
+                contender_error = (
+                    conflict.get("error") if conflict is not None else None)
+                if contender_error != "audio producer already active":
+                    raise RuntimeError(
+                        "second audio producer was not explicitly rejected")
+                transient_sock.sendall(mask_frame(0x8, b"\x03\xe8"))
+                transient_sock.close()
+                transient_reader.join(timeout=2.0)
+                print("  [observer] transient connection closed during stream")
+            if args.test_observer and sent == 20:
+                late_observer_sock, late_observer_reader = open_reader(
+                    args.host, args.port, verbose=False)
+                late_ready = late_observer_reader.wait_for(
+                    lambda message: message.get("type") == "ready",
+                    timeout=args.command_timeout)
+                if late_ready is None:
+                    raise RuntimeError(
+                        "no ready response for late observer connection")
+                print("  [observer] late connection joined after audio start")
             if args.rate > 0:
                 target_wall = (sent * args.frame_ms / 1000.0) / args.rate
                 slack = target_wall - (time.monotonic() - t0)
@@ -915,6 +978,12 @@ def main(args):
         push_wall = time.monotonic() - t0
 
         flush_index = reader.message_index()
+        observer_flush_index = (
+            observer_reader.message_index()
+            if observer_reader is not None else 0)
+        late_observer_flush_index = (
+            late_observer_reader.message_index()
+            if late_observer_reader is not None else 0)
         sock.sendall(mask_frame(0x1, b'{"flush":true}'))
         print("  [flush] waiting for timeline...")
         flush_timeline = reader.wait_for(
@@ -925,13 +994,44 @@ def main(args):
                   f"({flush_timeline.get('audio_sec', '?')}s)")
         else:
             print("  [flush] no timeline (continuing to end)")
+        if observer_reader is not None:
+            observer_flush_timeline = observer_reader.wait_for(
+                lambda message: message.get("type") == "timeline",
+                after_index=observer_flush_index,
+                timeout=args.timeline_timeout)
+            if observer_flush_timeline is None:
+                print("  [observer] no flush timeline", file=sys.stderr)
+        if late_observer_reader is not None:
+            late_observer_flush_timeline = late_observer_reader.wait_for(
+                lambda message: message.get("type") == "timeline",
+                after_index=late_observer_flush_index,
+                timeout=args.timeline_timeout)
+            if late_observer_flush_timeline is None:
+                print("  [observer] late observer has no flush timeline",
+                      file=sys.stderr)
 
         end_index = reader.message_index()
+        observer_end_index = (
+            observer_reader.message_index()
+            if observer_reader is not None else 0)
+        late_observer_end_index = (
+            late_observer_reader.message_index()
+            if late_observer_reader is not None else 0)
         sock.sendall(mask_frame(0x1, b'{"end":true}'))
         print("  [end] waiting for final timeline...")
         final_timeline = reader.wait_for(
             lambda message: message.get("type") == "timeline",
             after_index=end_index, timeout=args.timeline_timeout)
+        if observer_reader is not None:
+            observer_final_timeline = observer_reader.wait_for(
+                lambda message: message.get("type") == "timeline",
+                after_index=observer_end_index,
+                timeout=args.timeline_timeout)
+        if late_observer_reader is not None:
+            late_observer_final_timeline = late_observer_reader.wait_for(
+                lambda message: message.get("type") == "timeline",
+                after_index=late_observer_end_index,
+                timeout=args.timeline_timeout)
         total_wall = time.monotonic() - t0
     finally:
         tegra_sampler.stop()
@@ -941,6 +1041,20 @@ def main(args):
             pass
         sock.close()
         reader.join(timeout=2.0)
+        if observer_sock is not None:
+            try:
+                observer_sock.sendall(mask_frame(0x8, b"\x03\xe8"))
+            except (BrokenPipeError, ConnectionResetError, OSError):
+                pass
+            observer_sock.close()
+            observer_reader.join(timeout=2.0)
+        if late_observer_sock is not None:
+            try:
+                late_observer_sock.sendall(mask_frame(0x8, b"\x03\xe8"))
+            except (BrokenPipeError, ConnectionResetError, OSError):
+                pass
+            late_observer_sock.close()
+            late_observer_reader.join(timeout=2.0)
 
     device_series = tegra_sampler.samples
 
@@ -957,6 +1071,65 @@ def main(args):
     diar_compute = diar.get("compute_sec")
     asr_compute = asr.get("compute_sec")
     contract_issues = validate_terminal_contract(reader.events, tl)
+    if abs(float(tl.get("audio_sec", -1.0)) - audio_sec) > 0.0015:
+        contract_issues.append(
+            "terminal audio extent differs from streamed PCM duration")
+
+    observer_report = {"enabled": bool(args.test_observer)}
+    if args.test_observer:
+        early_timeline_match = observer_final_timeline == tl
+        late_timeline_match = late_observer_final_timeline == tl
+        early_events_match = observer_reader.events == reader.events
+        early_telemetry_match = observer_reader.telemetry == reader.telemetry
+        early_ready_count = sum(
+            message.get("type") == "ready"
+            for message in observer_reader.messages)
+        early_observer_errors = [
+            message.get("error") for message in observer_reader.messages
+            if message.get("type") == "error"]
+        late_observer_errors = [
+            message.get("error") for message in late_observer_reader.messages
+            if message.get("type") == "error"]
+        observer_report.update({
+            "early_ready_count": early_ready_count,
+            "early_event_count": len(observer_reader.events),
+            "late_event_count": len(late_observer_reader.events),
+            "early_telemetry_count": len(observer_reader.telemetry),
+            "late_telemetry_count": len(late_observer_reader.telemetry),
+            "early_events_match": early_events_match,
+            "early_telemetry_match": early_telemetry_match,
+            "early_terminal_match": early_timeline_match,
+            "late_terminal_match": late_timeline_match,
+            "producer_terminal_sha256": canonical_json_sha256(tl),
+            "early_terminal_sha256": (
+                canonical_json_sha256(observer_final_timeline)
+                if observer_final_timeline is not None else None),
+            "late_terminal_sha256": (
+                canonical_json_sha256(late_observer_final_timeline)
+                if late_observer_final_timeline is not None else None),
+            "contender_error": contender_error,
+            "unexpected_errors": early_observer_errors + late_observer_errors,
+        })
+        if early_ready_count < 2:
+            contract_issues.append(
+                "observer did not receive the producer session-start event")
+        if not early_events_match:
+            contract_issues.append(
+                "early observer live events differ from producer events")
+        if not early_telemetry_match:
+            contract_issues.append(
+                "early observer telemetry differs from producer telemetry")
+        if not early_timeline_match:
+            contract_issues.append(
+                "early observer terminal timeline differs from producer")
+        if not late_timeline_match:
+            contract_issues.append(
+                "late observer terminal timeline differs from producer")
+        unexpected_errors = observer_report["unexpected_errors"]
+        if unexpected_errors:
+            contract_issues.append(
+                "observer received unexpected server errors: " +
+                ", ".join(unexpected_errors))
     config_evidence = config_provenance(start_config_snapshot, tl)
     if not config_evidence["acceptance_consistent"]:
         contract_issues.append(
@@ -1038,6 +1211,7 @@ def main(args):
         "device_series": device_series,
         "telemetry_summary": telemetry_report,
         "command_responses": command_responses,
+        "observer": observer_report,
         "events": reader.events,
         "telemetry": reader.telemetry,
         "timeline": tl,
@@ -1114,6 +1288,9 @@ if __name__ == "__main__":
     ap.add_argument("--test-reset", action="store_true", help="Test reset command")
     ap.add_argument("--test-sessions", action="store_true", help="Test sessions command")
     ap.add_argument("--test-load-session", type=str, help="Test load_session command with session ID")
+    ap.add_argument(
+        "--test-observer", action="store_true",
+        help="verify early and late observer connections against the producer")
     ap.add_argument("--command-timeout", type=float, default=30.0,
                     help="Seconds to wait for ready and optional command responses")
     ap.add_argument("--max-total-time", type=float, default=7200.0,

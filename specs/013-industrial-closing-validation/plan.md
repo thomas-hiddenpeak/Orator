@@ -77,6 +77,17 @@ does not perform another speaker split. Browser tests assert that partial,
 final, revision, reconnect, and terminal states converge without duplicate or
 stale rows.
 
+The WebSocket session has one audio producer and any number of observers. The
+first connection that sends audio owns production until it ends, resets, or
+disconnects. Opening an observer never calls `AuditoryStream::Reset()` and all
+stream-generated events are broadcast to every connected observer. A second
+connection that attempts to send audio while a producer is active receives an
+explicit error and its bytes are not ingested. The unified WebSocket client
+opens a concurrent observer in the registered integration gate and requires
+the producer and observer to receive identical terminal timeline content. A
+real browser is also connected before a promotion stream to verify that live
+rows and telemetry update while the unified client remains the producer.
+
 ### 3.4 Configuration
 
 Startup order is corrected to:

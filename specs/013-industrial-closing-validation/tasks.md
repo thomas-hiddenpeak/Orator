@@ -34,6 +34,17 @@
 - [x] T017 Add ID-convergence tests across partial/final events, align groups,
   revisions, terminal tracks, export, reconnect, and Web UI state. Node model
   tests, the unified client, and the real Chromium flow cover the full chain.
+- [x] T017A Replace the single active WebSocket output pointer with one audio
+  producer plus multiple non-mutating observers. Extend the unified client gate
+  to prove that observer connection lifecycle does not reset the producer and
+  that producer/observer terminal timelines are identical. The registered
+  12-second real-WebSocket gate covers an observer present before production, a
+  rejected concurrent producer that disconnects during the stream, and a late
+  observer. The producer and both retained observers received terminal SHA-256
+  `9b1f2b3c...`; the early observer's 37 business events and nine telemetry
+  events matched the producer exactly. A real Chromium observer independently
+  converged to 2 ASR / 5 diar entries and exported the same parsed terminal
+  document as the unified client.
 - [x] T018 Correct configuration precedence and migrate/remove every behavioral
   environment-only switch. Precedence and timeline gap-fill are corrected;
   migrate ASR/align/Sortformer/GPU/transport controls through typed config and

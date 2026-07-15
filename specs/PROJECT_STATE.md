@@ -102,6 +102,22 @@ microphone capture, and desktop/mobile screenshots with no unexpected browser
 errors. This is short-path product-contract evidence, not the required physical
 microphone, full-session context review, or accuracy result.
 
+**2026-07-15 concurrent UI observation correction**: `SessionEmit` now
+broadcasts each stream event to one audio producer and all registered observer
+connections. Opening or closing an observer no longer resets the shared
+`AuditoryStream`; a second audio producer receives an explicit error and its
+bytes are not ingested. The registered 12-second real-WebSocket gate connects
+an early observer, connects and disconnects a rejected producer during the
+stream, then connects a late observer. The early observer's 37 business events
+and nine telemetry events exactly matched the producer, and all retained
+connections received terminal SHA-256 `9b1f2b3c...` over the full 12.0-second
+extent. A separate real Chromium observer showed live text plus GPU, video
+memory, and power, then converged to 2 ASR / 5 diar entries and exported the
+same parsed terminal document as the unified client. Desktop and 390-pixel
+screenshots had no horizontal overflow or browser errors. The configured suite
+passes 64/64. This is transport and UI convergence evidence, not a contextual
+accuracy result.
+
 **2026-07-14 frozen baseline**: clean commit `ee0dd82` completed committed-TOML
 120/360/600 s real-WebSocket runs at 0.990x/0.998x/0.999x with no mechanical
 contract errors. Its 3615.12 s diagnostic run completed in 3616.496 s (1.000x),
@@ -163,7 +179,7 @@ provisional boundary is accepted as manual adjudication. See
 | WhisperMel / BPE tokenizer / sharded safetensors loader | ✅ Verified | Unit-tested. |
 | Decoupling (interfaces + registry) | Contract corrected; product acceptance open | Model interfaces and registry construction are in place. VAD→ASR, ASR→forced-align, and raw evidence→business speaker now flow only through typed `ComprehensiveTimeline` reads/subscriptions. The registered `business_speaker` pipeline owns fusion policy and writes its own track; protocol topics mirror committed records for persistence and transport. Full product validation remains open under Spec 013. |
 | `OverlapTimelineMerger` / `ITimelineMerger` | 🗑️ Removed | The old one-shot max-overlap merger and its orphaned interface were deleted — superseded by `ComprehensiveTimeline` (Spec 004). |
-| WebSocket server (libwebsockets v4.3.3) | ✅ Refactored | Replaced hand-rolled POSIX WS with libwebsockets (multi-client, RFC 6455/7692). Eliminated file-scope static variables (`serve_server`, `serve_factory`, `pss_list_head`) → instance members via `lws_context_user`. Thread-safe `SendText` with wakeup/cancel-service. ServeOnce mode for unit tests. |
+| WebSocket server (libwebsockets v4.3.3) | ✅ Refactored | Replaced hand-rolled POSIX WS with libwebsockets (multi-client, RFC 6455/7692). One connection owns audio production while browser and diagnostic observers receive the same broadcast stream without resetting it; concurrent producer bytes are rejected. Eliminated file-scope static variables (`serve_server`, `serve_factory`, `pss_list_head`) → instance members via `lws_context_user`. Thread-safe `SendText` with wakeup/cancel-service. ServeOnce mode for unit tests. |
 | ASR + WS integration | Implemented; full-session acceptance open | `AuditoryStream` owns one private `PipelineAudioCache` per active producer and uses separate worker threads. One session-owned `TimeBase` is injected into all active stores and workers. Final ASR live emission and its typed sink reuse one `text_id`; partial rejection emits a matching retract, and the terminal ASR track serializes the ID. ASR reads immutable VAD evidence snapshots from `ComprehensiveTimeline`; forced alignment consumes finalized ASR records there. Registered WS/Node tests and a real Chromium run verify short-path revision/export/reconnect/UI convergence. Full repeatability and contextual accuracy remain open. |
 | Incremental KV-cache ASR streaming (Spec 003) | ✅ Implemented, verified, committed (8cc31ab); params refined 2026-07-03 | Persistent KV cache + prefix caching + chunk-local windowed encoder; partial-emission every 1 s via WebSocket. Full 1hr CER 16.1% / 6.22x; beats production Silero-VAD at every scale. **Current params**: `kStreamWindowMel=100` (1 s), `max_new_tokens=32`, `unfixed_chunks=2`, `unfixed_tokens=15`, `segment_sec=24.0`, `vad_min_overlap_sec=0.12`. 2026-07-03 real WS `test.mp3` 600 s A/B after the VAD-overlap filter: `segment_sec=24` produced 49 ASR finals vs 67 at 12 s, with the same final comprehensive count (115) and better `To C` wording; default restored to 24 s for ASR semantic stability. |
 | Revisable comprehensive timeline (Spec 004) | Container/fusion ownership corrected; acceptance open | `ComprehensiveTimeline` stores typed diarization, ASR, VAD, alignment, and business tracks and publishes immutable snapshots/typed updates. `BusinessSpeakerPipeline` owns align-aware projection, gap fill, and speaker-support diagnostics. The terminal `comprehensive` field is a compatibility alias serialized from the exact stored `business_speaker` entries. Full contextual acceptance remains open. |

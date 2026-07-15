@@ -1,7 +1,8 @@
 # Orator 测试目录
 
-当前 CMake 配置注册 53 项 CTest：51 项 C++ 测试、1 项真实
-Python/WebSocket 语音与静音合同测试、1 项 Node Web UI 状态模型测试。
+当前 CMake 配置注册 64 项 CTest：55 项 C++ 测试、8 项 Python
+工具/集成测试、1 项 Node Web UI 状态模型测试。其中真实 WebSocket
+合同测试覆盖语音、静音、单音频生产者和并发观察连接。
 真实流客户端仍只有 `tools/verify/py/ws_unified_test.py`；
 `integration/py/run_ws_integration.py` 只负责服务端生命周期和临时 TOML
 隔离，不读写 WebSocket。
@@ -67,3 +68,5 @@ v2.1 高/低延迟配置测试承担。
 2. Python 流式测试必须调用唯一的 `ws_unified_test.py` 客户端；辅助脚本
    只可负责服务端启停、超时、临时 TOML 和产物路径，并通过 CTest 注册。
 3. 流式产品测试必须走真实 WebSocket，不得直接调用内部 worker 代替。
+4. Web UI 联动测试使用观察连接；观察连接不得重置音频生产者或产生第二套
+   时间线。

@@ -6,10 +6,11 @@
 // the stream's JSON result callback to the client connection.
 //
 // Architecture: the AuditoryStream (and its loaded GPU models) is created ONCE
-// and shared across all connections via a shared_ptr. Each new client
-// connection calls Reset() on the stream and re-routes the emit callback to the
-// new socket. This avoids the GPU OOM crash caused by loading the ASR model
-// once per client.
+// and shared across all connections via a shared_ptr. The first connection to
+// send audio owns production for that session; other connections observe the
+// same emitted events without resetting the stream. This avoids loading the
+// ASR model once per client and allows the Web UI to observe an external test
+// client safely.
 //
 // Wire protocol (client -> server):
 //   * Binary frames: raw mono PCM at the configured sample rate. int16
@@ -29,6 +30,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <vector>
 
 #include "net/websocket_server.h"
 #include "pipeline/auditory_stream.h"
@@ -36,16 +38,25 @@
 namespace orator {
 namespace net {
 
-// Thread-safe emit target shared between the AuditoryStream and all
-// connections. The active connection registers itself; previous connection
-// clears on close.
+// Thread-safe session hub shared between AuditoryStream and all connections.
+// Exactly one connection may produce audio; every registered connection
+// receives the same stream-generated events.
 struct SessionEmit {
-  std::mutex mu;
-  WebSocketConnection* conn = nullptr;  // guarded by mu
-  int64_t msg_id = 0;                   // auto-increment, guarded by mu
+  enum class ProducerClaim { kClaimed, kOwned, kBusy };
 
-  // Transform legacy messages to the new topic-based envelope format, then
-  // send.
+  std::mutex mu;
+  std::vector<WebSocketConnection*> connections;  // guarded by mu
+  WebSocketConnection* producer = nullptr;        // guarded by mu
+  int64_t msg_id = 0;                             // guarded by mu
+
+  void Register(WebSocketConnection* conn);
+  void Unregister(WebSocketConnection* conn);
+  ProducerClaim ClaimProducer(WebSocketConnection* conn);
+  bool IsProducer(WebSocketConnection* conn);
+  bool CanReset(WebSocketConnection* conn);
+  void ReleaseProducer(WebSocketConnection* conn);
+
+  // Transform a legacy message to the topic envelope once, then broadcast it.
   void Send(const std::string& json);
 };
 
@@ -66,6 +77,7 @@ class AuditoryWsHandler final : public WebSocketHandler {
   std::shared_ptr<SessionEmit> emit_target_;
   WebSocketConnection* conn_ = nullptr;
   bool float_format_ = false;
+  bool producer_conflict_reported_ = false;
 };
 
 }  // namespace net

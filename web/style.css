@@ -123,6 +123,7 @@ body {
   gap: 12px;
   margin-top: 12px;
 }
+.progress-row[hidden] { display: none; }
 
 .progress-label { font-size: 12px; color: var(--text-dim); min-width: 50px; }
 .progress-bar {
@@ -510,6 +511,7 @@ body {
 
 /* ── Live observability panel (Spec 011 telemetry) ── */
 .obs-section { margin-top: 12px; }
+.obs-section .panel-header { gap: 12px; }
 .obs-hint { font-size: 12px; color: #8b90a0; margin-right: auto; }
 .obs-grid {
   display: grid;

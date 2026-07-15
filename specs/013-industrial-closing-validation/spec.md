@@ -193,7 +193,11 @@ subject to the complete acceptance gates in this spec.
 
 - **FR17**: Web UI live rows must converge exactly to the terminal business view
   without duplicate IDs, stale partials, missing revisions, or browser-side
-  speaker re-splitting.
+  speaker re-splitting. One connection owns audio production for a session;
+  browser and diagnostic observer connections receive the same live events and
+  terminal timeline without resetting, replacing, or otherwise mutating that
+  session. Connecting or disconnecting an observer must not change the common
+  time base, producer ownership, track contents, or terminal result.
 - **FR18**: Full tests must capture `tegrastats` continuously and report CPU,
   RAM, GPU utilization, GPU memory, temperature, rail/system power, and thermal
   or allocation failures. GPU utilization must be present during GPU load.

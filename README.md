@@ -100,12 +100,6 @@ cmake --build build -j
 ORATOR_CONFIG=orator.toml ./build/orator_ws
 ```
 
-也可以显式指定端口和模型路径：
-
-```bash
-./build/orator_ws 8765 models/sortformer_4spk_v2.1.safetensors models/asr/Qwen/Qwen3-ASR-1.7B
-```
-
 服务启动后：
 
 - WebSocket 默认监听 `ws://0.0.0.0:8765`
@@ -133,6 +127,11 @@ ORATOR_CONFIG=orator.toml ./build/orator_ws
 
 `flush` 输出当前 timeline 并继续流式处理；`end` 结束当前流、输出最终
 timeline，然后重置会话。
+
+一个会话只允许一个连接发送音频。浏览器和诊断连接可以同时观察该会话，
+并接收相同的实时事件与终端 timeline；观察连接的建立和断开不会重置流。
+第二个连接尝试发送音频时会收到 `audio producer already active` 错误，
+对应音频帧不会进入管线。
 
 ## 配置
 
@@ -328,6 +327,7 @@ ctest -R test_vad --output-on-failure
 python3 tools/verify/py/ws_unified_test.py --duration 120 --port 8765 --out test_120s.json
 python3 tools/verify/py/ws_unified_test.py --duration 600 --port 8765 --out test_600s.json
 python3 tools/verify/py/ws_unified_test.py --duration 3615 --port 8765 --rate 1.0 --out test_full.json
+python3 tools/verify/py/ws_unified_test.py --duration 120 --port 8765 --test-observer --out test_observer.json
 ```
 
 项目测试治理要求：

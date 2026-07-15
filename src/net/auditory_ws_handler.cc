@@ -4,6 +4,7 @@
 #include "protocol/protocol_timeline.h"
 #include "protocol/session_store.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -128,12 +129,65 @@ std::string WrapMessageInEnvelope(const std::string& json, int64_t msg_id) {
   return envelope;
 }
 
+std::string BuildReadyMessage(
+    const std::shared_ptr<pipeline::AuditoryStream>& stream) {
+  const auto now = std::chrono::system_clock::now();
+  const double wall_start =
+      std::chrono::duration<double>(now.time_since_epoch()).count();
+  return "{\"type\":\"ready\",\"sample_rate\":16000,\"asr\":" +
+         std::string(stream->asr_enabled() ? "true" : "false") +
+         ",\"time_base\":\"absolute_samples\",\"origin_sample\":0," +
+         "\"session_start_wall_sec\":" + std::to_string(wall_start) +
+         ",\"protocol_version\":2,\"envelope_format\":true}";
+}
+
 }  // namespace
+
+void SessionEmit::Register(WebSocketConnection* conn) {
+  if (conn == nullptr) return;
+  std::lock_guard<std::mutex> lk(mu);
+  if (std::find(connections.begin(), connections.end(), conn) ==
+      connections.end()) {
+    connections.push_back(conn);
+  }
+}
+
+void SessionEmit::Unregister(WebSocketConnection* conn) {
+  std::lock_guard<std::mutex> lk(mu);
+  connections.erase(std::remove(connections.begin(), connections.end(), conn),
+                    connections.end());
+  if (producer == conn) producer = nullptr;
+}
+
+SessionEmit::ProducerClaim SessionEmit::ClaimProducer(
+    WebSocketConnection* conn) {
+  std::lock_guard<std::mutex> lk(mu);
+  if (producer == conn) return ProducerClaim::kOwned;
+  if (producer != nullptr) return ProducerClaim::kBusy;
+  producer = conn;
+  return ProducerClaim::kClaimed;
+}
+
+bool SessionEmit::IsProducer(WebSocketConnection* conn) {
+  std::lock_guard<std::mutex> lk(mu);
+  return producer == conn;
+}
+
+bool SessionEmit::CanReset(WebSocketConnection* conn) {
+  std::lock_guard<std::mutex> lk(mu);
+  return producer == nullptr || producer == conn;
+}
+
+void SessionEmit::ReleaseProducer(WebSocketConnection* conn) {
+  std::lock_guard<std::mutex> lk(mu);
+  if (producer == conn) producer = nullptr;
+}
 
 void SessionEmit::Send(const std::string& json) {
   std::lock_guard<std::mutex> lk(mu);
-  if (conn && !conn->closed()) {
-    conn->SendText(WrapMessageInEnvelope(json, ++msg_id));
+  const std::string envelope = WrapMessageInEnvelope(json, ++msg_id);
+  for (WebSocketConnection* conn : connections) {
+    if (conn != nullptr && !conn->closed()) conn->SendText(envelope);
   }
 }
 
@@ -145,33 +199,28 @@ AuditoryWsHandler::AuditoryWsHandler(
 void AuditoryWsHandler::OnOpen(WebSocketConnection& conn) {
   conn_ = &conn;
   float_format_ = false;
-
-  // Route emitted events to this connection. Previous connection has already
-  // cleared the pointer in OnClose(); we take ownership here under the lock.
-  {
-    std::lock_guard<std::mutex> lk(emit_target_->mu);
-    emit_target_->conn = &conn;
-  }
-
-  // Reset the shared stream for a fresh session (models stay loaded).
-  stream_->Reset();
-
-  const auto now = std::chrono::system_clock::now();
-  const double wall_start =
-      std::chrono::duration<double>(now.time_since_epoch()).count();
-  std::string ready =
-      "{\"type\":\"ready\",\"sample_rate\":" + std::to_string(16000) +
-      ",\"asr\":" + (stream_->asr_enabled() ? "true" : "false") +
-      ",\"time_base\":\"absolute_samples\",\"origin_sample\":0,"
-      "\"session_start_wall_sec\":" +
-      std::to_string(wall_start) +
-      ",\"protocol_version\":2,\"envelope_format\":true}";
-  conn.SendText(ready);
+  producer_conflict_reported_ = false;
+  emit_target_->Register(&conn);
+  conn.SendText(BuildReadyMessage(stream_));
 }
 
 void AuditoryWsHandler::OnBinary(WebSocketConnection& conn, const uint8_t* data,
                                  size_t n) {
-  (void)conn;
+  const SessionEmit::ProducerClaim claim = emit_target_->ClaimProducer(&conn);
+  if (claim == SessionEmit::ProducerClaim::kBusy) {
+    if (!producer_conflict_reported_) {
+      conn.SendText(
+          "{\"type\":\"error\",\"error\":\"audio producer already active\"}");
+      producer_conflict_reported_ = true;
+    }
+    return;
+  }
+  if (claim == SessionEmit::ProducerClaim::kClaimed) {
+    // Producer ownership begins a new common-time-base session. Observer
+    // connections remain registered and receive the matching ready event.
+    stream_->Reset();
+    emit_target_->Send(BuildReadyMessage(stream_));
+  }
   LOG_DEBUG("OnBinary: received %zu bytes\n", n);
   std::vector<float> in;
   if (float_format_) {
@@ -212,13 +261,26 @@ void AuditoryWsHandler::OnText(WebSocketConnection& conn,
     return;
   }
   if (text.find("\"reset\"") != std::string::npos) {
+    if (!emit_target_->CanReset(&conn)) {
+      conn.SendText(
+          "{\"type\":\"error\",\"error\":\"only the audio producer may "
+          "reset\"}");
+      return;
+    }
     stream_->Reset();
+    emit_target_->Send(BuildReadyMessage(stream_));
     conn.SendText("{\"type\":\"reset_ok\"}");
     return;
   }
   if (text.find("\"end\"") != std::string::npos) {
+    if (!emit_target_->IsProducer(&conn)) {
+      conn.SendText(
+          "{\"type\":\"error\",\"error\":\"only the audio producer may end\"}");
+      return;
+    }
     stream_->EmitTimeline(/*finalize=*/true);
     stream_->Reset();
+    emit_target_->ReleaseProducer(&conn);
     return;
   }
   if (text.find("\"flush\"") != std::string::npos) {
@@ -313,12 +375,7 @@ void AuditoryWsHandler::OnText(WebSocketConnection& conn,
 }
 
 void AuditoryWsHandler::OnClose() {
-  // Deregister this connection as the emit target so in-flight worker events
-  // are silently dropped (not sent to a dead socket).
-  {
-    std::lock_guard<std::mutex> lk(emit_target_->mu);
-    if (emit_target_->conn == conn_) emit_target_->conn = nullptr;
-  }
+  emit_target_->Unregister(conn_);
   conn_ = nullptr;
   float_format_ = false;
   // stream_ is shared; do NOT reset or destroy it here.
