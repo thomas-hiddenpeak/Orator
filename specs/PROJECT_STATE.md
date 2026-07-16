@@ -14,7 +14,7 @@ work is specified under [specs/](.).
 > pass is the consistency proof. Status lines advance to `Implemented` in the
 > same change that lands the code, with the commit reference.
 
-- **Last updated**: 2026-07-16 (v2.1 canonical speaker-business acceptance)
+- **Last updated**: 2026-07-17 (accepted speaker-policy ownership refactor)
 - **Branch**: `master`
 - **Constitution**: v1.7.0
 - **Speaker-business closure**: **CANONICAL SCENE ACCEPTED**. Current-source
@@ -237,6 +237,19 @@ confidence. The clean-`3b40245` full package replayed all 935 business entries
 and isolated 347 competing-support decisions for later contextual candidate
 review without changing a frozen track.
 
+**Accepted-policy maintainability checkpoint (2026-07-17)**:
+`BusinessSpeakerPipeline` now owns orchestration and typed-track publication,
+while the internal `SpeakerFusionPolicy` owns the accepted fusion-rule
+execution. The public API, timeline ownership, TOML surface, rule order,
+reasons/sources, and serialized result are unchanged. A retained 3615.120-second
+typed-track replay emitted 1,775 business entries before and after extraction;
+both files are byte-identical with SHA-256 `04ba82a8...51db9`. The focused tests
+passed 3/3, the complete suite passed 101/101, and a new-binary 120-second 1x
+real-WebSocket run passed observer, provenance, time, and telemetry contracts.
+This is mechanical equivalence and engineering evidence, not a new accuracy
+evaluation. See
+[speaker-policy-maintainability-2026-07-17.md](013-industrial-closing-validation/speaker-policy-maintainability-2026-07-17.md).
+
 ## 3. Component status
 
 | Component | Status | Notes |
@@ -251,7 +264,7 @@ review without changing a frozen track.
 | WebSocket server (libwebsockets v4.3.3) | ✅ Refactored | Replaced hand-rolled POSIX WS with libwebsockets (multi-client, RFC 6455/7692). One connection owns audio production while browser and diagnostic observers receive the same broadcast stream without resetting it; concurrent producer bytes are rejected. Eliminated file-scope static variables (`serve_server`, `serve_factory`, `pss_list_head`) → instance members via `lws_context_user`. Thread-safe `SendText` with wakeup/cancel-service. ServeOnce mode for unit tests. |
 | ASR + WS integration | Implemented; full-session acceptance open | `AuditoryStream` owns one private `PipelineAudioCache` per active producer and uses separate worker threads. One session-owned `TimeBase` is injected into all active stores and workers. Final ASR live emission and its typed sink reuse one `text_id`; partial rejection emits a matching retract, and the terminal ASR track serializes the ID. ASR reads immutable VAD evidence snapshots from `ComprehensiveTimeline`; forced alignment consumes finalized ASR records there. Registered WS/Node tests and a real Chromium run verify short-path revision/export/reconnect/UI convergence. Full repeatability and contextual accuracy remain open. |
 | Incremental KV-cache ASR streaming (Spec 003) | ✅ Implemented, verified, committed (8cc31ab); params refined 2026-07-03 | Persistent KV cache + prefix caching + chunk-local windowed encoder; partial-emission every 1 s via WebSocket. Full 1hr CER 16.1% / 6.22x; beats production Silero-VAD at every scale. **Current params**: `kStreamWindowMel=100` (1 s), `max_new_tokens=32`, `unfixed_chunks=2`, `unfixed_tokens=15`, `segment_sec=24.0`, `vad_min_overlap_sec=0.12`. 2026-07-03 real WS `test.mp3` 600 s A/B after the VAD-overlap filter: `segment_sec=24` produced 49 ASR finals vs 67 at 12 s, with the same final comprehensive count (115) and better `To C` wording; default restored to 24 s for ASR semantic stability. |
-| Revisable comprehensive timeline (Spec 004) | Speaker-business canonical scene accepted | `ComprehensiveTimeline` stores typed diarization, ASR, VAD, alignment, voiceprint, and business tracks and publishes immutable snapshots/typed updates. `BusinessSpeakerPipeline` consumes typed `SpeakerEvidenceStage` output for the final revisable speaker view. Current-source full Run A and Run B passed complete contextual speaker-business review; ASR and independent holdout claims remain open. |
+| Revisable comprehensive timeline (Spec 004) | Speaker-business canonical scene accepted | `ComprehensiveTimeline` stores typed diarization, ASR, VAD, alignment, voiceprint, and business tracks and publishes immutable snapshots/typed updates. `BusinessSpeakerPipeline` consumes typed `SpeakerEvidenceStage` output and owns orchestration/publication; the internal `SpeakerFusionPolicy` owns accepted rule execution. Current-source full Run A and Run B passed complete contextual speaker-business review; ASR and independent holdout claims remain open. |
 | Reusable common time base (Spec 004) | Session ownership and final reconciliation implemented; acceptance open | `AuditoryStream` owns one immutable `TimeBase` and injects it into every active private cache, worker, and retained audio store. Finalization reconciles exact sample extents for input, diarization, speaker identity, ASR, VAD, alignment, and business speaker; focused tests and the 2026-07-13 120 s real-WebSocket run reported zero gaps. Full-session repeatability remains open under Spec 013. |
 | Pipeline protocol layer (Spec 004) | ✅ Implemented | Phases 7–12 complete: data types (topic.h, schema.h), pipeline registry, topic router, storage layer (MEMORY + DISK), ProtocolTimeline integration, WS v2 envelope with describe command, --storage-disk-path flag. 25/25 tests pass. |
 | Streaming validation | Full canonical A/B mechanical gates passed | `ws_unified_test.py` has one socket reader, captures source/config/binary pre/post hashes, continuous `tegrastats`, and runtime telemetry, and rejects source drift, sparse telemetry, mechanical live/final, typed-track, ID, alignment, VAD/diar, and extent violations. Current 3615.120-second empty-registry A and restarted frozen-registry B runs passed these contracts at 0.983x stream RTF. Structural checks never assign correctness, aggregate accuracy, rank candidates, or issue a product verdict. |

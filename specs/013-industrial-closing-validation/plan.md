@@ -20,6 +20,31 @@ numerical contracts, generate reference-free candidate views, and display
 unjudged evidence. It may not assign labels, aggregate an accuracy result,
 compare or rank candidates, select parameters, or issue a gate verdict.
 
+### 1.1 Accepted-policy maintainability refactor
+
+The canonical speaker-business result is frozen before structural work. The
+refactor changes ownership and file boundaries only:
+
+1. Keep `BusinessSpeakerPipeline` as the registered orchestration boundary for
+   subscriptions, synchronization, base diar/text projection, revisions, and
+   decision-audit construction.
+2. Move the accepted voiceprint/primary/VAD/alignment rule executor behind one
+   internal `SpeakerFusionPolicy` type. The policy receives the owning pipeline
+   state read-only and returns projected entries; it does not subscribe, publish,
+   mutate producer tracks, or read configuration independently.
+3. Preserve the existing policy order and all reason/source strings exactly in
+   the first extraction. Do not combine, delete, reorder, generalize, or tune a
+   rule in the same change.
+4. Freeze a full-session production replay before editing and require exact
+   byte equality after editing. This is a mechanical equivalence contract, not
+   result evaluation.
+5. Run focused policy tests, the complete CTest suite, and a real-WebSocket
+   smoke after extraction. If any output or contract changes, restore the last
+   accepted implementation before attempting a smaller extraction.
+6. Only after the extraction is accepted may a later task consolidate common
+   guards and archive rejected experimental assets. That later work receives its
+   own exact-equivalence gate and may not alter the accepted speaker result.
+
 ## 2. Phase 0: Governance and Baseline Reset
 
 1. Review and approve Spec 013 before runtime implementation.

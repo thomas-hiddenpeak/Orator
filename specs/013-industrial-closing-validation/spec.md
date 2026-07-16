@@ -1,7 +1,8 @@
 # Spec 013: Industrial Closing Validation
 
-**Status**: Canonical speaker-business scene accepted 2026-07-16; independent
-holdout and non-speaker product gates remain open
+**Status**: Canonical speaker-business scene accepted 2026-07-16; accepted
+policy ownership refactored 2026-07-17; independent holdout and non-speaker
+product gates remain open
 **Created**: 2026-07-13
 **Scope**: Re-establish a truthful product baseline, recover full-session business
 accuracy, and define the evidence required before Orator may be declared closed.
@@ -181,6 +182,16 @@ subject to the complete acceptance gates in this spec.
   declared quantization envelopes; any runtime value outside those bounds must
   fail. New artifacts must retain round-trip raw confidence precision, while
   millisecond time-derived fields remain explicitly bounded.
+- **FR23**: Closing includes an engineering-maintainability gate for the accepted
+  speaker-business implementation. Evidence collection, speaker-fusion policy,
+  and business-track orchestration MUST have separate ownership boundaries.
+  Refactoring MUST preserve the public `BusinessSpeakerPipeline` contract, typed
+  timeline tracks, TOML fields and defaults, policy execution order, decision
+  reasons and sources, projected text/time ranges, and serialized output. It
+  MUST add no model, threshold, runtime dependency, reference-specific value, or
+  alternate pipeline data path. Before and after outputs from one frozen full-
+  session typed input MUST be byte-identical; a mismatch aborts the refactor and
+  cannot be interpreted as an accuracy change or improvement.
 
 ### 4.3 Reference and evaluation
 

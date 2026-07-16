@@ -1561,3 +1561,28 @@
   in the accepted commit.
 - [ ] T088 Review the final report, close all priority-zero/priority-one defects,
   and create the release tag only after sign-off.
+
+## Phase 8: Accepted Speaker-Policy Maintainability
+
+- [x] T089 Freeze the accepted production projector before refactoring. Replay
+  the retained full-session typed diar/ASR/align/primary/voiceprint tracks using
+  the checked-in TOML and record SHA-256
+  `04ba82a844a14edb08b3cce60a543e831dfd6bb1e1368d58440303f6f2251db9`.
+  This is a mechanical behavior baseline and does not evaluate correctness.
+- [x] T090 Extract the accepted voiceprint fusion implementation from
+  `BusinessSpeakerPipeline` into one internal `SpeakerFusionPolicy` owner while
+  preserving the public API, read-only state access, policy order, reason/source
+  strings, TOML surface, and timeline ownership.
+- [x] T091 Preserve or strengthen focused tests for every accepted fusion guard
+  and abstention path without retaining an alternate runtime implementation.
+- [x] T092 Replay the same frozen full-session typed inputs after extraction and
+  require byte identity with T089. No program may convert this equivalence check
+  into an accuracy or acceptance judgment.
+- [x] T093 Pass a warning-clean build, all registered CTest entries, and a real-
+  WebSocket smoke with source/config/binary/time/observer/telemetry contracts.
+- [x] T094 Synchronize `PROJECT_STATE.md`, Spec 013, plan, tasks, and final
+  maintainability evidence in the same commit.
+- [ ] T095 In a separate exact-equivalence change, consolidate duplicated policy
+  guards and move rejected one-off candidate tools/configurations out of the
+  active build surface. Do not remove production regression coverage or alter
+  the accepted output.

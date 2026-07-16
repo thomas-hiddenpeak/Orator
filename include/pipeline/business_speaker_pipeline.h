@@ -17,6 +17,8 @@
 namespace orator {
 namespace pipeline {
 
+class SpeakerFusionPolicy;
+
 class BusinessSpeakerPipeline {
  public:
   enum class SpeakerOverlapTiePolicy {
@@ -70,6 +72,8 @@ class BusinessSpeakerPipeline {
   void set_gap_fill_enabled(bool enabled);
 
  private:
+  friend class SpeakerFusionPolicy;
+
   using AlignGroup = ComprehensiveTimeline::AlignGroup;
   using Entry = ComprehensiveTimeline::Entry;
   using RawTextSeg = ComprehensiveTimeline::RawTextSeg;
