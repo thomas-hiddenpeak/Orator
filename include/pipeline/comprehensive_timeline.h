@@ -105,11 +105,47 @@ class ComprehensiveTimeline {
     std::vector<AlignUnitSeg> units;
   };
 
+  // One incremental Sortformer output block on the session common clock.
+  // local_speaker_offset disambiguates slots after an optional model reset.
+  struct DiarFrameBlock {
+    double start = 0.0;
+    double frame_period_sec = 0.0;
+    int num_frames = 0;
+    int num_speakers = 0;
+    int local_speaker_offset = 0;
+    std::vector<float> probabilities;
+  };
+
+  struct VoiceprintScore {
+    std::string speaker_id;
+    float score = 0.0f;
+  };
+
+  // Immutable acoustic evidence for a source-character range. The producer
+  // supplies two independent registry views; this store does not rank them or
+  // choose a speaker.
+  struct SpeakerVoiceprintEvidence {
+    std::string evidence_id;
+    std::string kind;
+    long text_id = -1;
+    int source_start = 0;
+    int source_end = 0;
+    double start = 0.0;
+    double end = 0.0;
+    bool embedding_available = false;
+    bool robust_gallery_complete = false;
+    std::vector<VoiceprintScore> session_scores;
+    std::vector<VoiceprintScore> robust_scores;
+  };
+
   enum class EvidenceTrack {
     kDiarization,
+    kPrimarySpeaker,
     kAsrFinal,
     kVad,
     kAlignment,
+    kDiarFrames,
+    kSpeakerVoiceprint,
     kReset,
   };
 
@@ -130,9 +166,12 @@ class ComprehensiveTimeline {
 
   struct TrackSnapshot {
     std::vector<SpeakerInput> diarization;
+    std::vector<SpeakerInput> primary_speaker;
     std::vector<RawTextSeg> asr;
     std::vector<VadSeg> vad;
     std::vector<AlignGroup> align;
+    std::vector<DiarFrameBlock> diar_frames;
+    std::vector<SpeakerVoiceprintEvidence> speaker_voiceprint;
     std::vector<Entry> business_speaker;
     std::map<std::string, std::string> speaker_label_ids;
     std::vector<std::string> speaker_ids;
@@ -142,11 +181,15 @@ class ComprehensiveTimeline {
   // an identical repeat is idempotent and a conflicting repeat is rejected.
   void DepositDiarization(const std::vector<SpeakerInput>& segments);
   void DepositDiarizationSegment(const SpeakerInput& segment);
+  void DepositPrimarySpeaker(const std::vector<SpeakerInput>& segments);
   DepositResult DepositAsrFinal(const RawTextSeg& segment);
   void DepositVad(const VadSeg& segment);
   void AdvanceVadHorizon(double horizon_sec);
   void UpdateVadState(bool in_speech, double observed_at_sec);
   DepositResult DepositAlignment(const AlignGroup& group);
+  DepositResult DepositDiarFrameBlock(const DiarFrameBlock& block);
+  void DepositSpeakerVoiceprint(
+      const std::vector<SpeakerVoiceprintEvidence>& evidence);
 
   // Registered derived pipelines write only their own track. This operation
   // cannot mutate any producer track.
@@ -162,10 +205,13 @@ class ComprehensiveTimeline {
 
   TrackSnapshot SnapshotTracks() const;
   std::vector<SpeakerInput> SnapshotDiarization() const;
+  std::vector<SpeakerInput> SnapshotPrimarySpeaker() const;
   std::vector<RawTextSeg> SnapshotRawTexts() const;
   std::vector<VadSeg> SnapshotVad() const;
   VadEvidence SnapshotVadEvidence() const;
   std::vector<AlignGroup> SnapshotAlign() const;
+  std::vector<DiarFrameBlock> SnapshotDiarFrames() const;
+  std::vector<SpeakerVoiceprintEvidence> SnapshotSpeakerVoiceprint() const;
   std::optional<RawTextSeg> FindAsrFinal(long text_id) const;
   std::optional<AlignGroup> FindAlignment(long text_id) const;
 
@@ -190,6 +236,7 @@ class ComprehensiveTimeline {
   std::map<std::string, std::string> BuildSpeakerLabelIdsLocked() const;
 
   std::vector<SpeakerInput> diarization_;
+  std::vector<SpeakerInput> primary_speaker_;
   std::vector<RawTextSeg> asr_;
   std::vector<VadSeg> vad_;
   std::shared_ptr<const std::vector<VadSeg>> vad_snapshot_ =
@@ -198,6 +245,8 @@ class ComprehensiveTimeline {
   bool vad_in_speech_ = false;
   double vad_state_observed_at_sec_ = -1e9;
   std::map<long, AlignGroup> align_;
+  std::vector<DiarFrameBlock> diar_frames_;
+  std::vector<SpeakerVoiceprintEvidence> speaker_voiceprint_;
   std::map<long, std::vector<Entry>> business_speaker_;
   std::set<std::string> seen_speaker_ids_;
 

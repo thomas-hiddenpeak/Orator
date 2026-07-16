@@ -1,0 +1,20 @@
+[prototype_local_veto]
+require_initial_direct_anchor = true
+require_terminal_direct_disagreement = true
+require_raw_local_identity_agreement = true
+veto_on_eligible_piece_conflict = true
+veto_on_eligible_phrase_conflict = true
+allow_cross_prototype_margin_veto = true
+require_cross_prototype_top_pair = true
+allow_clean_gallery_current_voiceprint_consensus = true
+allow_clean_gallery_non_top_channel_consensus = true
+allow_gallery_multiscale_channel_consensus = true
+allow_gallery_single_scale_channel_consensus = false
+allow_current_multiscale_channel_consensus = true
+allow_current_single_scale_channel_consensus = true
+allow_sustained_raw_local_consensus = false
+allow_dual_registry_multiscale_consensus = false
+allow_dominant_raw_micro_consensus = false
+active_channel_threshold = 0.5
+minimum_active_channel_run_sec = 0.08
+minimum_raw_local_run_sec = 0.4

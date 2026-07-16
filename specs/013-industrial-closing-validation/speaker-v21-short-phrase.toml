@@ -1,0 +1,27 @@
+[diarizer]
+model_weights = "models/sortformer_4spk_v2.1.safetensors"
+max_speakers = 4
+threshold = 0.4
+merge_gap_sec = 0.8
+deliver_interval_sec = 1.0
+spkcache_len = 188
+chunk_len = 340
+spkcache_update_period = 188
+chunk_left_context = 1
+chunk_right_context = 1
+spkcache_sil_frames = 3
+fifo_len = 188
+onset = 0.45
+offset = 0.35
+pad_onset = 0.0
+pad_offset = 0.0
+min_dur_on = 0.5
+min_dur_off = 1.0
+reset_period_sec = 0.0
+
+[speaker]
+# Short aligned phrases are independent evidence, not registry references.
+# Identity score and margin gates remain those of the frozen resolved config.
+min_embed_sec = 0.8
+edge_margin_sec = 0.08
+max_embed_window_sec = 3.0

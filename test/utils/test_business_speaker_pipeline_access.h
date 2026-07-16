@@ -14,9 +14,12 @@ class TestBusinessSpeakerPipeline {
   using Entry = ComprehensiveTimeline::Entry;
   using Revision = ComprehensiveTimeline::Revision;
   using SpeakerInput = ComprehensiveTimeline::SpeakerInput;
+  using SpeakerVoiceprintEvidence =
+      ComprehensiveTimeline::SpeakerVoiceprintEvidence;
 
-  TestBusinessSpeakerPipeline()
-      : pipeline_(&timeline_, BusinessSpeakerPipeline::Config{},
+  explicit TestBusinessSpeakerPipeline(
+      BusinessSpeakerPipeline::Config config = {})
+      : pipeline_(&timeline_, config,
                   core::TimeBase(16000), [this](const Revision& revision) {
                     revisions_.push_back(revision);
                   }) {
@@ -37,6 +40,13 @@ class TestBusinessSpeakerPipeline {
     return TakeRevisions();
   }
 
+  std::vector<Revision> ReplacePrimarySpeakers(
+      const std::vector<SpeakerInput>& segments) {
+    revisions_.clear();
+    timeline_.DepositPrimarySpeaker(segments);
+    return TakeRevisions();
+  }
+
   std::vector<Revision> UpsertText(long id, double start, double end,
                                    const std::string& text) {
     revisions_.clear();
@@ -50,6 +60,13 @@ class TestBusinessSpeakerPipeline {
                                     const std::vector<AlignUnitSeg>& units) {
     revisions_.clear();
     timeline_.DepositAlignment({text_id, start, end, units});
+    return TakeRevisions();
+  }
+
+  std::vector<Revision> ReplaceVoiceprint(
+      const std::vector<SpeakerVoiceprintEvidence>& evidence) {
+    revisions_.clear();
+    timeline_.DepositSpeakerVoiceprint(evidence);
     return TakeRevisions();
   }
 

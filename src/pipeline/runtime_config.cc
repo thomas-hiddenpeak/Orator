@@ -115,6 +115,8 @@ std::string SerializeResolvedConfig(const AuditoryStream::Config& c) {
   timeline.Add("speaker_support_max_islands",
                c.timeline_speaker_support_max_islands);
   timeline.Add("gap_fill_enabled", c.timeline_gap_fill_enabled);
+  timeline.Add("speaker_overlap_tie_policy",
+               c.timeline_speaker_overlap_tie_policy);
   root.AddObject("timeline", timeline.Finish());
 
   JsonObject vad;
@@ -189,11 +191,40 @@ std::string SerializeResolvedConfig(const AuditoryStream::Config& c) {
   speaker.Add(
       "local_drift_competing_candidate_margin",
       static_cast<double>(c.speaker_local_drift_competing_candidate_margin));
+  speaker.Add("local_drift_competing_candidate_min_confirmations",
+              c.speaker_local_drift_competing_candidate_min_confirmations);
   speaker.Add("local_drift_competing_backfill_sec",
               c.speaker_local_drift_competing_backfill_sec);
   speaker.Add("local_drift_competing_backfill_gap_sec",
               c.speaker_local_drift_competing_backfill_gap_sec);
   root.AddObject("speaker", speaker.Finish());
+
+  JsonObject speaker_fusion;
+  speaker_fusion.Add("enable", c.speaker_fusion_enable);
+  speaker_fusion.Add("min_embed_sec", c.speaker_fusion_min_embed_sec);
+  speaker_fusion.Add("edge_margin_sec", c.speaker_fusion_edge_margin_sec);
+  speaker_fusion.Add("max_embed_window_sec",
+                     c.speaker_fusion_max_embed_window_sec);
+  speaker_fusion.Add("phrase_min_sec", c.speaker_fusion_phrase_min_sec);
+  speaker_fusion.Add("phrase_max_sec", c.speaker_fusion_phrase_max_sec);
+  speaker_fusion.Add("punctuation", c.speaker_fusion_punctuation);
+  speaker_fusion.Add(
+      "frame_activity_threshold",
+      static_cast<double>(c.speaker_fusion_frame_activity_threshold));
+  speaker_fusion.Add("minimum_gallery_size",
+                     c.speaker_fusion_minimum_gallery_size);
+  speaker_fusion.Add("short_max_sec", c.speaker_fusion_short_max_sec);
+  speaker_fusion.Add("short_min_score",
+                     static_cast<double>(c.speaker_fusion_short_min_score));
+  speaker_fusion.Add("short_min_margin",
+                     static_cast<double>(c.speaker_fusion_short_min_margin));
+  speaker_fusion.Add("regular_min_score",
+                     static_cast<double>(c.speaker_fusion_regular_min_score));
+  speaker_fusion.Add("regular_min_margin",
+                     static_cast<double>(c.speaker_fusion_regular_min_margin));
+  speaker_fusion.Add("four_view_min_aligned_units",
+                     c.speaker_fusion_four_view_min_aligned_units);
+  root.AddObject("speaker_fusion", speaker_fusion.Finish());
 
   JsonObject storage;
   storage.Add("disk_path", c.storage_disk_path);

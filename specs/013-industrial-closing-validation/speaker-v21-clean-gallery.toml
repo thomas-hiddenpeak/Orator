@@ -1,0 +1,24 @@
+[speaker]
+# Prototype embeddings must match the production clean-span window exactly.
+min_embed_sec = 3.0
+edge_margin_sec = 0.3
+max_embed_window_sec = 10.0
+
+[speaker_gallery]
+minimum_prototype_duration_sec = 3.0
+minimum_diar_confidence = 0.5
+overlap_epsilon_sec = 0.1
+prototype_min_score = 0.55
+prototype_min_margin = 0.04
+max_prototypes_per_identity = 6
+aggregation = "maximum"
+require_initial_terminal_agreement = true
+require_raw_local_identity_agreement = true
+require_complete_gallery = true
+
+[speaker_fusion]
+short_max_sec = 1.5
+short_min_score = 0.0
+short_min_margin = 0.04
+regular_min_score = 0.55
+regular_min_margin = 0.04

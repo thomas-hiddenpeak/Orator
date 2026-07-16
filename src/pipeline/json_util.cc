@@ -64,7 +64,7 @@ std::string SerializeRevisionToJson(const ComprehensiveTimeline::Revision& r,
   out += source;
   out += "\",";
   std::snprintf(buf, sizeof(buf),
-                "\"dirty_start\":%.3f,\"dirty_end\":%.3f,\"entries\":[",
+                "\"dirty_start\":%.9f,\"dirty_end\":%.9f,\"entries\":[",
                 r.dirty_start, r.dirty_end);
   out += buf;
   for (size_t i = 0; i < r.entries.size(); ++i) {
@@ -80,7 +80,7 @@ std::string SerializeRevisionToJson(const ComprehensiveTimeline::Revision& r,
       }
     }
     std::snprintf(buf, sizeof(buf),
-                  "{\"start\":%.3f,\"end\":%.3f,\"text_id\":%ld,\"speaker\":%d",
+                  "{\"start\":%.9f,\"end\":%.9f,\"text_id\":%ld,\"speaker\":%d",
                   e.start, e.end, e.text_id, spk_idx);
     out += buf;
     // Spec 010: surface the resolved global voiceprint identity live. Prefer

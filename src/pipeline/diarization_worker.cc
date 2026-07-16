@@ -77,6 +77,17 @@ void DiarizationWorker::ProcessSpan(const float* samples, int n) {
       diar_speakers_ = part.num_speakers;
       diar_frame_period_sec_ = part.frame_period_sec;
     }
+    const int session_start_frame = session_bounds_.back().first;
+    const int existing_frames =
+        static_cast<int>(diar_probs_.size() / diar_speakers_);
+    part.t_start_sec =
+        session_bounds_.back().second +
+        (existing_frames - session_start_frame) * part.frame_period_sec;
+    if (frame_sink_) {
+      const int local_offset =
+          static_cast<int>(session_bounds_.size() - 1) * part.num_speakers;
+      frame_sink_(part, local_offset);
+    }
     diar_probs_.insert(diar_probs_.end(), part.probs.begin(), part.probs.end());
   }
   processed_samples_.fetch_add(n);
@@ -93,6 +104,19 @@ void DiarizationWorker::ProcessSpan(const float* samples, int n) {
       core::DiarizationFrames tail =
           diarizer_->StreamAudio(nullptr, 0, true, stream_);
       if (tail.num_frames > 0 && diar_speakers_ > 0) {
+        const int session_start_frame = session_bounds_.back().first;
+        const int existing_frames =
+            static_cast<int>(diar_probs_.size() / diar_speakers_);
+        tail.t_start_sec =
+            session_bounds_.back().second +
+            (existing_frames - session_start_frame) *
+                tail.frame_period_sec;
+        if (frame_sink_) {
+          const int local_offset =
+              static_cast<int>(session_bounds_.size() - 1) *
+              tail.num_speakers;
+          frame_sink_(tail, local_offset);
+        }
         diar_probs_.insert(diar_probs_.end(), tail.probs.begin(),
                            tail.probs.end());
       }
@@ -118,6 +142,17 @@ void DiarizationWorker::Finalize() {
     if (diar_speakers_ == 0) {
       diar_speakers_ = tail.num_speakers;
       diar_frame_period_sec_ = tail.frame_period_sec;
+    }
+    const int session_start_frame = session_bounds_.back().first;
+    const int existing_frames =
+        static_cast<int>(diar_probs_.size() / diar_speakers_);
+    tail.t_start_sec =
+        session_bounds_.back().second +
+        (existing_frames - session_start_frame) * tail.frame_period_sec;
+    if (frame_sink_) {
+      const int local_offset =
+          static_cast<int>(session_bounds_.size() - 1) * tail.num_speakers;
+      frame_sink_(tail, local_offset);
     }
     diar_probs_.insert(diar_probs_.end(), tail.probs.begin(), tail.probs.end());
   }

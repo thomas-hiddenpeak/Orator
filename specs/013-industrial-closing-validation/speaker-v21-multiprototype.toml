@@ -1,0 +1,12 @@
+[speaker_prototype_fusion]
+# Keep each deployable registry state as a separate prototype for one stable
+# identity. Cross-identity competition is evaluated after this reduction.
+aggregation = "maximum"
+require_complete_gallery = true
+
+[speaker_fusion]
+short_max_sec = 1.5
+short_min_score = 0.0
+short_min_margin = 0.04
+regular_min_score = 0.55
+regular_min_margin = 0.04

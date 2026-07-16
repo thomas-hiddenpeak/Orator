@@ -45,7 +45,7 @@ class GpuVad : public core::IVad {
     float silero_threshold = 0.5f;
     int silero_min_speech_ms = 250;
     int silero_min_silence_ms = 120;
-    int silero_speech_pad_ms = 60;  // accepted for parity; unused for endpoints
+    int silero_speech_pad_ms = 60;
     cudaStream_t stream =
         nullptr;  // Spec 002: dedicated CUDA stream (lock-free)
   };
@@ -96,6 +96,8 @@ class GpuVad : public core::IVad {
   // input (64-sample history + n_windows*512 audio) is in host `ext`. Writes
   // n_windows probabilities to *probs. Advances the LSTM device state.
   void RunBatch(const float* ext, int n_windows, std::vector<float>* probs);
+  void EmitPaddedSegment(long raw_start, long raw_end, long processed_horizon,
+                         std::vector<core::VadSegmentResult>* segs);
   // Free all device memory and reset pointers to nullptr.
   void FreeDeviceMemory();
 
@@ -154,6 +156,7 @@ class GpuVad : public core::IVad {
   int silence_samples_ = 0;
   long seg_start_abs_ =
       0;  // absolute sample where the open speech segment began
+  long last_emitted_end_abs_ = 0;
   double compute_sec_ = 0.0;
 };
 

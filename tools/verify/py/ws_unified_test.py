@@ -464,6 +464,13 @@ class Reader(threading.Thread):
         self.telemetry = []
         self.messages = []
         self._condition = threading.Condition()
+        self._send_lock = threading.Lock()
+
+    def send_frame(self, opcode, payload):
+        """Serialize client frames so control and application writes cannot mix."""
+        frame = mask_frame(opcode, payload)
+        with self._send_lock:
+            self.sock.sendall(frame)
 
     def message_index(self):
         with self._condition:
@@ -490,6 +497,12 @@ class Reader(threading.Thread):
                 break
             if op is None or op == 0x8:  # EOF or CLOSE
                 break
+            if op == 0x9:                # PING requires same-payload PONG
+                try:
+                    self.send_frame(0xA, pl)
+                except (ConnectionResetError, BrokenPipeError, OSError):
+                    break
+                continue
             if op != 0x1:                # only text frames carry JSON
                 continue
             try:
@@ -879,7 +892,7 @@ def main(args):
     def run_command(name, payload, predicate):
         start_index = reader.message_index()
         print(f"  [test] sending {name} command...")
-        sock.sendall(mask_frame(0x1, json.dumps(payload).encode("utf-8")))
+        reader.send_frame(0x1, json.dumps(payload).encode("utf-8"))
         response = reader.wait_for(
             predicate, after_index=start_index, timeout=args.command_timeout)
         if response is None:
@@ -938,7 +951,7 @@ def main(args):
     try:
         sent = 0
         for off in range(0, len(pcm), frame_bytes):
-            sock.sendall(mask_frame(0x2, pcm[off:off + frame_bytes]))
+            reader.send_frame(0x2, pcm[off:off + frame_bytes])
             sent += 1
             if args.test_observer and sent == 10:
                 transient_sock, transient_reader = open_reader(
@@ -950,7 +963,7 @@ def main(args):
                     raise RuntimeError(
                         "no ready response for transient observer connection")
                 conflict_index = transient_reader.message_index()
-                transient_sock.sendall(mask_frame(0x2, pcm[:frame_bytes]))
+                transient_reader.send_frame(0x2, pcm[:frame_bytes])
                 conflict = transient_reader.wait_for(
                     lambda message: message.get("type") == "error",
                     after_index=conflict_index,
@@ -960,7 +973,7 @@ def main(args):
                 if contender_error != "audio producer already active":
                     raise RuntimeError(
                         "second audio producer was not explicitly rejected")
-                transient_sock.sendall(mask_frame(0x8, b"\x03\xe8"))
+                transient_reader.send_frame(0x8, b"\x03\xe8")
                 transient_sock.close()
                 transient_reader.join(timeout=2.0)
                 print("  [observer] transient connection closed during stream")
@@ -988,7 +1001,7 @@ def main(args):
         late_observer_flush_index = (
             late_observer_reader.message_index()
             if late_observer_reader is not None else 0)
-        sock.sendall(mask_frame(0x1, b'{"flush":true}'))
+        reader.send_frame(0x1, b'{"flush":true}')
         print("  [flush] waiting for timeline...")
         flush_timeline = reader.wait_for(
             lambda message: message.get("type") == "timeline",
@@ -1021,7 +1034,7 @@ def main(args):
         late_observer_end_index = (
             late_observer_reader.message_index()
             if late_observer_reader is not None else 0)
-        sock.sendall(mask_frame(0x1, b'{"end":true}'))
+        reader.send_frame(0x1, b'{"end":true}')
         print("  [end] waiting for final timeline...")
         final_timeline = reader.wait_for(
             lambda message: message.get("type") == "timeline",
@@ -1040,21 +1053,21 @@ def main(args):
     finally:
         tegra_sampler.stop()
         try:
-            sock.sendall(mask_frame(0x8, b"\x03\xe8"))
+            reader.send_frame(0x8, b"\x03\xe8")
         except (BrokenPipeError, ConnectionResetError, OSError):
             pass
         sock.close()
         reader.join(timeout=2.0)
         if observer_sock is not None:
             try:
-                observer_sock.sendall(mask_frame(0x8, b"\x03\xe8"))
+                observer_reader.send_frame(0x8, b"\x03\xe8")
             except (BrokenPipeError, ConnectionResetError, OSError):
                 pass
             observer_sock.close()
             observer_reader.join(timeout=2.0)
         if late_observer_sock is not None:
             try:
-                late_observer_sock.sendall(mask_frame(0x8, b"\x03\xe8"))
+                late_observer_reader.send_frame(0x8, b"\x03\xe8")
             except (BrokenPipeError, ConnectionResetError, OSError):
                 pass
             late_observer_sock.close()
@@ -1227,8 +1240,6 @@ def main(args):
         args, tl, pcm, args.out, source_evidence)
 
     if getattr(args, "rrd", None):
-        import os
-        import subprocess
         script = os.path.join(os.path.dirname(__file__), "..", "..",
                               "observability", "timeline_to_rerun.py")
         try:

@@ -1,0 +1,32 @@
+[speaker]
+min_embed_sec = 0.4
+edge_margin_sec = 0.0
+max_embed_window_sec = 3.0
+
+[punctuation_phrase]
+minimum_duration_sec = 0.5
+maximum_duration_sec = 4.0
+minimum_visible_character_count = 1
+punctuation = "，。？！；：、,.?!;:"
+
+[speaker_fusion]
+short_max_sec = 1.5
+short_min_score = 0.0
+short_min_margin = 0.04
+regular_min_score = 0.55
+regular_min_margin = 0.04
+
+[punctuation_phrase_projection]
+preserve_direct_anchors = true
+reject_on_direct_anchor_conflict = true
+require_agreeing_direct_anchor = false
+
+[posterior_bounded_phrase]
+# Match the pinned v2.1 native onset/offset contract.
+frame_activity_threshold = 0.5
+# Match the minimum audio accepted by the independent TitaNet probe.
+minimum_sustained_run_sec = 0.4
+minimum_piece_duration_sec = 0.4
+regular_piece_min_sec = 1.5
+preserve_regular_direct_anchors = true
+allow_regular_consensus_over_short_anchor = true

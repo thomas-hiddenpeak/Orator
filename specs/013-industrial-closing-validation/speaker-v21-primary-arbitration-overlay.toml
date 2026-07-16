@@ -1,0 +1,3 @@
+[reviewed_speaker_overlay]
+enabled = true
+allowed_reasons = ["primary_speaker_tie_break"]

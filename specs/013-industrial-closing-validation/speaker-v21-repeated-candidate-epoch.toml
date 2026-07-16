@@ -1,0 +1,53 @@
+[diarizer]
+model_weights = "models/sortformer_4spk_v2.1.safetensors"
+max_speakers = 4
+threshold = 0.4
+merge_gap_sec = 0.8
+deliver_interval_sec = 1.0
+spkcache_len = 188
+chunk_len = 340
+spkcache_update_period = 188
+chunk_left_context = 1
+chunk_right_context = 1
+spkcache_sil_frames = 3
+fifo_len = 188
+onset = 0.5
+offset = 0.5
+pad_onset = 0.0
+pad_offset = 0.0
+min_dur_on = 0.0
+min_dur_off = 0.0
+reset_period_sec = 0.0
+
+[speaker]
+match_threshold = 0.55
+min_embed_sec = 3.0
+min_confidence = 0.5
+retain_sec = 180.0
+overlap_eps_sec = 0.1
+max_ref_segs = 6
+edge_margin_sec = 0.3
+max_embed_window_sec = 10.0
+enroll_min_refs = 1
+speakers_per_session = 4
+merge_threshold = 0.70
+cosession_merge_threshold = 0.85
+cross_session_match_min_refs = 1
+defer_unmatched_cross_session = false
+# A low self-cosine alone may reflect channel/prosody variation and must not
+# create an unknown identity in this frozen candidate. Epoch changes require
+# evidence for a competing enrolled identity below.
+local_drift_threshold = 0.0
+local_drift_min_span_sec = 5.0
+local_drift_min_epoch_sec = 60.0
+local_drift_allow_same_session_match = true
+local_drift_competing_threshold = 0.72
+local_drift_competing_margin = 0.08
+local_drift_competing_min_span_sec = 3.0
+local_drift_competing_candidate_threshold = 0.58
+local_drift_competing_candidate_margin = 0.04
+# Frozen evidence topology: two non-overlapping candidate-strength clean spans
+# naming one competing identity confirm the epoch change.
+local_drift_competing_candidate_min_confirmations = 2
+local_drift_competing_backfill_sec = 120.0
+local_drift_competing_backfill_gap_sec = 4.0

@@ -29,6 +29,8 @@ namespace {
 
 using orator::pipeline::AuditoryStream;
 
+constexpr double kDurationEpsilonSec = 1e-6;
+
 struct TurnSpan {
   std::string evidence_id;
   double start_sec = 0.0;
@@ -192,7 +194,8 @@ int main(int argc, char** argv) {
     int embedded_count = 0;
     int insufficient_count = 0;
     for (const auto& span : spans) {
-      if (span.end_sec - span.start_sec < config.speaker_min_embed_sec) {
+      if (span.end_sec - span.start_sec + kDurationEpsilonSec <
+          config.speaker_min_embed_sec) {
         WriteEmptyEvidence(output, span, "insufficient_duration",
                            database.Size());
         ++insufficient_count;

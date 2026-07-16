@@ -1,0 +1,43 @@
+[timeline]
+# Preserve activity diarization as the business source. The independent native
+# primary track may arbitrate only an exact maximum-overlap activity tie.
+speaker_overlap_tie_policy = "primary_speaker"
+
+[speaker_primary_top1]
+enabled = true
+require_vad_support = true
+minimum_probability = 0.5
+minimum_run_sec = 0.4
+
+[speaker]
+min_embed_sec = 0.4
+edge_margin_sec = 0.0
+max_embed_window_sec = 3.0
+
+[speaker_fusion]
+short_max_sec = 1.5
+short_min_score = 0.0
+short_min_margin = 0.04
+regular_min_score = 0.55
+regular_min_margin = 0.04
+
+[primary_aligned_island]
+enabled = true
+require_vad_bounded_primary_run = true
+require_same_identity_activity_support = true
+require_robust_gallery_agreement = true
+require_complete_alignment_units = true
+require_uniform_known_baseline_conflict = true
+reject_conflicting_overlays = true
+minimum_activity_support_sec = 0.4
+protected_decision_reasons = [
+  "dual_gallery_exact_phrase_consensus",
+  "complete_local_phrase_sortformer_consensus",
+  "bounded_local_run_voiceprint_dual_voiceprint_override",
+  "vad_edge_run_low_activity_dual_voiceprint_consensus",
+  "complete_source_voiceprint_dual_voiceprint_override",
+  "complete_edge_contribution_sortformer_handoff",
+  "bracketed_local_churn_dual_voiceprint_consensus",
+  "bracketed_local_churn_relative_low_margin_consensus",
+  "maximal_multislot_envelope_dual_voiceprint_consensus",
+]

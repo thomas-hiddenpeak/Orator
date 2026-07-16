@@ -1,0 +1,50 @@
+[speaker]
+min_embed_sec = 0.4
+edge_margin_sec = 0.0
+max_embed_window_sec = 3.0
+
+[speaker_fusion]
+short_max_sec = 1.5
+short_min_score = 0.0
+short_min_margin = 0.04
+regular_min_score = 0.55
+regular_min_margin = 0.04
+
+[posterior_bounded_phrase]
+frame_activity_threshold = 0.5
+minimum_sustained_run_sec = 0.4
+minimum_piece_duration_sec = 0.4
+regular_piece_min_sec = 1.5
+preserve_regular_direct_anchors = true
+allow_regular_consensus_over_short_anchor = true
+
+[complete_local_phrase]
+enabled = true
+require_complete_punctuation_phrase = true
+require_padded_vad_interval = true
+require_single_top1_channel = true
+require_uniform_known_baseline_identity = true
+veto_any_different_session_voiceprint = true
+veto_any_different_robust_voiceprint = true
+veto_top_ranked_baseline_voiceprint = true
+project_complete_phrase = true
+minimum_phrase_sec = 0.4
+maximum_phrase_sec = 3.0
+
+[expanded_local_run_phrase]
+enabled = true
+require_maximal_contiguous_top1_run = true
+require_query_strictly_expands_phrase = true
+require_query_within_padded_vad = true
+require_query_within_existing_embedding_window = true
+require_uniform_known_baseline_identity = true
+require_session_registry_agreement = true
+require_robust_gallery_agreement = true
+require_raw_local_identity_agreement = true
+project_complete_phrase = true
+minimum_query_sec = 0.4
+maximum_query_sec = 3.0
+
+[robust_gallery]
+aggregation = "top_half_mean"
+require_complete_gallery = true

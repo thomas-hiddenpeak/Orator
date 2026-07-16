@@ -3,6 +3,7 @@
 import importlib.util
 import os
 import pathlib
+import socket
 import subprocess
 import sys
 import tempfile
@@ -25,6 +26,32 @@ class UnifiedManifestTest(unittest.TestCase):
             cwd=REPO, text=True, capture_output=True, check=False)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("--require-telemetry", result.stdout)
+
+    def test_reader_replies_to_ping_with_masked_same_payload_pong(self):
+        server_sock, client_sock = socket.socketpair()
+        server_sock.settimeout(2.0)
+        reader = ws_unified_test.Reader(client_sock, verbose=False)
+        reader.start()
+        payload = b"orator-validity"
+        try:
+            server_sock.sendall(bytes([0x89, len(payload)]) + payload)
+            header = ws_unified_test.recvn(server_sock, 2)
+            self.assertEqual(len(header), 2)
+            self.assertEqual(header[0] & 0x0F, 0x0A)
+            self.assertNotEqual(header[1] & 0x80, 0)
+            self.assertEqual(header[1] & 0x7F, len(payload))
+            mask = ws_unified_test.recvn(server_sock, 4)
+            encoded = ws_unified_test.recvn(server_sock, len(payload))
+            decoded = bytes(
+                encoded[index] ^ mask[index & 3]
+                for index in range(len(encoded)))
+            self.assertEqual(decoded, payload)
+            self.assertEqual(reader.messages, [])
+            self.assertEqual(reader.events, [])
+        finally:
+            server_sock.close()
+            client_sock.close()
+            reader.join(timeout=2.0)
 
     def test_git_workspace_digest_detects_content_change_at_same_path(self):
         with tempfile.TemporaryDirectory() as directory:

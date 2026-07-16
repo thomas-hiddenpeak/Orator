@@ -1,0 +1,30 @@
+[speaker_fusion]
+short_max_sec = 1.5
+short_min_score = 0.0
+short_min_margin = 0.04
+regular_min_score = 0.55
+regular_min_margin = 0.04
+
+[relative_top1_phrase_expansion]
+enabled = true
+required_candidate_kind = "v21_relative_top1_dual_voiceprint_consensus"
+required_piece_reason = "relative_top1_dual_voiceprint_consensus"
+require_accepted_relative_piece = true
+require_piece_within_phrase = true
+require_phrase_dual_top_rank_identity = true
+require_existing_margin = true
+phrase_margin = 0.04
+require_all_known_baseline_identities = true
+require_baseline_conflict = true
+reject_conflicting_overlays = true
+protected_decision_reasons = [
+  "dual_gallery_exact_phrase_consensus",
+  "complete_local_phrase_sortformer_consensus",
+  "bounded_local_run_voiceprint_dual_voiceprint_override",
+  "vad_edge_run_low_activity_dual_voiceprint_consensus",
+  "complete_source_voiceprint_dual_voiceprint_override",
+  "complete_edge_contribution_sortformer_handoff",
+  "bracketed_local_churn_dual_voiceprint_consensus",
+  "bracketed_local_churn_relative_low_margin_consensus",
+  "maximal_multislot_envelope_dual_voiceprint_consensus",
+]

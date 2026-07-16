@@ -1,0 +1,35 @@
+[speaker]
+min_embed_sec = 0.4
+edge_margin_sec = 0.0
+max_embed_window_sec = 10.0
+
+[speaker_fusion]
+short_max_sec = 1.5
+short_min_score = 0.0
+short_min_margin = 0.04
+regular_min_score = 0.55
+regular_min_margin = 0.04
+
+[bracketed_local_churn]
+enabled = true
+frame_activity_threshold = 0.5
+minimum_outer_run_sec = 0.4
+maximum_query_sec = 10.0
+require_same_outer_local_channel = true
+require_different_inner_channel = true
+require_dual_query_voiceprint_agreement = true
+require_query_identity_equal_outer_mapping = true
+project_complete_punctuation_phrases = true
+require_complete_alignment_in_query = true
+require_uniform_known_phrase_conflict = true
+require_dual_phrase_top_rank_outer_identity = true
+veto_single_inner_channel_with_dual_phrase_support = true
+allow_relative_low_margin_complete_clause_group = true
+veto_dual_agreed_different_phrase_top_rank = true
+require_single_active_channel_in_inner_runs = true
+reject_conflicting_overlays = true
+punctuation = "，。？！；：、,.?!;:"
+
+[robust_gallery]
+aggregation = "top_half_mean"
+require_complete_gallery = true

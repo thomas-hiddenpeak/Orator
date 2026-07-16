@@ -1,0 +1,16 @@
+[speaker]
+# Rebuild every production business interval from its own audio. The terminal
+# view uses the registry refreshed by this session's best long-span references.
+min_embed_sec = 0.4
+edge_margin_sec = 0.0
+max_embed_window_sec = 3.0
+
+[speaker_fusion]
+# Absolute cosine is duration-sensitive and the production 0.55 threshold is
+# calibrated for roughly 3-4 seconds. Short evidence therefore uses only the
+# existing active-identity margin; regular evidence reuses production gates.
+short_max_sec = 1.5
+short_min_score = 0.0
+short_min_margin = 0.04
+regular_min_score = 0.55
+regular_min_margin = 0.04

@@ -1,0 +1,8 @@
+[dual_gallery_phrase]
+enabled = true
+require_baseline_disagreement = true
+veto_competing_direct_anchor = true
+require_target_channel_top1 = true
+reject_competing_sustained_top1 = true
+require_known_baseline_conflict = true
+reject_short_only_direct_support = true

@@ -146,8 +146,26 @@ local_drift_competing_margin = 0.08
 local_drift_competing_min_span_sec = 3.0
 local_drift_competing_candidate_threshold = 0.58
 local_drift_competing_candidate_margin = 0.04
+local_drift_competing_candidate_min_confirmations = 2
 local_drift_competing_backfill_sec = 120.0
 local_drift_competing_backfill_gap_sec = 4.0
+
+[speaker_fusion]
+enable = true
+min_embed_sec = 0.4
+edge_margin_sec = 0.0
+max_embed_window_sec = 3.0
+phrase_min_sec = 0.5
+phrase_max_sec = 3.0
+punctuation = "，。？！"
+frame_activity_threshold = 0.5
+minimum_gallery_size = 4
+short_max_sec = 1.5
+short_min_score = 0.0
+short_min_margin = 0.04
+regular_min_score = 0.55
+regular_min_margin = 0.04
+four_view_min_aligned_units = 3
 
 [vad]
 model = "/models/vad/custom.safetensors"
@@ -175,6 +193,7 @@ speaker_support_min_coverage_ratio = 0.625
 speaker_support_max_gap_sec = 1.25
 speaker_support_max_islands = 2
 gap_fill_enabled = false
+speaker_overlap_tie_policy = "higher_confidence"
 
 [telemetry]
 gpu_interval_sec = 5.0
@@ -278,10 +297,21 @@ ws_text_log_path = "/tmp/ws-frames.jsonl"
           "cfg.speaker_local_drift_competing_candidate_threshold == 0.58");
     CHECK(cfg.speaker_local_drift_competing_candidate_margin == 0.04f,
           "cfg.speaker_local_drift_competing_candidate_margin == 0.04");
+    CHECK(cfg.speaker_local_drift_competing_candidate_min_confirmations == 2,
+          "candidate confirmation count == 2");
     CHECK(cfg.speaker_local_drift_competing_backfill_sec == 120.0,
           "cfg.speaker_local_drift_competing_backfill_sec == 120.0");
     CHECK(cfg.speaker_local_drift_competing_backfill_gap_sec == 4.0,
           "cfg.speaker_local_drift_competing_backfill_gap_sec == 4.0");
+    CHECK(cfg.speaker_fusion_enable, "cfg.speaker_fusion_enable == true");
+    CHECK(cfg.speaker_fusion_min_embed_sec == 0.4,
+          "cfg.speaker_fusion_min_embed_sec == 0.4");
+    CHECK(cfg.speaker_fusion_minimum_gallery_size == 4,
+          "cfg.speaker_fusion_minimum_gallery_size == 4");
+    CHECK(cfg.speaker_fusion_regular_min_score == 0.55f,
+          "cfg.speaker_fusion_regular_min_score == 0.55");
+    CHECK(cfg.speaker_fusion_four_view_min_aligned_units == 3,
+          "cfg.speaker_fusion_four_view_min_aligned_units == 3");
 
     // [vad]
     CHECK(cfg.vad_model == "/models/vad/custom.safetensors", "cfg.vad_model");
@@ -317,6 +347,8 @@ ws_text_log_path = "/tmp/ws-frames.jsonl"
           "cfg.timeline_speaker_support_max_islands == 2");
     CHECK(cfg.timeline_gap_fill_enabled == false,
           "cfg.timeline_gap_fill_enabled == false");
+    CHECK(cfg.timeline_speaker_overlap_tie_policy == "higher_confidence",
+          "cfg.timeline_speaker_overlap_tie_policy == higher_confidence");
 
     // [telemetry]
     CHECK(cfg.gpu_telemetry_interval_sec == 5.0,
@@ -346,10 +378,41 @@ ws_text_log_path = "/tmp/ws-frames.jsonl"
     CHECK(resolved.find("\"ws_text_log_path\":\"/tmp/ws-frames.jsonl\"") !=
               std::string::npos,
           "resolved config contains transport diagnostics");
-    CHECK(resolved.find("\"local_drift_competing_backfill_gap_sec\":4") !=
+    CHECK(resolved.find("\"minimum_gallery_size\":4") !=
               std::string::npos,
           "resolved config contains speaker-fusion tuning");
+    CHECK(resolved.find("\"four_view_min_aligned_units\":3") !=
+              std::string::npos,
+          "resolved config contains four-view aligned-unit gate");
+    CHECK(resolved.find(
+              "\"local_drift_competing_candidate_min_confirmations\":2") !=
+              std::string::npos,
+          "resolved config contains candidate confirmation count");
 
+    std::remove(path.c_str());
+  }
+
+  // ── Primary-speaker tie policy is typed and rejects unknown values ──
+  std::printf("\n-- Primary speaker tie policy --\n");
+  {
+    std::string path = WriteTemp(R"(
+[timeline]
+speaker_overlap_tie_policy = "primary_speaker"
+)");
+    pipeline::AuditoryStream::Config cfg;
+    CHECK(io::ApplyTomlConfig(path, cfg),
+          "primary_speaker tie policy is accepted");
+    CHECK(cfg.timeline_speaker_overlap_tie_policy == "primary_speaker",
+          "primary_speaker tie policy is loaded exactly");
+    std::remove(path.c_str());
+
+    path = WriteTemp(R"(
+[timeline]
+speaker_overlap_tie_policy = "unbounded_override"
+)");
+    pipeline::AuditoryStream::Config invalid;
+    CHECK(!io::ApplyTomlConfig(path, invalid),
+          "unknown speaker tie policy is rejected");
     std::remove(path.c_str());
   }
 

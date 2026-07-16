@@ -54,6 +54,11 @@ class DiarizationWorker {
   using SpeakerSink =
       std::function<void(const std::vector<core::DiarSegment>&)>;
 
+  // Publishes each incremental raw Sortformer frame block exactly once. The
+  // sink receives absolute common-clock timing and a reset-aware local slot
+  // offset; consumers never need to read this worker's private state.
+  using FrameSink = std::function<void(const core::DiarizationFrames&, int)>;
+
   // `diarizer` is owned by the controller and must outlive the worker.
   // The diarizer must already be initialized + weight-loaded.
   // `stream` is the CUDA stream for all GPU work (kernels, copies, sync).
@@ -65,6 +70,7 @@ class DiarizationWorker {
 
   // Set the typed diarization evidence sink. Optional.
   void set_speaker_sink(SpeakerSink sink) { speaker_sink_ = std::move(sink); }
+  void set_frame_sink(FrameSink sink) { frame_sink_ = std::move(sink); }
 
   // Post-diarization segment processor (Spec 010): a hook invoked on the
   // freshly derived segment view BEFORE it is delivered to the sink, allowed to
@@ -113,6 +119,7 @@ class DiarizationWorker {
   core::TimeBase tb_;
   cudaStream_t stream_;
   SpeakerSink speaker_sink_;
+  FrameSink frame_sink_;
   SegmentProcessor segment_processor_;
   long last_deliver_sample_ = 0;
   std::atomic<long> processed_samples_{0};

@@ -240,6 +240,19 @@ def _assignment_signature(
     return signature
 
 
+def _speaker_sequence_signature(
+    entries: list[ViewEntry], start: float, end: float,
+) -> list[str]:
+    signature: list[str] = []
+    for entry in entries:
+        if _overlap(entry.start, entry.end, start, end) <= 0.0:
+            continue
+        value = entry.speaker
+        if not signature or signature[-1] != value:
+            signature.append(value)
+    return signature
+
+
 def _render(
     timeline_path: Path,
     reference_path: Path,
@@ -286,17 +299,19 @@ def _render_by_reference(
     comparison_path: Path | None = None,
     comparison_entries: list[ViewEntry] | None = None,
     only_changed: bool = False,
+    speaker_sequence_only: bool = False,
 ) -> str:
     selected: list[tuple[RefBlock, float, float, bool | None]] = []
     for block in refs:
         evidence_start, evidence_end = _evidence_window(block, audio_sec)
         changed = None
         if comparison_entries is not None:
+            signature = (
+                _speaker_sequence_signature
+                if speaker_sequence_only else _assignment_signature)
             changed = (
-                _assignment_signature(
-                    comparison_entries, evidence_start, evidence_end)
-                != _assignment_signature(
-                    entries, evidence_start, evidence_end)
+                signature(comparison_entries, evidence_start, evidence_end)
+                != signature(entries, evidence_start, evidence_end)
             )
         if only_changed and not changed:
             continue
@@ -358,6 +373,12 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         help="with --comparison-timeline, show only changed reference rows",
     )
     parser.add_argument(
+        "--speaker-sequence-only",
+        action="store_true",
+        help=("compare collapsed speaker-label sequences without treating "
+              "boundary, reason, or uncertainty-only changes as changed"),
+    )
+    parser.add_argument(
         "--by-reference",
         action="store_true",
         help="render one section for every reference row",
@@ -414,6 +435,7 @@ def main(argv: list[str]) -> int:
             comparison_path=comparison_path,
             comparison_entries=comparison_entries,
             only_changed=args.only_changed,
+            speaker_sequence_only=args.speaker_sequence_only,
         )
     if not args.by_reference:
         render_args["windows"] = windows

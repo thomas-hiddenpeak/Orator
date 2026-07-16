@@ -76,12 +76,12 @@ void HandleSpeakerSink(ComprehensiveTimeline& comp, std::mutex& state_mutex,
     char b[200];
     if (s.speaker_id.empty()) {
       std::snprintf(b, sizeof(b),
-                    "{\"start\":%.3f,\"end\":%.3f,\"speaker\":\"%s\","
+                    "{\"start\":%.9f,\"end\":%.9f,\"speaker\":\"%s\","
                     "\"confidence\":%.9g}",
                     s.start_sec, s.end_sec, label.c_str(), s.confidence);
     } else {
       std::snprintf(b, sizeof(b),
-                    "{\"start\":%.3f,\"end\":%.3f,\"speaker\":\"%s\","
+                    "{\"start\":%.9f,\"end\":%.9f,\"speaker\":\"%s\","
                     "\"speaker_id\":\"%s\",\"confidence\":%.9g}",
                     s.start_sec, s.end_sec, label.c_str(), s.speaker_id.c_str(),
                     s.confidence);
@@ -137,12 +137,12 @@ void HandleTextSink(ComprehensiveTimeline& comp,
   msg.timestamp_sec = start;
   msg.qos = static_cast<uint8_t>(protocol::QoS::AT_LEAST_ONCE);
   msg.schema_version = 1;
-  msg.data = "{\"type\":\"" + std::string(is_final ? "asr" : "asr_partial") +
-             "\",\"id\":" + std::to_string(id) +
-             ",\"text_id\":" + std::to_string(id) +
-             ",\"start\":" + std::to_string(start) +
-             ",\"end\":" + std::to_string(end) + ",\"text\":\"" +
-             JsonEscape(text) + "\"}";
+  char prefix[256];
+  std::snprintf(prefix, sizeof(prefix),
+                "{\"type\":\"%s\",\"id\":%ld,\"text_id\":%ld,"
+                "\"start\":%.9f,\"end\":%.9f,\"text\":\"",
+                is_final ? "asr" : "asr_partial", id, id, start, end);
+  msg.data = std::string(prefix) + JsonEscape(text) + "\"}";
   protocol_timeline->Publish(*asr_handle, topic, msg,
                              protocol::QoS::AT_LEAST_ONCE);
 }
@@ -163,18 +163,19 @@ void HandleAlignSink(ComprehensiveTimeline& comp,
     const auto& u = units[i];
     typed_units.push_back({u.start_sec, u.end_sec, u.text});
     char b[256];
-    std::snprintf(b, sizeof(b), "{\"text\":\"%s\",\"start\":%.3f,\"end\":%.3f}",
+    std::snprintf(b, sizeof(b), "{\"text\":\"%s\",\"start\":%.9f,\"end\":%.9f}",
                   JsonEscape(u.text).c_str(), u.start_sec, u.end_sec);
     units_json += b;
     if (i + 1 < units.size()) units_json += ",";
   }
   units_json += "]";
 
-  std::string payload = "{\"type\":\"align\",\"id\":" + std::to_string(id) +
-                        ",\"text_id\":" + std::to_string(id) +
-                        ",\"start\":" + std::to_string(seg_start) +
-                        ",\"end\":" + std::to_string(seg_end) +
-                        ",\"units\":" + units_json + "}";
+  char prefix[256];
+  std::snprintf(prefix, sizeof(prefix),
+                "{\"type\":\"align\",\"id\":%ld,\"text_id\":%ld,"
+                "\"start\":%.9f,\"end\":%.9f,\"units\":",
+                id, id, seg_start, seg_end);
+  std::string payload = std::string(prefix) + units_json + "}";
 
   const auto result =
       comp.DepositAlignment({id, seg_start, seg_end, std::move(typed_units)});
@@ -243,7 +244,7 @@ void HandleVadDrain(core::IVad* vad_detector, ComprehensiveTimeline& comp,
     msg.schema_version = 1;
     char buf[128];
     std::snprintf(buf, sizeof(buf),
-                  "{\"type\":\"vad\",\"start\":%.3f,\"end\":%.3f,"
+                  "{\"type\":\"vad\",\"start\":%.9f,\"end\":%.9f,"
                   "\"source\":\"silero_gpu\"}",
                   s, e);
     msg.data = buf;
@@ -268,7 +269,8 @@ void PublishVadProgress(ComprehensiveTimeline& comp,
   msg.schema_version = 1;
   char buf[64];
   std::snprintf(buf, sizeof(buf),
-                "{\"type\":\"vad_progress\",\"horizon\":%.3f}", horizon_sec);
+                "{\"type\":\"vad_progress\",\"horizon\":%.9f}",
+                horizon_sec);
   msg.data = buf;
   // AT_MOST_ONCE: a frequent, lossy heartbeat -- the next one supersedes it.
   protocol_timeline->Publish(*vad_handle, protocol::kVadProgress, msg,

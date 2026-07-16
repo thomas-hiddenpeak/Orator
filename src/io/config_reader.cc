@@ -150,6 +150,15 @@ bool ApplyTomlConfig(const std::string& path,
     if (auto v = sec->get("gap_fill_enabled")) {
       if (auto b = v->value<bool>()) cfg.timeline_gap_fill_enabled = *b;
     }
+    if (auto v = sec->get("speaker_overlap_tie_policy")) {
+      if (auto s = v->value<std::string>()) {
+        if (*s != "shorter_span" && *s != "higher_confidence" &&
+            *s != "primary_speaker") {
+          return false;
+        }
+        cfg.timeline_speaker_overlap_tie_policy = *s;
+      }
+    }
   }
 
   // ── [speaker] ─────────────────────────────────────────────────────
@@ -249,6 +258,12 @@ bool ApplyTomlConfig(const std::string& path,
         cfg.speaker_local_drift_competing_candidate_margin =
             static_cast<float>(*d);
     }
+    if (auto v =
+            sec->get("local_drift_competing_candidate_min_confirmations")) {
+      if (auto i = v->value<int64_t>())
+        cfg.speaker_local_drift_competing_candidate_min_confirmations =
+            static_cast<int>(*i);
+    }
     if (auto v = sec->get("local_drift_competing_backfill_sec")) {
       if (auto d = v->value<double>())
         cfg.speaker_local_drift_competing_backfill_sec = *d;
@@ -256,6 +271,73 @@ bool ApplyTomlConfig(const std::string& path,
     if (auto v = sec->get("local_drift_competing_backfill_gap_sec")) {
       if (auto d = v->value<double>())
         cfg.speaker_local_drift_competing_backfill_gap_sec = *d;
+    }
+  }
+
+  // ── [speaker_fusion] ──────────────────────────────────────────────
+  if (auto* sec = config["speaker_fusion"].as_table()) {
+    if (auto v = sec->get("enable")) {
+      if (auto b = v->value<bool>()) cfg.speaker_fusion_enable = *b;
+    }
+    if (auto v = sec->get("min_embed_sec")) {
+      if (auto d = v->value<double>()) cfg.speaker_fusion_min_embed_sec = *d;
+    }
+    if (auto v = sec->get("edge_margin_sec")) {
+      if (auto d = v->value<double>()) cfg.speaker_fusion_edge_margin_sec = *d;
+    }
+    if (auto v = sec->get("max_embed_window_sec")) {
+      if (auto d = v->value<double>()) {
+        cfg.speaker_fusion_max_embed_window_sec = *d;
+      }
+    }
+    if (auto v = sec->get("phrase_min_sec")) {
+      if (auto d = v->value<double>()) cfg.speaker_fusion_phrase_min_sec = *d;
+    }
+    if (auto v = sec->get("phrase_max_sec")) {
+      if (auto d = v->value<double>()) cfg.speaker_fusion_phrase_max_sec = *d;
+    }
+    if (auto v = sec->get("punctuation")) {
+      if (auto s = v->value<std::string>()) {
+        cfg.speaker_fusion_punctuation = *s;
+      }
+    }
+    if (auto v = sec->get("frame_activity_threshold")) {
+      if (auto d = v->value<double>()) {
+        cfg.speaker_fusion_frame_activity_threshold = static_cast<float>(*d);
+      }
+    }
+    if (auto v = sec->get("minimum_gallery_size")) {
+      if (auto n = v->value<int>()) {
+        cfg.speaker_fusion_minimum_gallery_size = *n;
+      }
+    }
+    if (auto v = sec->get("short_max_sec")) {
+      if (auto d = v->value<double>()) cfg.speaker_fusion_short_max_sec = *d;
+    }
+    if (auto v = sec->get("short_min_score")) {
+      if (auto d = v->value<double>()) {
+        cfg.speaker_fusion_short_min_score = static_cast<float>(*d);
+      }
+    }
+    if (auto v = sec->get("short_min_margin")) {
+      if (auto d = v->value<double>()) {
+        cfg.speaker_fusion_short_min_margin = static_cast<float>(*d);
+      }
+    }
+    if (auto v = sec->get("regular_min_score")) {
+      if (auto d = v->value<double>()) {
+        cfg.speaker_fusion_regular_min_score = static_cast<float>(*d);
+      }
+    }
+    if (auto v = sec->get("regular_min_margin")) {
+      if (auto d = v->value<double>()) {
+        cfg.speaker_fusion_regular_min_margin = static_cast<float>(*d);
+      }
+    }
+    if (auto v = sec->get("four_view_min_aligned_units")) {
+      if (auto n = v->value<int>()) {
+        cfg.speaker_fusion_four_view_min_aligned_units = *n;
+      }
     }
   }
 

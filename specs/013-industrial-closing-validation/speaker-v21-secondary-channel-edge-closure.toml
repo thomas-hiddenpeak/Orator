@@ -1,0 +1,74 @@
+[speaker]
+min_embed_sec = 0.4
+edge_margin_sec = 0.0
+max_embed_window_sec = 3.0
+
+[punctuation_phrase]
+minimum_duration_sec = 0.5
+maximum_duration_sec = 3.0
+minimum_visible_character_count = 1
+punctuation = "，。？！；：、,.?!;:"
+
+[punctuation_phrase_projection]
+preserve_direct_anchors = true
+reject_on_direct_anchor_conflict = true
+require_agreeing_direct_anchor = false
+
+[speaker_fusion]
+short_max_sec = 1.5
+short_min_score = 0.0
+short_min_margin = 0.04
+regular_min_score = 0.55
+regular_min_margin = 0.04
+
+[posterior_bounded_phrase]
+frame_activity_threshold = 0.5
+minimum_sustained_run_sec = 0.4
+minimum_piece_duration_sec = 0.4
+regular_piece_min_sec = 1.5
+preserve_regular_direct_anchors = true
+allow_regular_consensus_over_short_anchor = true
+
+[secondary_channel_edge_closure]
+enabled = true
+require_one_containing_vad = true
+require_two_contiguous_known_identity_runs = true
+require_selected_direct_anchor_prefix = true
+require_single_positive_duration_suffix_unit = true
+require_dual_phrase_margin_rank_identity = true
+require_selected_channel_sustained_activity = true
+require_suffix_competing_top1_with_selected_channel_active = true
+project_complete_phrase = true
+reject_conflicting_overlays = true
+reject_overlapping_proposals = true
+frame_activity_threshold = 0.5
+minimum_selected_channel_sec = 0.4
+positive_suffix_unit_count = 1
+allowed_anchor_reasons = [
+  "baseline_confirmed_short_direct_voiceprint",
+  "baseline_confirmed_regular_direct_voiceprint",
+]
+allowed_competing_reasons = [
+  "baseline_confirmed_short_direct_voiceprint",
+]
+protected_decision_reasons = [
+  "dual_gallery_exact_phrase_consensus",
+  "complete_local_phrase_sortformer_consensus",
+  "bounded_local_run_voiceprint_dual_voiceprint_override",
+  "vad_edge_run_low_activity_dual_voiceprint_consensus",
+  "complete_source_voiceprint_dual_voiceprint_override",
+  "complete_edge_contribution_sortformer_handoff",
+  "bracketed_local_churn_dual_voiceprint_consensus",
+  "bracketed_local_churn_relative_low_margin_consensus",
+  "maximal_multislot_envelope_dual_voiceprint_consensus",
+  "relative_top1_complete_phrase_expansion",
+  "complete_vad_phrase_four_view_voiceprint_challenge",
+  "contextual_vad_phrase_four_view_voiceprint_challenge",
+  "edge_anchor_trimmed_dual_voiceprint_challenge",
+  "primary_run_dual_phrase_anchor_expansion",
+  "phrase_led_outer_abstention_challenge",
+]
+
+[robust_gallery]
+aggregation = "top_half_mean"
+require_complete_gallery = true

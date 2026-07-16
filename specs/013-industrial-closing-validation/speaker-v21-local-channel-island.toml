@@ -1,0 +1,31 @@
+[speaker]
+min_embed_sec = 0.4
+edge_margin_sec = 0.0
+max_embed_window_sec = 3.0
+
+[speaker_fusion]
+short_max_sec = 1.5
+short_min_score = 0.0
+short_min_margin = 0.04
+regular_min_score = 0.55
+regular_min_margin = 0.04
+
+[posterior_bounded_phrase]
+frame_activity_threshold = 0.5
+minimum_sustained_run_sec = 0.4
+minimum_piece_duration_sec = 0.4
+regular_piece_min_sec = 1.5
+preserve_regular_direct_anchors = true
+allow_regular_consensus_over_short_anchor = true
+
+[local_channel_island]
+enabled = true
+require_vad_continuity = true
+require_same_bracketing_channel = true
+require_session_registry_agreement = true
+require_robust_gallery_agreement = true
+require_raw_local_identity_agreement = true
+require_known_baseline_conflict = true
+project_only_wholly_contained_alignment_units = true
+minimum_island_run_sec = 0.4
+minimum_adjacent_run_sec = 0.4

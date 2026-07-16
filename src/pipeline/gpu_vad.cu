@@ -388,8 +388,7 @@ void GpuVad::DrainSegments(bool finalize,
           in_speech_ = false;
           // Speech actually stopped where this silence run began.
           const long seg_end = win_end_abs - silence_samples_;
-          if (seg_end > seg_start_abs_)
-            segs->push_back({seg_start_abs_, seg_end});
+          EmitPaddedSegment(seg_start_abs_, seg_end, win_end_abs, segs);
           speech_samples_ = 0;
         }
       } else {
@@ -408,12 +407,25 @@ void GpuVad::DrainSegments(bool finalize,
 
   if (finalize && in_speech_) {
     // Flush the open speech segment up to the last processed sample.
-    if (next_window_abs_ > seg_start_abs_)
-      segs->push_back({seg_start_abs_, next_window_abs_});
+    EmitPaddedSegment(seg_start_abs_, next_window_abs_, next_window_abs_, segs);
     in_speech_ = false;
     speech_samples_ = 0;
     silence_samples_ = 0;
   }
+}
+
+void GpuVad::EmitPaddedSegment(
+    long raw_start, long raw_end, long processed_horizon,
+    std::vector<core::VadSegmentResult>* segs) {
+  if (segs == nullptr || raw_end <= raw_start) return;
+  const long pad = static_cast<long>(params_.silero_speech_pad_ms) *
+                   params_.sample_rate / 1000;
+  const long padded_start =
+      std::max(last_emitted_end_abs_, std::max(0L, raw_start - pad));
+  const long padded_end = std::min(processed_horizon, raw_end + pad);
+  if (padded_end <= padded_start) return;
+  segs->push_back({padded_start, padded_end});
+  last_emitted_end_abs_ = padded_end;
 }
 
 void GpuVad::Reset() {
@@ -423,6 +435,7 @@ void GpuVad::Reset() {
   in_speech_ = false;
   speech_samples_ = 0;
   silence_samples_ = 0;
+  last_emitted_end_abs_ = 0;
   if (d_h_) CUDA_CHECK(cudaMemset(d_h_, 0, kHidden * sizeof(float)));
   if (d_c_) CUDA_CHECK(cudaMemset(d_c_, 0, kHidden * sizeof(float)));
 }

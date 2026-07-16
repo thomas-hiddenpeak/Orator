@@ -1,0 +1,35 @@
+[speaker_fusion]
+short_max_sec = 1.5
+short_min_score = 0.0
+short_min_margin = 0.04
+regular_min_score = 0.55
+regular_min_margin = 0.04
+
+[primary_run_phrase_anchor]
+enabled = true
+contained_phrase_count = 2
+require_same_source_adjacent_phrases = true
+require_anchor_contains_mapped_identity = true
+require_dual_anchor_voiceprint_consensus = true
+require_known_single_competitor_combined_range = true
+project_both_complete_phrases = true
+reject_dual_eligible_competitor = true
+reject_dual_eligible_disagreement = true
+reject_conflicting_overlays = true
+reject_overlapping_proposals = true
+boundary_tolerance_frames = 1
+protected_decision_reasons = [
+  "dual_gallery_exact_phrase_consensus",
+  "complete_local_phrase_sortformer_consensus",
+  "bounded_local_run_voiceprint_dual_voiceprint_override",
+  "vad_edge_run_low_activity_dual_voiceprint_consensus",
+  "complete_source_voiceprint_dual_voiceprint_override",
+  "complete_edge_contribution_sortformer_handoff",
+  "bracketed_local_churn_dual_voiceprint_consensus",
+  "bracketed_local_churn_relative_low_margin_consensus",
+  "maximal_multislot_envelope_dual_voiceprint_consensus",
+  "relative_top1_complete_phrase_expansion",
+  "complete_vad_phrase_four_view_voiceprint_challenge",
+  "contextual_vad_phrase_four_view_voiceprint_challenge",
+  "edge_anchor_trimmed_dual_voiceprint_challenge",
+]

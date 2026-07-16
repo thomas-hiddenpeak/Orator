@@ -50,3 +50,15 @@ Testing/
 # Runtime log files
 *.log
 orator_ws.log
+
+# Local runtime/session output. Canonical acceptance artifacts live outside the
+# repository and are referenced by immutable hashes in the review records.
+/storage/
+/sessions/
+/runtime/
+/artifacts/
+/test-results/
+/playwright-report/
+/screenshots/
+/spec013-speakers.bin
+/*-speakers.bin

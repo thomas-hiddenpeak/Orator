@@ -1,0 +1,20 @@
+[complete_phrase_cross_prototype]
+enabled = true
+required_candidate_kind = "v21_prototype_local_veto"
+required_decision_reason = "cross_prototype_margin_veto"
+require_accepted_challenge = true
+require_exact_punctuation_phrase = true
+require_identity_parity = true
+require_uniform_known_baseline_conflict = true
+reject_conflicting_overlays = true
+protected_decision_reasons = [
+  "dual_gallery_exact_phrase_consensus",
+  "complete_local_phrase_sortformer_consensus",
+  "bounded_local_run_voiceprint_dual_voiceprint_override",
+  "vad_edge_run_low_activity_dual_voiceprint_consensus",
+  "complete_source_voiceprint_dual_voiceprint_override",
+  "complete_edge_contribution_sortformer_handoff",
+  "bracketed_local_churn_dual_voiceprint_consensus",
+  "bracketed_local_churn_relative_low_margin_consensus",
+  "maximal_multislot_envelope_dual_voiceprint_consensus",
+]

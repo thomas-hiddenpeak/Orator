@@ -62,6 +62,7 @@ namespace orator {
 namespace pipeline {
 
 class SpeakerIdentityStage;
+class SpeakerEvidenceStage;
 
 class AuditoryStream {
  public:
@@ -114,6 +115,7 @@ class AuditoryStream {
     double timeline_speaker_support_max_gap_sec = 1.00;
     int timeline_speaker_support_max_islands = 1;
     bool timeline_gap_fill_enabled = true;
+    std::string timeline_speaker_overlap_tie_policy = "shorter_span";
 
     // ── VAD pipeline ─────────────────────────────────────────────────
     bool vad_stream = true;
@@ -188,8 +190,28 @@ class AuditoryStream {
     double speaker_local_drift_competing_min_span_sec = 5.0;
     float speaker_local_drift_competing_candidate_threshold = 0.0f;
     float speaker_local_drift_competing_candidate_margin = 0.05f;
+    int speaker_local_drift_competing_candidate_min_confirmations = 0;
     double speaker_local_drift_competing_backfill_sec = 0.0;
     double speaker_local_drift_competing_backfill_gap_sec = 3.0;
+
+    // Final/revisable multi-resolution speaker evidence. These fields govern
+    // model queries and evidence construction only; business selection gates
+    // remain in the timeline configuration below.
+    bool speaker_fusion_enable = false;
+    double speaker_fusion_min_embed_sec = 0.4;
+    double speaker_fusion_edge_margin_sec = 0.0;
+    double speaker_fusion_max_embed_window_sec = 3.0;
+    double speaker_fusion_phrase_min_sec = 0.5;
+    double speaker_fusion_phrase_max_sec = 3.0;
+    std::string speaker_fusion_punctuation = "，。？！；：、,.?!;:";
+    float speaker_fusion_frame_activity_threshold = 0.5f;
+    int speaker_fusion_minimum_gallery_size = 2;
+    double speaker_fusion_short_max_sec = 1.5;
+    float speaker_fusion_short_min_score = 0.0f;
+    float speaker_fusion_short_min_margin = 0.04f;
+    float speaker_fusion_regular_min_score = 0.55f;
+    float speaker_fusion_regular_min_margin = 0.04f;
+    int speaker_fusion_four_view_min_aligned_units = 2;
 
     // ── Storage ──────────────────────────────────────────────────────
     std::string storage_disk_path = "/tmp/orator/storage/";
@@ -348,6 +370,7 @@ class AuditoryStream {
   std::unique_ptr<model::TitaNetEmbedder> speaker_embedder_;
   std::unique_ptr<model::SpeakerDatabase> speaker_db_;
   std::unique_ptr<SpeakerIdentityStage> speaker_id_stage_;
+  std::unique_ptr<SpeakerEvidenceStage> speaker_evidence_stage_;
 
   // Spec 004: independent VAD detector (third pipeline consumer).
   std::unique_ptr<core::IVad> vad_detector_;

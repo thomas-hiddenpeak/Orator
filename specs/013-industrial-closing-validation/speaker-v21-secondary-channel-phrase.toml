@@ -1,0 +1,48 @@
+[speaker]
+min_embed_sec = 0.4
+edge_margin_sec = 0.0
+max_embed_window_sec = 3.0
+
+[punctuation_phrase]
+minimum_duration_sec = 0.5
+maximum_duration_sec = 3.0
+minimum_visible_character_count = 1
+punctuation = "，。？！；：、,.?!;:"
+
+[punctuation_phrase_projection]
+preserve_direct_anchors = true
+reject_on_direct_anchor_conflict = true
+require_agreeing_direct_anchor = false
+
+[speaker_fusion]
+short_max_sec = 1.5
+short_min_score = 0.0
+short_min_margin = 0.04
+regular_min_score = 0.55
+regular_min_margin = 0.04
+
+[posterior_bounded_phrase]
+frame_activity_threshold = 0.5
+minimum_sustained_run_sec = 0.4
+minimum_piece_duration_sec = 0.4
+regular_piece_min_sec = 1.5
+preserve_regular_direct_anchors = true
+allow_regular_consensus_over_short_anchor = true
+
+[secondary_channel_phrase]
+enabled = true
+require_complete_punctuation_phrase = true
+require_uniform_known_baseline_identity = true
+require_session_and_robust_same_top_rank = true
+require_existing_duration_margin = true
+ignore_score_gate_only_with_raw_channel_support = true
+require_voiceprint_conflict_with_baseline = true
+require_non_top1_selected_channel = true
+require_selected_channel_sustained_activity = true
+project_complete_phrase = true
+frame_activity_threshold = 0.5
+minimum_selected_channel_sec = 0.4
+
+[robust_gallery]
+aggregation = "top_half_mean"
+require_complete_gallery = true

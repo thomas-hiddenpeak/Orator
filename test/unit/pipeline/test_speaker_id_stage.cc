@@ -23,10 +23,10 @@ constexpr int kDim = 192;
 
 // Returns a controlled 192-d embedding selected by the first audio sample:
 // samples[0] <= 0.5 -> "speaker 0" (dim 0), <= 1.5 -> "speaker 1" (dim 1),
-// <= 2.5 -> "speaker 2" (dim 2), else a weak candidate toward speaker 1 with
-// cosine 0.65. One-hot vectors are orthogonal, giving clean match/no-match
-// behaviour for the existing tests while allowing a deterministic weak-match
-// case for competing drift backfill.
+// <= 2.5 -> "speaker 2" (dim 2), <= 3.5 -> a weak candidate toward speaker 1,
+// else a weak candidate toward speaker 2. Candidate embeddings have cosine
+// 0.65. One-hot vectors are orthogonal, giving clean match/no-match behaviour
+// while allowing deterministic competing-drift confirmation tests.
 class StubEmbedder : public core::ISpeakerEmbedder {
  public:
   void LoadWeights(const std::string&) override {}
@@ -35,7 +35,8 @@ class StubEmbedder : public core::ISpeakerEmbedder {
   std::vector<float> Embed(const core::AudioChunk& c) override {
     std::vector<float> e(kDim, 0.0f);
     if (c.num_samples > 0 && c.samples[0] > 2.5f) {
-      e[1] = 0.65f;
+      const int weak_speaker = c.samples[0] <= 3.5f ? 1 : 2;
+      e[weak_speaker] = 0.65f;
       e[3] = static_cast<float>(std::sqrt(1.0 - 0.65 * 0.65));
       return e;
     }
@@ -102,6 +103,23 @@ int main() {
     Check(segs[1].speaker_id == "spk_1", "seg1 should enroll spk_1");
     Check(segs[2].speaker_id.empty(), "short seg must stay unidentified");
     Check(db.Size() == 2, "two speakers enrolled");
+  }
+
+  // Final phrase queries reuse the mature session and robust galleries but do
+  // not make an identity decision inside the identity stage.
+  {
+    const auto evidence = stage.EvaluateSpan(
+        1.0, 2.0, {"spk_0", "spk_1"}, 0.4, 0.0, 3.0);
+    Check(evidence.embedding_available,
+          "retained phrase audio should produce an embedding");
+    Check(evidence.session_gallery_complete &&
+              evidence.robust_gallery_complete,
+          "both voiceprint gallery views should be complete");
+    Check(evidence.session_scores.size() == 2 &&
+              evidence.robust_scores.size() == 2,
+          "phrase evidence exposes every active identity score");
+    Check(stage.IdentityAt(0, 2.0) == "spk_0",
+          "common-clock local identity lookup resolves the active epoch");
   }
 
   // Delivery 2: a NEW SESSION's local slot (4 = session 1, speakers_per_session
@@ -367,6 +385,94 @@ int main() {
     Check(confirmed[4].speaker_id == "spk_1",
           "confirmed competing split binds the strong span");
     Check(db6.Size() == 2, "backfilled competing split must reuse speaker id");
+  }
+
+  // Repeated candidate-strength spans can confirm an epoch without lowering
+  // the strong gate. A different candidate replaces the pending state, and a
+  // strong active-epoch span clears it. A later strong return starts another
+  // epoch instead of rewriting the confirmed interval.
+  {
+    model::SpeakerDatabase db7(/*max_speakers=*/16, kDim);
+    pipeline::SpeakerIdConfig cfg7 = cfg;
+    cfg7.min_embed_sec = 2.0;
+    cfg7.local_drift_threshold = 0.0f;
+    cfg7.local_drift_min_epoch_sec = 0.0;
+    cfg7.local_drift_allow_same_session_match = true;
+    cfg7.local_drift_competing_min_span_sec = 2.0;
+    cfg7.local_drift_competing_threshold = 0.8f;
+    cfg7.local_drift_competing_margin = 0.1f;
+    cfg7.local_drift_competing_candidate_threshold = 0.6f;
+    cfg7.local_drift_competing_candidate_margin = 0.05f;
+    cfg7.local_drift_competing_candidate_min_confirmations = 2;
+    cfg7.local_drift_competing_backfill_sec = 20.0;
+    cfg7.local_drift_competing_backfill_gap_sec = 4.0;
+    pipeline::SpeakerIdentityStage stage7(&embedder, &db7, tb, cfg7);
+
+    std::vector<float> audio7(64 * sr, 0.0f);
+    for (int i = 8 * sr; i < 13 * sr; ++i) audio7[i] = 1.0f;
+    for (int i = 14 * sr; i < 18 * sr; ++i) audio7[i] = 2.0f;
+    for (int i = 21 * sr; i < 25 * sr; ++i) audio7[i] = 3.0f;
+    for (int i = 27 * sr; i < 31 * sr; ++i) audio7[i] = 4.0f;
+    for (int i = 33 * sr; i < 37 * sr; ++i) audio7[i] = 3.0f;
+    for (int i = 45 * sr; i < 49 * sr; ++i) audio7[i] = 3.0f;
+    for (int i = 51 * sr; i < 55 * sr; ++i) audio7[i] = 3.0f;
+    stage7.AppendAudio(audio7.data(), static_cast<int>(audio7.size()));
+
+    std::vector<core::DiarSegment> setup = {
+        Seg(0, 1.0, 4.0, 0.9f), Seg(1, 9.0, 12.0, 0.9f),
+        Seg(2, 14.0, 17.0, 0.9f)};
+    stage7.Process(setup);
+    Check(setup[0].speaker_id == "spk_0", "repeat setup local0 -> spk_0");
+    Check(setup[1].speaker_id == "spk_1", "repeat setup local1 -> spk_1");
+    Check(setup[2].speaker_id == "spk_2", "repeat setup local2 -> spk_2");
+
+    auto first_candidate = setup;
+    first_candidate.push_back(Seg(0, 21.0, 24.0, 0.9f));
+    stage7.Process(first_candidate);
+    Check(first_candidate.back().speaker_id == "spk_0",
+          "one candidate must preserve the active epoch");
+
+    auto conflicting_candidate = first_candidate;
+    conflicting_candidate.push_back(Seg(0, 27.0, 30.0, 0.9f));
+    stage7.Process(conflicting_candidate);
+    Check(conflicting_candidate.back().speaker_id == "spk_0",
+          "a different candidate must replace rather than confirm");
+
+    auto replaced_candidate = conflicting_candidate;
+    replaced_candidate.push_back(Seg(0, 33.0, 36.0, 0.9f));
+    stage7.Process(replaced_candidate);
+    Check(replaced_candidate.back().speaker_id == "spk_0",
+          "one span after candidate replacement must remain provisional");
+
+    auto active_confirmation = replaced_candidate;
+    active_confirmation.push_back(Seg(0, 39.0, 42.0, 0.9f));
+    stage7.Process(active_confirmation);
+    Check(active_confirmation.back().speaker_id == "spk_0",
+          "strong active evidence must clear the pending candidate");
+
+    auto repeated_first = active_confirmation;
+    repeated_first.push_back(Seg(0, 45.0, 48.0, 0.9f));
+    stage7.Process(repeated_first);
+    Check(repeated_first.back().speaker_id == "spk_0",
+          "first repeated candidate must remain provisional");
+
+    auto repeated_second = repeated_first;
+    repeated_second.push_back(Seg(0, 51.0, 54.0, 0.9f));
+    stage7.Process(repeated_second);
+    Check(repeated_second[repeated_second.size() - 2].speaker_id == "spk_1",
+          "second matching candidate must backfill the confirmed epoch");
+    Check(repeated_second.back().speaker_id == "spk_1",
+          "second matching candidate must bind to the competing identity");
+
+    auto strong_return = repeated_second;
+    strong_return.push_back(Seg(0, 57.0, 63.0, 0.9f));
+    stage7.Process(strong_return);
+    Check(strong_return[strong_return.size() - 2].speaker_id == "spk_1",
+          "strong return must preserve the confirmed competing epoch");
+    Check(strong_return.back().speaker_id == "spk_0",
+          "strong return must start a new active-identity epoch");
+    Check(db7.Size() == 3,
+          "repeated confirmation must reuse enrolled speaker ids");
   }
 
   if (fails) {

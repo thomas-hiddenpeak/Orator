@@ -93,6 +93,9 @@ struct SpeakerIdConfig {
                                   // if a later strong competing span confirms
                                   // the same global id.
   float local_drift_competing_candidate_margin = 0.05f;
+  int local_drift_competing_candidate_min_confirmations = 0;  // disabled at 0;
+                                  // repeated non-overlapping candidate spans
+                                  // naming one competing id confirm a split
   double local_drift_competing_backfill_sec = 0.0;  // max pending age to
                                   // backfill from a later confirmed split.
   double local_drift_competing_backfill_gap_sec = 3.0;  // same-local gap used
@@ -102,6 +105,19 @@ struct SpeakerIdConfig {
 
 class SpeakerIdentityStage {
  public:
+  struct VoiceprintScore {
+    std::string speaker_id;
+    float score = 0.0f;
+  };
+
+  struct SpanEvidence {
+    bool embedding_available = false;
+    bool session_gallery_complete = false;
+    bool robust_gallery_complete = false;
+    std::vector<VoiceprintScore> session_scores;
+    std::vector<VoiceprintScore> robust_scores;
+  };
+
   SpeakerIdentityStage(core::ISpeakerEmbedder* embedder,
                        model::SpeakerDatabase* db, core::TimeBase tb,
                        SpeakerIdConfig config);
@@ -112,6 +128,17 @@ class SpeakerIdentityStage {
   // Resolve global identities and fill DiarSegment::speaker_id in place
   // (called on the diarization thread, before the segments are delivered).
   void Process(std::vector<core::DiarSegment>& segs);
+
+  // Query the same retained audio and TitaNet model against two independent
+  // session galleries. This returns model evidence only; it never chooses an
+  // identity or mutates the diarization track.
+  SpanEvidence EvaluateSpan(double start_sec, double end_sec,
+                            const std::vector<std::string>& active_ids,
+                            double min_duration_sec,
+                            double edge_margin_sec,
+                            double max_window_sec);
+
+  std::string IdentityAt(int local_speaker, double at_sec) const;
 
   void Reset();
 
@@ -142,6 +169,7 @@ class SpeakerIdentityStage {
     std::string global_id;
     float own_score = 0.0f;
     float competing_score = 0.0f;
+    int confirmations = 0;
     std::vector<float> emb;
   };
 
@@ -170,7 +198,7 @@ class SpeakerIdentityStage {
                                   float threshold, float margin,
                                   float* own_score,
                                   float* best_score) const;
-  void RecordPendingCompeting(int local, const core::DiarSegment& s,
+  bool RecordPendingCompeting(int local, const core::DiarSegment& s,
                               double backfill_start, double quality,
                               const std::vector<float>& emb,
                               const std::string& global_id, float own_score,
@@ -192,6 +220,9 @@ class SpeakerIdentityStage {
   // Embed the centre of a span (edge-trimmed, window-capped) with TitaNet;
   // returns empty if the audio has aged out of the retain window.
   std::vector<float> EmbedSpan(double start_sec, double end_sec);
+  std::vector<float> EmbedSpan(double start_sec, double end_sec,
+                               double edge_margin_sec,
+                               double max_window_sec);
 
   core::ISpeakerEmbedder* embedder_;
   model::SpeakerDatabase* db_;

@@ -122,6 +122,19 @@ three
         self.assertIn("## ref-0002", rendered)
         self.assertIn("Displayed entries: `1`", rendered)
 
+    def test_speaker_sequence_signature_ignores_boundary_refinement(self):
+        coarse = [speaker_business_review_packet.ViewEntry(
+            0.0, 4.0, "spk_1", "whole")]
+        refined = [
+            speaker_business_review_packet.ViewEntry(
+                0.0, 2.0, "spk_1", "left"),
+            speaker_business_review_packet.ViewEntry(
+                2.0, 4.0, "spk_1", "right"),
+        ]
+        signature = speaker_business_review_packet._speaker_sequence_signature
+        self.assertEqual(
+            signature(coarse, 0.0, 4.0), signature(refined, 0.0, 4.0))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,3 @@
+[robust_gallery]
+aggregation = "top_half_mean"
+require_complete_gallery = true

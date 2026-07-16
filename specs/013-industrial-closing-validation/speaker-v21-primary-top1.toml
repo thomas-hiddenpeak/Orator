@@ -1,0 +1,19 @@
+[speaker_primary_top1]
+enabled = true
+require_vad_support = true
+minimum_probability = 0.5
+minimum_run_sec = 0.4
+
+[reviewed_speaker_overlay]
+enabled = true
+allowed_reasons = [
+  "dual_gallery_exact_phrase_consensus",
+  "complete_local_phrase_sortformer_consensus",
+  "bounded_local_run_voiceprint_dual_voiceprint_override",
+  "vad_edge_run_low_activity_dual_voiceprint_consensus",
+  "complete_source_voiceprint_dual_voiceprint_override",
+  "complete_edge_contribution_sortformer_handoff",
+  "bracketed_local_churn_dual_voiceprint_consensus",
+  "bracketed_local_churn_relative_low_margin_consensus",
+  "maximal_multislot_envelope_dual_voiceprint_consensus",
+]

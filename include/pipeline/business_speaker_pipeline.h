@@ -19,6 +19,12 @@ namespace pipeline {
 
 class BusinessSpeakerPipeline {
  public:
+  enum class SpeakerOverlapTiePolicy {
+    kShorterSpan,
+    kHigherConfidence,
+    kPrimarySpeaker,
+  };
+
   struct Config {
     double align_snap_pause_sec = 0.25;
     double align_boundary_split_tolerance_sec = 0.08;
@@ -26,6 +32,17 @@ class BusinessSpeakerPipeline {
     double speaker_support_max_gap_sec = 1.00;
     int speaker_support_max_islands = 1;
     bool gap_fill_enabled = true;
+    bool voiceprint_fusion_enabled = false;
+    double voiceprint_short_max_sec = 1.5;
+    float voiceprint_short_min_score = 0.0f;
+    float voiceprint_short_min_margin = 0.04f;
+    float voiceprint_regular_min_score = 0.55f;
+    float voiceprint_regular_min_margin = 0.04f;
+    double voiceprint_primary_consensus_min_sec = 0.4;
+    double voiceprint_phrase_max_sec = 3.0;
+    int voiceprint_four_view_min_aligned_units = 2;
+    SpeakerOverlapTiePolicy speaker_overlap_tie_policy =
+        SpeakerOverlapTiePolicy::kShorterSpan;
   };
 
   using Revision = ComprehensiveTimeline::Revision;
@@ -58,6 +75,8 @@ class BusinessSpeakerPipeline {
   using RawTextSeg = ComprehensiveTimeline::RawTextSeg;
   using SpeakerDecisionAudit = ComprehensiveTimeline::SpeakerDecisionAudit;
   using SpeakerInput = ComprehensiveTimeline::SpeakerInput;
+  using SpeakerVoiceprintEvidence =
+      ComprehensiveTimeline::SpeakerVoiceprintEvidence;
 
   struct SpeakerSeg {
     double start = 0.0;
@@ -70,6 +89,7 @@ class BusinessSpeakerPipeline {
   struct SpeakerAttr {
     std::string speaker;
     std::string speaker_id;
+    std::string primary_reason;
   };
 
   struct SpeakerSupport {
@@ -93,14 +113,23 @@ class BusinessSpeakerPipeline {
   void SynchronizeAll();
   void ApplyDiarization(const std::vector<SpeakerInput>& segments,
                         std::vector<Revision>* revisions);
+  void ApplyPrimarySpeaker(const std::vector<SpeakerInput>& segments,
+                           std::vector<Revision>* revisions);
   void ApplyAsrFinal(const RawTextSeg& segment,
                      std::vector<Revision>* revisions);
   void ApplyAlignment(const AlignGroup& group,
                       std::vector<Revision>* revisions);
+  void ApplySpeakerVoiceprint(
+      const std::vector<SpeakerVoiceprintEvidence>& evidence,
+      std::vector<Revision>* revisions);
   void PublishRevisions(const std::vector<Revision>& revisions);
   void ResetState();
 
   SpeakerAttr AttributeInterval(double start, double end) const;
+  SpeakerAttr PrimaryAttribute(double start, double end) const;
+  bool PrimaryTieSelected(double start, double end,
+                          const std::string& speaker,
+                          const std::string& speaker_id) const;
   SpeakerSupport ComputeSpeakerSupport(double start, double end,
                                        const std::string& speaker,
                                        const std::string& speaker_id) const;
@@ -110,9 +139,13 @@ class BusinessSpeakerPipeline {
       const std::string& text_projection_source) const;
   Entry MakeEntry(double start, double end, const std::string& speaker,
                   const std::string& speaker_id, std::string text, long text_id,
-                  const std::string& text_projection_source) const;
+                  const std::string& text_projection_source,
+                  const std::string& primary_reason = "") const;
   void MergeEntrySupport(Entry* dst, const Entry& src) const;
   std::vector<Entry> SplitTextByDiar(const TextSeg& text) const;
+  std::vector<Entry> SplitTextByDiarBase(const TextSeg& text) const;
+  std::vector<Entry> ApplyVoiceprintEvidence(
+      const TextSeg& text, std::vector<Entry> entries) const;
   void ReprojectText(const TextSeg& text, std::vector<Revision>* revisions);
 
   ComprehensiveTimeline* timeline_ = nullptr;
@@ -121,8 +154,10 @@ class BusinessSpeakerPipeline {
   RevisionSink revision_sink_;
 
   std::vector<SpeakerSeg> speakers_;
+  std::vector<SpeakerSeg> primary_speakers_;
   std::vector<TextSeg> texts_;
   std::map<long, AlignGroup> align_;
+  std::vector<SpeakerVoiceprintEvidence> voiceprint_;
   std::map<long, std::vector<Entry>> pieces_;
 
   mutable std::mutex mutex_;

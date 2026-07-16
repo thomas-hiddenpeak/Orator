@@ -1,0 +1,25 @@
+[diarizer]
+model_weights = "models/sortformer_4spk_v2.1.safetensors"
+max_speakers = 4
+threshold = 0.4
+merge_gap_sec = 0.8
+deliver_interval_sec = 1.0
+
+# Accepted continuous v2.1 execution profile. Only the four postprocessing
+# values below differ from the closing baseline.
+spkcache_len = 188
+chunk_len = 340
+spkcache_update_period = 188
+chunk_left_context = 1
+chunk_right_context = 1
+spkcache_sil_frames = 3
+fifo_len = 188
+
+# Pinned NeMo PostProcessingParams defaults.
+onset = 0.5
+offset = 0.5
+pad_onset = 0.0
+pad_offset = 0.0
+min_dur_on = 0.0
+min_dur_off = 0.0
+reset_period_sec = 0.0

@@ -1,0 +1,4 @@
+[timeline]
+# Equal-overlap diar candidates are compared by confidence before total segment
+# length. This is the sole FR16ZZ experiment delta.
+speaker_overlap_tie_policy = "higher_confidence"

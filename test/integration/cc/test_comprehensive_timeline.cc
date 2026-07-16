@@ -1,7 +1,9 @@
 #include <cstdio>
 #include <string>
 
+#include "core/time_base.h"
 #include "pipeline/comprehensive_timeline.h"
+#include "pipeline/json_util.h"
 
 namespace {
 
@@ -114,6 +116,23 @@ int main() {
   CHECK(timeline.FindAsrFinal(7)->text == "immutable final",
         "business re-attribution leaves finalized ASR immutable");
 
+  Timeline::Entry one_sample_entry = business_entry;
+  one_sample_entry.start = 1.0;
+  one_sample_entry.end =
+      one_sample_entry.start + orator::core::TimeBase(16000).SecondsAt(1);
+  const std::string one_sample_json =
+      orator::pipeline::SerializeRevisionToJson(
+          {one_sample_entry.start, one_sample_entry.end, {one_sample_entry}},
+          "business_speaker");
+  CHECK(one_sample_json.find(
+            "\"dirty_start\":1.000000000,\"dirty_end\":1.000062500") !=
+            std::string::npos,
+        "revision JSON preserves a positive one-sample dirty interval");
+  CHECK(one_sample_json.find(
+            "\"start\":1.000000000,\"end\":1.000062500") !=
+            std::string::npos,
+        "revision JSON preserves a positive one-sample business entry");
+
   timeline.DepositVad({2.0, 2.5});
   timeline.AdvanceVadHorizon(3.0);
   timeline.UpdateVadState(true, 2.75);
@@ -130,11 +149,55 @@ int main() {
   CHECK(second_vad.in_speech && second_vad.state_observed_at == 2.75,
         "VAD activity state is available as typed evidence");
 
+  Timeline::DiarFrameBlock frame_block;
+  frame_block.start = 0.0;
+  frame_block.frame_period_sec = 0.08;
+  frame_block.num_frames = 2;
+  frame_block.num_speakers = 2;
+  frame_block.probabilities = {0.8f, 0.2f, 0.7f, 0.3f};
+  CHECK(timeline.DepositDiarFrameBlock(frame_block) ==
+            Timeline::DepositResult::kInserted,
+        "first raw diar frame block is inserted");
+  Timeline::DiarFrameBlock next_block = frame_block;
+  next_block.start = 0.16;
+  CHECK(timeline.DepositDiarFrameBlock(next_block) ==
+            Timeline::DepositResult::kInserted,
+        "contiguous raw diar frame block is appended");
+  Timeline::DiarFrameBlock overlapping_block = frame_block;
+  overlapping_block.start = 0.08;
+  CHECK(timeline.DepositDiarFrameBlock(overlapping_block) ==
+            Timeline::DepositResult::kConflict,
+        "overlapping raw diar frame block is rejected");
+  CHECK(timeline.SnapshotDiarFrames().size() == 2,
+        "rejected frame block cannot mutate the raw frame track");
+
+  Timeline::SpeakerVoiceprintEvidence voiceprint;
+  voiceprint.evidence_id = "phrase:7:0";
+  voiceprint.kind = "punctuation_phrase";
+  voiceprint.text_id = 7;
+  voiceprint.source_start = 0;
+  voiceprint.source_end = 9;
+  voiceprint.start = 1.0;
+  voiceprint.end = 2.0;
+  voiceprint.embedding_available = true;
+  voiceprint.robust_gallery_complete = true;
+  voiceprint.session_scores = {{"voice_0", 0.8f}, {"voice_1", 0.5f}};
+  voiceprint.robust_scores = {{"voice_0", 0.75f}, {"voice_1", 0.45f}};
+  timeline.DepositSpeakerVoiceprint({voiceprint});
+  const auto voiceprint_snapshot = timeline.SnapshotSpeakerVoiceprint();
+  CHECK(voiceprint_snapshot.size() == 1 &&
+            voiceprint_snapshot[0].evidence_id == "phrase:7:0",
+        "typed voiceprint evidence is committed without a decision");
+  CHECK(timeline.FindAsrFinal(7)->text == "immutable final",
+        "voiceprint evidence cannot mutate finalized ASR");
+
   timeline.UnsubscribeAsrFinals(final_subscription);
   timeline.Clear();
   const auto cleared = timeline.SnapshotTracks();
   CHECK(cleared.diarization.empty() && cleared.asr.empty() &&
             cleared.vad.empty() && cleared.align.empty() &&
+            cleared.diar_frames.empty() &&
+            cleared.speaker_voiceprint.empty() &&
             cleared.business_speaker.empty(),
         "session reset clears every stored track");
   CHECK(evidence_notifications >= 5,

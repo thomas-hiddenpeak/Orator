@@ -9,6 +9,7 @@
 #include "model/streaming_sortformer.h"
 #include "model/titanet_embedder.h"
 #include "pipeline/speaker_identity_stage.h"
+#include "pipeline/speaker_evidence_stage.h"
 #include "protocol/protocol_timeline.h"
 #include "protocol/session_store.h"
 
@@ -108,6 +109,34 @@ void AuditoryStream::Start() {
   business_config.speaker_support_max_islands =
       config_.timeline_speaker_support_max_islands;
   business_config.gap_fill_enabled = config_.timeline_gap_fill_enabled;
+  business_config.voiceprint_fusion_enabled = config_.speaker_fusion_enable;
+  business_config.voiceprint_short_max_sec =
+      config_.speaker_fusion_short_max_sec;
+  business_config.voiceprint_short_min_score =
+      config_.speaker_fusion_short_min_score;
+  business_config.voiceprint_short_min_margin =
+      config_.speaker_fusion_short_min_margin;
+  business_config.voiceprint_regular_min_score =
+      config_.speaker_fusion_regular_min_score;
+  business_config.voiceprint_regular_min_margin =
+      config_.speaker_fusion_regular_min_margin;
+  business_config.voiceprint_primary_consensus_min_sec =
+      config_.speaker_fusion_min_embed_sec;
+  business_config.voiceprint_phrase_max_sec =
+      config_.speaker_fusion_phrase_max_sec;
+  business_config.voiceprint_four_view_min_aligned_units =
+      config_.speaker_fusion_four_view_min_aligned_units;
+  if (config_.timeline_speaker_overlap_tie_policy == "higher_confidence") {
+    business_config.speaker_overlap_tie_policy =
+        BusinessSpeakerPipeline::SpeakerOverlapTiePolicy::kHigherConfidence;
+  } else if (config_.timeline_speaker_overlap_tie_policy ==
+             "primary_speaker") {
+    business_config.speaker_overlap_tie_policy =
+        BusinessSpeakerPipeline::SpeakerOverlapTiePolicy::kPrimarySpeaker;
+  } else {
+    business_config.speaker_overlap_tie_policy =
+        BusinessSpeakerPipeline::SpeakerOverlapTiePolicy::kShorterSpan;
+  }
   business_speaker_pipeline_ = std::make_unique<BusinessSpeakerPipeline>(
       &comp_, business_config, common_time_base(),
       [this](const ComprehensiveTimeline::Revision& revision) {
@@ -246,12 +275,31 @@ void AuditoryStream::Start() {
         config_.speaker_local_drift_competing_candidate_threshold;
     sc.local_drift_competing_candidate_margin =
         config_.speaker_local_drift_competing_candidate_margin;
+    sc.local_drift_competing_candidate_min_confirmations =
+        config_.speaker_local_drift_competing_candidate_min_confirmations;
     sc.local_drift_competing_backfill_sec =
         config_.speaker_local_drift_competing_backfill_sec;
     sc.local_drift_competing_backfill_gap_sec =
         config_.speaker_local_drift_competing_backfill_gap_sec;
     speaker_id_stage_ = std::make_unique<SpeakerIdentityStage>(
         speaker_embedder_.get(), speaker_db_.get(), common_time_base(), sc);
+    SpeakerEvidenceStage::Config evidence_config;
+    evidence_config.enabled = config_.speaker_fusion_enable;
+    evidence_config.min_embed_sec = config_.speaker_fusion_min_embed_sec;
+    evidence_config.edge_margin_sec =
+        config_.speaker_fusion_edge_margin_sec;
+    evidence_config.max_embed_window_sec =
+        config_.speaker_fusion_max_embed_window_sec;
+    evidence_config.phrase_min_sec = config_.speaker_fusion_phrase_min_sec;
+    evidence_config.phrase_max_sec = config_.speaker_fusion_phrase_max_sec;
+    evidence_config.short_max_sec = config_.speaker_fusion_short_max_sec;
+    evidence_config.punctuation = config_.speaker_fusion_punctuation;
+    evidence_config.frame_activity_threshold =
+        config_.speaker_fusion_frame_activity_threshold;
+    evidence_config.minimum_gallery_size =
+        config_.speaker_fusion_minimum_gallery_size;
+    speaker_evidence_stage_ = std::make_unique<SpeakerEvidenceStage>(
+        speaker_id_stage_.get(), std::move(evidence_config));
     LOG_INFO("[speaker-id] enabled: %s (registry %s)\n", wpath.c_str(),
              config_.speaker_registry_path.empty()
                  ? "(none)"
@@ -285,6 +333,22 @@ void AuditoryStream::StartWorkers() {
               comp_, comp_mutex_, last_segments_, protocol_timeline_.get(),
               diar_handle_.get(),
               [this](const std::string& json) { EmitLocked(json); }, segs);
+        });
+    diar_worker_->set_frame_sink(
+        [this](const core::DiarizationFrames& frames, int local_offset) {
+          ComprehensiveTimeline::DiarFrameBlock block;
+          block.start = frames.t_start_sec;
+          block.frame_period_sec = frames.frame_period_sec;
+          block.num_frames = frames.num_frames;
+          block.num_speakers = frames.num_speakers;
+          block.local_speaker_offset = local_offset;
+          block.probabilities = frames.probs;
+          const auto result = comp_.DepositDiarFrameBlock(block);
+          if (result == ComprehensiveTimeline::DepositResult::kConflict ||
+              result == ComprehensiveTimeline::DepositResult::kInvalid) {
+            LOG_ERROR("[diar] rejected raw frame block at %.3f\n",
+                      frames.t_start_sec);
+          }
         });
     // Spec 010: resolve global voiceprint identities on the segment view before
     // it is delivered. The worker depends only on a std::function (Art. III);
@@ -517,6 +581,20 @@ void AuditoryStream::StopWorkers() {
     align_worker_->Stop();
     align_worker_->FinalizeExtent(total_samples_.load());
   }
+  if (speaker_evidence_stage_) {
+    const auto primary = speaker_evidence_stage_->BuildPrimarySpeaker(
+        comp_.SnapshotTracks());
+    // Primary top-1 is an independent typed track and can revise exact
+    // activity ties. Voiceprint intervals must be generated from that revised
+    // business view, otherwise coarse pre-primary source ranges overwrite the
+    // more precise projection during the following evidence update.
+    comp_.DepositPrimarySpeaker(primary);
+    const auto voiceprint = speaker_evidence_stage_->BuildVoiceprint(
+        comp_.SnapshotTracks());
+    comp_.DepositSpeakerVoiceprint(voiceprint);
+    LOG_INFO("[speaker-fusion] final evidence: primary=%zu voiceprint=%zu\n",
+             primary.size(), voiceprint.size());
+  }
   if (business_speaker_pipeline_) {
     business_speaker_pipeline_->Finalize(total_samples_.load());
   }
@@ -740,6 +818,7 @@ void AuditoryStream::Reset() {
   }
   if (diarizer_) diarizer_->Reset();
   if (asr_) asr_->Reset();
+  if (speaker_id_stage_) speaker_id_stage_->Reset();
   session_start_wall_sec_.store(0.0);
   wall_clock_ok_.store(true);
   timebase_reconciled_.store(false);

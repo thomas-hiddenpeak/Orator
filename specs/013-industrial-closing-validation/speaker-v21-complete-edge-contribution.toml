@@ -1,0 +1,51 @@
+[speaker]
+min_embed_sec = 0.4
+edge_margin_sec = 0.0
+max_embed_window_sec = 3.0
+
+[speaker_fusion]
+short_max_sec = 1.5
+short_min_score = 0.0
+short_min_margin = 0.04
+regular_min_score = 0.55
+regular_min_margin = 0.04
+
+[posterior_bounded_phrase]
+frame_activity_threshold = 0.5
+minimum_sustained_run_sec = 0.4
+minimum_piece_duration_sec = 0.4
+regular_piece_min_sec = 1.5
+preserve_regular_direct_anchors = true
+allow_regular_consensus_over_short_anchor = true
+
+[vad_active_edge]
+enabled = true
+require_padded_vad_interval = true
+require_multiple_top1_runs = true
+require_edge_run = true
+require_adjacent_sustained_run = true
+require_all_edge_frames_active = true
+require_all_adjacent_frames_active = true
+require_raw_local_identity = true
+veto_agreed_different_dual_voiceprint = true
+require_known_baseline_conflict = true
+project_only_wholly_contained_alignment_units = true
+minimum_run_sec = 0.4
+maximum_run_sec = 3.0
+frame_activity_threshold = 0.5
+
+[complete_edge_contribution]
+enabled = true
+require_complete_punctuation_clause = true
+require_terminal_edge_run = true
+require_all_nonseparator_characters_aligned = true
+require_clause_wholly_inside_edge_run = true
+merge_only_adjacent_complete_clauses = true
+require_uniform_known_baseline_identity = true
+reuse_active_edge_identity_decision = true
+project_complete_clause_group = true
+punctuation = "，。？！；：、,.?!;:"
+
+[robust_gallery]
+aggregation = "top_half_mean"
+require_complete_gallery = true

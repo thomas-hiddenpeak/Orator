@@ -221,13 +221,16 @@ int main() {
   const std::string& diar_event = events.back();
   CHECK(diar_event.find("\"confidence\":0.700123429") != std::string::npos,
         "live diarization retains round-trip float confidence precision");
-  const auto first = diar_event.find("\"start\":0.100");
+  const auto first = diar_event.find("\"start\":0.100000000");
   const auto overlap_zero = diar_event.find(
-      "\"start\":1.000,\"end\":1.500,\"speaker\":\"speaker_0\"");
+      "\"start\":1.000000000,\"end\":1.500000000,"
+      "\"speaker\":\"speaker_0\"");
   const auto overlap_one = diar_event.find(
-      "\"start\":1.000,\"end\":1.500,\"speaker\":\"speaker_1\"");
+      "\"start\":1.000000000,\"end\":1.500000000,"
+      "\"speaker\":\"speaker_1\"");
   const auto longest = diar_event.find(
-      "\"start\":1.000,\"end\":2.000,\"speaker\":\"speaker_2\"");
+      "\"start\":1.000000000,\"end\":2.000000000,"
+      "\"speaker\":\"speaker_2\"");
   CHECK(first < overlap_zero && overlap_zero < overlap_one &&
             overlap_one < longest,
         "live diarization uses terminal canonical ordering");

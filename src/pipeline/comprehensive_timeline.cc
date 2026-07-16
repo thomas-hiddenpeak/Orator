@@ -97,6 +97,30 @@ void ComprehensiveTimeline::DepositDiarizationSegment(
   DispatchEvidence({EvidenceTrack::kDiarization, -1}, subscribers);
 }
 
+void ComprehensiveTimeline::DepositPrimarySpeaker(
+    const std::vector<SpeakerInput>& segments) {
+  std::vector<EvidenceSubscriber> subscribers;
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    primary_speaker_.clear();
+    primary_speaker_.reserve(segments.size());
+    for (const auto& segment : segments) {
+      if (ValidSpan(segment.start, segment.end)) {
+        primary_speaker_.push_back(segment);
+      }
+    }
+    std::stable_sort(primary_speaker_.begin(), primary_speaker_.end(),
+                     [](const SpeakerInput& a, const SpeakerInput& b) {
+                       if (!NearEqual(a.start, b.start)) {
+                         return a.start < b.start;
+                       }
+                       return a.end < b.end;
+                     });
+    subscribers = CopyEvidenceSubscribersLocked();
+  }
+  DispatchEvidence({EvidenceTrack::kPrimarySpeaker, -1}, subscribers);
+}
+
 ComprehensiveTimeline::DepositResult ComprehensiveTimeline::DepositAsrFinal(
     const RawTextSeg& segment) {
   if (segment.id < 0 || !ValidSpan(segment.start, segment.end)) {
@@ -200,6 +224,59 @@ ComprehensiveTimeline::DepositResult ComprehensiveTimeline::DepositAlignment(
   return DepositResult::kInserted;
 }
 
+ComprehensiveTimeline::DepositResult
+ComprehensiveTimeline::DepositDiarFrameBlock(const DiarFrameBlock& block) {
+  if (!std::isfinite(block.start) || block.start < 0.0 ||
+      !std::isfinite(block.frame_period_sec) ||
+      block.frame_period_sec <= 0.0 || block.num_frames <= 0 ||
+      block.num_speakers <= 0 || block.local_speaker_offset < 0 ||
+      block.probabilities.size() !=
+          static_cast<std::size_t>(block.num_frames) * block.num_speakers) {
+    return DepositResult::kInvalid;
+  }
+
+  std::vector<EvidenceSubscriber> subscribers;
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (!diar_frames_.empty()) {
+      const DiarFrameBlock& previous = diar_frames_.back();
+      const double previous_end =
+          previous.start + previous.num_frames * previous.frame_period_sec;
+      if (block.start + 1e-6 < previous_end) {
+        return DepositResult::kConflict;
+      }
+    }
+    diar_frames_.push_back(block);
+    subscribers = CopyEvidenceSubscribersLocked();
+  }
+  DispatchEvidence({EvidenceTrack::kDiarFrames, -1}, subscribers);
+  return DepositResult::kInserted;
+}
+
+void ComprehensiveTimeline::DepositSpeakerVoiceprint(
+    const std::vector<SpeakerVoiceprintEvidence>& evidence) {
+  std::vector<EvidenceSubscriber> subscribers;
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    speaker_voiceprint_ = evidence;
+    std::stable_sort(
+        speaker_voiceprint_.begin(), speaker_voiceprint_.end(),
+        [](const SpeakerVoiceprintEvidence& left,
+           const SpeakerVoiceprintEvidence& right) {
+          if (left.text_id != right.text_id) return left.text_id < right.text_id;
+          if (left.source_start != right.source_start) {
+            return left.source_start < right.source_start;
+          }
+          if (left.source_end != right.source_end) {
+            return left.source_end < right.source_end;
+          }
+          return left.evidence_id < right.evidence_id;
+        });
+    subscribers = CopyEvidenceSubscribersLocked();
+  }
+  DispatchEvidence({EvidenceTrack::kSpeakerVoiceprint, -1}, subscribers);
+}
+
 void ComprehensiveTimeline::DepositBusinessSpeakerRevision(
     const Revision& revision) {
   if (revision.entries.empty()) return;
@@ -271,6 +348,7 @@ ComprehensiveTimeline::TrackSnapshot ComprehensiveTimeline::SnapshotTracks()
   std::lock_guard<std::mutex> lock(mutex_);
   TrackSnapshot snapshot;
   snapshot.diarization = diarization_;
+  snapshot.primary_speaker = primary_speaker_;
   snapshot.asr = asr_;
   snapshot.vad = vad_;
   snapshot.align.reserve(align_.size());
@@ -282,6 +360,8 @@ ComprehensiveTimeline::TrackSnapshot ComprehensiveTimeline::SnapshotTracks()
                    [](const AlignGroup& a, const AlignGroup& b) {
                      return a.start < b.start;
                    });
+  snapshot.diar_frames = diar_frames_;
+  snapshot.speaker_voiceprint = speaker_voiceprint_;
   snapshot.business_speaker = BuildBusinessSnapshotLocked();
   snapshot.speaker_label_ids = BuildSpeakerLabelIdsLocked();
   snapshot.speaker_ids.assign(seen_speaker_ids_.begin(),
@@ -293,6 +373,12 @@ std::vector<ComprehensiveTimeline::SpeakerInput>
 ComprehensiveTimeline::SnapshotDiarization() const {
   std::lock_guard<std::mutex> lock(mutex_);
   return diarization_;
+}
+
+std::vector<ComprehensiveTimeline::SpeakerInput>
+ComprehensiveTimeline::SnapshotPrimarySpeaker() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return primary_speaker_;
 }
 
 std::vector<ComprehensiveTimeline::RawTextSeg>
@@ -328,6 +414,18 @@ ComprehensiveTimeline::SnapshotAlign() const {
                      return a.start < b.start;
                    });
   return groups;
+}
+
+std::vector<ComprehensiveTimeline::DiarFrameBlock>
+ComprehensiveTimeline::SnapshotDiarFrames() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return diar_frames_;
+}
+
+std::vector<ComprehensiveTimeline::SpeakerVoiceprintEvidence>
+ComprehensiveTimeline::SnapshotSpeakerVoiceprint() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return speaker_voiceprint_;
 }
 
 std::optional<ComprehensiveTimeline::RawTextSeg>
@@ -370,6 +468,7 @@ void ComprehensiveTimeline::Clear() {
   {
     std::lock_guard<std::mutex> lock(mutex_);
     diarization_.clear();
+    primary_speaker_.clear();
     asr_.clear();
     vad_.clear();
     vad_snapshot_ = std::make_shared<const std::vector<VadSeg>>();
@@ -377,6 +476,8 @@ void ComprehensiveTimeline::Clear() {
     vad_in_speech_ = false;
     vad_state_observed_at_sec_ = -1e9;
     align_.clear();
+    diar_frames_.clear();
+    speaker_voiceprint_.clear();
     business_speaker_.clear();
     seen_speaker_ids_.clear();
     subscribers = CopyEvidenceSubscribersLocked();

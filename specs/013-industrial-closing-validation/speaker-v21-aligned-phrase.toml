@@ -1,0 +1,12 @@
+[speaker_phrase_fusion]
+# Forced-alignment units belong to one phrase run only while their gap stays
+# within the production timeline pause contract.
+max_alignment_gap_sec = 0.25
+
+# This is the already frozen short-evidence boundary. It is not selected from
+# reference outcomes and is not swept.
+max_bridge_sec = 1.5
+
+# A low-evidence bridge requires independent current-audio anchors on both
+# sides. One-sided continuity is not speaker evidence.
+require_two_sided_agreement = true

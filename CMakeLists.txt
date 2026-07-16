@@ -111,6 +111,7 @@ set(ORATOR_CORE_SOURCES
     src/pipeline/retained_audio_buffer.cc
     src/pipeline/align_worker.cc
     src/pipeline/speaker_identity_stage.cc
+    src/pipeline/speaker_evidence_stage.cc
     # networking (libwebsockets-based WebSocket server)
     src/net/http_static_server.cc
     src/net/websocket_server.cc
@@ -208,6 +209,23 @@ set_property(TARGET speaker_turn_evidence_probe
   PROPERTY CUDA_ARCHITECTURES native)
 target_link_libraries(speaker_turn_evidence_probe PRIVATE orator_core)
 
+# Export normalized TitaNet vectors for frozen absolute-clock evidence spans.
+add_executable(speaker_span_embedding_probe
+  tools/probes/speaker_span_embedding_probe.cc)
+set_property(TARGET speaker_span_embedding_probe
+  PROPERTY CUDA_ARCHITECTURES native)
+target_link_libraries(speaker_span_embedding_probe PRIVATE orator_core)
+
+# ---------------------------------------------------------------------------
+# speaker_identity_replay_probe: replay frozen diar segments and audio through
+# the production speaker-identity stage. It emits evidence, never evaluation.
+# ---------------------------------------------------------------------------
+add_executable(speaker_identity_replay_probe
+  tools/probes/speaker_identity_replay_probe.cc)
+set_property(TARGET speaker_identity_replay_probe
+  PROPERTY CUDA_ARCHITECTURES native)
+target_link_libraries(speaker_identity_replay_probe PRIVATE orator_core)
+
 # ---------------------------------------------------------------------------
 # diar_evidence_probe: offline frame-level Sortformer evidence dump. It reads
 # orator.toml and writes CSV diagnostics outside the runtime path.
@@ -215,6 +233,21 @@ target_link_libraries(speaker_turn_evidence_probe PRIVATE orator_core)
 add_executable(diar_evidence_probe tools/probes/diar_evidence_probe.cc)
 set_property(TARGET diar_evidence_probe PROPERTY CUDA_ARCHITECTURES native)
 target_link_libraries(diar_evidence_probe PRIVATE orator_core)
+
+# Export production GPU VAD intervals from one TOML-owned audio replay.
+add_executable(vad_segment_probe tools/probes/vad_segment_probe.cc)
+set_property(TARGET vad_segment_probe PROPERTY CUDA_ARCHITECTURES native)
+target_link_libraries(vad_segment_probe PRIVATE orator_core)
+
+# ---------------------------------------------------------------------------
+# business_speaker_replay_probe: replay frozen typed producer tracks through
+# the production ComprehensiveTimeline and BusinessSpeakerPipeline.
+# ---------------------------------------------------------------------------
+add_executable(business_speaker_replay_probe
+  tools/probes/business_speaker_replay_probe.cc)
+set_property(TARGET business_speaker_replay_probe
+  PROPERTY CUDA_ARCHITECTURES native)
+target_link_libraries(business_speaker_replay_probe PRIVATE orator_core)
 
 # ---------------------------------------------------------------------------
 # Tests

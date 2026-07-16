@@ -1,0 +1,3 @@
+[raw_authoritative]
+require_known_identity = true
+allowed_reasons = ["sole_diar_support"]

@@ -388,6 +388,8 @@ std::string AuditoryStream::Serialize() {
   // Serialize never parses protocol JSON and never mutates a track.
   const auto tracks = comp_.SnapshotTracks();
   const auto& diar_view = tracks.diarization;
+  const auto& primary_view = tracks.primary_speaker;
+  const auto& voiceprint_view = tracks.speaker_voiceprint;
   const auto& comp_view = tracks.business_speaker;
   const auto& vad_view = tracks.vad;
   const auto& raw_texts = tracks.asr;
@@ -431,7 +433,7 @@ std::string AuditoryStream::Serialize() {
       }
     }
     std::snprintf(buf, sizeof(buf),
-                  "{\"start\":%.3f,\"end\":%.3f,\"text_id\":%ld,"
+                  "{\"start\":%.9f,\"end\":%.9f,\"text_id\":%ld,"
                   "\"speaker\":%d",
                   entry.start, entry.end, entry.text_id, speaker_index);
     business_entries_json += buf;
@@ -469,7 +471,7 @@ std::string AuditoryStream::Serialize() {
   std::string out = "{\"type\":\"timeline\",\"schema_version\":1,";
   std::snprintf(
       buf, sizeof(buf),
-      "\"audio_sec\":%.3f,\"sample_rate\":%d,"
+      "\"audio_sec\":%.9f,\"sample_rate\":%d,"
       "\"session_start_wall_sec\":%.3f,\"wall_clock_ok\":%s,"
       "\"timebase_reconciled\":%s,\"timebase_ok\":%s,",
       audio, config_.sample_rate, wall_start, wclk_ok ? "true" : "false",
@@ -509,7 +511,7 @@ std::string AuditoryStream::Serialize() {
       }
     }
     std::snprintf(buf, sizeof(buf),
-                  "{\"start\":%.3f,\"end\":%.3f,\"speaker\":%d", s.start, s.end,
+                  "{\"start\":%.9f,\"end\":%.9f,\"speaker\":%d", s.start, s.end,
                   speaker_index);
     out += buf;
     // Spec 010: surface the resolved global voiceprint identity (and optional
@@ -527,6 +529,37 @@ std::string AuditoryStream::Serialize() {
   }
   out += "]}";
 
+  // Track: independent frame-wise top-1 Sortformer projection. The raw frame
+  // blocks remain typed in ComprehensiveTimeline; this compact run view is the
+  // externally auditable form used by speaker fusion.
+  if (!primary_view.empty()) {
+    out +=
+        ",{\"kind\":\"primary_speaker\",\"source\":\"sortformer_top1\","
+        "\"entries\":[";
+    for (std::size_t i = 0; i < primary_view.size(); ++i) {
+      const auto& segment = primary_view[i];
+      int speaker_index = -1;
+      if (segment.speaker.rfind("speaker_", 0) == 0) {
+        try {
+          speaker_index = std::stoi(segment.speaker.substr(8));
+        } catch (const std::exception&) {
+          speaker_index = -1;
+        }
+      }
+      std::snprintf(buf, sizeof(buf),
+                    "{\"start\":%.9f,\"end\":%.9f,\"speaker\":%d,"
+                    "\"confidence\":%.9g",
+                    segment.start, segment.end, speaker_index, segment.conf);
+      out += buf;
+      if (!segment.speaker_id.empty()) {
+        out += ",\"speaker_id\":\"" + JsonEscape(segment.speaker_id) + "\"";
+      }
+      out += "}";
+      if (i + 1 < primary_view.size()) out += ",";
+    }
+    out += "]}";
+  }
+
   // Track: automatic speech recognition (present only when ASR is enabled).
   if (asr_) {
     std::snprintf(
@@ -538,7 +571,7 @@ std::string AuditoryStream::Serialize() {
     for (size_t i = 0; i < transcript.tokens.size(); ++i) {
       const auto& t = transcript.tokens[i];
       std::snprintf(buf, sizeof(buf),
-                    "{\"text_id\":%ld,\"start\":%.3f,\"end\":%.3f,\"text\":\"",
+                    "{\"text_id\":%ld,\"start\":%.9f,\"end\":%.9f,\"text\":\"",
                     t.text_id, t.start_sec, t.end_sec);
       out += std::string(buf) + JsonEscape(t.text) + "\"}";
       if (i + 1 < transcript.tokens.size()) out += ",";
@@ -556,7 +589,7 @@ std::string AuditoryStream::Serialize() {
         vad_c, vad_c > 0 ? audio / vad_c : 0.0);
     out += buf;
     for (size_t i = 0; i < vad_view.size(); ++i) {
-      std::snprintf(buf, sizeof(buf), "{\"start\":%.3f,\"end\":%.3f}",
+      std::snprintf(buf, sizeof(buf), "{\"start\":%.9f,\"end\":%.9f}",
                     vad_view[i].start, vad_view[i].end);
       out += buf;
       if (i + 1 < vad_view.size()) out += ",";
@@ -578,19 +611,59 @@ std::string AuditoryStream::Serialize() {
     for (size_t i = 0; i < align_view.size(); ++i) {
       const auto& g = align_view[i];
       std::snprintf(buf, sizeof(buf),
-                    "{\"text_id\":%ld,\"start\":%.3f,\"end\":%.3f,\"units\":[",
+                    "{\"text_id\":%ld,\"start\":%.9f,\"end\":%.9f,\"units\":[",
                     g.text_id, g.start, g.end);
       out += buf;
       for (size_t j = 0; j < g.units.size(); ++j) {
         const auto& u = g.units[j];
         std::snprintf(buf, sizeof(buf),
-                      "{\"start\":%.3f,\"end\":%.3f,\"text\":\"", u.start,
+                      "{\"start\":%.9f,\"end\":%.9f,\"text\":\"", u.start,
                       u.end);
         out += std::string(buf) + JsonEscape(u.text) + "\"}";
         if (j + 1 < g.units.size()) out += ",";
       }
       out += "]}";
       if (i + 1 < align_view.size()) out += ",";
+    }
+    out += "]}";
+  }
+
+  if (config_.speaker_fusion_enable) {
+    out +=
+        ",{\"kind\":\"speaker_voiceprint\",\"source\":\"titanet_large\","
+        "\"entries\":[";
+    for (std::size_t i = 0; i < voiceprint_view.size(); ++i) {
+      const auto& evidence = voiceprint_view[i];
+      std::snprintf(
+          buf, sizeof(buf),
+          "{\"evidence_id\":\"%s\",\"evidence_kind\":\"%s\","
+          "\"text_id\":%ld,\"source_start\":%d,\"source_end\":%d,"
+          "\"start\":%.9f,\"end\":%.9f,"
+          "\"embedding_available\":%s,\"robust_gallery_complete\":%s,",
+          JsonEscape(evidence.evidence_id).c_str(),
+          JsonEscape(evidence.kind).c_str(), evidence.text_id,
+          evidence.source_start, evidence.source_end, evidence.start,
+          evidence.end, evidence.embedding_available ? "true" : "false",
+          evidence.robust_gallery_complete ? "true" : "false");
+      out += buf;
+      auto append_scores = [&](const char* name, const auto& scores) {
+        out += "\"" + std::string(name) + "\":[";
+        for (std::size_t score_index = 0; score_index < scores.size();
+             ++score_index) {
+          const auto& score = scores[score_index];
+          std::snprintf(buf, sizeof(buf),
+                        "{\"speaker_id\":\"%s\",\"score\":%.9g}",
+                        JsonEscape(score.speaker_id).c_str(), score.score);
+          out += buf;
+          if (score_index + 1 < scores.size()) out += ",";
+        }
+        out += "]";
+      };
+      append_scores("session_scores", evidence.session_scores);
+      out += ",";
+      append_scores("robust_scores", evidence.robust_scores);
+      out += "}";
+      if (i + 1 < voiceprint_view.size()) out += ",";
     }
     out += "]}";
   }

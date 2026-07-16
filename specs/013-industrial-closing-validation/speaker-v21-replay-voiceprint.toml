@@ -1,0 +1,14 @@
+[speaker]
+# Embed every rebuilt business interval from its own audio. The short minimum
+# exists only for this frozen evidence candidate; production integration is
+# gated by the complete contextual review.
+min_embed_sec = 0.4
+edge_margin_sec = 0.0
+max_embed_window_sec = 3.0
+
+[speaker_fusion]
+short_max_sec = 1.5
+short_min_score = 0.25
+short_min_margin = 0.05
+regular_min_score = 0.58
+regular_min_margin = 0.04

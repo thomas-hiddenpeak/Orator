@@ -219,7 +219,7 @@ std::string SpeakerIdentityStage::BestCompetingGlobal(
   return best_id;
 }
 
-void SpeakerIdentityStage::RecordPendingCompeting(
+bool SpeakerIdentityStage::RecordPendingCompeting(
     int local, const core::DiarSegment& s, double backfill_start,
     double quality, const std::vector<float>& emb,
     const std::string& global_id, float own_score, float competing_score) {
@@ -228,7 +228,20 @@ void SpeakerIdentityStage::RecordPendingCompeting(
       s.start_sec - pending.clean_start_sec <=
           config_.local_drift_competing_backfill_sec) {
     pending.start_sec = std::min(pending.start_sec, backfill_start);
-    return;
+    if (s.start_sec + 1e-6 >= pending.end_sec) {
+      pending.end_sec = s.end_sec;
+      pending.own_score = own_score;
+      pending.competing_score = competing_score;
+      ++pending.confirmations;
+    }
+    const int required =
+        config_.local_drift_competing_candidate_min_confirmations;
+    LOG_INFO(
+        "[speaker-id] local %d repeated competing drift at %.3f -> %s "
+        "(%d/%d confirmations, score=%.3f, own=%.3f)\n",
+        local, s.start_sec, global_id.c_str(), pending.confirmations, required,
+        competing_score, own_score);
+    return required > 0 && pending.confirmations >= required;
   }
   pending.valid = true;
   pending.start_sec = backfill_start;
@@ -238,12 +251,14 @@ void SpeakerIdentityStage::RecordPendingCompeting(
   pending.global_id = global_id;
   pending.own_score = own_score;
   pending.competing_score = competing_score;
+  pending.confirmations = 1;
   pending.emb = emb;
   LOG_INFO(
       "[speaker-id] local %d pending competing drift at %.3f -> %s "
       "(score=%.3f, own=%.3f, backfill=%.3f)\n",
       local, s.start_sec, global_id.c_str(), competing_score, own_score,
       backfill_start);
+  return config_.local_drift_competing_candidate_min_confirmations == 1;
 }
 
 void SpeakerIdentityStage::AddReference(LocalEpoch* epoch, double quality,
@@ -455,6 +470,104 @@ std::vector<float> SpeakerIdentityStage::EmbedSpan(double start_sec,
   return emb;
 }
 
+std::vector<float> SpeakerIdentityStage::EmbedSpan(
+    double start_sec, double end_sec, double edge_margin_sec,
+    double max_window_sec) {
+  double a = start_sec;
+  double b = end_sec;
+  if (b - a > 2.0 * edge_margin_sec + 0.5) {
+    a += edge_margin_sec;
+    b -= edge_margin_sec;
+  }
+  if (max_window_sec > 0.0 && b - a > max_window_sec) {
+    const double middle = 0.5 * (a + b);
+    a = middle - 0.5 * max_window_sec;
+    b = middle + 0.5 * max_window_sec;
+  }
+  if (b <= a) return {};
+  std::vector<float> pcm = audio_.ReadSpan(tb_.SampleAt(a), tb_.SampleAt(b));
+  if (pcm.empty()) return {};
+  core::AudioChunk chunk;
+  chunk.samples = pcm.data();
+  chunk.num_samples = static_cast<int>(pcm.size());
+  chunk.sample_rate = static_cast<int>(tb_.sample_rate());
+  chunk.t_start_sec = a;
+  std::vector<float> embedding = embedder_->Embed(chunk);
+  if (static_cast<int>(embedding.size()) != config_.embedding_dim) return {};
+  return embedding;
+}
+
+SpeakerIdentityStage::SpanEvidence SpeakerIdentityStage::EvaluateSpan(
+    double start_sec, double end_sec,
+    const std::vector<std::string>& active_ids, double min_duration_sec,
+    double edge_margin_sec, double max_window_sec) {
+  SpanEvidence evidence;
+  if (embedder_ == nullptr || db_ == nullptr || active_ids.empty() ||
+      end_sec - start_sec + 1e-9 < min_duration_sec) {
+    return evidence;
+  }
+  const std::vector<float> embedding = EmbedSpan(
+      start_sec, end_sec, edge_margin_sec, max_window_sec);
+  if (embedding.empty()) return evidence;
+  evidence.embedding_available = true;
+
+  std::map<std::string, std::vector<float>> robust_by_identity;
+  for (const auto& [local_speaker, epochs] : local_epochs_) {
+    (void)local_speaker;
+    for (const auto& epoch : epochs) {
+      if (epoch.global_id.empty()) continue;
+      auto& scores = robust_by_identity[epoch.global_id];
+      for (const auto& reference : epoch.refs) {
+        scores.push_back(Cosine(embedding, reference.second));
+      }
+    }
+  }
+
+  evidence.session_scores.reserve(active_ids.size());
+  evidence.robust_scores.reserve(active_ids.size());
+  evidence.session_gallery_complete = true;
+  evidence.robust_gallery_complete = true;
+  for (const auto& speaker_id : active_ids) {
+    const auto session = global_centroid_.find(speaker_id);
+    if (session == global_centroid_.end()) {
+      evidence.session_gallery_complete = false;
+    } else {
+      evidence.session_scores.push_back(
+          {speaker_id, Cosine(embedding, session->second)});
+    }
+
+    auto robust = robust_by_identity.find(speaker_id);
+    if (robust == robust_by_identity.end() || robust->second.empty()) {
+      evidence.robust_gallery_complete = false;
+      continue;
+    }
+    std::sort(robust->second.begin(), robust->second.end(),
+              [](float left, float right) { return left > right; });
+    const std::size_t retained = (robust->second.size() + 1) / 2;
+    double total = 0.0;
+    for (std::size_t index = 0; index < retained; ++index) {
+      total += robust->second[index];
+    }
+    evidence.robust_scores.push_back(
+        {speaker_id, static_cast<float>(total / retained)});
+  }
+  const auto by_id = [](const VoiceprintScore& left,
+                        const VoiceprintScore& right) {
+    return left.speaker_id < right.speaker_id;
+  };
+  std::sort(evidence.session_scores.begin(), evidence.session_scores.end(),
+            by_id);
+  std::sort(evidence.robust_scores.begin(), evidence.robust_scores.end(),
+            by_id);
+  return evidence;
+}
+
+std::string SpeakerIdentityStage::IdentityAt(int local_speaker,
+                                             double at_sec) const {
+  const LocalEpoch* epoch = ActiveEpoch(local_speaker, at_sec);
+  return epoch == nullptr ? std::string() : epoch->global_id;
+}
+
 void SpeakerIdentityStage::Process(std::vector<core::DiarSegment>& segs) {
   if (segs.empty() || embedder_ == nullptr || db_ == nullptr) return;
 
@@ -510,12 +623,34 @@ void SpeakerIdentityStage::Process(std::vector<core::DiarSegment>& segs) {
             config_.local_drift_competing_candidate_margin,
             &candidate_own_score, &candidate_score);
         if (!candidate_id.empty()) {
-          const double backfill_start = BackfillStartForLocal(s, segs, local);
-          RecordPendingCompeting(local, s, backfill_start, best_q[local], emb,
-                                 candidate_id, candidate_own_score,
-                                 candidate_score);
-          epoch->last_embedded_end = s.end_sec;
-          continue;
+          const double backfill_start = std::max(
+              epoch->last_embedded_end,
+              BackfillStartForLocal(s, segs, local));
+          const bool confirmed = RecordPendingCompeting(
+              local, s, backfill_start, best_q[local], emb, candidate_id,
+              candidate_own_score, candidate_score);
+          if (!confirmed) {
+            epoch->last_embedded_end = s.end_sec;
+            continue;
+          }
+          competing_id = candidate_id;
+          own_score = candidate_own_score;
+          competing_score = candidate_score;
+        }
+      }
+    }
+    if (competing_id.empty()) {
+      auto pending_it = pending_competing_.find(local);
+      if (pending_it != pending_competing_.end()) {
+        const bool expired =
+            s.start_sec - pending_it->second.clean_start_sec >
+            config_.local_drift_competing_backfill_sec;
+        const bool active_epoch_confirmed =
+            config_.local_drift_competing_threshold > 0.0f &&
+            Cosine(epoch->centroid, emb) >=
+                config_.local_drift_competing_threshold;
+        if (expired || active_epoch_confirmed) {
+          pending_competing_.erase(pending_it);
         }
       }
     }
@@ -529,7 +664,11 @@ void SpeakerIdentityStage::Process(std::vector<core::DiarSegment>& segs) {
                           /*allow_same_session_match=*/true);
       pending_competing_.erase(local);
     } else if (!competing_id.empty()) {
-      double epoch_start = BackfillStartForLocal(s, segs, local);
+      // A return split may include a short lead-in, but it must never cross
+      // clean audio already committed to the active epoch. A saved pending
+      // candidate can still extend this boundary to its own earlier evidence.
+      double epoch_start = std::max(
+          epoch->last_embedded_end, BackfillStartForLocal(s, segs, local));
       auto pending_it = pending_competing_.find(local);
       const bool use_pending =
           pending_it != pending_competing_.end() && pending_it->second.valid &&

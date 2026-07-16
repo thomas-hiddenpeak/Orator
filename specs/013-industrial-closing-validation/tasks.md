@@ -222,6 +222,1266 @@
   137 / 1 (`75.1799%`). This remains below the 93 percent implementation gate,
   so policy tuning stops and the frozen candidate is not integrated. See
   `speaker-sliding-v21-2026-07-15.md`.
+- [x] T059J Generate one full v2.1 Sortformer candidate with a TOML-defined
+  90-second state-rotation period, session-qualified local slots, and the exact
+  inherited `340/1/188/188` execution profile. Retain frame posterior, segment,
+  source hash, and common-time-base evidence without reading reference labels.
+  The run produced 45,189 frames, 768 segments, and 41 sessions over 3615.12 s.
+- [x] T059K Independently map every eligible session-qualified local slot to the
+  frozen global registry with TitaNet audio evidence. Build one auditable
+  business-speaker candidate using VAD/forced-alignment boundaries, with no
+  transcript phrase, speaker name, known timestamp, or correctness input. Four
+  focused tests cover session qualification, cannot-link completion, mapped
+  diar priority, and conservative no-diar behavior.
+- [ ] T059L Complete chronological and reversed-block contextual semantic review
+  over all 556 rows. Manually derive and independently verify every result; no
+  code may label rows, aggregate accuracy, rank the candidate, or issue the
+  promotion verdict. Stop this candidate family if the 93 percent development
+  gate is not established. The candidate stopped after the complete 0-120 s
+  promotion context: multiple short interjections retained the wrong local
+  Sortformer slot despite correct session mapping, so no full-session verdict
+  is claimed and the rotation family receives no retuning.
+- [x] T059M Generate one continuous-v2.1 short-phrase TitaNet candidate from the
+  frozen business/alignment intervals using the dedicated TOML, existing strong
+  identity gates, and active-registry filtering. The generator must not read
+  references or emit correctness fields. The frozen 935-entry candidate and
+  complete changed-context worksheet were generated; 16 reference
+  contributions display an assignment change.
+- [ ] T059N Complete chronological and reversed-block contextual semantic review
+  of all 556 rows and manually verify the development gate before any runtime
+  implementation. Stop the short-phrase family on failure; do not sweep its
+  minimum duration, edge margin, or identity thresholds against the reference.
+  The strong-only view is not promoted: complete review of every changed
+  context shows useful repairs but insufficient coverage and one whole-interval
+  mixed-speaker rewrite risk. No full-session result is claimed.
+- [x] T059O Generate one continuous-v2.1 direct-evidence fusion candidate using
+  the unchanged TOML candidate gates. Permit current business-turn and
+  overlap-weighted diar-segment voiceprint evidence only; reject conflicts,
+  prohibit neighbour/local-slot propagation, and preserve the baseline when no
+  eligible direct evidence exists. The generator must not read references or
+  emit correctness fields. Four focused tests pass and the 935-entry candidate
+  was frozen with a complete 89-reference changed-context worksheet.
+- [x] T059P Complete the 0-120-second contextual promotion review, followed only
+  on success by chronological and reversed-block review of all 556 rows. All
+  judgments and totals are manual; tools may arrange evidence but may not label
+  correctness, aggregate accuracy, rank the candidate, or issue the verdict.
+  The candidate failed the first gate: it did not recover the existing early
+  short-turn failures and regressed Zhu Jie's "没说完" to Tang Yunfeng. No
+  full-session result is claimed.
+- [x] T059Q Generate one full continuous-v2.1 candidate with the exact pinned
+  NeMo postprocessing defaults `0.5/0.5/0/0`, changing no other producer or
+  fusion parameter. Retain frame posterior, segment, TitaNet mapping, source
+  hashes, and common-time-base evidence without reading reference labels. The
+  full run retained 45,189 frames, 1,370 native segments, 909 eligible segment
+  voiceprints, and one four-slot acoustic mapping.
+- [x] T059R Complete the 0-120-second contextual promotion review, followed only
+  on success by chronological and reversed-block review of all 556 rows. The
+  candidate must be rejected without retuning if the model-native contract does
+  not establish the development gate. The preliminary old-grid projection is
+  not a valid boundary-candidate verdict because it cannot split an inherited
+  business interval. Production replay was reviewed over all 18 contributions
+  in the gate: 15 are contextually correct and three remain incorrect, so no
+  full-session result is claimed.
+- [x] T059S Replay the frozen native diar segments, unchanged ASR, and unchanged
+  forced-alignment tracks through the production `ComprehensiveTimeline` and
+  `BusinessSpeakerPipeline`. Retain typed replay inputs, source hashes, and the
+  rebuilt business view; then use that view for T059R. The replay consumed
+  1,370 diar segments, 287 ASR finals, and 287 alignment groups and produced
+  1,233 business intervals.
+- [x] T059T Generate one replay-interval direct TitaNet candidate using the
+  dedicated duration-aware TOML gates. Every interval must be embedded from its
+  current audio only; no local-slot or neighbour identity propagation and no
+  reference input are permitted. Both initial- and final-registry evidence was
+  frozen; the final registry differs because it contains the current-session
+  refreshed centroids.
+- [x] T059U Complete the 0-120-second contextual promotion review, followed only
+  on success by chronological and reversed-block review of all 556 rows. Do not
+  sweep the short-duration boundary, score, or margin against the reference.
+  The final-registry view repairs most of the long opening contribution but
+  leaves the 72-second Shi Yi and 78-second Tang Yunfeng contributions wrong,
+  and the 82-second Tang Yunfeng start is still wrong. The topology is rejected
+  without a full-session result.
+- [x] T059V Generate one final-registry duration-calibrated candidate from
+  `speaker-v21-duration-calibrated.toml`. Below 1.5 seconds use only the existing
+  `0.04` active-identity margin; at and above 1.5 seconds reuse the production
+  `0.55` match threshold and existing `0.04` candidate margin. Do not read the
+  reference, propagate neighbours/local slots, or sweep any value.
+- [x] T059W Complete the 0-120-second contextual promotion review. Only on
+  success, review all 556 rows chronologically and in reversed fixed blocks and
+  derive every label and total manually. No code may assign correctness,
+  aggregate accuracy, rank the candidate, or issue a verdict. The early gate
+  passed, then complete chronological and reversed-block review manually
+  recorded 469 correct / 86 incorrect / 1 ambiguous (`84.35%`). The topology
+  fails the industrial gate; no threshold is retuned.
+- [x] T059X Generate one aligned-phrase reaggregation candidate from
+  `speaker-v21-aligned-phrase.toml`. Preserve every eligible current-interval
+  direct voiceprint anchor. Fill only a sub-1.5-second low-evidence bridge whose
+  immediate two anchors independently select the same active identity inside
+  one ASR `text_id` and one forced-alignment run. Preserve every conflict,
+  one-sided case, overlong bridge, pause crossing, and direct anchor. The
+  generator may not read references or emit correctness fields. Nine legal
+  bridges changed ten entries; all direct anchors and source text are retained.
+- [x] T059Y Run the complete 0-120-second contextual promotion review. The
+  candidate leaves this range unchanged and therefore preserves the accepted
+  duration-calibrated early context. Stop the topology as an insufficient-
+  coverage evidence probe without widening any parameter; no new full-session
+  accuracy result is claimed.
+- [x] T059Z Generate punctuation-bounded phrase spans from finalized ASR and
+  forced alignment using `speaker-v21-punctuation-phrase.toml`, run each span's
+  own audio through TitaNet against the final four-identity session registry,
+  and freeze the complete score audit. No reference input or correctness field
+  is permitted. All 1,397 frozen spans embedded successfully.
+- [x] T059AA Build one phrase-overlay business candidate. Permit a phrase to
+  fill low-evidence characters only when all overlapping eligible direct
+  voiceprint anchors agree with its identity; reject every conflict and never
+  rewrite an eligible direct anchor. Prove exact per-`text_id` ASR source-text
+  preservation and common-clock bounds mechanically, then perform the complete
+  0-120-second contextual promotion review. Only on success, review all 556
+  rows chronologically and in reversed fixed blocks and manually derive and
+  check every result. No code, script, formula, query, notebook, metric, or
+  algorithm may label correctness, aggregate accuracy, rank/select a candidate,
+  or issue a verdict. The 984-overlay candidate fails the 0-120-second manual
+  gate: an unanchored phrase regresses Zhu Jie's `81.6-82.16` "然后呢" to Xu
+  Zijing and the 96-second split remains unresolved. Stop without full review.
+- [x] T059AB Rebuild from the same frozen phrase evidence using
+  `speaker-v21-anchored-punctuation-phrase.toml`. Require at least one eligible
+  direct interval anchor and unanimous identity agreement across every anchor;
+  zero-anchor phrases become audit-only. Do not change any numeric gate. The
+  frozen candidate accepts 802 phrases and produces 1,754 business-view turns.
+- [x] T059AC Complete the 0-120-second contextual promotion review. Only on
+  success, review all 556 rows chronologically and in reversed fixed blocks and
+  manually derive and check every result. No code, script, formula, query,
+  notebook, metric, or algorithm may label correctness, aggregate accuracy,
+  rank/select a candidate, or issue a verdict. The candidate passes the early
+  gate, then the complete two-direction manual review records 469 correct, 86
+  incorrect, and one ambiguous row (approximately 84.35 percent). It repairs
+  `ref-0033` but regresses `ref-0121` by propagating a one-sided Tang Yunfeng
+  phrase anchor across Shi Yi's short interjection. Stop this topology without
+  changing a numeric gate.
+- [x] T059AD Freeze and generate one posterior-bounded aligned-phrase candidate
+  from `speaker-v21-posterior-bounded-phrase.toml`. Split punctuation phrases
+  at sustained active v2.1 raw-posterior local-slot transitions, embed every
+  resulting piece independently with TitaNet, and permit a rewrite only when
+  the piece identity agrees with the frozen local/global slot mapping. Preserve
+  every regular direct anchor and every unresolved conflict. Mechanically prove
+  exact source-text preservation, common-clock bounds, source hashes, and the
+  absence of reference/correctness inputs or outputs. The frozen run produces
+  1,376 bounded pieces, embeds 1,372 of them, accepts 982 consensus pieces, and
+  emits a 1,406-turn terminal candidate; these are mechanical provenance facts,
+  not product-accuracy measurements.
+- [x] T059AE Complete the 0-120-second contextual promotion review. Only on a
+  pass, review all 556 rows chronologically and again in reversed fixed blocks.
+  Every semantic judgment, count, percentage, candidate comparison, and gate
+  verdict must be performed manually from full context. No code, script,
+  formula, query, notebook, metric, or algorithm may label correctness,
+  aggregate accuracy, rank/select the candidate, or issue a verdict. The early
+  gate passes. The complete two-direction manual review records 472 correct,
+  83 incorrect, and one ambiguous row (approximately 84.9 percent), repairing
+  `ref-0033`, `ref-0156`, and `ref-0459` with no semantic regression. This
+  remains below the industrial gate, so stop this topology without integration
+  or numeric retuning. See
+  `posterior-bounded-phrase-review-2026-07-15.md`.
+- [x] T059AF Freeze and generate one multiresolution phrase candidate from
+  `speaker-v21-multiresolution-phrase.toml`. Reuse every posterior-bounded piece
+  and TitaNet score without rerunning or changing a gate. Add one-frame raw
+  micro pieces, enclosing-phrase TitaNet evidence, global active-run extent,
+  three-view regular-anchor splitting, strong dual-voiceprint correction, and
+  isolated unanchored short correction exactly as FR16K defines. Prove exact
+  source-text preservation, common-clock bounds, deterministic overlay priority,
+  source hashes, and reference-free provenance with focused tests. Mechanical
+  counts are evidence inventory only and may not be treated as accuracy. The
+  one-shot candidate contains 1,376 inherited posterior pieces, 170 one-frame
+  micro pieces, 24 accepted corrections, and 1,456 output turns; focused tests
+  pass and no reference data enters generation.
+- [x] T059AG Complete the multiresolution candidate's full-context gate. Review
+  the complete 0-120-second prefix manually; only on a pass, review all 556
+  reference contexts chronologically and again in reversed fixed blocks. Every
+  correctness judgment, result count, percentage, comparison, configuration
+  decision, and verdict is manual. No code, script, formula, query, notebook,
+  metric, or algorithm may evaluate, aggregate, rank, select, promote, or reject
+  the result. The complete manual review records `475 correct / 80 incorrect /
+  1 ambiguous`, approximately 85.4 percent. It repairs `ref-0035`, `ref-0037`,
+  and `ref-0109` without a contextual regression, but remains below the
+  industrial gate and is not integrated. See
+  `multiresolution-phrase-review-2026-07-15.md`.
+- [x] T059AH Implement FR16L in `SpeakerIdentityStage` with a TOML-owned
+  candidate confirmation count. Preserve all existing score, margin, clean-
+  span, overlap, epoch-age, and backfill gates. Add deterministic unit tests for
+  one-candidate preservation, repeated same-identity confirmation, conflicting
+  candidate replacement, strong active-epoch cancellation, and a strong return
+  split. Update resolved-config serialization and configuration tests. The
+  focused state-machine and configuration tests pass; they also expose and fix
+  a prior backfill bug that allowed a return split to rewrite clean evidence
+  already committed to the current epoch.
+- [x] T059AI Add a C++ frozen identity-stage replay probe that reads the native
+  v2.1 segment CSV, original audio, initial registry, and one TOML; streams them
+  on the common time base through the production stage and exports only
+  evidence-bearing diarization identities. Replay those identities through the
+  production business-speaker view and freeze source hashes. No reference or
+  correctness input/output is permitted. The probe preserves all 1,370 segment
+  intervals and, with unknown-identity drift disabled in the candidate TOML,
+  retains exactly the established four active identities.
+- [x] T059AJ Complete the repeated-candidate epoch full-context gate. Manually
+  review the complete 0-120-second prefix; only on a pass, manually review all
+  556 contexts chronologically and again in reversed fixed blocks. No code,
+  script, formula, query, notebook, metric, or algorithm may evaluate,
+  aggregate, rank, select, promote, or reject the result. Integrate only after
+  the manual industrial gate is met without a critical-turn regression. The
+  0-120-second prefix is unchanged, but manual review of all 20 changed
+  full-session contexts rejects the topology: one long local-slot epoch mixes
+  rapidly alternating Tang Yunfeng and Zhu Jie turns and introduces multiple
+  clear Zhu-to-Tang regressions.
+- [x] T059AK Implement FR16M as a reference-free multi-prototype TitaNet
+  evidence reducer. Require identical evidence IDs, intervals, statuses, and
+  complete score galleries; combine only scores sharing one registry ID; emit
+  both source hashes and no correctness field. Add focused mechanical tests.
+  The reducer and five focused tests are complete.
+- [x] T059AL Build one frozen duration-calibrated direct candidate from the
+  pre-session and session-refreshed registries. Apply the unchanged TOML score,
+  margin, and duration gates. Manually complete the 0-120-second contextual
+  gate and, only on a pass, all changed contexts plus the full chronological
+  and reversed-block review. No executable automation may evaluate, aggregate,
+  rank, select, promote, or reject the result. Manual review of all 38 changed
+  contexts rejects the candidate: it repairs reference contexts 127 and 500
+  but clearly regresses 66, 405, 407, and 478.
+- [x] T059AM If T059AL passes without regression, apply the same frozen multi-
+  prototype gallery to posterior-bounded pieces and punctuation phrases,
+  rebuild the terminal multiresolution candidate, and complete the same manual
+  full-context review before any production integration. T059AL did not pass,
+  so this conditional branch is closed without generation.
+- [ ] T059AN Implement FR16N as a reference-free initial-prototype challenger
+  over the accepted multiresolution baseline. Require an eligible initial
+  direct identity, disagreement with the terminal direct identity, exact raw
+  local-slot agreement on the forced-aligned source range, and no eligible
+  conflicting terminal piece or punctuation-phrase identity. Freeze every
+  enabled contract in TOML and add focused mechanical tests.
+- [ ] T059AO Generate one frozen FR16N candidate from the existing native v2.1
+  evidence. Verify source hashes, direct-track parity, active-ID completeness,
+  exact text reconstruction, and common-clock projection. Do not read or emit
+  reference labels or correctness judgments.
+- [ ] T059AP Manually judge the complete 0-120-second prefix. Only on a pass,
+  manually review every changed context and then all 556 contexts in
+  chronological and reversed fixed-block order. No code, script, formula,
+  query, notebook, metric, or algorithm may evaluate, aggregate, rank, select,
+  promote, or reject the candidate.
+- [ ] T059AQ Implement FR16O clean-gallery span selection. Reuse production
+  clean-span gates, `confidence * duration` ordering, and `max_ref_segs`; require
+  raw-local, pre-session, and session-refreshed identity agreement. Freeze the
+  contract in TOML and add focused mechanical tests.
+- [ ] T059AR Add a native C++ TitaNet embedding probe that emits normalized
+  current-audio embeddings for arbitrary absolute-clock spans without reading
+  diar labels, transcript meaning, real names, or reference judgments. Verify
+  dimensions, source intervals, and failure statuses.
+- [ ] T059AS Build one reference-free direct clean-gallery candidate by maximum
+  reduction within each stable ID and unchanged duration-aware cross-identity
+  gates. Verify complete galleries, hashes, interval parity, and exact source
+  reconstruction.
+- [ ] T059AT Apply the direct gallery only through the FR16N raw-local and
+  current piece/phrase veto topology. Manually review 0-120 seconds, all changed
+  contexts, and then all 556 chronological and reversed-block contexts. No
+  executable automation may evaluate, aggregate, rank, select, promote, or
+  reject the result.
+- [ ] T059AU Implement FR16P clean-gallery/current-audio consensus. Require at
+  least one agreeing eligible posterior-piece or punctuation-phrase identity,
+  reject every eligible conflict, freeze the switch in TOML, preserve exact
+  source intersections, and add focused mechanical tests.
+- [ ] T059AV Generate one FR16P candidate from frozen evidence and complete the
+  same manual prefix, changed-context, chronological, and reversed-block review
+  before integration. No executable automation may assign correctness,
+  aggregate accuracy, rank/select a candidate or parameter, or issue a verdict.
+- [ ] T059AW Implement FR16Q four-view non-top-channel consensus. Reuse the
+  frozen 0.5 native-channel activity gate and one-frame micro floor, require
+  clean-gallery direct/piece/phrase agreement, reject every current or gallery
+  conflict, preserve exact source ranges, and add focused mechanical tests.
+- [ ] T059AX Generate one FR16Q candidate and perform the complete manual
+  prefix, changed-context, chronological, and reversed-block semantic review.
+  No executable automation may evaluate, aggregate, rank, select, promote, or
+  reject the result.
+- [ ] T059AY Implement FR16R gallery multiscale/channel consensus. Require
+  clean-gallery exact-piece and enclosing-phrase agreement, the unchanged
+  raw-local identity, native-channel activity/run contract, and no eligible
+  session-refreshed conflict. Freeze the switch in TOML, preserve exact aligned source ranges,
+  and add focused mechanical tests.
+- [ ] T059AZ Generate one FR16R candidate and manually review every changed
+  context before any full chronological/reversed-block review. No executable
+  automation may evaluate, aggregate accuracy, rank/select a candidate or
+  parameter, or issue a promotion/rejection verdict.
+- [ ] T059BA Implement FR16S single-gallery-scale/channel consensus. Require
+  exactly one eligible gallery scale, raw-local and native-channel agreement,
+  no current-audio conflict, unchanged gates, exact projection, TOML freezing,
+  and focused mechanical tests.
+- [ ] T059BB Generate one FR16S candidate and manually review every changed
+  context before chronological/reversed-block review. Executable automation
+  remains prohibited from assigning correctness or a product verdict.
+- [ ] T059BC Implement FR16T current multiscale/channel consensus with exact
+  piece/phrase/raw-local/native-channel agreement, clean-gallery conflict veto,
+  baseline-disagreement guard, exact projection, TOML freezing, and focused
+  mechanical tests.
+- [ ] T059BD Generate one FR16T candidate and manually review every changed
+  context before any full review; tools may arrange evidence but may not assign
+  correctness, rank candidates, or issue a verdict.
+- [ ] T059BE Implement FR16U current single-scale/channel consensus with exact
+  one-scale eligibility, raw-local/native-channel agreement, clean-gallery
+  positive support and conflict veto, unchanged gates, exact projection, and
+  focused tests.
+- [ ] T059BF Generate one FR16U candidate and manually review every changed
+  context before any full review; executable result evaluation remains
+  prohibited.
+- [ ] T059BG Implement FR16V sustained raw-local restoration with the inherited
+  FR16K activity and sustained-run gates, all-voiceprint conflict veto,
+  baseline-disagreement guard, exact projection, TOML consistency check, and
+  focused tests.
+- [ ] T059BH Generate one FR16V candidate and manually review every changed
+  context before any full review; no executable accuracy or verdict is allowed.
+- [ ] T059BI Implement FR16W dual-registry multiscale voiceprint consensus with
+  four eligible agreeing views, baseline-disagreement guard, exact projection,
+  TOML switch, unchanged gates, and focused tests.
+- [ ] T059BJ Generate one FR16W candidate and manually review every changed
+  context before any full review; tools may arrange but never judge results.
+- [ ] T059BK Implement FR16X dominant raw-micro restoration with exact frame
+  count/range validation, sole-active/top-1/local-slot agreement, overlay
+  conflict rejection, exact projection, TOML switch, and focused tests.
+- [ ] T059BL Generate one FR16X candidate and manually review every changed
+  context before any full review; no executable result evaluation is allowed.
+- [x] T059BM Implement FR16Y raw-authoritative fusion with TOML-owned allowed
+  reasons, immutable text/identity/source parity, exact forced-alignment
+  projection, source hashes, audit records, and focused mechanical tests.
+- [x] T059BN Generate the `sole_diar_support` FR16Y candidate and manually
+  review every one of its 52 changed reference contexts. The candidate is
+  rejected because it clearly regresses multiple previously correct speaker
+  turns across the session; no full candidate result is claimed. See
+  `raw-authoritative-review-2026-07-15.md`. No executable result judgment was
+  used.
+- [x] T059BO Implement FR16Z exact-phrase dual-gallery consensus using the
+  existing session-refreshed and clean multi-prototype phrase decisions,
+  unchanged duration/score/margin gates, competing-direct-anchor veto, exact
+  source projection, conflict rejection, a TOML boolean, and focused mechanical
+  tests. The generator may not read references or emit correctness fields.
+- [x] T059BP Generate one FR16Z candidate and manually review all 37 changed
+  contexts. Reject the candidate because shared-model gallery agreement causes
+  clear speaker regressions, including a phrase spanning the real change at
+  `ref-0121`. Do not perform a complete candidate review. See
+  `dual-gallery-phrase-review-2026-07-15.md`. No executable result judgment was
+  used.
+- [x] T059BQ Implement FR16ZA native-channel guards. Require the agreed target
+  channel to become native frame top-1 inside the exact phrase and reject any
+  different channel with an active top-1 run meeting the unchanged FR16K
+  `0.5` activity and `0.4 s` sustained-run contract. Verify exact TOML parity,
+  common-clock frame bounds, exact projection, and focused mechanical tests.
+- [x] T059BR Generate one FR16ZA candidate and manually review all 20 changed
+  contexts. The guard removes the cross-speaker phrase regression but still
+  produces an unsafe confident fill over a pure-unknown phrase and expands a
+  short-only direct anchor. Do not perform a complete review. See
+  `dual-gallery-native-review-2026-07-15.md`; no executable result judgment was
+  used.
+- [x] T059BS Implement FR16ZB known-conflict and regular-anchor guards. Require
+  at least one different known baseline identity in the exact phrase. If any
+  direct anchor exists, require at least one agreeing regular direct anchor and
+  reject short-only anchor support. Use only existing categorical reasons,
+  retain every FR16ZA guard, and add focused mechanical tests.
+- [x] T059BT Generate one FR16ZB candidate and manually review all 11 changed
+  contexts. No new whole-turn regression is found, but only one previously
+  incorrect reference contribution is clearly repaired, so stop before a
+  complete review as insufficient coverage. See
+  `dual-gallery-final-review-2026-07-15.md`. Executable result evaluation was not
+  used.
+- [x] T059BU Implement FR16ZC robust clean-gallery evidence from frozen query
+  and prototype embeddings. Require complete normalized galleries and
+  `top_half_mean` aggregation from TOML, preserve all query metadata/source
+  hashes, reuse unchanged downstream gates, and add focused mechanical tests.
+  The focused suite covers complete-gallery enforcement, normalization,
+  deterministic top-half aggregation, and metadata preservation.
+- [x] T059BV Regenerate only the clean-gallery punctuation-phrase evidence,
+  substitute it into FR16ZB, and manually review every changed context. No code,
+  script, formula, query, notebook, metric, or algorithm may assign product
+  correctness, aggregate accuracy, rank/select the candidate, choose a result
+  parameter, or issue the verdict. The guarded path is retained after complete
+  changed-context review; a separate broad R/T/U substitution is rejected after
+  both of its changed contexts regress real speaker boundaries. See
+  `robust-gallery-review-2026-07-15.md`.
+- [x] T059BW Implement FR16ZD VAD-bounded relative-top-1 phrase evidence.
+  Require frozen VAD speech support, one continuous native top-1 channel for
+  the unchanged FR16J run floor, exact forced-alignment projection, agreement
+  between session-refreshed TitaNet, robust clean-gallery TitaNet, and the
+  local-slot mapping, a different known baseline identity, TOML parity, source
+  hashes, and focused mechanical tests.
+- [x] T059BX Generate one FR16ZD candidate on top of the retained robust FR16ZB
+  path and manually review every changed context before any complete review.
+  Tools may execute models, verify contracts, and arrange unjudged evidence;
+  no code, script, formula, query, notebook, metric, or algorithm may assign
+  correctness, aggregate accuracy, rank/select a candidate or parameter, or
+  issue the verdict.
+- [x] T059BY Implement FR16ZE complete local-channel island evidence. Require a
+  VAD-continuous `A-B-A` top-1 sequence with all three runs meeting the
+  unchanged FR16J floor, query TitaNet on the complete B run, project only
+  wholly contained forced-alignment units, require session-registry, robust-
+  gallery, and frozen local-map agreement, preserve exact text/time contracts,
+  freeze all switches in TOML, and add focused mechanical tests.
+- [x] T059BZ Generate one FR16ZE candidate on top of the retained robust FR16ZB
+  path and manually review every changed context before any complete review.
+  Tools may arrange evidence only; no executable result judgment, aggregation,
+  ranking, candidate selection, parameter selection, or verdict is permitted.
+- [x] T059CA Implement FR16ZF in `GpuVad::DrainSegments`: apply the TOML-owned
+  sample padding at emission, clamp to the processed horizon, update the stale
+  interface contract, and add a paired zero-padding/configured-padding real-
+  audio mechanical test that proves count and exact-boundary behavior without
+  assigning product correctness.
+- [x] T059CB Regenerate frozen VAD evidence through the native runtime after
+  FR16ZF, inspect all changed endpoint contexts manually, and rerun speaker
+  evidence only if endpoint review shows no semantic regression. No executable
+  product evaluation, result aggregation, ranking, parameter selection, or
+  verdict is permitted.
+- [x] T059CC Implement FR16ZG complete short-VAD-utterance evidence. Require a
+  padded VAD interval in the inherited FR16J/TitaNet short-duration bounds,
+  one native top-1 channel throughout, complete-interval acoustic queries,
+  session-registry, robust-gallery, and frozen local-map agreement, exact
+  wholly-contained forced-alignment projection, TOML parity, source hashes,
+  and focused mechanical tests.
+- [x] T059CD Generate one FR16ZG candidate on top of the retained guarded
+  robust-gallery path and manually review every changed context before any
+  complete review. Tools may execute models, verify contracts, and arrange
+  unjudged evidence only; no executable correctness judgment, result
+  aggregation, ranking, candidate/parameter selection, or verdict is permitted.
+  The complete two-context manual review rejects the unrestricted candidate:
+  one context regresses a continuous contribution and the other is only a
+  partial repair. See `vad-utterance-review-2026-07-15.md`.
+- [x] T059CE Implement FR16ZH padded-VAD edge-run evidence. Require a
+  multi-run VAD interval, first/last-run scope, inherited sustained floors for
+  the candidate and adjacent run, complete-query parity with the TOML maximum
+  embedding window, dual TitaNet/local-map agreement, exact wholly-contained
+  alignment projection, known baseline conflict, source hashes, and focused
+  mechanical tests.
+- [x] T059CF Generate one FR16ZH candidate on top of the retained guarded
+  robust-gallery path and manually review every changed context. Tools may
+  execute models, check contracts, and arrange unjudged context only; no code,
+  script, formula, query, notebook, metric, or algorithm may assign product
+  correctness, aggregate accuracy, rank/select candidates or parameters, or
+  issue the verdict.
+  The complete nine-context manual review retains one repair but rejects the
+  unrestricted candidate because it also trades an adjacent speaker boundary
+  and produces incomplete character-only changes. See
+  `vad-edge-run-review-2026-07-15.md`.
+- [x] T059CG Implement FR16ZI by requiring every eligible FR16ZH edge-run frame
+  to remain below the unchanged TOML/FR16J activity threshold. Add exact-parity
+  and threshold-boundary mechanical tests; retain every other FR16ZH contract.
+- [x] T059CH Generate one FR16ZI candidate and manually review every displayed
+  changed context. No executable product judgment, aggregation, ranking,
+  candidate/parameter selection, or verdict is permitted.
+  The single displayed change completely repairs `ref-0146`; no other
+  assignment changes. Retain the guarded candidate as the next baseline. See
+  `vad-edge-run-review-2026-07-15.md`.
+- [x] T059CI Implement FR16ZJ active VAD-edge handoff evidence. Require every
+  frame in both edge and adjacent runs to meet the unchanged FR16J activity
+  threshold, both runs to meet the inherited duration floor, complete-query
+  window parity, exact wholly-contained alignment projection, a frozen local
+  mapping and known baseline conflict, plus an unchanged dual-TitaNet agreed-
+  different-identity veto. Add focused mechanical tests and source hashes.
+- [x] T059CJ Generate one FR16ZJ candidate on top of retained FR16ZI and
+  manually review every displayed changed context before broader use. Tools
+  may execute and arrange evidence only; no executable correctness judgment,
+  aggregation, ranking, candidate/parameter selection, or verdict is allowed.
+  The complete 24-context manual review rejects the unrestricted candidate:
+  one complete repair does not offset multiple semantic-boundary regressions.
+  FR16ZI remains the retained baseline. See
+  `vad-active-edge-review-2026-07-15.md`.
+- [x] T059CK Implement FR16ZK complete local-phrase evidence. Require one
+  finalized punctuation phrase wholly inside one padded-VAD interval, exact
+  parity with the inherited sustained floor and TitaNet embedding window, one
+  native top-1 local channel for every phrase frame, a frozen local mapping,
+  one different known baseline identity across the complete source range, and
+  an independent different-identity veto from either unchanged TitaNet view.
+  Also preserve the uniform baseline when either raw TitaNet ranking places it
+  first, even if the duration-aware gate abstains; never use a sub-gate rank as
+  positive rewrite evidence.
+  Project only the exact complete phrase and add focused mechanical tests and
+  source hashes.
+- [x] T059CL Generate one FR16ZK candidate on top of retained FR16ZI and
+  manually review every displayed changed context before broader use. Tools
+  may execute models, verify contracts, and arrange unjudged context only; no
+  code, script, formula, query, notebook, metric, or algorithm may assign
+  product correctness, aggregate accuracy, rank/select a candidate or
+  parameter, or issue the verdict.
+  The guarded candidate retains two complete phrases. Manual review of all
+  four displayed contexts finds one residual contribution repair, one safe
+  strengthening, and no regression. Retain it as the next composition
+  baseline. See `complete-local-phrase-review-2026-07-15.md`.
+- [x] T059CM Implement FR16ZL bracketed unknown-phrase evidence. Reuse FR16ZK
+  complete-phrase eligibility; require unknown-only baseline coverage, known
+  immediately adjacent source fragments with one identity, frozen local-map
+  agreement, and a different-identity veto from either unchanged TitaNet view.
+  Preserve exact source/time contracts and add focused tests and source hashes.
+- [x] T059CN Generate one FR16ZL candidate on top of retained FR16ZK and
+  manually review every displayed changed context. Tools may generate and
+  arrange evidence but no executable mechanism may assign correctness,
+  aggregate accuracy, rank/select candidates or parameters, or issue a verdict.
+  The frozen candidate has zero accepted phrases because the sole unknown-only
+  complete phrase lacks exact known brackets. Close this tested no-op without
+  relaxing source adjacency.
+- [x] T059CO Implement FR16ZM bracketed known-conflict phrase evidence. Reuse
+  FR16ZK complete-phrase eligibility; require a uniform different known phrase
+  identity, immediately adjacent finalized phrases in the same ASR source with
+  one uniform mapped stable identity, and an eligible conflict veto from either
+  unchanged TitaNet view.
+  Preserve exact projection and add focused tests and source hashes.
+- [x] T059CP Generate one FR16ZM candidate on top of retained FR16ZK and
+  manually review every displayed changed context before broader use. No
+  executable product judgment, aggregation, ranking, candidate/parameter
+  selection, or verdict is permitted.
+  The frozen candidate has zero accepted phrases. All 27 mechanically valid
+  same-identity phrase brackets have a native local mapping that supports the
+  middle phrase identity instead of the bracket identity. Close this tested
+  no-op without weakening the local-map or immediate-phrase contracts.
+- [x] T059CQ Implement FR16ZN expanded-local-run phrase evidence. Reuse FR16ZK
+  complete-phrase eligibility, expand only the acoustic query to the maximal
+  contiguous same-top-1 run inside the containing padded VAD, require the full
+  run to fit unchanged TOML duration bounds, and require eligible agreement
+  among session registry, robust gallery, and frozen local mapping. Preserve
+  exact phrase-only projection and add focused tests and source hashes.
+- [x] T059CR Generate one FR16ZN candidate on top of retained FR16ZK and
+  manually review every displayed changed context before broader use. Tools may
+  execute models, verify contracts, and arrange unjudged evidence only; no
+  executable product judgment, aggregation, ranking, candidate/parameter
+  selection, or verdict is permitted.
+  The complete two-context manual review rejects the sole rewrite: the phrase
+  belongs to Zhu Jie but is assigned to Xu Zijing. Retain guarded FR16ZK and
+  use expanded-run voiceprint only as counter-evidence. See
+  `expanded-local-run-phrase-review-2026-07-15.md`.
+- [x] T059CS Implement FR16ZO bounded local-run voiceprint override evidence.
+  Reuse FR16ZK complete-phrase eligibility, derive a deterministic query of at
+  most the existing TOML embedding window from the containing same-top-1 run,
+  and require eligible session/robust agreement on an identity different from
+  both the uniform baseline and frozen local mapping. Require the selected
+  identity's mapped native channel to have the unchanged FR16J sustained
+  support inside the query. Preserve exact phrase-only projection and add
+  focused tests and source hashes.
+- [x] T059CT Generate one FR16ZO candidate on top of retained FR16ZK and
+  manually review every displayed changed context before broader use. Tools may
+  execute models, verify contracts, and arrange unjudged evidence only; no
+  executable product judgment, aggregation, ranking, candidate/parameter
+  selection, or verdict is permitted.
+  The unguarded four-context review finds two regressions where the selected
+  voiceprint identity has no native channel support. The inherited sustained-
+  channel guard leaves only `ref-0258`; manual context review repairs its main
+  Tang Yunfeng contribution with one approximately `0.4 s` repeated-fragment
+  boundary residual. Retain the guarded candidate. See
+  `bounded-local-run-voiceprint-review-2026-07-15.md`.
+- [x] T059CU Implement FR16ZQ temporally stratified clean-gallery selection.
+  Retain all FR16O eligibility gates and the complete TOML gallery size, divide
+  each identity's common-clock-ordered eligible set into that many contiguous
+  rank strata, and use the existing quality maximum within each stratum. Add
+  focused deterministic/completeness tests and source hashes.
+- [x] T059CV Generate the FR16ZQ prototype embeddings and robust scores, first
+  substitute them only into retained FR16ZO, and manually review every changed
+  context. No executable product judgment, aggregation, ranking,
+  candidate/parameter selection, or verdict is permitted.
+  The substitution reproduces guarded FR16ZO without a new speaker assignment;
+  guarded exact-phrase output is also unchanged. Close as component evidence.
+- [x] T059CW Freeze FR16ZR at the committed production `10.0 s` speaker
+  embedding window while retaining every guarded FR16ZO decision and projection
+  contract. Allow selected-identity raw support through either the inherited
+  sustained active channel or unanimous native top-2 across the complete
+  query. Add policy parity and categorical-boundary coverage; do not change any
+  score or margin gate.
+- [x] T059CX Generate one FR16ZR candidate on top of guarded FR16ZO and manually
+  review every changed context before broader use. Tools may execute models,
+  verify contracts, and arrange unjudged evidence only; no executable product
+  judgment, aggregation, ranking, candidate/parameter selection, or verdict is
+  permitted.
+  The sole changed context, `ref-0194`, moves only the indexed prefix to Xu
+  Zijing and leaves the unindexed suffix on Tang Yunfeng. Manual review records
+  this as a partial repair and does not retain FR16ZR alone. See
+  `production-window-complete-source-review-2026-07-15.md`.
+- [x] T059CY Implement FR16ZS complete-source projection. Require exactly one
+  indexed phrase in the ASR source, complete forced alignment of every non-
+  separator character inside the inherited FR16ZR query, one uniform known
+  source identity, and the unchanged FR16ZR identity decision. Add focused
+  alignment/source-boundary tests and hashes.
+- [x] T059CZ Generate one FR16ZS candidate on top of guarded FR16ZO and manually
+  review every changed context. No executable product judgment, aggregation,
+  ranking, candidate/parameter selection, or verdict is permitted.
+  The sole changed context remains `ref-0194`; complete contextual review
+  confirms that the whole contribution belongs to Xu Zijing and that no other
+  speaker sequence changes. Retain FR16ZS as the next composition baseline.
+  See `production-window-complete-source-review-2026-07-15.md`.
+- [x] T059DA Implement FR16ZT complete edge-contribution evidence. Enumerate
+  punctuation clauses without the phrase character floor, require complete
+  in-run forced alignment for every non-separator character, require the
+  terminal edge run, merge only
+  source-adjacent eligible clauses, require one uniform known baseline
+  identity, and reuse the inherited active-edge local mapping and dual-
+  voiceprint veto. Add focused completeness, adjacency, and abstention tests.
+- [x] T059DB Generate one FR16ZT candidate on top of retained FR16ZS and
+  manually review every changed context before retention. Tools may execute
+  models, verify contracts, and arrange unjudged evidence only. No executable
+  product judgment, accuracy aggregation, candidate/parameter ranking or
+  selection, or verdict is permitted.
+  Manual review rejects all three initial-edge changes and retains the four
+  terminal-edge groups. Three complete business contributions are repaired at
+  `ref-0162`, `ref-0221`, and `ref-0404`; the fourth change is attribution-
+  neutral and no reviewed context regresses. See
+  `complete-edge-contribution-review-2026-07-15.md`.
+- [x] T059DC Implement FR16ZU secondary-channel complete-phrase evidence. Keep
+  the frozen punctuation and TitaNet query bounds, require both voiceprint
+  views to have one top-ranked active identity with the existing duration
+  margin, and require that identity's mapped raw channel to satisfy the
+  inherited `0.5`/`0.4 s` sustained-activity contract while being non-top-1 on
+  at least one phrase frame. Project only one uniform-conflict complete phrase.
+- [x] T059DD Generate FR16ZU once on retained FR16ZT and manually review every
+  changed context. Tools may check numerical/source contracts and arrange
+  unjudged evidence only; no executable product judgment, accuracy aggregation,
+  candidate/parameter ranking or selection, or verdict is permitted.
+  The frozen generation enumerates 1195 structurally eligible phrase contexts
+  and produces zero timeline writes because none satisfies every independent
+  evidence gate. Zero writes is a mechanical no-op, not an accuracy judgment;
+  no changed context exists for manual semantic review and retained FR16ZT is
+  unchanged. See `secondary-channel-phrase-review-2026-07-15.md`.
+- [x] T059DE Implement FR16ZV bracketed local-churn contribution evidence.
+  Derive native top-1 runs from the frozen frame table, require same-channel
+  stable outer runs and a bounded different-channel interior, construct one
+  deterministic production-window query, require unchanged regular-gate
+  agreement from session and robust TitaNet, and project only fully aligned
+  complete punctuation phrases. Preserve a dual-phrase-voiceprint veto for a
+  single-channel interior. After complete review of the unrestricted candidate,
+  require every projected phrase to have one uniform known conflicting baseline
+  identity and require both phrase-level galleries to rank the outer identity
+  first. Reject mixed phrases, phrase-rank disagreement, and conflicting
+  overlays. Add a complete-clause-group path only when every intervening run
+  has lower mean native margin than both outer runs and no phrase has dual-
+  gallery agreement on another top-ranked identity. Require one active native
+  channel on every intervening frame so overlap cannot be absorbed. Record
+  source hashes and add focused mechanical tests.
+- [x] T059DF Generate FR16ZV once on retained FR16ZT and manually review every
+  changed conversational context before retention. Tools may execute models,
+  verify numerical/source/time contracts, and arrange unjudged evidence only.
+  No code, script, formula, query, notebook, metric, or algorithm may assign
+  correctness, aggregate accuracy, rank or select a candidate or parameter, or
+  issue the verdict.
+  Complete review rejects the unrestricted 22-piece candidate. The frozen
+  phrase and overlap guards leave three changed contexts: `ref-0441` becomes a
+  complete Shi Yi contribution, while `ref-0452` and `ref-0554` receive
+  attribution-consistent cleanup. No reviewed context regresses; retain the
+  final guarded candidate. See
+  `bracketed-local-churn-review-2026-07-15.md`.
+- [x] T059DG Implement FR16ZW maximal multi-slot envelope evidence. Choose the
+  farthest same-channel stable closure that fits the inherited production
+  query capacity, require at least two foreign local channels and greater
+  combined outer support, maximize actual outer audio deterministically,
+  require unchanged regular-gate agreement from both TitaNet galleries, veto
+  dual phrase-top support for the duration-dominant foreign channel, and
+  project only complete aligned clauses per ASR source wholly contained in one
+  frozen comprehensive-timeline VAD segment. Reject VAD-split projections and
+  conflicting envelopes, preserve source hashes, and add focused mechanical
+  tests.
+- [x] T059DH Generate FR16ZW once on retained FR16ZV and manually review every
+  changed conversational context before retention. Tools may execute models,
+  verify numerical/source/time contracts, and arrange unjudged evidence only.
+  No code, script, formula, query, notebook, metric, or algorithm may assign
+  correctness, aggregate accuracy, rank or select a candidate or parameter, or
+  issue the verdict. Complete review rejects the unrestricted 12-accepted-query
+  candidate because five classes bridge independent VAD endpoints. The frozen
+  comprehensive-timeline VAD guard leaves three changed contexts; all three
+  are contextual repairs with no reviewed regression. Retain the guarded
+  candidate. See `maximal-multislot-envelope-review-2026-07-15.md`.
+- [x] T059DI Implement FR16ZX VAD-complete contribution evidence. Require one
+  frozen VAD segment within the production window, at least two inherited
+  stable native channels, one strict stable-duration majority, unchanged
+  session/robust TitaNet agreement with that channel's mapping, a dual-phrase
+  different-identity veto, and adjacent complete forced-alignment clauses
+  wholly contained by the VAD. Require every written clause to independently
+  pass both unchanged TitaNet galleries with the VAD identity, contain an
+  existing selected-identity anchor, and receive the same dual identity on
+  every exact conflicting baseline fragment. Project only actual baseline
+  conflicts, reject conflicting overlays, preserve all source hashes, and add
+  focused tests.
+- [x] T059DJ Generate FR16ZX once on retained FR16ZW and manually review every
+  changed conversational context before retention. Tools may execute models,
+  verify numerical/source/time contracts, and arrange unjudged evidence only.
+  No code, script, formula, query, notebook, metric, or algorithm may assign
+  correctness, aggregate accuracy, rank or select a candidate or parameter, or
+  issue the verdict. Complete review rejects the unrestricted VAD and clause-
+  only projections because long crops absorb real short replies. Requiring an
+  existing selected anchor and dual agreement on every exact conflicting
+  fragment leaves zero writes. Close FR16ZX as a safe no-op and preserve
+  retained FR16ZW. See `vad-complete-contribution-review-2026-07-15.md`.
+- [x] T059DK Implement FR16ZY complete-source unanimous-phrase evidence. Use a
+  fully aligned production-window ASR source only as query context, require
+  dual source identity agreement, inherited stable support from that identity's
+  mapped native channel, frozen VAD containment for every indexed phrase, and
+  unanimous dual-gallery phrase top rank. Require the selected identity at both
+  baseline phrase boundaries and project only internal complete indexed phrase
+  conflicts. Reject conflicting overlays, record hashes, and add focused tests.
+- [x] T059DL Generate FR16ZY once on retained FR16ZW and manually review every
+  changed conversational context before retention. Tools may execute models,
+  verify numerical/source/time contracts, and arrange unjudged evidence only.
+  No code, script, formula, query, notebook, metric, or algorithm may assign
+  correctness, aggregate accuracy, rank or select a candidate or parameter, or
+  issue the verdict. The initial candidate changes one visible context and
+  merges a real source-edge handoff. Requiring the selected identity at both
+  phrase boundaries leaves zero writes. Close FR16ZY as a safe no-op and
+  preserve FR16ZW. See
+  `complete-source-unanimous-phrase-review-2026-07-15.md`.
+- [x] T059DM Implement FR16ZZ typed equal-overlap arbitration. Add the
+  `timeline.speaker_overlap_tie_policy` TOML field, preserve `shorter_span` as
+  the default, implement `higher_confidence` as confidence-first with segment
+  length as the secondary deterministic tie-break, serialize the resolved
+  value, and add focused configuration and business-pipeline tests. Do not
+  alter overlap priority, boundaries, model evidence, or raw tracks.
+- [x] T059DN Replay the frozen full-session raw tracks once with the FR16ZZ
+  experiment TOML, mechanically verify deterministic/source/time contracts,
+  arrange every changed context, and read every displayed conversation
+  manually before retention. No code, script, formula, query, notebook,
+  metric, or algorithm may assign correctness, aggregate accuracy, rank/select
+  the policy, or issue the verdict. Both replays are byte-identical. Manual
+  reading stops after the first 20 of 188 displayed changed contexts because
+  genuine short replies are absorbed; the candidate is rejected and the old
+  default remains. See `confidence-overlap-review-2026-07-15.md`.
+- [ ] T059DO Implement FR16AAA primary top-1 replay evidence. Read frozen native
+  frames, VAD spans, local-slot mapping, and TOML; emit only VAD-contained,
+  `0.5`-active, same-top-1 runs meeting the inherited `0.4 s` sustained floor.
+  Short runs abstain without neighbour fill. Record source hashes and add
+  focused boundary, duration, mapping, and deterministic tests.
+- [ ] T059DP Replay the primary track through the production C++ business
+  pipeline, then compose only exact source ranges whose reasons are present in
+  the frozen TOML allowlist of previously completed manual voiceprint reviews.
+  Verify immutable source/time contracts mechanically, read every changed
+  context manually, and only then perform complete chronological and reverse-
+  block contextual semantic review. No code, script, formula, query, notebook,
+  metric, or algorithm may assign correctness, aggregate accuracy, rank/select
+  a candidate or parameter, or issue the verdict.
+- [ ] T059DQ Implement FR16AAB typed primary-speaker arbitration. Add a
+  separate comprehensive-timeline producer track, preserve raw activity
+  diarization, allow primary evidence only for an exact maximum-overlap tie,
+  retain the existing activity policy as fallback, expose the selected reason,
+  and add focused isolation, unique-winner, matching-tie, ambiguous-primary,
+  and configuration tests.
+- [ ] T059DR Replay frozen activity and primary tracks twice through the
+  production C++ business projector, verify deterministic/source/time/track
+  contracts mechanically, arrange every changed context, and read every one
+  manually. Only a no-regression contextual result may proceed to complete
+  chronological and reverse-block review. No executable mechanism may assign
+  correctness, aggregate accuracy, select the policy, or issue the verdict.
+- [x] T059DS Implement the FR16AAC primary-aligned-island evidence composer.
+  Require one VAD-bounded sustained primary run, same-identity production
+  activity support, robust clean-gallery TitaNet agreement under existing
+  duration-class gates, complete forced-alignment units, and one conflicting
+  known baseline identity. Add focused abstention, conflict, source, time, and
+  deterministic contract tests without reading any reference result.
+- [x] T059DT Generate the full-session FR16AAC candidate twice, verify only its
+  mechanical hashes and immutable source/time contracts, arrange every changed
+  context, and read every context manually. A retained candidate must then pass
+  complete chronological and reverse-block contextual semantic review. No code,
+  script, formula, query, notebook, metric, or algorithm may assign correctness,
+  aggregate accuracy, rank/select a candidate or parameter, or issue a verdict.
+  The two business tracks are identical. All 36 displayed changed contexts are
+  read manually; genuine cross-speaker boundary regressions remain, so the
+  candidate is rejected before full-session review. See
+  `primary-aligned-island-review-2026-07-16.md`.
+- [x] T059DU Implement the FR16AAD complete-phrase cross-prototype composer.
+  Require frozen accepted challenge provenance, exact punctuation-phrase source
+  equality, initial/source/local identity parity, a different terminal override,
+  one conflicting known current-baseline identity, protected-overlay abstention,
+  source/time preservation, non-overlap, and deterministic focused tests.
+- [x] T059DV Generate the full-session FR16AAD candidate twice, verify only its
+  mechanical contracts and hashes, arrange every changed context, and read all
+  changes manually before complete chronological and reverse-block review. No
+  executable mechanism may judge correctness, aggregate accuracy, rank/select,
+  or issue a product verdict.
+  Both generated candidates are identical and contain no overlay because the
+  retained input already carries every eligible accepted prototype decision.
+  The path is recorded as a deterministic no-op; no product result is inferred.
+  See `complete-phrase-cross-prototype-review-2026-07-16.md`.
+- [x] T059DW Implement FR16AAE relative-top-1 complete-phrase expansion. Reuse
+  only accepted FR16ZD identity decisions, require exact enclosing phrase
+  containment, dual phrase-view top-rank and inherited margin vetoes, all-known
+  conflicting baseline characters, protected-overlay abstention, immutable
+  source/time, and focused deterministic tests.
+- [ ] T059DX Generate FR16AAE twice on the retained full candidate, verify only
+  mechanical contracts and hashes, arrange and manually read every changed
+  context, then include it only in a complete chronological and reverse-block
+  contextual semantic review. Executable result judgment and aggregation are
+  prohibited.
+- [x] T059DY Implement FR16AAF complete-VAD-phrase voiceprint challenges. Reuse
+  frozen short-VAD and punctuation-phrase evidence, require four-view identity
+  agreement under inherited gates, challenge one differing raw local mapping
+  and one uniform known baseline identity, derive one-frame boundary tolerance
+  from metadata, protect retained overlay reasons, and add focused deterministic
+  source/time/abstention tests.
+- [ ] T059DZ Generate FR16AAF twice on the retained full candidate, verify only
+  hashes and immutable source/time contracts, arrange every changed context,
+  and read every context manually before retention. A retained candidate must
+  then enter complete chronological and reverse-block contextual semantic
+  review. No executable mechanism may judge correctness, aggregate accuracy,
+  rank/select a candidate or parameter, or issue the product verdict.
+  Two guarded generations are byte-identical and the sole retained change was
+  manually accepted; complete two-pass review remains pending. See
+  `complete-vad-phrase-challenge-review-2026-07-16.md`.
+- [x] T059EA Implement FR16AAG contextual VAD phrase challenges. Require one
+  containing VAD interval and one covering primary raw run, four-view identical
+  top rank under inherited margins, at least one outer VAD view at the inherited
+  regular-score floor, one conflicting raw mapping, one uniform known baseline
+  identity, one-frame-derived boundary tolerance, protected-overlay abstention,
+  and focused deterministic source/time tests.
+- [ ] T059EB Generate FR16AAG twice on the retained FR16AAF candidate, verify
+  only hashes and immutable contracts, arrange every changed context, and read
+  all changes manually before full two-pass review. No executable mechanism may
+  judge correctness, aggregate accuracy, rank/select a candidate or parameter,
+  or issue the product verdict.
+  Two generations are byte-identical and all four displayed changed contexts
+  were manually accepted without a changed-context regression; complete two-
+  pass review remains pending. See
+  `contextual-vad-phrase-challenge-review-2026-07-16.md`.
+- [x] T059EC Implement FR16AAH edge-anchor-trimmed phrase challenges. Require
+  one contiguous competing direct-anchor prefix or suffix, one derived native
+  frame of forced-alignment separation, dual complete-phrase registry decisions
+  under unchanged gates, all-known conflicting remainder labels, protected-
+  overlay abstention, exact source/time projection, TOML ownership, and focused
+  deterministic mechanical tests.
+- [ ] T059ED Generate FR16AAH twice on the retained FR16AAG candidate, verify
+  only hashes and immutable contracts, arrange every changed context, and read
+  all changes manually before retention and full two-pass review. No executable
+  mechanism may judge correctness, aggregate accuracy, rank/select a candidate
+  or parameter, or issue the product verdict.
+  Two generations are byte-identical and the sole changed context was manually
+  accepted; complete two-pass review remains pending. See
+  `edge-anchor-trimmed-phrase-review-2026-07-16.md`.
+- [x] T059EE Implement FR16AAI adjacent-subminimum-clause envelopes. Enumerate
+  exactly two adjacent complete clauses whose individual aligned durations are
+  below the inherited phrase minimum and whose combined span satisfies the
+  inherited phrase bounds; require dual registry decisions under unchanged
+  gates, a uniform known conflicting baseline, protected-overlay and overlap
+  abstention, exact source/time projection, TOML ownership, and focused tests.
+- [x] T059EF Export all FR16AAI spans, run both frozen TitaNet evidence views,
+  generate the candidate twice on retained FR16AAH, verify only model/numerical/
+  source/time/hash contracts, and manually read every changed context before
+  retention and full two-pass review. Executable result judgment, aggregation,
+  ranking, and parameter or candidate selection are prohibited.
+  Both generations are byte-identical. Manual reading rejects all six changed
+  contexts because the two-clause envelope crosses real handoffs; the two
+  motivating residuals also abstain under the frozen dual-view gates. FR16AAI
+  is not retained and does not enter full review. See
+  `adjacent-subminimum-clause-review-2026-07-16.md`.
+- [x] T059EG Implement FR16AAJ two-phrase primary-run anchor expansion. Require
+  exactly two source-adjacent complete phrases in one primary run, one mapped-
+  identity-containing anchor confirmed by both frozen phrase views, one all-
+  known combined range with exactly one competing identity, no dual eligible non-mapped
+  voiceprint result, one-frame-derived tolerance, protected-overlay and overlap
+  abstention, exact two-phrase closure, TOML ownership, and focused mechanical
+  tests.
+- [ ] T059EH Generate FR16AAJ twice on retained FR16AAH, verify only source/
+  time/model/config/hash contracts, arrange every changed context, and read all
+  changes manually before retention and full two-pass review. No executable
+  mechanism may judge correctness, aggregate accuracy, rank/select a candidate
+  or parameter, or issue the product verdict.
+  Two generations are byte-identical and all five displayed changed contexts
+  were manually accepted without regression; the complete two-pass review
+  remains pending. See `primary-run-phrase-anchor-review-2026-07-16.md`.
+- [x] T059EI Implement FR16AAK phrase-led outer-abstention challenges. Require
+  one containing VAD and one covering primary run, a uniform mapped baseline
+  with TOML-listed unconfirmed provenance, dual outer top-rank agreement on the
+  mapped identity with both views abstaining under unchanged gates, dual exact-
+  phrase top-rank agreement on one challenge identity with exactly one eligible
+  view and one margin-only abstention, one-frame tolerance, protected-overlay
+  and overlap abstention, exact source projection, and focused tests.
+- [x] T059EJ Generate FR16AAK twice on retained FR16AAJ, verify only model,
+  source/time/config/hash and determinism contracts, arrange every changed
+  context, and manually read every change before retention. No executable
+  mechanism may judge correctness, aggregate accuracy, rank or select a
+  candidate or parameter, or issue the verdict. Complete forward and reverse-
+  block review remains mandatory after policy freeze.
+  Both generations are byte-identical. Manual contextual reading retains both
+  exact-phrase changes without a changed-context regression; the final full
+  two-pass review remains a separate pending gate. See
+  `phrase-led-outer-abstention-review-2026-07-16.md`.
+- [x] T059EK Implement FR16AAL secondary-channel single-unit edge closures.
+  Require exactly one direct-anchor target prefix and one competing suffix,
+  exactly one positive-duration suffix alignment unit, one containing VAD,
+  dual exact-phrase margin-rank agreement, inherited sustained target-channel
+  activity, simultaneous target activity under a mapped competing top-1 tail
+  frame, exact source projection, provenance/protected/overlap abstention, TOML
+  ownership, and focused mechanical tests.
+- [x] T059EL Generate FR16AAL twice on retained FR16AAK, verify only model,
+  numerical/source/time/config/hash and determinism contracts, arrange every
+  changed context, and manually read every change before retention. No
+  executable mechanism may judge correctness, aggregate accuracy, rank or
+  select a candidate or parameter, or issue the verdict.
+  Both generations are byte-identical. The sole changed context was read
+  manually and retained without expanding across the following real handoff.
+  See `secondary-channel-edge-closure-review-2026-07-16.md`.
+- [ ] T059EM Implement FR16AAM in the production C++ business projector. Reuse
+  the TOML `speaker_fusion.min_embed_sec` and existing duration-class voiceprint
+  gates; require complete same-identity primary coverage, same-identity activity
+  support, and session/robust phrase agreement before overriding a conflicting
+  coarse direct interval. Add focused agreement and abstention tests.
+- [ ] T059EN Export the same real-WebSocket timeline's typed tracks with source
+  hashes, replay FR16AAM twice, verify only deterministic/source/time/track
+  contracts, and manually read every changed context. No code, script, formula,
+  query, notebook, metric, or algorithm may judge correctness, aggregate
+  accuracy, rank/select a policy or parameter, or issue the verdict. Promote
+  only through a new real-WebSocket run and complete chronological plus reverse-
+  block contextual semantic review.
+- [ ] T059EO Implement FR16AAN overlap-contained primary refinement in the
+  production C++ projector. Add primary boundaries only inside simultaneous
+  multi-identity activity, require full unambiguous primary coverage by an
+  already-active identity, keep support activity-only, expose a distinct audit
+  reason, and add focused refinement plus unique-winner abstention tests.
+- [ ] T059EP Replay the frozen 600-second typed tracks twice, verify only
+  deterministic/source/time/track contracts, manually read every changed
+  context, and then manually reread the complete block in chronological and
+  reverse order. No executable mechanism may assign correctness, aggregate
+  accuracy, rank/select a candidate or parameter, or issue the verdict.
+- [x] T059EQ Implement FR16AAO in the runtime speaker-evidence producer. Split
+  only leading/trailing business ranges that partially intersect a complete
+  punctuation phrase, retain complete interior phrase context, derive every
+  query from forced-alignment character times, and add focused edge-isolation,
+  wholly-contained, and source-reconstruction tests.
+- [x] T059ER Re-run frozen replay and a clean 600-second real-WebSocket stream,
+  verify mechanical source/time/hash/telemetry contracts, read every changed
+  context manually, and repeat complete chronological plus reverse-block
+  semantic review. No executable mechanism may judge correctness, aggregate
+  accuracy, rank/select a candidate or parameter, or issue the verdict.
+- [x] T059ES Implement FR16AAP in the production business projector. Normalize
+  only adjacent overlapping source-ordered projection spans, require both sides
+  to retain at least one sample, calculate entries from the normalized times,
+  and fall back to the reconstructing diarization baseline when infeasible.
+  Add a focused reversed-alignment-time identity-boundary regression test.
+- [x] T059ET Rebuild and rerun the clean 600-second real-WebSocket acceptance.
+  Require byte-exact ASR/business reconstruction, latest-revision/terminal
+  equality, common-time-base, source/config/binary stability, and telemetry
+  contracts before any manual semantic judgment. Then repeat complete
+  chronological and reverse-block contextual review; no executable mechanism
+  may judge correctness, aggregate accuracy, rank/select, or issue a verdict.
+- [x] T059EU Implement FR16AAQ in the production C++ business projector. Derive
+  one immutable initial identity per local Sortformer slot; require complete,
+  uncontested activity coverage, a uniform conflicting current phrase, dual
+  phrase-gallery top-rank agreement under TOML duration/margin gates, exact
+  forced-alignment projection, and focused agreement plus abstention tests.
+- [x] T059EV Replay the frozen Run A typed tracks twice with FR16AAQ, verify only
+  deterministic/source/time/config/track contracts, arrange every changed
+  context, and read all changes manually before any retention decision. No
+  code, script, formula, query, notebook, metric, or algorithm may assign
+  correctness, aggregate accuracy, rank/select a candidate or parameter, or
+  issue the product verdict.
+- [x] T059EW Implement FR16AAR across live revisions and terminal timeline JSON,
+  add focused one-sample serialization and source-order replay tests, and verify
+  that the transport precision change leaves typed in-memory evidence unchanged.
+- [x] T059EX Implement FR16AAS in the production C++ projector using the typed
+  VAD and phrase voiceprint evidence. Require four-view top-rank identity,
+  exactly three unchanged-gate decisions, one score-passing margin-only
+  abstention, unique VAD/primary containment, the TOML minimum aligned-unit
+  count, uniform conflicting current identity, exact phrase projection, and
+  focused agreement/abstention tests.
+- [x] T059EY Replay FR16AAS twice on the retained FR16AAQ frozen candidate,
+  verify only hashes and immutable source/time/config/track contracts, arrange
+  every changed context, and read all changes manually before retention or full
+  review. No executable mechanism may judge correctness, aggregate accuracy,
+  rank/select a candidate or parameter, or issue the verdict.
+- [x] T059EZ Implement FR16AAT in the authoritative raw WebSocket acceptance
+  client. Serialize writes per connection, respond to server PING with a masked
+  same-payload PONG, exclude control frames from captured application events,
+  and add focused socket-level coverage. Do not change the server validity
+  policy, event contents, producer ownership, or typed tracks.
+- [x] T059FA Repeat the real 360-second producer plus early/late observer gate.
+  Require all connections to remain open, producer/observer ordered live events
+  and terminal timeline to match, and existing time/hash/telemetry contracts to
+  pass before resuming speaker contextual review. This task performs no product
+  result evaluation.
+- [x] T059FB Diagnose the independent 360-second semantic failure from typed
+  production evidence. Record that all worker extents reached the common clock
+  while the voiceprint track remained empty because three observed stable
+  identities did not satisfy the configured four-identity gallery gate. Define
+  FR16AAU before changing the profile; do not alter score, margin, duration,
+  phrase, primary, alignment, or robust-gallery rules.
+- [x] T059FC Set only TOML `speaker_fusion.minimum_gallery_size` to three, then
+  repeat independently terminated 120-second, 360-second, and 600-second real
+  WebSocket promotion runs with producer plus observers. Verify mechanical
+  contracts separately, then manually read every chronological context and all
+  reverse blocks. Stop on the first semantic failure. No executable mechanism
+  may judge correctness, count or aggregate results, rank the profile, or issue
+  a verdict.
+- [x] T059FD Implement FR16AAV in the production business projector. Require a
+  short business-interval or phrase to cross at least two typed VAD intervals
+  without one containing VAD, then require a uniform current source identity,
+  complete uncontested activity and primary coverage, and the existing TOML
+  duration boundaries before ordinary voiceprint evidence must abstain.
+  Preserve the earlier FR16AAQ and FR16AAS specialized challenges, raw tracks,
+  source text, time base, and all existing score/margin gates. Add focused
+  fragmented-VAD, containing-VAD, and competing-native tests.
+- [ ] T059FE Export the frozen full Run B typed tracks, replay FR16AAV twice,
+  verify only deterministic/source/time/config/track contracts, and arrange
+  every changed context. Read every change manually with complete surrounding
+  conversation before retaining the candidate, then repeat the complete
+  chronological and reverse-block contextual review. No code, script,
+  formula, query, notebook, metric, or algorithm may assign correctness,
+  aggregate an accuracy result, rank/select a candidate or parameter, or issue
+  the product verdict.
+- [x] T059FF Implement FR16AAW for generic aligned-unit voiceprint writes. Keep
+  a conflicting exact-range primary tie-break or overlap-refinement label,
+  while preserving aligned evidence that agrees, sole-activity behavior, all
+  explicit multi-view challenges, raw tracks, source text, time base, and TOML
+  gates. Add focused conflicting-primary and agreeing-primary tests.
+- [x] T059FG Replay the combined FR16AAV/FR16AAW production projector twice on
+  the frozen Run B tracks, verify only deterministic/source/time/config/track
+  contracts, arrange all changed contexts, and read each change manually in
+  full conversation before retaining or rejecting FR16AAW. No code, script,
+  formula, query, notebook, metric, or algorithm may assign correctness,
+  aggregate accuracy, rank/select, or issue the product verdict.
+- [x] T059FH Implement FR16AAX in the production business projector. Record only
+  same-stable-identity activity and primary starts within the existing TOML
+  alignment-boundary tolerance, after each view has an existing-TOML-duration
+  native gap and while each new segment remains uncontested for the existing
+  TOML minimum embedding duration. Require a different nearest prior identity,
+  then allow a continuous forced-alignment run to break after a complete
+  aligned unit that straddles that corroborated native transition. Preserve
+  activity-owned business boundaries, midpoint assignment of the crossing
+  unit, byte-exact source reconstruction, unmatched/short/contested/conflicting
+  transition abstention, and evidence-arrival convergence. Add focused tests.
+- [x] T059FI Replay the combined FR16AAV/FR16AAW/FR16AAX projector twice on the
+  frozen Run B tracks, verify only determinism and source/time/config/immutable-
+  track contracts, arrange every changed context, and manually read each one in
+  complete surrounding conversation before retaining or rejecting FR16AAX. No
+  code, script, formula, query, notebook, metric, or algorithm may judge
+  correctness, aggregate accuracy, rank/select, or issue the product verdict.
+- [x] T059FJ Implement FR16AAY for a short, exact punctuation phrase whose
+  primary-arbitrated current local slot has a different immutable initial
+  stable identity. Require existing TOML duration/aligned-unit gates, one
+  containing robust VAD whose two galleries pass for the initial identity,
+  phrase robust margin-only support for the initial identity, and phrase
+  session margin-only support for the current identity. Preserve every other
+  topology and add focused positive plus abstention tests without new values.
+- [x] T059FK Replay the combined retained projector with FR16AAY twice on frozen
+  Run B, verify only determinism and source/time/config/immutable-track
+  contracts, arrange every changed context, and manually read each in complete
+  conversation before retention or rejection. No executable mechanism may
+  judge correctness, aggregate accuracy, rank/select, or issue the verdict.
+- [x] T059FL Implement FR16AAZ for one short business interval immediately after
+  a dual-gallery-passing punctuation phrase. Require exact source/time
+  adjacency, the anchor identity as unique runner-up in both margin-only target
+  galleries, continuous activity coverage through the existing TOML minimum
+  duration, one covering current primary run, and the existing aligned-unit
+  count. Write only the target with a direct-anchor reason and add positive plus
+  weak/non-runner-up/short/missing-primary/alignment abstention tests.
+- [x] T059FM Replay the combined retained projector with FR16AAZ twice on frozen
+  Run B, verify only determinism and source/time/config/immutable-track
+  contracts, arrange every changed context, and manually read each in complete
+  conversation before retention or rejection. No executable mechanism may
+  judge correctness, aggregate accuracy, rank/select, or issue the verdict.
+- [x] T059FN Implement FR16ABA for an exact short punctuation phrase whose two
+  galleries top-rank one initial local-slot identity but abstain only on margin
+  against a uniform coarse `voiceprint_direct_*` current attribution. Require
+  one uncontested covering current local slot, one current primary run, and the
+  existing TOML duration/alignment gates. Add positive and all specified
+  abstention tests without changing any threshold.
+- [x] T059FO Replay the combined retained projector with FR16ABA twice on frozen
+  Run B, verify only determinism and source/time/config/immutable-track
+  contracts, arrange every changed context, and manually read each in complete
+  conversation before retention or rejection. No executable mechanism may
+  judge correctness, aggregate accuracy, rank/select, or issue the verdict.
+- [x] T059FP Implement FR16ABB as a postpass for one positive but subminimum
+  no-embedding aligned unit. Require the existing TOML pause to the nearest
+  aligned unit on both sides, uniform non-voiceprint current labels, one
+  uncontested covering current local slot with a different initial identity,
+  one uncontested covering current primary run, and one containing robust VAD
+  whose two galleries pass existing gates for that initial identity. Write only
+  the exact unit and add the specified positive and abstention tests.
+- [x] T059FQ Replay the combined retained projector with FR16ABB twice on frozen
+  Run B, verify only determinism and source/time/config/immutable-track
+  contracts, arrange every changed context, and read each manually in complete
+  surrounding conversation before retention or rejection. No executable
+  mechanism may judge correctness, aggregate accuracy, rank/select, or issue
+  the verdict.
+- [x] T059FR Implement FR16ABC for one subminimum no-embedding aligned unit
+  completely contained by a different primary micro-run that is immediately
+  and gaplessly bracketed by the same uniform current identity. Require typed direct current
+  labels, sole uncontested current activity, no candidate activity, and the
+  nearest aligned neighbors outside the micro-run. Write only the exact unit
+  and add the specified positive and abstention tests without new thresholds.
+- [x] T059FS Replay the combined retained projector with FR16ABC twice on frozen
+  Run B, verify only determinism and source/time/config/immutable-track
+  contracts, arrange every changed context, and read each manually in complete
+  surrounding conversation before retention or rejection. No executable
+  mechanism may judge correctness, aggregate accuracy, rank/select, or issue
+  the verdict.
+- [x] T059FT Implement FR16ABD for the maximal contiguous forced-aligned source
+  range wholly contained by one robust-complete VAD interval. Require existing-
+  gate dual-gallery agreement, typed VAD isolation on both sides, one text ID,
+  contiguous alignment, uniform direct current labels, one uncontested current
+  activity slot and primary run, and no candidate activity. Write only the
+  aligned source range and add all specified positive and abstention tests.
+- [x] T059FU Replay the combined retained projector with FR16ABD twice on frozen
+  Run B, verify only determinism and source/time/config/immutable-track
+  contracts, arrange every changed context, and read each manually in complete
+  surrounding conversation before retention or rejection. No executable
+  mechanism may judge correctness, aggregate accuracy, rank/select, or issue
+  the verdict.
+- [x] T059FV Implement FR16ABE for one short primary run at a separately bounded
+  VAD onset. Require a configured pause after the preceding current primary,
+  gapless same-current recovery, one candidate activity slot, no third activity
+  identity, a mixed VAD continuing through the existing minimum duration of the
+  restored current identity, and a one-text aligned run with exactly one
+  internal source discontinuity wholly inside the primary run. Preserve the
+  prefix, write only the aligned suffix, and add all specified positive and
+  abstention tests.
+- [x] T059FW Replay the combined retained projector with FR16ABE twice on frozen
+  Run B, verify only determinism and source/time/config/immutable-track
+  contracts, arrange every changed context, and read each manually in complete
+  surrounding conversation before retention or rejection. No executable
+  mechanism may judge correctness, aggregate accuracy, rank/select, or issue
+  the verdict.
+- [x] T059FX Implement FR16ABF for one no-embedding subminimum business interval
+  isolated on both sides by the existing TOML pause in typed VAD and positive-
+  duration alignment views. Require one uncontested current local slot in both
+  activity and primary, a different immutable initial identity, native current
+  labels, no candidate activity, and the existing aligned-unit count. Write
+  only the exact business-interval source range and add all abstention tests.
+- [x] T059FY Replay the combined retained projector with FR16ABF twice on frozen
+  Run B, verify only determinism and source/time/config/immutable-track
+  contracts, arrange every changed context, and read each manually in complete
+  surrounding conversation before retention or rejection. No executable
+  mechanism may judge correctness, aggregate accuracy, rank/select, or issue
+  the verdict.
+- [x] T059FZ Implement FR16ABG for one exact short punctuation phrase whose
+  phrase-session, phrase-robust, VAD-session, and VAD-robust rankings all
+  abstain on the existing margin while exposing one consistent top-two pair.
+  Require the initial local-slot identity to rank first once and second three
+  times, exclude the current identity from every pair, require uncontested
+  current activity/primary coverage and the existing aligned-unit count, and
+  write only the exact phrase.
+- [x] T059GA Replay the combined retained projector with FR16ABG twice on frozen
+  Run B, verify only determinism and source/time/config/immutable-track
+  contracts, arrange every changed context, and read each manually in complete
+  surrounding conversation before retention or rejection. No executable
+  mechanism may judge correctness, aggregate accuracy, rank/select, or issue
+  the verdict.
+  The focused C++ policy test passes. Both frozen replays produced SHA-256
+  `d60af2f079dcadf771418913021dac093e003f5a89b8b958aa18af3ac81a0aa0`.
+  Mechanical comparison arranged one changed reference context only. Complete
+  manual reading of `ref-0500` retained the change: Tang Yunfeng's statement
+  that an adult child is possible follows Shi Yi's conclusion that spouses are
+  financially indistinguishable, and Shi Yi then responds by asking about
+  waiting for Lili to become an adult. The candidate restores only that exact
+  phrase to Tang Yunfeng; no other reference context changed.
+- [x] T059GB Implement FR16ABH for one short punctuation phrase whose two
+  phrase views top-rank one candidate under score-pass/margin-abstention while
+  the two containing-VAD views top-rank the uniform direct current identity
+  under score-and-margin abstention. Require the same two identities as every
+  top-two pair, uncontested current activity and primary coverage, no candidate
+  activity, one robust-complete containing VAD, the existing aligned-unit
+  count, and exact phrase-only projection. Add positive and all specified
+  abstention tests without changing a TOML threshold.
+- [x] T059GC Replay the combined retained projector with FR16ABH twice on
+  frozen Run B, verify only deterministic/source/time/config/immutable-track
+  contracts, arrange every changed context, and read each manually in complete
+  surrounding conversation before retention or rejection. No executable
+  mechanism may judge correctness, aggregate accuracy, rank/select, or issue
+  the verdict.
+  The focused C++ policy test passes. Both frozen replays produced SHA-256
+  `8e0fa49382a252bbe291894447f2b9b0d44073ed00e9389b20f8b727ec492ace`.
+  Mechanical comparison arranged one changed coarse reference context. Full
+  manual reading retained the exact phrase: Zhu Jie asks whether to split,
+  Tang Yunfeng answers `不一定啊`, and Shi Yi then says `这不是老板吗`. The
+  source timestamp places Tang's audible reply just inside the next coarse
+  reference interval, but the semantic turn order is unambiguous and the rule
+  leaves Shi Yi's following phrase untouched.
+- [x] T059GD Implement FR16ABI for one exact short business interval whose two
+  galleries make the same eligible candidate decision while a uniform primary
+  attribution conflicts. Require the current and one competing activity slot
+  to cover the interval, exclude candidate activity, require one covering
+  primary run, and require both robust-complete containing-VAD views to abstain
+  while exposing the candidate and activity competitor as the same top-two pair
+  in opposite order. Add positive and all specified abstention tests without
+  changing a TOML threshold.
+- [x] T059GE Replay the combined retained projector with FR16ABI twice on
+  frozen Run B, verify only deterministic/source/time/config/immutable-track
+  contracts, arrange every changed context, and read each manually in complete
+  surrounding conversation before retention or rejection. No executable
+  mechanism may judge correctness, aggregate accuracy, rank/select, or issue
+  the verdict.
+  The focused C++ policy test passes. Both frozen replays produced SHA-256
+  `cc757ccdb0ff1a17b6b99a4b0b7ff0d3efa7d81acdd0cffd0fd1ef33f4d050a9`.
+  Mechanical comparison arranged one changed reference context only. Complete
+  manual reading retained the exact interval: Zhu Jie finishes that the product
+  is now international, Tang Yunfeng answers `是啊`, and Shi Yi then begins the
+  COB internationalization point. The candidate restores only Tang Yunfeng's
+  exact short reply and leaves both surrounding turns unchanged.
+- [x] T059GF Implement FR16ABJ as an exact subminimum business-interval
+  postpass. Require uniform phrase-session provenance, exactly two covering
+  activity slots, one matching the sole covering primary and one different
+  competitor, no current-candidate activity, one containing
+  phrase whose session is eligible and robust view margin-abstains for the
+  current identity, one containing VAD whose two margin-abstaining views rank
+  the native identity first and current identity second, and exactly one
+  contained positive-duration aligned unit. Add all specified abstention tests
+  without changing a TOML threshold.
+- [x] T059GG Replay the combined retained projector with FR16ABJ twice on frozen
+  Run B, verify only deterministic/source/time/config/immutable-track contracts,
+  arrange every changed context, and read each manually in complete surrounding
+  conversation before retention or rejection. No executable mechanism may
+  judge correctness, aggregate accuracy, rank/select, or issue the verdict.
+  The focused C++ policy test passes, including a cross-text source guard added
+  after the first full replay exposed the missing bound check. Both corrected
+  frozen replays produced SHA-256
+  `851cc707471d79e8e9187b832f2174a19ad08186cd98285c901b6108efc3b03a`.
+  Mechanical comparison displayed two coarse reference contexts around one
+  exact source split. Complete manual reading retained the change: Shi Yi asks
+  whether the three rounds include the current one, Tang Yunfeng answers
+  `不含`, and only that exact response is restored to Tang. The following `哦`
+  remains unchanged, so the already accepted next contribution does not
+  regress.
+- [x] T059GH Implement FR16ABK aligned complete-source VAD closure in the typed
+  C++ projector. Reuse only existing TOML thresholds; require an exact typed
+  business-interval source partition with per-interval alignment anchors,
+  dual-gallery short eligibility plus regular-score-only
+  abstention, one agreeing containing VAD, one margin-abstaining phrase, bounded
+  current-label edge topology, and exact two-identity activity/primary closure.
+  Add positive and specified abstention tests. Keep per-text postpasses bounded
+  to that text's typed source evidence.
+- [x] T059GI Replay the combined retained projector with FR16ABK twice on frozen
+  Run B, verify only deterministic/source/time/config/immutable-track contracts,
+  arrange every changed context, and read each manually in complete surrounding
+  conversation before retention or rejection. No executable mechanism may
+  judge correctness, aggregate accuracy, rank/select, or issue the verdict.
+  The focused C++ policy test passes with partition, alignment, gate, topology,
+  VAD, phrase, activity, and primary abstention cases. Both frozen replays
+  produced SHA-256
+  `ca6c506e4d2a3101d85720776bab51cf8d4f73559c68c7f90cf2e44e4eab4fca`.
+  Mechanical comparison arranged one changed reference context only. Complete
+  manual reading retained the atomic source: Xu Zijing comments that Tang has
+  too little after Shi Yi asks for opinions, and Tang enters only on the next
+  contribution. The rule leaves that following turn unchanged.
+- [x] T059GJ Implement FR16ABL adjacent-business-pair evidence and the exact
+  source-initial subminimum-prefix challenge. Enumerate every qualifying pair
+  from typed source/common-clock bounds, reuse only existing TOML gates, require
+  dual-gallery, primary, activity, alignment, and following-handoff closure,
+  and add positive plus all specified abstention tests.
+- [x] T059GK Replay the combined retained projector with FR16ABL twice on
+  frozen Run B. Verify only raw-evidence, deterministic, source/time/config,
+  and immutable-track contracts; arrange every changed context and read each
+  manually in complete surrounding conversation before retention or rejection.
+  No executable mechanism may judge correctness, aggregate accuracy,
+  rank/select a candidate, or issue the verdict.
+  The evidence stage enumerated 67 typed queries. The focused C++ tests pass,
+  including source/time adjacency, duration, dual-gallery, component,
+  provenance, primary, activity-confidence, alignment, and following-handoff
+  abstention cases. The augmented frozen voiceprint input has SHA-256
+  `252642472ffd2cf1b8cc10308f56914bc698bd31413d4886b597cd5a4082d357`;
+  both C++ replays produced SHA-256
+  `281a74b57803ab32af6a36a0c75ed9dbf19f23c02b15904babe6858950998b1b`.
+  Mechanical comparison displayed one changed entry only. Complete forward and
+  reverse context reading retained the change: Shi Yi's continuous finance-role
+  question now has one identity, while Xu Zijing's following reply remains
+  unchanged. The manually maintained frozen development ledger is now 518
+  accepted and 38 incorrect contributions out of 556, approximately 93.2
+  percent. See `adjacent-primary-prefix-review-2026-07-16.md`; real runtime
+  acceptance remains pending.
+- [x] T059GL Complete the frozen FR16ABL full-session contextual semantic gate.
+  Read all 556 contributions chronologically and then reread the complete
+  `0-3615.120`-second session in reverse fixed blocks. The two manual passes
+  agree on 518 accepted and 38 incorrect contributions, approximately 93.2
+  percent. No program assigned a correctness label, total, percentage, rank,
+  candidate decision, or verdict. The repaired `ref-0459` remains correct;
+  `ref-0396` is a natural Tang-to-Shi handoff and `ref-0548` is an ASR wording
+  error on the correct Shi speaker interval. See
+  `final-full-context-review-2026-07-16.md`.
 
 ## Phase 5: Model Escalation If Required
 
@@ -249,7 +1509,7 @@
 
 ## Phase 6: v2.1 Runtime Candidate
 
-- [ ] T070 Implement the frozen speaker-evidence and fusion contracts behind
+- [x] T070 Implement the frozen speaker-evidence and fusion contracts behind
   typed TOML fields.
 - [x] T071 Add complete audit evidence to each business-speaker decision. The
   attribution-neutral increment records structured source/projection/reason,
@@ -261,30 +1521,43 @@
   and time-envelope mismatch, preserve round-trip confidence in new artifacts,
   and emit a source-hashed full-session decision-evidence package without
   correctness labels. See `speaker-decision-audit-2026-07-15.md`.
-- [ ] T072 Validate that raw ASR, diarization, VAD, align, and voiceprint tracks
+- [x] T072 Validate that raw ASR, diarization, VAD, align, and voiceprint tracks
   remain unchanged by fusion revisions.
-- [ ] T073 Complete Web UI live/final convergence, microphone, reconnect,
+- [x] T073 Complete Web UI live/final convergence, microphone, reconnect,
   telemetry, and export validation in a real browser.
-- [ ] T074 Run all model oracle gates for the exact accepted v2.1 TOML profile.
-- [ ] T075 Pass 120 s, then 360 s, then 600 s promotion gates; stop on the first
+- [x] T074 Run all model oracle gates for the exact accepted v2.1 TOML profile.
+- [x] T075 Pass 120 s, then 360 s, then 600 s promotion gates; stop on the first
   regression.
 
 ## Phase 7: Full v2.1 Acceptance
 
-- [ ] T080 Run full v2.1 acceptance A with an empty isolated speaker registry.
-- [ ] T081 Complete the full 556-row context and semantic review for run A.
-- [ ] T082 Restart the process and run full v2.1 acceptance B with the frozen
-  enrolled-registry fixture.
-- [ ] T083 Complete the full 556-row context and semantic review for run B.
+- [x] T080 Run full v2.1 acceptance A with an empty isolated speaker registry.
+  The complete 3615.120-second real-WebSocket producer plus early/late observer
+  current-source run passed all mechanical contracts and froze the generated
+  registry with SHA256
+  `66461a77755984a08231d06306da7ce9e1eeac07be1927e91f8a772fc54c7b3f`.
+- [x] T081 Complete the full 556-row context and semantic review for run A.
+  Every row was reconciled chronologically and then reread in reverse fixed
+  blocks. The manually established current result is 515 accepted and 41
+  incorrect contributions, approximately 92.63 percent; see
+  `final-full-context-review-2026-07-16.md`. No executable mechanism judged or
+  aggregated the product result.
+- [x] T082 Restart the process and run full v2.1 acceptance B with the frozen
+  enrolled-registry fixture. The complete 3615.120-second current-source run
+  passed all mechanical contracts and preserved the frozen registry hash.
+- [x] T083 Complete the full 556-row context and semantic review for run B.
+  The forward and reverse reviews manually established 513 accepted and 43
+  incorrect contributions, approximately 92.27 percent. No executable
+  mechanism assigned correctness or produced the verdict.
 - [ ] T084 Verify every Spec 013 accuracy and business-result gate manually from
   complete contextual semantics, and verify mechanical boundary, alignment,
   latency, telemetry, stability, and repeatability evidence separately for both
   runs. No code may aggregate these into a product verdict.
 - [ ] T085 Execute the supplemental locked holdout suite after the Constitution
   amendment if an industrial-readiness claim is requested.
-- [ ] T086 Write the final closing report with manifests, hashes, complete ledger,
+- [x] T086 Write the final closing report with manifests, hashes, complete ledger,
   metrics, limitations, and exact product claim.
-- [ ] T087 Synchronize specs, tasks, `PROJECT_STATE.md`, README, and code comments
+- [x] T087 Synchronize specs, tasks, `PROJECT_STATE.md`, README, and code comments
   in the accepted commit.
 - [ ] T088 Review the final report, close all priority-zero/priority-one defects,
   and create the release tag only after sign-off.

@@ -6,11 +6,13 @@
 // asserts the per-window probabilities match within a recorded tolerance. Run
 // from the repo root so models/vad/silero_vad.safetensors resolves.
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <vector>
 
 #include "asr_vad_cpu.h"
+#include "io/audio_file.h"
 #include "pipeline/gpu_vad.h"
 
 using namespace orator;
@@ -77,6 +79,52 @@ int main() {
     std::printf("FAIL: GPU VAD probabilities exceed tolerance\n");
     return 1;
   }
+
+  auto audio = io::LoadAudioMono("test/data/audio/test.mp3", sr);
+  audio.samples.resize(std::min(
+      audio.samples.size(), static_cast<size_t>(30 * sr)));
+  pipeline::GpuVad::Params zero_pad_params = gp;
+  zero_pad_params.silero_min_silence_ms = 300;
+  zero_pad_params.silero_speech_pad_ms = 0;
+  pipeline::GpuVad zero_pad(zero_pad_params);
+  zero_pad.Push(audio.samples.data(), static_cast<int>(audio.samples.size()));
+  std::vector<core::VadSegmentResult> raw_segments;
+  zero_pad.DrainSegments(true, &raw_segments);
+
+  pipeline::GpuVad::Params padded_params = zero_pad_params;
+  padded_params.silero_speech_pad_ms = 60;
+  pipeline::GpuVad padded(padded_params);
+  padded.Push(audio.samples.data(), static_cast<int>(audio.samples.size()));
+  std::vector<core::VadSegmentResult> padded_segments;
+  padded.DrainSegments(true, &padded_segments);
+
+  if (raw_segments.empty() || raw_segments.size() != padded_segments.size()) {
+    std::printf("FAIL: padded VAD endpoint count differs (raw=%zu padded=%zu)\n",
+                raw_segments.size(), padded_segments.size());
+    return 1;
+  }
+  const long pad_samples = 60L * sr / 1000;
+  const long processed_horizon =
+      static_cast<long>(audio.samples.size() / 512) * 512;
+  long prior_end = 0;
+  for (size_t i = 0; i < raw_segments.size(); ++i) {
+    const long expected_start = std::max(
+        prior_end, std::max(0L, raw_segments[i].start_sample - pad_samples));
+    const long expected_end = std::min(
+        processed_horizon, raw_segments[i].end_sample + pad_samples);
+    if (padded_segments[i].start_sample != expected_start ||
+        padded_segments[i].end_sample != expected_end) {
+      std::printf(
+          "FAIL: padded VAD interval %zu differs "
+          "(got=%ld-%ld expected=%ld-%ld)\n",
+          i, padded_segments[i].start_sample, padded_segments[i].end_sample,
+          expected_start, expected_end);
+      return 1;
+    }
+    prior_end = expected_end;
+  }
+  std::printf("GPU VAD speech padding gate PASSED (%zu segments)\n",
+              padded_segments.size());
   std::printf("GPU VAD numeric gate PASSED\n");
   return 0;
 }
