@@ -2489,6 +2489,9 @@ The remaining work proceeds in this order:
 No new model or fusion parameter sweep starts while these evidence gaps are the
 blocking issue.
 
+Items 1 through 3 were completed by clean commit `588bfbe63555` and the
+full-length direct-end seal in Section 8.7. Current execution starts at item 4.
+
 ### 8.6 Precompute engineering seal (2026-07-18)
 
 T101A and T101B are implemented on the working tree based on parent commit
@@ -2526,9 +2529,31 @@ log reports 618 precompute operations and 640 cached spans at finalization;
 that count includes the final drain and is not a claim that every span was
 processed live. Exact equality, hashes, phase times, and latency are mechanical
 engineering evidence only. They do not evaluate speaker correctness or replace
-complete contextual semantic review. T101 remains open until a clean commit
-completes full-length direct-end A/B recapture and the resulting business views
-receive the required complete-context review.
+complete contextual semantic review. At this engineering checkpoint T101 was
+still open; the subsequent full-length seal is recorded below.
+
+### 8.7 Direct-end full A/B seal (2026-07-18)
+
+Clean commit `588bfbe63555` completed both required `3615.120`-second runs
+through the 1.0x production incremental WebSocket path. Run A started from an
+empty isolated registry; Run B restarted the process with Run A's registry
+frozen. The acceptance TOML changes only the isolated registry and storage
+paths from the checked-in file. Both runs sent `end` directly after the final
+audio frame and did not send `flush`.
+
+Run A reached the terminal timeline in `25.597 s`; Run B reached it in
+`26.305 s`. Both artifacts have exact seven-track common-clock reconciliation,
+no contract issue, complete producer/observer terminal equality, and required
+telemetry coverage above the cadence threshold. This closes T101 and the
+mechanical terminal-latency gate.
+
+Complete forward and reverse contextual semantic review manually records
+512 accepted / 44 incorrect natural contributions for Run A (approximately
+92.09 percent) and 509 accepted / 47 incorrect for Run B (approximately 91.55
+percent). No code assigned a judgment or total. Both runs retain the natural-
+business-turn gate, but all T102 ledger-derived gates remain open. The complete
+hashes, changed-context reconciliation, error lists, and permitted claim are in
+`direct-end-full-review-2026-07-18.md`.
 
 ## 9. Phase 7: Final Sign-Off
 

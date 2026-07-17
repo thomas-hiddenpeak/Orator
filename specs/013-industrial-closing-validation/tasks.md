@@ -1,6 +1,6 @@
 # Tasks: Industrial Closing Validation
 
-**Status**: In progress - v2.1 closing baseline selected 2026-07-15
+**Status**: In progress - direct-end full A/B gate recorded 2026-07-18
 
 ## Phase 0: Governance
 
@@ -1555,9 +1555,11 @@
   complete contextual semantics, and verify mechanical boundary, alignment,
   latency, telemetry, stability, and repeatability evidence separately for both
   runs. No code may aggregate these into a product verdict. The 2026-07-17
-  audit confirms this remains open: natural-turn attribution passes, but
-  speaker-time, fixed blocks, per-speaker recall, criticality, confidence,
-  audible boundaries, and direct terminal latency are unsigned.
+  audit confirmed this remained open. The 2026-07-18 direct-end A/B recapture
+  now signs the terminal-latency gate mechanically and again passes the natural-
+  turn gate under complete contextual semantic review. Speaker-time, fixed
+  blocks, per-speaker recall, criticality, confidence, and audible boundaries
+  remain unsigned.
 - [ ] T085 Execute the supplemental locked holdout suite after the Constitution
   amendment if an industrial-readiness claim is requested.
 - [ ] T086 Write the final closing report with manifests, hashes, complete
@@ -1629,16 +1631,18 @@
 - [x] T100 Audit every T084 conjunctive gate without converting mechanical
   evidence into a product verdict. Record that natural-turn attribution passes
   while the remaining unsigned gates keep T084 and Spec 013 open.
-- [ ] T101 Record `flush` and `end` terminal waits independently in the evidence
+- [x] T101 Record `flush` and `end` terminal waits independently in the evidence
   manifest, add focused structural tests, and recapture the affected real-
-  WebSocket latency evidence without changing runtime TOML policy. The client
-  implementation and focused tests are complete. The first full-length direct-
-  end A recapture at `7721024ceb60` completed the business artifact but recorded
-  `66.915 s`, so it is a mechanical failure rather than closure evidence. The
-  FR26 implementation subsequently passed same-binary 120-second cached and
-  uncached checks at `0.805 s` and `0.844 s`, plus 600-second checks at `4.514 s`
-  and `6.568 s`. These are mechanical engineering checks only. Full-length
-  clean-source A/B recapture remains before this task can close.
+  WebSocket latency evidence without changing runtime TOML policy. The first
+  full-length direct-end A recapture at `7721024ceb60` recorded `66.915 s` and
+  remains a mechanical failure artifact. After FR26, clean commit
+  `588bfbe63555` completed full A/B direct-end runs at `25.597 s` and
+  `26.305 s`, with no priming `flush`, stable source/config/binary identity,
+  exact producer/observer terminal convergence, complete common-clock extents,
+  and required telemetry coverage. Complete forward/reverse contextual review
+  manually records 512/556 for Run A and 509/556 for Run B. See
+  `direct-end-full-review-2026-07-18.md`. Timing and structural checks are
+  mechanical evidence only; the speaker result comes only from that review.
 - [x] T101A Add the FR26 typed speaker-evidence snapshot, common-sample-span
   embedding cache, session-owned periodic precompute worker, TOML cadence, and
   phase timing diagnostics. Route TitaNet through a scheduler-owned

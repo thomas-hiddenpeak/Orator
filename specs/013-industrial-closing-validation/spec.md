@@ -1,8 +1,8 @@
 # Spec 013: Industrial Closing Validation
 
-**Status**: Current clean-commit A/B natural-business-turn speaker gate passes;
-T084, full canonical closure, release sign-off, and industrial readiness remain
-open
+**Status**: Current direct-end clean-commit A/B natural-business-turn and
+terminal-latency gates pass; T084, full canonical closure, release sign-off,
+and industrial readiness remain open
 **Created**: 2026-07-13
 **Scope**: Re-establish a truthful product baseline, recover full-session business
 accuracy, and define the evidence required before Orator may be declared closed.
@@ -14,9 +14,10 @@ Orator's v2.1 speaker-business pipeline now has repeatable full-session evidence
 above 90 percent for the natural-business-turn speaker-attribution gate. Run A
 and Run B were each executed through the real WebSocket path, and all 556
 reference contributions were reconciled under complete conversational context.
-This signs one conjunctive gate only. Speaker-time, fixed-block, per-speaker,
-critical-turn, confident-wrong, audible-boundary, terminal-latency, ASR,
-release, and independent-holdout gates remain open.
+The current direct-end runs also satisfy the terminal-latency gate mechanically.
+These sign two conjunctive gates only. Speaker-time, fixed-block, per-speaker,
+critical-turn, confident-wrong, audible-boundary, ASR, release, and independent-
+holdout gates remain open.
 
 This spec defines two separate claims:
 
@@ -144,6 +145,15 @@ subject to the complete acceptance gates in this spec.
     T084 audit leaves speaker-time, fixed-block, per-speaker, criticality,
     confidence, audible-boundary, and terminal-latency gates unsigned. See
     `current-commit-full-review-2026-07-17.md`.
+13. **FR26 direct-end full A/B seal complete; T084 open**: clean commit
+    `588bfbe63555` completed the empty-registry and restarted frozen-registry
+    `3615.120`-second runs with direct `end` waits of `25.597 s` and
+    `26.305 s`. Both runs satisfy the terminal-latency contract mechanically.
+    Complete forward/reverse contextual semantic review manually records
+    `512/556` for Run A and `509/556` for Run B, so both retain the natural-turn
+    gate. Speaker-time, fixed-block, per-speaker, criticality, confidence, and
+    audible-boundary gates remain unsigned. See
+    `direct-end-full-review-2026-07-18.md`.
 
 ## 4. Requirements
 
