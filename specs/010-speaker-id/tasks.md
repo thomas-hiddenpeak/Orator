@@ -118,7 +118,8 @@ Full 60 min real-WS run (after the embed-window OOM fix + `--timeline-timeout
 - **ASR semantic**: ~88–92% (manual read vs test.txt — text tracks the
   reference closely, early and late).
 - **Speaker / diarization**: end-to-end attribution **70.6%** dur-weighted
-  (`tools/verify/py/speaker_attrib_eval.py`), 2/4 speakers enrolled, real
+  (historical `speaker_attrib_eval.py`, removed by Spec 013 T095), 2/4 speakers
+  enrolled, real
   speakers merged (朱杰+唐云峰 → one id at live cross-cosine 0.708).
 - **Root cause (data-confirmed)**: Sortformer long-session degradation +
   local-slot drift — per-window diar ceiling (optimal local→name) decays
@@ -142,7 +143,7 @@ Full 60 min real-WS run (after the embed-window OOM fix + `--timeline-timeout
 
 ## Phase G — Cross-session GLOBAL identity (supersedes Phase F's code verdict)
 Phase F incorrectly judged accuracy from a code metric
-(`speaker_attrib_eval.py`) that, on
+(`speaker_attrib_eval.py`, now removed) that, on
 a run whose `speaker_id` fields were empty, silently fell back to the diarizer's
 per-window LOCAL slots with an optimal mapping — i.e. it never measured the
 voiceprint at all. Re-evaluated per the Test Review Protocol (context-aware

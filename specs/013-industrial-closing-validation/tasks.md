@@ -1582,7 +1582,24 @@
   WebSocket smoke with source/config/binary/time/observer/telemetry contracts.
 - [x] T094 Synchronize `PROJECT_STATE.md`, Spec 013, plan, tasks, and final
   maintainability evidence in the same commit.
-- [ ] T095 In a separate exact-equivalence change, consolidate duplicated policy
+- [x] T095 In a separate exact-equivalence change, consolidate duplicated policy
   guards and move rejected one-off candidate tools/configurations out of the
   active build surface. Do not remove production regression coverage or alter
   the accepted output.
+- [x] T095A Freeze the current full retained typed replay at commit `52b3b22`.
+  The 1,775-entry output has SHA-256
+  `04ba82a844a14edb08b3cce60a543e831dfd6bb1e1368d58440303f6f2251db9`.
+  This is a mechanical behavior baseline only.
+- [x] T095B Consolidate the duplicated ranked-top-two and minimum-aligned-unit
+  guards without changing challenge order, thresholds, reasons, sources, or
+  abstention behavior.
+- [x] T095C Move standalone candidate generators, their integration tests, and
+  non-production speaker TOMLs to an explicitly inactive historical archive;
+  remove all archived candidate registrations from CTest.
+- [x] T095D Remove legacy runnable scripts that calculate speaker-attribution or
+  speaker-identification accuracy, plus the compiled reference-projection
+  harness. Preserve their history only through Git.
+- [x] T095E Require byte identity with T095A, a warning-clean build, all active
+  CTest entries, and a new-binary real-WebSocket observer/telemetry smoke.
+- [x] T095F Synchronize Spec 013, `PROJECT_STATE.md`, archive documentation, and
+  final maintainability evidence in the same commit.

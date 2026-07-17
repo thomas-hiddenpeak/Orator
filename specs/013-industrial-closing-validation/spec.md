@@ -1,8 +1,8 @@
 # Spec 013: Industrial Closing Validation
 
 **Status**: Canonical speaker-business scene accepted 2026-07-16; accepted
-policy ownership refactored 2026-07-17; independent holdout and non-speaker
-product gates remain open
+policy ownership and active surface consolidated 2026-07-17; independent
+holdout and non-speaker product gates remain open
 **Created**: 2026-07-13
 **Scope**: Re-establish a truthful product baseline, recover full-session business
 accuracy, and define the evidence required before Orator may be declared closed.
@@ -192,6 +192,17 @@ subject to the complete acceptance gates in this spec.
   alternate pipeline data path. Before and after outputs from one frozen full-
   session typed input MUST be byte-identical; a mismatch aborts the refactor and
   cannot be interpreted as an accuracy change or improvement.
+- **FR24**: The active build and validation surface MUST distinguish production
+  regression coverage from historical candidate experiments. The checked-in
+  root `orator.toml` is the sole production speaker configuration. Accepted
+  runtime fusion behavior MUST remain covered by focused C++ tests; evidence
+  capture, provenance, and review-packet tools may remain active only when they
+  do not assign correctness or select a result. One-off candidate generators,
+  their tests, and non-production TOML profiles MUST live in an explicitly
+  inactive historical archive and MUST NOT be registered by CMake/CTest.
+  Legacy programs that calculate product speaker accuracy or choose a result
+  MUST be removed rather than archived as runnable tools. Git history remains
+  the source for their historical implementation.
 
 ### 4.3 Reference and evaluation
 

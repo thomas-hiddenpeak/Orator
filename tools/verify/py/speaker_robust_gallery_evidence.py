@@ -3,16 +3,28 @@
 
 import argparse
 import csv
+import hashlib
 import json
 import math
 import os
 import tomllib
 from collections import defaultdict
 
-import speaker_posterior_bounded_phrase_candidate as posterior
-
 
 EPSILON = 1e-9
+
+
+def sha256_file(path):
+    digest = hashlib.sha256()
+    with open(path, "rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def load_json(path):
+    with open(path, encoding="utf-8") as source:
+        return json.load(source)
 
 
 def load_policy(path):
@@ -150,7 +162,7 @@ def write_evidence(path, queries, gallery, active_ids):
 def build(metadata_path, prototype_path, query_path, config_path, output_path,
           manifest_path):
     policy = load_policy(config_path)
-    metadata = posterior.load_json(metadata_path)
+    metadata = load_json(metadata_path)
     if metadata.get("kind") != "orator_clean_speaker_gallery_spans":
         raise ValueError("metadata is not a clean speaker gallery")
     prototypes = read_embeddings(prototype_path)
@@ -175,7 +187,7 @@ def build(metadata_path, prototype_path, query_path, config_path, output_path,
         "query_count": len(queries),
         "sources": {
             name: {"path": os.path.abspath(path),
-                   "sha256": posterior.sha256_file(path)}
+                   "sha256": sha256_file(path)}
             for name, path in {
                 "metadata": metadata_path,
                 "prototype_embeddings": prototype_path,
@@ -184,7 +196,7 @@ def build(metadata_path, prototype_path, query_path, config_path, output_path,
             }.items()
         },
         "output": {"path": os.path.abspath(output_path),
-                   "sha256": posterior.sha256_file(output_path)},
+                   "sha256": sha256_file(output_path)},
     }
     with open(manifest_path, "w", encoding="utf-8") as output:
         json.dump(manifest, output, ensure_ascii=False, indent=2)

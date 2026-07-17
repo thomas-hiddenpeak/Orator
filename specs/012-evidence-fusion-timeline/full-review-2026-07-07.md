@@ -46,8 +46,9 @@ non-authoritative mechanical records and may not evaluate or explain the result.
   - `pause_sec=0.25`: 1553 candidate entries, unknown speaker 22.120 s.
   - `pause_sec=0.40`: 1278 candidate entries, unknown speaker 19.920 s.
 - Current comprehensive has 723 entries. The candidate has more entries because it uses forced-alignment unit runs and drops silent gaps from ASR spans.
-- Historical `speaker_attrib_eval.py` output is retained only as a mechanical
-  record and does not explain, compare, or decide business-view accuracy:
+- Historical `speaker_attrib_eval.py` output (tool removed by Spec 013 T095) is
+  retained only as a mechanical record and does not explain, compare, or decide
+  business-view accuracy:
   - Current comprehensive: 73.4% duration-weighted attribution over 3064 s, 3/4 reference names covered by global mapping.
   - Fusion candidate: 73.3% over 2048 s, 3/4 reference names covered.
   - The candidate changes boundary granularity more than it changes speaker identity correctness.

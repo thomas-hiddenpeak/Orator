@@ -46,16 +46,10 @@ python3 tools/verify/py/speaker_business_review_packet.py \
   --out /tmp/orator_support_diag_review_packet_20260710.md
 ```
 
-Diagnostic-only overlap check:
-
-```bash
-python3 tools/verify/py/speaker_attrib_eval.py \
-  /tmp/orator_support_diag_full_20260710.json \
-  --txt /home/rm01/test/test.txt --windows 600
-```
-
-The overlap check is not the acceptance metric. It is retained only as a
-mechanical sanity probe before human context review.
+The historical run also invoked `speaker_attrib_eval.py`. That program was
+removed by Spec 013 T095 because code-based speaker-result aggregation is not a
+valid sanity probe or acceptance metric. The values below are retained only as
+historical records; they must not be reproduced or used for a product decision.
 
 ## Real WebSocket result
 

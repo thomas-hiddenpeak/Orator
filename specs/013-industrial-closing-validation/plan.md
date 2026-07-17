@@ -45,6 +45,33 @@ refactor changes ownership and file boundaries only:
    guards and archive rejected experimental assets. That later work receives its
    own exact-equivalence gate and may not alter the accepted speaker result.
 
+### 1.2 Active-surface consolidation
+
+T095 is a second, independently frozen equivalence change:
+
+1. Replay the full retained typed input at commit `52b3b22` and use its complete
+   serialized output as the only behavior baseline for this change.
+2. Consolidate only repeated, semantically identical policy guards: ranked
+   top-two voiceprint extraction and minimum forced-alignment-unit coverage.
+   Keep every challenge function, invocation order, abstention return, reason,
+   source, and threshold unchanged.
+3. Keep `test_business_speaker_pipeline` as the active exhaustive regression for
+   accepted fusion and abstention behavior. Keep active Python tests only for
+   raw evidence generation, replay-input integrity, provenance, and unjudged
+   review-packet construction.
+4. Move every standalone `speaker_*_candidate.py`, its matching integration
+   test, and every non-production speaker TOML under an explicit Spec 013
+   historical archive. Remove their CTest registrations. Keep Sortformer high-
+   and low-latency numerical-oracle profiles because they remain active model
+   parity fixtures, not product candidates.
+5. Delete legacy scripts that calculate product speaker-attribution accuracy or
+   model identification accuracy and remove the compiled reference-projection
+   harness. Do not retain runnable copies in the archive.
+6. Require byte identity with the frozen full replay, a clean build, all
+   remaining CTest entries, and a new-binary real-WebSocket smoke. Test-count
+   reduction caused solely by removal of archived candidate tests is expected
+   and is not a reduction in production regression coverage.
+
 ## 2. Phase 0: Governance and Baseline Reset
 
 1. Review and approve Spec 013 before runtime implementation.

@@ -14,7 +14,7 @@ work is specified under [specs/](.).
 > pass is the consistency proof. Status lines advance to `Implemented` in the
 > same change that lands the code, with the commit reference.
 
-- **Last updated**: 2026-07-17 (accepted speaker-policy ownership refactor)
+- **Last updated**: 2026-07-17 (speaker-policy active-surface consolidation)
 - **Branch**: `master`
 - **Constitution**: v1.7.0
 - **Speaker-business closure**: **CANONICAL SCENE ACCEPTED**. Current-source
@@ -250,6 +250,20 @@ This is mechanical equivalence and engineering evidence, not a new accuracy
 evaluation. See
 [speaker-policy-maintainability-2026-07-17.md](013-industrial-closing-validation/speaker-policy-maintainability-2026-07-17.md).
 
+**Speaker-policy active-surface checkpoint (2026-07-17)**: four duplicate
+top-two voiceprint rankers and seven duplicate aligned-unit guards now have one
+owner each; all challenge-specific conditions and invocation order remain
+unchanged. Forty-three one-off candidate generators, their 43 tests, and 51
+non-production TOMLs moved to explicit inactive archives. Thirty-three historical
+experiment tests left CTest, while the exhaustive C++ production fusion test and
+seven evidence/replay/review Python tests remain active. Two product-result
+scripts and the compiled reference-projection harness were removed. The retained
+full replay remains byte-identical at SHA-256 `04ba82a8...51db9`; the clean suite
+passes 68/68, and a new-binary 120-second 1x real-WebSocket run passed observer,
+provenance, time, and telemetry contracts. No product-result evaluation follows.
+See
+[speaker-policy-active-surface-2026-07-17.md](013-industrial-closing-validation/speaker-policy-active-surface-2026-07-17.md).
+
 ## 3. Component status
 
 | Component | Status | Notes |
@@ -271,7 +285,7 @@ evaluation. See
 | Logging system | ✅ Include-level `core/log.h` | Level-based macros (`LOG_DEBUG`/`INFO`/`WARN`/`ERROR`) with compile-time floor (`ORATOR_LOG_LEVEL`) and runtime env-var gate. All 14 `fprintf(stderr)` calls in src/ replaced. |
 | CUDA kernel unit tests | ✅ `test_kernels`: 13/13 passed | GPU kernel operations (Add, Multiply, NormalizeVector, CosineSimilarity, BatchCosineSimilarity) validated against CPU reference; includes edge cases (zero, single-element, large 1M vectors). |
 | CI pipeline | ✅ GitHub Actions | `.github/workflows/ci.yml`: CUDA 12.5, CMake build + ctest + warning check + Python syntax verification. Triggered on push/PR to master. |
-| Test suite | 101 configured CTest entries | The active Sortformer gates are bound to v2.1. Focused C++ and Python tests cover typed speaker evidence, production fusion policies, source/time/config invariants, immutable raw tracks, WebSocket manifests, telemetry, and evidence-only review packet integrity. The complete 2026-07-16 run passes 101/101. Browser and physical-microphone acceptance remain outside CTest. No automated result may assign correctness, aggregate accuracy, rank/select a candidate, or produce product acceptance. |
+| Test suite | 68 configured CTest entries | The active Sortformer gates are bound to v2.1. Focused C++ tests cover typed speaker evidence and every accepted production fusion/abstention policy; active Python tests cover source/time/config invariants, immutable raw tracks, WebSocket manifests, telemetry, evidence integrity, replay inputs, and unjudged review packets. Thirty-three historical candidate tests are archived outside CTest. The complete 2026-07-17 run passes 68/68. Browser and physical-microphone acceptance remain outside CTest. No automated result may assign correctness, aggregate accuracy, rank/select a candidate, or produce product acceptance. |
 | Diar tail parameter experiments | ❌ No accepted fix | 2026-07-10 TOML experiments used `diar_evidence_probe` on full `test.mp3` for strict onset/offset, `min_dur_on=1.2`, `min_dur_on=2.0`, `chunk_left_context=2`, `chunk_right_context=0`, and `left2_right0`. Threshold/min-duration changes deleted evidence without recovering the correct speaker; context variants did not solve 3270-3304 s and some removed the small local-2 hint at 3299.76 s. NeMo full-length reference on the same audio produced the same hard-window spk3 bias (`3270-3304.5`: spk3 313/431 frames; `3240-3360`: spk3 1013/1500 frames). The historical v2 numerical gate passed at that time; its checkpoint and CTest have since been removed. See Spec 012 `diar-tail-toml-experiments-2026-07-10.md`. |
 | TitaNet tail voiceprint review | ❌ No accepted override | 2026-07-10 orthogonal speaker-embedding review used `speaker_embedding_probe` on full `test.mp3` with 600 s, 60 s, and 30 s buckets. The hard-window `L3@3270-3300` bucket remains closest to historical L3 (`L3@3300-3330=0.762`, historical L3 up to 0.724) while best non-L3 alternatives are lower (`L0=0.440`, `L1=0.424`, `L2=0.321`). This rejects direct TitaNet override for 3270-3304 s. See Spec 012 `titanet-tail-evidence-2026-07-10.md`. |
 | OnText protocol matching | ✅ Fixed | Substring `text.find("end")` → JSON key `text.find("\"end\"")` to prevent false positives on partial matches. Same for reset/flush. |

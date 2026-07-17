@@ -61,6 +61,10 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
     bool score_pass = false;
     bool margin_pass = false;
   };
+  struct RankedPair {
+    Selection first;
+    std::string second_id;
+  };
   auto rank = [&](const std::vector<ComprehensiveTimeline::VoiceprintScore>&
                       scores,
                   double duration) -> std::optional<Selection> {
@@ -85,6 +89,20 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
                      ranked[0].score + 1e-9f >= score_gate,
                      margin + 1e-9f >= margin_gate};
   };
+  auto ranked_pair = [&](const auto& scores,
+                         double duration) -> std::optional<RankedPair> {
+    const auto selected = rank(scores, duration);
+    if (!selected || scores.size() < 2) return std::nullopt;
+    auto ordered = scores;
+    std::sort(ordered.begin(), ordered.end(), [](const auto& left,
+                                                 const auto& right) {
+      if (!NearEqual(left.score, right.score)) {
+        return left.score > right.score;
+      }
+      return left.speaker_id < right.speaker_id;
+    });
+    return RankedPair{*selected, ordered[1].speaker_id};
+  };
   auto select = [&](const std::vector<ComprehensiveTimeline::VoiceprintScore>&
                         scores,
                     double duration,
@@ -95,6 +113,19 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
       return std::nullopt;
     }
     return selected;
+  };
+  auto has_minimum_aligned_units = [&](double start, double end) {
+    const auto alignment = pipeline.align_.find(text.id);
+    if (alignment == pipeline.align_.end()) return false;
+    int aligned_unit_count = 0;
+    for (const auto& unit : alignment->second.units) {
+      if (unit.end > unit.start && unit.start + 1e-9 >= start &&
+          unit.end <= end + 1e-9) {
+        ++aligned_unit_count;
+      }
+    }
+    return aligned_unit_count >=
+           pipeline.config_.voiceprint_four_view_min_aligned_units;
   };
 
   auto speaker_label = [&](const std::string& speaker_id) {
@@ -355,17 +386,7 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
       }
     }
 
-    const auto alignment = pipeline.align_.find(text.id);
-    if (alignment == pipeline.align_.end()) return std::nullopt;
-    int aligned_unit_count = 0;
-    for (const auto& unit : alignment->second.units) {
-      if (unit.end <= unit.start || unit.start + 1e-9 < item.start ||
-          unit.end > item.end + 1e-9) {
-        continue;
-      }
-      ++aligned_unit_count;
-    }
-    if (aligned_unit_count < pipeline.config_.voiceprint_four_view_min_aligned_units) {
+    if (!has_minimum_aligned_units(item.start, item.end)) {
       return std::nullopt;
     }
 
@@ -503,16 +524,7 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
     }
     const std::string candidate_identity = initial->second.second;
 
-    const auto alignment = pipeline.align_.find(text.id);
-    if (alignment == pipeline.align_.end()) return std::nullopt;
-    int aligned_unit_count = 0;
-    for (const auto& unit : alignment->second.units) {
-      if (unit.end > unit.start && unit.start + 1e-9 >= item.start &&
-          unit.end <= item.end + 1e-9) {
-        ++aligned_unit_count;
-      }
-    }
-    if (aligned_unit_count < pipeline.config_.voiceprint_four_view_min_aligned_units) {
+    if (!has_minimum_aligned_units(item.start, item.end)) {
       return std::nullopt;
     }
 
@@ -635,37 +647,10 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
     }
     if (containing_vad == nullptr) return std::nullopt;
 
-    const auto alignment = pipeline.align_.find(text.id);
-    if (alignment == pipeline.align_.end()) return std::nullopt;
-    int aligned_unit_count = 0;
-    for (const auto& unit : alignment->second.units) {
-      if (unit.end > unit.start && unit.start + 1e-9 >= item.start &&
-          unit.end <= item.end + 1e-9) {
-        ++aligned_unit_count;
-      }
-    }
-    if (aligned_unit_count < pipeline.config_.voiceprint_four_view_min_aligned_units) {
+    if (!has_minimum_aligned_units(item.start, item.end)) {
       return std::nullopt;
     }
 
-    struct RankedPair {
-      Selection first;
-      std::string second_id;
-    };
-    auto ranked_pair = [&](const auto& scores,
-                           double duration) -> std::optional<RankedPair> {
-      const auto selected = rank(scores, duration);
-      if (!selected || scores.size() < 2) return std::nullopt;
-      auto ordered = scores;
-      std::sort(ordered.begin(), ordered.end(), [](const auto& left,
-                                                   const auto& right) {
-        if (!NearEqual(left.score, right.score)) {
-          return left.score > right.score;
-        }
-        return left.speaker_id < right.speaker_id;
-      });
-      return RankedPair{*selected, ordered[1].speaker_id};
-    };
     const double vad_duration = containing_vad->end - containing_vad->start;
     const std::array<std::optional<RankedPair>, 4> views = {
         ranked_pair(item.session_scores, phrase_duration),
@@ -780,37 +765,10 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
     }
     if (containing_vad == nullptr) return std::nullopt;
 
-    const auto alignment = pipeline.align_.find(text.id);
-    if (alignment == pipeline.align_.end()) return std::nullopt;
-    int aligned_unit_count = 0;
-    for (const auto& unit : alignment->second.units) {
-      if (unit.end > unit.start && unit.start + 1e-9 >= item.start &&
-          unit.end <= item.end + 1e-9) {
-        ++aligned_unit_count;
-      }
-    }
-    if (aligned_unit_count < pipeline.config_.voiceprint_four_view_min_aligned_units) {
+    if (!has_minimum_aligned_units(item.start, item.end)) {
       return std::nullopt;
     }
 
-    struct RankedPair {
-      Selection first;
-      std::string second_id;
-    };
-    auto ranked_pair = [&](const auto& scores,
-                           double duration) -> std::optional<RankedPair> {
-      const auto selected = rank(scores, duration);
-      if (!selected || scores.size() < 2) return std::nullopt;
-      auto ordered = scores;
-      std::sort(ordered.begin(), ordered.end(), [](const auto& left,
-                                                   const auto& right) {
-        if (!NearEqual(left.score, right.score)) {
-          return left.score > right.score;
-        }
-        return left.speaker_id < right.speaker_id;
-      });
-      return RankedPair{*selected, ordered[1].speaker_id};
-    };
     const double vad_duration = containing_vad->end - containing_vad->start;
     const auto phrase_session =
         ranked_pair(item.session_scores, phrase_duration);
@@ -955,24 +913,6 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
     }
     if (containing_vad == nullptr) return std::nullopt;
 
-    struct RankedPair {
-      Selection first;
-      std::string second_id;
-    };
-    auto ranked_pair = [&](const auto& scores,
-                           double duration) -> std::optional<RankedPair> {
-      const auto selected = rank(scores, duration);
-      if (!selected || scores.size() < 2) return std::nullopt;
-      auto ordered = scores;
-      std::sort(ordered.begin(), ordered.end(), [](const auto& left,
-                                                   const auto& right) {
-        if (!NearEqual(left.score, right.score)) {
-          return left.score > right.score;
-        }
-        return left.speaker_id < right.speaker_id;
-      });
-      return RankedPair{*selected, ordered[1].speaker_id};
-    };
     const double vad_duration = containing_vad->end - containing_vad->start;
     const auto vad_session =
         ranked_pair(containing_vad->session_scores, vad_duration);
@@ -1000,16 +940,7 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
       return std::nullopt;
     }
 
-    const auto alignment = pipeline.align_.find(text.id);
-    if (alignment == pipeline.align_.end()) return std::nullopt;
-    int aligned_unit_count = 0;
-    for (const auto& unit : alignment->second.units) {
-      if (unit.end > unit.start && unit.start + 1e-9 >= item.start &&
-          unit.end <= item.end + 1e-9) {
-        ++aligned_unit_count;
-      }
-    }
-    if (aligned_unit_count < pipeline.config_.voiceprint_four_view_min_aligned_units) {
+    if (!has_minimum_aligned_units(item.start, item.end)) {
       return std::nullopt;
     }
     return candidate_identity;
@@ -1115,16 +1046,7 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
       return std::nullopt;
     }
 
-    const auto alignment = pipeline.align_.find(text.id);
-    if (alignment == pipeline.align_.end()) return std::nullopt;
-    int aligned_unit_count = 0;
-    for (const auto& unit : alignment->second.units) {
-      if (unit.end > unit.start && unit.start + 1e-9 >= item.start &&
-          unit.end <= item.end + 1e-9) {
-        ++aligned_unit_count;
-      }
-    }
-    if (aligned_unit_count < pipeline.config_.voiceprint_four_view_min_aligned_units) {
+    if (!has_minimum_aligned_units(item.start, item.end)) {
       return std::nullopt;
     }
     return anchor_identity;
@@ -1201,16 +1123,7 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
       return std::nullopt;
     }
 
-    const auto alignment = pipeline.align_.find(text.id);
-    if (alignment == pipeline.align_.end()) return std::nullopt;
-    int aligned_unit_count = 0;
-    for (const auto& unit : alignment->second.units) {
-      if (unit.end > unit.start && unit.start + 1e-9 >= item.start &&
-          unit.end <= item.end + 1e-9) {
-        ++aligned_unit_count;
-      }
-    }
-    if (aligned_unit_count < pipeline.config_.voiceprint_four_view_min_aligned_units) {
+    if (!has_minimum_aligned_units(item.start, item.end)) {
       return std::nullopt;
     }
     return candidate_identity;
@@ -2106,24 +2019,6 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
       return std::nullopt;
     }
 
-    struct RankedPair {
-      Selection first;
-      std::string second_id;
-    };
-    auto ranked_pair = [&](const auto& scores,
-                           double duration) -> std::optional<RankedPair> {
-      const auto selected = rank(scores, duration);
-      if (!selected || scores.size() < 2) return std::nullopt;
-      auto ordered = scores;
-      std::sort(ordered.begin(), ordered.end(), [](const auto& left,
-                                                   const auto& right) {
-        if (!NearEqual(left.score, right.score)) {
-          return left.score > right.score;
-        }
-        return left.speaker_id < right.speaker_id;
-      });
-      return RankedPair{*selected, ordered[1].speaker_id};
-    };
     const double vad_duration = containing_vad->end - containing_vad->start;
     const auto vad_session =
         ranked_pair(containing_vad->session_scores, vad_duration);

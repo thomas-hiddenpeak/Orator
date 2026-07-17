@@ -97,8 +97,6 @@ cmake --build build -j
 - `asr_testmp3`、`asr_stream_test`：ASR / 流式验证工具。
 - `asr_stream_window_probe`、`asr_encoder_chunk_probe`、
   `asr_stream_incremental_probe`：ASR 流式策略探针。
-- `orator_eval`：历史机械投影诊断工具，不作为 CTest 运行，也不得用于结果
-  准确率、候选比较、参数选择或验收结论。
 
 ## 运行
 
@@ -211,8 +209,8 @@ src/            implementations
   pipeline/     AuditoryStream controller and workers
   net/          libwebsockets server and HTTP static server
 web/            browser UI, plain ES modules
-test/           CTest unit and integration tests
-tools/          probes, offline validation, observability
+test/           active CTest unit/integration tests; inactive history in archive/
+tools/          probes, evidence capture, observability; inactive history in archive/
 specs/          SDD artifacts
 ```
 
@@ -318,6 +316,10 @@ UI 支持：
 cd build
 ctest --output-on-failure
 ```
+
+当前活跃套件包含 68 项。生产说话人融合与弃权规则由 C++ 测试覆盖；Python
+只验证证据、回放输入、来源一致性和无判断的人工审阅包。Spec 013 的一次性候选
+生成器、对应测试和非生产 TOML 已移入各自 `archive/`，不会进入 CMake/CTest。
 
 常用子集：
 

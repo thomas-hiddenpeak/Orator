@@ -139,12 +139,6 @@ set_tests_properties(
     TIMEOUT 120
     LABELS "cuda;unit;model-parity")
 
-# Manual evaluation tool (not a ctest): runs against a real reference file.
-add_executable(orator_eval ${CMAKE_CURRENT_SOURCE_DIR}/eval_reference.cc)
-set_property(TARGET orator_eval PROPERTY CUDA_ARCHITECTURES native)
-target_link_libraries(orator_eval PRIVATE orator_core)
-target_include_directories(orator_eval PRIVATE ${TEST_UTILS_DIR})
-
 # Real-WebSocket integration uses the one authoritative Python socket client.
 # The runner only owns process lifecycle and test isolation; it never opens a
 # WebSocket itself.
@@ -190,38 +184,6 @@ if(Python3_EXECUTABLE)
     TIMEOUT 30
     LABELS "python;unit;model-evidence")
 
-  add_test(NAME test_speaker_sequence_candidate
-    COMMAND ${Python3_EXECUTABLE}
-      ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/test_speaker_sequence_candidate.py)
-  set_tests_properties(test_speaker_sequence_candidate PROPERTIES
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    TIMEOUT 30
-    LABELS "python;unit;model-evidence")
-
-  add_test(NAME test_speaker_rotation_candidate
-    COMMAND ${Python3_EXECUTABLE}
-      ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/test_speaker_rotation_candidate.py)
-  set_tests_properties(test_speaker_rotation_candidate PROPERTIES
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    TIMEOUT 30
-    LABELS "python;unit;model-evidence")
-
-  add_test(NAME test_speaker_short_phrase_candidate
-    COMMAND ${Python3_EXECUTABLE}
-      ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/test_speaker_short_phrase_candidate.py)
-  set_tests_properties(test_speaker_short_phrase_candidate PROPERTIES
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    TIMEOUT 30
-    LABELS "python;unit;model-evidence")
-
-  add_test(NAME test_speaker_direct_fusion_candidate
-    COMMAND ${Python3_EXECUTABLE}
-      ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/test_speaker_direct_fusion_candidate.py)
-  set_tests_properties(test_speaker_direct_fusion_candidate PROPERTIES
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    TIMEOUT 30
-    LABELS "python;unit;model-evidence")
-
   add_test(NAME test_speaker_business_replay_inputs
     COMMAND ${Python3_EXECUTABLE}
       ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/test_speaker_business_replay_inputs.py)
@@ -238,54 +200,6 @@ if(Python3_EXECUTABLE)
     TIMEOUT 30
     LABELS "python;unit;model-evidence")
 
-  add_test(NAME test_speaker_reviewed_overlay_candidate
-    COMMAND ${Python3_EXECUTABLE}
-      ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/test_speaker_reviewed_overlay_candidate.py)
-  set_tests_properties(test_speaker_reviewed_overlay_candidate PROPERTIES
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    TIMEOUT 30
-    LABELS "python;unit;model-evidence")
-
-  add_test(NAME test_speaker_replay_voiceprint_candidate
-    COMMAND ${Python3_EXECUTABLE}
-      ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/test_speaker_replay_voiceprint_candidate.py)
-  set_tests_properties(test_speaker_replay_voiceprint_candidate PROPERTIES
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    TIMEOUT 30
-    LABELS "python;unit;model-evidence")
-
-  add_test(NAME test_speaker_phrase_reaggregation_candidate
-    COMMAND ${Python3_EXECUTABLE}
-      ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/test_speaker_phrase_reaggregation_candidate.py)
-  set_tests_properties(test_speaker_phrase_reaggregation_candidate PROPERTIES
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    TIMEOUT 30
-    LABELS "python;unit;model-evidence")
-
-  add_test(NAME test_speaker_punctuation_phrase_candidate
-    COMMAND ${Python3_EXECUTABLE}
-      ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/test_speaker_punctuation_phrase_candidate.py)
-  set_tests_properties(test_speaker_punctuation_phrase_candidate PROPERTIES
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    TIMEOUT 30
-    LABELS "python;unit;model-evidence")
-
-  add_test(NAME test_speaker_posterior_bounded_phrase_candidate
-    COMMAND ${Python3_EXECUTABLE}
-      ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/test_speaker_posterior_bounded_phrase_candidate.py)
-  set_tests_properties(test_speaker_posterior_bounded_phrase_candidate PROPERTIES
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    TIMEOUT 30
-    LABELS "python;unit;model-evidence")
-
-  add_test(NAME test_speaker_multiresolution_phrase_candidate
-    COMMAND ${Python3_EXECUTABLE}
-      ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/test_speaker_multiresolution_phrase_candidate.py)
-  set_tests_properties(test_speaker_multiresolution_phrase_candidate PROPERTIES
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    TIMEOUT 30
-    LABELS "python;unit;model-evidence")
-
   add_test(NAME test_speaker_multiprototype_evidence
     COMMAND ${Python3_EXECUTABLE}
       ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/test_speaker_multiprototype_evidence.py)
@@ -294,194 +208,10 @@ if(Python3_EXECUTABLE)
     TIMEOUT 30
     LABELS "python;unit;model-evidence")
 
-  add_test(NAME test_speaker_prototype_local_veto_candidate
-    COMMAND ${Python3_EXECUTABLE}
-      ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/test_speaker_prototype_local_veto_candidate.py)
-  set_tests_properties(test_speaker_prototype_local_veto_candidate PROPERTIES
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    TIMEOUT 30
-    LABELS "python;unit;model-evidence")
-
-  add_test(NAME test_speaker_raw_authoritative_candidate
-    COMMAND ${Python3_EXECUTABLE}
-      ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/test_speaker_raw_authoritative_candidate.py)
-  set_tests_properties(test_speaker_raw_authoritative_candidate PROPERTIES
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    TIMEOUT 30
-    LABELS "python;unit;model-evidence")
-
-  add_test(NAME test_speaker_dual_gallery_phrase_candidate
-    COMMAND ${Python3_EXECUTABLE}
-      ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/test_speaker_dual_gallery_phrase_candidate.py)
-  set_tests_properties(test_speaker_dual_gallery_phrase_candidate PROPERTIES
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    TIMEOUT 30
-    LABELS "python;unit;model-evidence")
-
   add_test(NAME test_speaker_robust_gallery_evidence
     COMMAND ${Python3_EXECUTABLE}
       ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/test_speaker_robust_gallery_evidence.py)
   set_tests_properties(test_speaker_robust_gallery_evidence PROPERTIES
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    TIMEOUT 30
-    LABELS "python;unit;model-evidence")
-
-  add_test(NAME test_speaker_relative_top1_phrase_candidate
-    COMMAND ${Python3_EXECUTABLE}
-      ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/test_speaker_relative_top1_phrase_candidate.py)
-  set_tests_properties(test_speaker_relative_top1_phrase_candidate PROPERTIES
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    TIMEOUT 30
-    LABELS "python;unit;model-evidence")
-
-  add_test(NAME test_speaker_local_channel_island_candidate
-    COMMAND ${Python3_EXECUTABLE}
-      ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/test_speaker_local_channel_island_candidate.py)
-  set_tests_properties(test_speaker_local_channel_island_candidate PROPERTIES
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    TIMEOUT 30
-    LABELS "python;unit;model-evidence")
-
-  add_test(NAME test_speaker_vad_utterance_candidate
-    COMMAND ${Python3_EXECUTABLE}
-      ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/test_speaker_vad_utterance_candidate.py)
-  set_tests_properties(test_speaker_vad_utterance_candidate PROPERTIES
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    TIMEOUT 30
-    LABELS "python;unit;model-evidence")
-
-  add_test(NAME test_speaker_vad_edge_run_candidate
-    COMMAND ${Python3_EXECUTABLE}
-      ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/test_speaker_vad_edge_run_candidate.py)
-  set_tests_properties(test_speaker_vad_edge_run_candidate PROPERTIES
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    TIMEOUT 30
-    LABELS "python;unit;model-evidence")
-
-  add_test(NAME test_speaker_vad_active_edge_candidate
-    COMMAND ${Python3_EXECUTABLE}
-      ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/test_speaker_vad_active_edge_candidate.py)
-  set_tests_properties(test_speaker_vad_active_edge_candidate PROPERTIES
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    TIMEOUT 30
-    LABELS "python;unit;model-evidence")
-
-  add_test(NAME test_speaker_complete_local_phrase_candidate
-    COMMAND ${Python3_EXECUTABLE}
-      ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/test_speaker_complete_local_phrase_candidate.py)
-  set_tests_properties(test_speaker_complete_local_phrase_candidate PROPERTIES
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    TIMEOUT 30
-    LABELS "python;unit;model-evidence")
-
-  add_test(NAME test_speaker_bracketed_unknown_phrase_candidate
-    COMMAND ${Python3_EXECUTABLE}
-      ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/test_speaker_bracketed_unknown_phrase_candidate.py)
-  set_tests_properties(test_speaker_bracketed_unknown_phrase_candidate PROPERTIES
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    TIMEOUT 30
-    LABELS "python;unit;model-evidence")
-
-  add_test(NAME test_speaker_bracketed_local_phrase_candidate
-    COMMAND ${Python3_EXECUTABLE}
-      ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/test_speaker_bracketed_local_phrase_candidate.py)
-  set_tests_properties(test_speaker_bracketed_local_phrase_candidate PROPERTIES
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    TIMEOUT 30
-    LABELS "python;unit;model-evidence")
-
-  add_test(NAME test_speaker_expanded_local_run_phrase_candidate
-    COMMAND ${Python3_EXECUTABLE}
-      ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/test_speaker_expanded_local_run_phrase_candidate.py)
-  set_tests_properties(test_speaker_expanded_local_run_phrase_candidate PROPERTIES
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    TIMEOUT 30
-    LABELS "python;unit;model-evidence")
-
-  add_test(NAME test_speaker_bounded_local_run_voiceprint_candidate
-    COMMAND ${Python3_EXECUTABLE}
-      ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/test_speaker_bounded_local_run_voiceprint_candidate.py)
-  set_tests_properties(test_speaker_bounded_local_run_voiceprint_candidate PROPERTIES
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    TIMEOUT 30
-    LABELS "python;unit;model-evidence")
-
-  add_test(NAME test_speaker_complete_source_voiceprint_candidate
-    COMMAND ${Python3_EXECUTABLE}
-      ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/test_speaker_complete_source_voiceprint_candidate.py)
-  set_tests_properties(test_speaker_complete_source_voiceprint_candidate PROPERTIES
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    TIMEOUT 30
-    LABELS "python;unit;model-evidence")
-
-  add_test(NAME test_speaker_complete_edge_contribution_candidate
-    COMMAND ${Python3_EXECUTABLE}
-      ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/test_speaker_complete_edge_contribution_candidate.py)
-  set_tests_properties(test_speaker_complete_edge_contribution_candidate PROPERTIES
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    TIMEOUT 30
-    LABELS "python;unit;model-evidence")
-
-  add_test(NAME test_speaker_secondary_channel_phrase_candidate
-    COMMAND ${Python3_EXECUTABLE}
-      ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/test_speaker_secondary_channel_phrase_candidate.py)
-  set_tests_properties(test_speaker_secondary_channel_phrase_candidate PROPERTIES
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    TIMEOUT 30
-    LABELS "python;unit;model-evidence")
-
-  add_test(NAME test_speaker_bracketed_local_churn_candidate
-    COMMAND ${Python3_EXECUTABLE}
-      ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/test_speaker_bracketed_local_churn_candidate.py)
-  set_tests_properties(test_speaker_bracketed_local_churn_candidate PROPERTIES
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    TIMEOUT 30
-    LABELS "python;unit;model-evidence")
-
-  add_test(NAME test_speaker_maximal_multislot_envelope_candidate
-    COMMAND ${Python3_EXECUTABLE}
-      ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/test_speaker_maximal_multislot_envelope_candidate.py)
-  set_tests_properties(test_speaker_maximal_multislot_envelope_candidate PROPERTIES
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    TIMEOUT 30
-    LABELS "python;unit;model-evidence")
-
-  add_test(NAME test_speaker_vad_complete_contribution_candidate
-    COMMAND ${Python3_EXECUTABLE}
-      ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/test_speaker_vad_complete_contribution_candidate.py)
-  set_tests_properties(test_speaker_vad_complete_contribution_candidate PROPERTIES
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    TIMEOUT 30
-    LABELS "python;unit;model-evidence")
-
-  add_test(NAME test_speaker_complete_source_unanimous_phrase_candidate
-    COMMAND ${Python3_EXECUTABLE}
-      ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/test_speaker_complete_source_unanimous_phrase_candidate.py)
-  set_tests_properties(test_speaker_complete_source_unanimous_phrase_candidate PROPERTIES
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    TIMEOUT 30
-    LABELS "python;unit;model-evidence")
-
-  add_test(NAME test_speaker_temporal_clean_gallery
-    COMMAND ${Python3_EXECUTABLE}
-      ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/test_speaker_temporal_clean_gallery.py)
-  set_tests_properties(test_speaker_temporal_clean_gallery PROPERTIES
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    TIMEOUT 30
-    LABELS "python;unit;model-evidence")
-
-  add_test(NAME test_speaker_clean_gallery_candidate
-    COMMAND ${Python3_EXECUTABLE}
-      ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/test_speaker_clean_gallery_candidate.py)
-  set_tests_properties(test_speaker_clean_gallery_candidate PROPERTIES
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    TIMEOUT 30
-    LABELS "python;unit;model-evidence")
-
-  add_test(NAME test_speaker_sliding_voiceprint
-    COMMAND ${Python3_EXECUTABLE}
-      ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/test_speaker_sliding_voiceprint.py)
-  set_tests_properties(test_speaker_sliding_voiceprint PROPERTIES
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
     TIMEOUT 30
     LABELS "python;unit;model-evidence")
