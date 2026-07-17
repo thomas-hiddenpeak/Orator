@@ -1,8 +1,8 @@
 # Spec 013: Industrial Closing Validation
 
-**Status**: Canonical speaker-business scene accepted 2026-07-16; accepted
-policy ownership and active surface consolidated 2026-07-17; independent
-holdout and non-speaker product gates remain open
+**Status**: Current clean-commit A/B natural-business-turn speaker gate passes;
+T084, full canonical closure, release sign-off, and industrial readiness remain
+open
 **Created**: 2026-07-13
 **Scope**: Re-establish a truthful product baseline, recover full-session business
 accuracy, and define the evidence required before Orator may be declared closed.
@@ -10,12 +10,13 @@ accuracy, and define the evidence required before Orator may be declared closed.
 
 ## 1. Objective
 
-Orator's v2.1 speaker-business pipeline now has repeatable full-session
-canonical-scene evidence above 90 percent. Run A and Run B were each executed
-through the real WebSocket path and independently reviewed over all 556
-reference contributions in complete conversational context. This closes the
-canonical speaker-business claim only; ASR accuracy and independent holdout
-industrial readiness remain open.
+Orator's v2.1 speaker-business pipeline now has repeatable full-session evidence
+above 90 percent for the natural-business-turn speaker-attribution gate. Run A
+and Run B were each executed through the real WebSocket path, and all 556
+reference contributions were reconciled under complete conversational context.
+This signs one conjunctive gate only. Speaker-time, fixed-block, per-speaker,
+critical-turn, confident-wrong, audible-boundary, terminal-latency, ASR,
+release, and independent-holdout gates remain open.
 
 This spec defines two separate claims:
 
@@ -37,8 +38,8 @@ the sole closing baseline. The v2 checkpoint and its CTest gate have been
 removed; only prior reports and hashes remain as historical evidence. A v2
 artifact cannot be selected for a new candidate, used for an acceptance run, or
 satisfy any Phase 3-7 gate. This decision fixed the model line on which accuracy
-recovery and formal validation proceeded. The current-source A/B evidence now
-accepts its canonical speaker-business output within the claim boundary above.
+recovery and formal validation proceeded. The current-source A/B evidence
+accepts only its natural-business-turn gate within the claim boundary above.
 
 ## 2. Definitions
 
@@ -95,12 +96,12 @@ subject to the complete acceptance gates in this spec.
    partial/final/retract, alignment, business revision, terminal track, exact
    export/load, and reconnect convergence. Full-session repeatability remains
    open.
-6. **Expanded 2026-07-15**: the configured CTest suite contains 64 tests: 55
-   C++ tests, eight Python unit/integration gates, and one dependency-free Node
-   browser-model gate. The complete suite passes, including the real-WebSocket
-   contract, official v2.1 numerical profiles, short-block GEMM, and multi-scale
-   voiceprint evidence. The browser acceptance tool remains manual because
-   Playwright is a tools-only dependency.
+6. **Expanded through 2026-07-17**: the configured CTest suite contains 68
+   active entries. The complete suite passes, including the real-WebSocket
+   contract, official v2.1 numerical profiles, focused speaker-evidence and
+   production-policy coverage, and the dependency-free browser-model gate.
+   Full browser acceptance remains manual because Playwright is a tools-only
+   dependency.
 7. **Historical defect-isolation evidence only**: a pinned NVIDIA v2 NeMo oracle
    crosses five runtime chunks and repeated FIFO/cache updates. The
    regenerated 1502-frame fixture matches C++ at `max_abs=1.43051e-6` and
@@ -136,6 +137,13 @@ subject to the complete acceptance gates in this spec.
     speaker-time, offsets, criticality, and independent totals remain unsigned,
     so this is not a constitutional closing score. See
     `closing-baseline-v21-context-review-2026-07-15.md`.
+12. **Current clean-commit natural-turn gate passed; T084 open**: commit
+    `6dbc600e4eb5` completed empty-registry Run A and restarted frozen-registry
+    Run B over the full real-WebSocket path. Complete contextual semantic review
+    manually records `514/556` for Run A and `513/556` for Run B. The complete
+    T084 audit leaves speaker-time, fixed-block, per-speaker, criticality,
+    confidence, audible-boundary, and terminal-latency gates unsigned. See
+    `current-commit-full-review-2026-07-17.md`.
 
 ## 4. Requirements
 

@@ -1,5 +1,11 @@
 # Closing Promotion Review - 2026-07-16
 
+> **Historical evidence.** The current clean-commit evidence and conjunctive-
+> gate audit are recorded in
+> [current-commit-full-review-2026-07-17.md](current-commit-full-review-2026-07-17.md).
+> That report supersedes this document's current-source totals and promotion
+> wording.
+
 ## Evaluation boundary
 
 This record separates mechanical verification from product-result evaluation.
@@ -406,7 +412,7 @@ industrial business-speaker floor. This is one acceptance run, not the final
 closing verdict; the independently restarted frozen-registry Run B and its own
 complete forward and reverse semantic review remain mandatory.
 
-## Current-source superseding acceptance
+## Historical current-source promotion evidence
 
 After FR16ABL entered the production projector, the current binary repeated the
 entire acceptance protocol. Empty-registry Run A and restarted frozen-registry
@@ -430,7 +436,7 @@ percentages, or issued the verdict. The complete current ledgers, artifact
 hashes, reconciliation notes, residual cluster, and claim boundary are recorded
 in `final-full-context-review-2026-07-16.md`.
 
-Both current runs exceed the 90-percent canonical speaker-business floor. This
-promotes the Sortformer v2.1 comprehensive speaker view for the canonical
-`test.mp3` scene; it does not close ASR accuracy or the independent holdout
-industrial-readiness claim.
+Both runs exceeded the 90-percent natural-business-turn speaker floor in this
+historical review. The 2026-07-17 clean-commit report supersedes these totals
+and records that the natural-turn gate alone does not close T084, the complete
+canonical scene, ASR accuracy, or industrial readiness.

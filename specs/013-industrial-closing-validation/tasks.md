@@ -1533,8 +1533,8 @@
 
 - [x] T080 Run full v2.1 acceptance A with an empty isolated speaker registry.
   The complete 3615.120-second real-WebSocket producer plus early/late observer
-  current-source run passed all mechanical contracts and froze the generated
-  registry with SHA256
+  current-source run passed all manifest-enforced structural contracts and
+  froze the generated registry with SHA256
   `66461a77755984a08231d06306da7ce9e1eeac07be1927e91f8a772fc54c7b3f`.
 - [x] T081 Complete the full 556-row context and semantic review for run A.
   Every row was reconciled chronologically and then reread in reverse fixed
@@ -1544,7 +1544,9 @@
   aggregated the product result.
 - [x] T082 Restart the process and run full v2.1 acceptance B with the frozen
   enrolled-registry fixture. The complete 3615.120-second current-source run
-  passed all mechanical contracts and preserved the frozen registry hash.
+  passed all manifest-enforced structural contracts and preserved the frozen
+  registry hash. The client did not record the `flush` and `end` terminal waits
+  independently, so the direct 30-second latency gate remains open.
 - [x] T083 Complete the full 556-row context and semantic review for run B.
   The forward and reverse reviews manually established 513 accepted and 43
   incorrect contributions, approximately 92.27 percent. No executable
@@ -1552,13 +1554,17 @@
 - [ ] T084 Verify every Spec 013 accuracy and business-result gate manually from
   complete contextual semantics, and verify mechanical boundary, alignment,
   latency, telemetry, stability, and repeatability evidence separately for both
-  runs. No code may aggregate these into a product verdict.
+  runs. No code may aggregate these into a product verdict. The 2026-07-17
+  audit confirms this remains open: natural-turn attribution passes, but
+  speaker-time, fixed blocks, per-speaker recall, criticality, confidence,
+  audible boundaries, and direct terminal latency are unsigned.
 - [ ] T085 Execute the supplemental locked holdout suite after the Constitution
   amendment if an industrial-readiness claim is requested.
-- [x] T086 Write the final closing report with manifests, hashes, complete ledger,
-  metrics, limitations, and exact product claim.
-- [x] T087 Synchronize specs, tasks, `PROJECT_STATE.md`, README, and code comments
-  in the accepted commit.
+- [ ] T086 Write the final closing report with manifests, hashes, complete
+  signed ledger, limitations, and exact product claim after T084. The current
+  report is an interim clean-commit evidence seal, not a final closing report.
+- [x] T087 Synchronize specs, tasks, `PROJECT_STATE.md`, and README with the
+  current evidence boundary.
 - [ ] T088 Review the final report, close all priority-zero/priority-one defects,
   and create the release tag only after sign-off.
 
@@ -1603,3 +1609,29 @@
   CTest entries, and a new-binary real-WebSocket observer/telemetry smoke.
 - [x] T095F Synchronize Spec 013, `PROJECT_STATE.md`, archive documentation, and
   final maintainability evidence in the same commit.
+
+## Phase 9: Current-Commit Acceptance Seal
+
+- [x] T096 Build commit `6dbc600e4eb5` warning-clean and pass all 68 registered
+  CTest entries. Freeze binary, TOML, audio, reference, and test-log hashes.
+- [x] T097 Run the complete `3615.120`-second empty-registry A fixture through
+  the production real-WebSocket path at 1.0x, preserve producer and observer
+  evidence, and freeze the generated registry at SHA-256
+  `66461a77755984a08231d06306da7ce9e1eeac07be1927e91f8a772fc54c7b3f`.
+- [x] T098 Restart the server and run the complete frozen-registry B fixture.
+  Preserve the registry hash and verify source, configuration, binary, common-
+  clock, observer, telemetry, and stability contracts mechanically.
+- [x] T099 Reconcile all 556 natural contributions for both current runs under
+  complete forward and reverse conversational context. The reviewer manually
+  establishes Run A at 514 accepted / 42 incorrect (approximately 92.45
+  percent) and Run B at 513 accepted / 43 incorrect (approximately 92.27
+  percent). See `current-commit-full-review-2026-07-17.md`.
+- [x] T100 Audit every T084 conjunctive gate without converting mechanical
+  evidence into a product verdict. Record that natural-turn attribution passes
+  while the remaining unsigned gates keep T084 and Spec 013 open.
+- [ ] T101 Record `flush` and `end` terminal waits independently in the evidence
+  manifest, add focused structural tests, and recapture the affected real-
+  WebSocket latency evidence without changing runtime TOML policy.
+- [ ] T102 Manually sign the 556-row audible-boundary, overlap, criticality, and
+  confidence ledger, then complete the remaining speaker-time, fixed-block,
+  per-speaker, critical-turn, confident-wrong, and boundary-offset reviews.

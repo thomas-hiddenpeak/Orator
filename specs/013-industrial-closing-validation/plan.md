@@ -2440,6 +2440,31 @@ must match the server terminal document by `text_id`, time span, text, and
 speaker identity. Screenshots and browser-console output are retained as
 evidence.
 
+### 8.5 Current-commit seal and remaining work
+
+Commit `6dbc600e4eb5` has completed the required empty-registry A run and
+restarted frozen-registry B run. Both full streams pass the natural-business-
+turn speaker gate under complete contextual semantic review. This result does
+not close the conjunctive acceptance table.
+
+The remaining work proceeds in this order:
+
+1. extend the WebSocket evidence manifest to record `flush` and `end` terminal
+   waits independently, without changing runtime policy;
+2. create and manually sign the audible reference ledger for all 556 rows,
+   including start/end boundaries, overlap, criticality, and confidence class;
+3. derive speaker-time, fixed-block, per-speaker, critical-turn, confident-
+   wrong, and boundary-offset judgments only by complete contextual semantic
+   review of that signed ledger;
+4. rerun only the mechanical transport evidence affected by the timing-capture
+   change, while preserving the checked-in TOML and v2.1 profile;
+5. close T084 only when both A and B independently satisfy every applicable
+   gate, then complete ASR, browser/microphone, holdout, report review, and
+   release-signing work.
+
+No new model or fusion parameter sweep starts while these evidence gaps are the
+blocking issue.
+
 ## 9. Phase 7: Final Sign-Off
 
 Create one closing report containing:

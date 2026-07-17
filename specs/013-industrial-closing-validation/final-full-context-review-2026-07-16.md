@@ -1,5 +1,11 @@
 # Sortformer v2.1 Speaker Full-Context Review (2026-07-16)
 
+> **Historical evidence.** The current clean-commit A/B evidence and its
+> narrower acceptance boundary are recorded in
+> [current-commit-full-review-2026-07-17.md](current-commit-full-review-2026-07-17.md).
+> That report supersedes this document's current-source totals and verdict;
+> the frozen-candidate findings below remain historical development evidence.
+
 ## Scope and authority
 
 This record covers the frozen FR16ABL business-speaker candidate for the full
@@ -94,7 +100,7 @@ The frozen review closed the development semantic gate. The current-source
 acceptance evidence below supersedes it for the canonical speaker-business
 claim.
 
-## Current-source full acceptance
+## Historical current-source A/B evidence
 
 Both acceptance runs used the checked-in `orator.toml`, streaming Sortformer
 v2.1, the production C++ projector, a 1.0x real-WebSocket producer, and early
@@ -110,7 +116,7 @@ started a new process with the registry frozen from Run A.
 | Wall / stream RTF | `3677.73 s / 0.983x` | `3677.36 s / 0.983x` |
 | Terminal tracks | diar 755, ASR 275 | diar 755, ASR 275 |
 | Frozen registry SHA-256 | `66461a77755984a08231d06306da7ce9e1eeac07be1927e91f8a772fc54c7b3f` | unchanged |
-| Mechanical contracts | passed | passed |
+| Manifest-enforced structural contracts | passed | passed |
 
 The source, resolved configuration, binary, and worktree hashes remained
 stable during both streams. Producer, early observer, and late observer
@@ -166,13 +172,14 @@ manually confirmed Run B errors are:
 The reviewer manually established 513 accepted and 43 incorrect contributions
 and manually calculated `513 / 556`, approximately `92.27%`.
 
-## Final speaker-business verdict
+## Historical natural-turn verdict
 
-Run A and independently restarted Run B both exceed the 90-percent canonical
-speaker-business floor. The production v2.1 speaker-business pipeline is
-accepted for the `test.mp3` canonical scene. The residual tail cluster at
-`ref-0504` through `ref-0509` remains documented, but neither review found a
-whole-session identity permutation or an unresolved priority-zero defect.
+Run A and independently restarted Run B both exceeded the 90-percent natural-
+business-turn speaker floor in this historical review. The residual tail
+cluster at `ref-0504` through `ref-0509` remains documented, but neither review
+found a whole-session identity permutation. The 2026-07-17 clean-commit report
+supersedes these totals and makes explicit that this gate alone does not close
+the canonical scene or T084.
 
 This verdict does not evaluate ASR wording accuracy and does not claim broad
 industrial readiness without the separately locked holdout set.
