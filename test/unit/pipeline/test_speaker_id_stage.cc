@@ -33,6 +33,7 @@ class StubEmbedder : public core::ISpeakerEmbedder {
   int dim() const override { return kDim; }
   std::string name() const override { return "stub"; }
   std::vector<float> Embed(const core::AudioChunk& c) override {
+    ++embed_calls_;
     std::vector<float> e(kDim, 0.0f);
     if (c.num_samples > 0 && c.samples[0] > 2.5f) {
       const int weak_speaker = c.samples[0] <= 3.5f ? 1 : 2;
@@ -49,6 +50,11 @@ class StubEmbedder : public core::ISpeakerEmbedder {
     e[which] = 1.0f;
     return e;
   }
+
+  int embed_calls() const { return embed_calls_; }
+
+ private:
+  int embed_calls_ = 0;
 };
 
 core::DiarSegment Seg(int local, double s, double e, float conf) {
@@ -84,6 +90,77 @@ int main() {
   cfg.retain_sec = 180.0;
   cfg.enroll_min_refs = 1;  // enroll on first clean span for this unit test
   pipeline::SpeakerIdentityStage stage(&embedder, &db, tb, cfg);
+
+  // Acoustic precomputation caches only the embedding. Final gallery scoring
+  // must be byte-for-byte identical to an uncached path, and session reset must
+  // discard the prior session's cache.
+  {
+    StubEmbedder cached_embedder;
+    StubEmbedder uncached_embedder;
+    model::SpeakerDatabase cached_db(/*max_speakers=*/16, kDim);
+    model::SpeakerDatabase uncached_db(/*max_speakers=*/16, kDim);
+    pipeline::SpeakerIdentityStage cached_stage(&cached_embedder, &cached_db,
+                                                tb, cfg);
+    pipeline::SpeakerIdentityStage uncached_stage(&uncached_embedder,
+                                                  &uncached_db, tb, cfg);
+    std::vector<float> cache_audio(8 * sr, 0.0f);
+    for (int i = 4 * sr; i < 8 * sr; ++i) cache_audio[i] = 1.0f;
+    cached_stage.AppendAudio(cache_audio.data(),
+                             static_cast<int>(cache_audio.size()));
+    uncached_stage.AppendAudio(cache_audio.data(),
+                               static_cast<int>(cache_audio.size()));
+    std::vector<core::DiarSegment> cached_segments = {Seg(0, 0.5, 3.5, 0.9f),
+                                                      Seg(1, 4.5, 7.5, 0.9f)};
+    std::vector<core::DiarSegment> uncached_segments = cached_segments;
+    cached_stage.Process(cached_segments);
+    uncached_stage.Process(uncached_segments);
+
+    const int before_precompute = cached_embedder.embed_calls();
+    Check(cached_stage.PrecomputeSpan(3.0, 4.0, 0.4, 0.0, 3.0),
+          "available fusion span should precompute");
+    Check(cached_embedder.embed_calls() == before_precompute + 1,
+          "first precompute should invoke the embedder once");
+    const auto cached_evidence =
+        cached_stage.EvaluateSpan(3.0, 4.0, {"spk_0", "spk_1"}, 0.4, 0.0, 3.0);
+    Check(cached_embedder.embed_calls() == before_precompute + 1,
+          "final scoring should reuse the precomputed embedding");
+    const auto uncached_evidence = uncached_stage.EvaluateSpan(
+        3.0, 4.0, {"spk_0", "spk_1"}, 0.4, 0.0, 3.0);
+    Check(cached_evidence.embedding_available ==
+                  uncached_evidence.embedding_available &&
+              cached_evidence.session_gallery_complete ==
+                  uncached_evidence.session_gallery_complete &&
+              cached_evidence.robust_gallery_complete ==
+                  uncached_evidence.robust_gallery_complete &&
+              cached_evidence.session_scores.size() ==
+                  uncached_evidence.session_scores.size() &&
+              cached_evidence.robust_scores.size() ==
+                  uncached_evidence.robust_scores.size(),
+          "cached and uncached evidence structure must match exactly");
+    for (std::size_t i = 0; i < cached_evidence.session_scores.size(); ++i) {
+      Check(cached_evidence.session_scores[i].speaker_id ==
+                    uncached_evidence.session_scores[i].speaker_id &&
+                cached_evidence.session_scores[i].score ==
+                    uncached_evidence.session_scores[i].score,
+            "cached and uncached session-gallery scores must match exactly");
+    }
+    for (std::size_t i = 0; i < cached_evidence.robust_scores.size(); ++i) {
+      Check(cached_evidence.robust_scores[i].speaker_id ==
+                    uncached_evidence.robust_scores[i].speaker_id &&
+                cached_evidence.robust_scores[i].score ==
+                    uncached_evidence.robust_scores[i].score,
+            "cached and uncached robust-gallery scores must match exactly");
+    }
+
+    cached_stage.Reset();
+    cached_stage.AppendAudio(cache_audio.data(),
+                             static_cast<int>(cache_audio.size()));
+    const int before_reset_query = cached_embedder.embed_calls();
+    Check(cached_stage.PrecomputeSpan(3.0, 4.0, 0.4, 0.0, 3.0),
+          "reset session should precompute retained replacement audio");
+    Check(cached_embedder.embed_calls() == before_reset_query + 1,
+          "reset must clear the prior session embedding cache");
+  }
 
   // 16 s of audio: [0,8) = speaker 0 (value 0), [8,16) = speaker 1 (value 1).
   std::vector<float> audio(16 * sr, 0.0f);

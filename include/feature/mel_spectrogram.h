@@ -48,7 +48,8 @@ class MelSpectrogram {
   // Returns row-major [num_frames * n_mels]; *out_num_frames receives the
   // number of frames produced.
   std::vector<float> Compute(const float* samples, int num_samples,
-                             int* out_num_frames) const;
+                             int* out_num_frames,
+                             cudaStream_t stream = nullptr) const;
 
   // Streaming frame producer for continuous real-time use. `sig` is an
   // already-pre-emphasized signal buffer; the first produced frame's window

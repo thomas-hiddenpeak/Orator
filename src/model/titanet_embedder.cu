@@ -388,12 +388,12 @@ void TitaNetEmbedder::RunPooledHead(float* enc, int T, std::vector<float>* out,
 
 std::vector<float> TitaNetEmbedder::Embed(const core::AudioChunk& chunk) {
   if (!loaded_) throw std::runtime_error("titanet: weights not loaded");
-  cudaStream_t stream = nullptr;
+  cudaStream_t stream = stream_;
 
   // 1. log-mel [T, 80] (frame-major == [T, C]).
   int T = 0;
   std::vector<float> mel_host =
-      mel_->Compute(chunk.samples, chunk.num_samples, &T);
+      mel_->Compute(chunk.samples, chunk.num_samples, &T, stream);
   if (T < 2) return std::vector<float>(config_.embedding_dim, 0.0f);
 
   float* level0 = scratch_.GetT<float>(kLevel0, static_cast<size_t>(T) * 3072);
@@ -437,6 +437,17 @@ std::vector<float> TitaNetEmbedder::Embed(const core::AudioChunk& chunk) {
   std::vector<float> emb;
   RunPooledHead(x_in, T, &emb, stream);
   return emb;
+}
+
+void TitaNetEmbedder::Warmup(int num_samples) {
+  if (num_samples <= 0) return;
+  std::vector<float> silence(static_cast<std::size_t>(num_samples), 0.0f);
+  core::AudioChunk chunk;
+  chunk.samples = silence.data();
+  chunk.num_samples = num_samples;
+  chunk.sample_rate = config_.sample_rate;
+  chunk.t_start_sec = 0.0;
+  (void)Embed(chunk);
 }
 
 }  // namespace model

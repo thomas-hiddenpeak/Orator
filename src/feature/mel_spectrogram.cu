@@ -147,8 +147,8 @@ void MelSpectrogram::BuildMelFilterbank() {
 }
 
 std::vector<float> MelSpectrogram::Compute(const float* samples,
-                                           int num_samples,
-                                           int* out_num_frames) const {
+                                           int num_samples, int* out_num_frames,
+                                           cudaStream_t stream) const {
   const int num_frames = NumFrames(num_samples);
   if (out_num_frames) *out_num_frames = num_frames;
   if (num_frames <= 0) return {};
@@ -165,7 +165,7 @@ std::vector<float> MelSpectrogram::Compute(const float* samples,
   }
 
   return RunStftMel(sig.data(), num_samples, /*input_offset=*/0, num_frames,
-                    /*stream=*/nullptr);
+                    stream);
 }
 
 // Streaming frame producer: computes `num_frames` log-mel frames from an
@@ -197,12 +197,14 @@ std::vector<float> MelSpectrogram::RunStftMel(const float* sig, int num_samples,
   float* d_mel =
       scratch_.GetT<float>(4, static_cast<size_t>(num_frames) * n_mels);
 
-  gpu::GpuMemory::CopyHostToDevice(
-      d_samples, sig, static_cast<size_t>(num_samples) * sizeof(float));
-  gpu::GpuMemory::CopyHostToDevice(d_win, hann_.data(),
-                                   hann_.size() * sizeof(float));
-  gpu::GpuMemory::CopyHostToDevice(d_filters, mel_filters_.data(),
-                                   mel_filters_.size() * sizeof(float));
+  CUDA_CHECK(cudaMemcpyAsync(d_samples, sig,
+                             static_cast<size_t>(num_samples) * sizeof(float),
+                             cudaMemcpyHostToDevice, stream));
+  CUDA_CHECK(cudaMemcpyAsync(d_win, hann_.data(), hann_.size() * sizeof(float),
+                             cudaMemcpyHostToDevice, stream));
+  CUDA_CHECK(cudaMemcpyAsync(d_filters, mel_filters_.data(),
+                             mel_filters_.size() * sizeof(float),
+                             cudaMemcpyHostToDevice, stream));
 
   const int block = 256;
   const long power_total = static_cast<long>(num_frames) * n_freqs;

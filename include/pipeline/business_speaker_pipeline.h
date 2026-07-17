@@ -126,6 +126,7 @@ class BusinessSpeakerPipeline {
   void ApplySpeakerVoiceprint(
       const std::vector<SpeakerVoiceprintEvidence>& evidence,
       std::vector<Revision>* revisions);
+  void ReindexSpeakerVoiceprint();
   void PublishRevisions(const std::vector<Revision>& revisions);
   void ResetState();
 
@@ -162,6 +163,10 @@ class BusinessSpeakerPipeline {
   std::vector<TextSeg> texts_;
   std::map<long, AlignGroup> align_;
   std::vector<SpeakerVoiceprintEvidence> voiceprint_;
+  std::vector<SpeakerVoiceprintEvidence> voiceprint_vad_;
+  std::vector<SpeakerVoiceprintEvidence> voiceprint_aligned_units_;
+  std::vector<SpeakerVoiceprintEvidence> voiceprint_business_intervals_;
+  std::map<long, std::vector<SpeakerVoiceprintEvidence>> voiceprint_by_text_;
   std::map<long, std::vector<Entry>> pieces_;
 
   mutable std::mutex mutex_;

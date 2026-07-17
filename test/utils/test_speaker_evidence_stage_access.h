@@ -25,6 +25,13 @@ class TestSpeakerEvidenceStage {
     return SpeakerEvidenceStage::BuildAdjacentBusinessPairs(
         intervals, min_embed_sec, short_max_sec);
   }
+
+  static void Precompute(
+      SpeakerEvidenceStage* stage,
+      const ComprehensiveTimeline::SpeakerEvidenceSnapshot& snapshot,
+      std::size_t max_spans) {
+    stage->Precompute(snapshot, max_spans);
+  }
 };
 
 }  // namespace pipeline

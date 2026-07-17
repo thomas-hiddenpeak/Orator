@@ -1,7 +1,12 @@
 #include <cstdio>
+#include <string>
 #include <utility>
 #include <vector>
 
+#include "core/stages.h"
+#include "core/time_base.h"
+#include "model/speaker_database.h"
+#include "pipeline/speaker_identity_stage.h"
 #include "test_speaker_evidence_stage_access.h"
 
 namespace {
@@ -21,8 +26,23 @@ using orator::pipeline::TestSpeakerEvidenceStage;
 using VoiceprintEvidence =
     orator::pipeline::ComprehensiveTimeline::SpeakerVoiceprintEvidence;
 
-void CheckReconstruction(const std::vector<Range>& ranges, int start,
-                         int end) {
+class CountingEmbedder : public orator::core::ISpeakerEmbedder {
+ public:
+  void LoadWeights(const std::string&) override {}
+  int dim() const override { return 4; }
+  std::string name() const override { return "counting"; }
+  std::vector<float> Embed(const orator::core::AudioChunk&) override {
+    ++calls_;
+    return {1.0f, 0.0f, 0.0f, 0.0f};
+  }
+
+  int calls() const { return calls_; }
+
+ private:
+  int calls_ = 0;
+};
+
+void CheckReconstruction(const std::vector<Range>& ranges, int start, int end) {
   CHECK(!ranges.empty(), "split emits at least one range");
   if (ranges.empty()) return;
   CHECK(ranges.front().first == start, "split preserves source start");
@@ -108,6 +128,48 @@ int main() {
             0.4, 1.5)
             .empty(),
         "a pair at the short-span ceiling does not form an adjacent query");
+
+  {
+    constexpr int kSampleRate = 10;
+    CountingEmbedder embedder;
+    orator::model::SpeakerDatabase database(/*max_speakers=*/4, embedder.dim());
+    orator::pipeline::SpeakerIdConfig identity_config;
+    identity_config.embedding_dim = embedder.dim();
+    identity_config.retain_sec = 10.0;
+    orator::pipeline::SpeakerIdentityStage identity(
+        &embedder, &database, orator::core::TimeBase(kSampleRate, 0),
+        identity_config);
+    std::vector<float> audio(4 * kSampleRate, 0.25f);
+    identity.AppendAudio(audio.data(), static_cast<int>(audio.size()));
+
+    orator::pipeline::SpeakerEvidenceStage::Config evidence_config;
+    evidence_config.enabled = true;
+    evidence_config.min_embed_sec = 0.4;
+    evidence_config.minimum_gallery_size = 2;
+    orator::pipeline::SpeakerEvidenceStage stage(&identity, evidence_config);
+
+    orator::pipeline::ComprehensiveTimeline::SpeakerEvidenceSnapshot snapshot;
+    snapshot.diarization.push_back(
+        {.start = 0.0, .end = 1.0, .speaker_id = "spk_0"});
+    snapshot.vad = {{.start = 0.0, .end = 1.0},
+                    {.start = 1.0, .end = 2.0},
+                    {.start = 2.0, .end = 3.0}};
+    TestSpeakerEvidenceStage::Precompute(&stage, snapshot, 1);
+    CHECK(embedder.calls() == 0 && stage.precomputed_span_count() == 0,
+          "precompute waits for the minimum active gallery");
+
+    snapshot.diarization.push_back(
+        {.start = 1.0, .end = 2.0, .speaker_id = "spk_1"});
+    TestSpeakerEvidenceStage::Precompute(&stage, snapshot, 1);
+    CHECK(embedder.calls() == 1 && stage.precomputed_span_count() == 1,
+          "one live cycle caches at most one available span");
+    TestSpeakerEvidenceStage::Precompute(&stage, snapshot, 1);
+    CHECK(embedder.calls() == 2 && stage.precomputed_span_count() == 2,
+          "a later live cycle advances to the next span");
+    TestSpeakerEvidenceStage::Precompute(&stage, snapshot, 0);
+    CHECK(embedder.calls() == 3 && stage.precomputed_span_count() == 3,
+          "unlimited final drain caches every remaining span");
+  }
 
   if (failures == 0) {
     std::printf("SpeakerEvidenceStage test PASSED\n");

@@ -1632,10 +1632,31 @@
 - [ ] T101 Record `flush` and `end` terminal waits independently in the evidence
   manifest, add focused structural tests, and recapture the affected real-
   WebSocket latency evidence without changing runtime TOML policy. The client
-  implementation, focused tests, `68/68` CTest, and a 120-second 1.0x direct-
-  end speech run are complete; the short run recorded `0.807 s` from final
-  frame to terminal timeline with no contract issue. Full-length clean-source
-  A/B recapture remains before this task can close.
+  implementation and focused tests are complete. The first full-length direct-
+  end A recapture at `7721024ceb60` completed the business artifact but recorded
+  `66.915 s`, so it is a mechanical failure rather than closure evidence. The
+  FR26 implementation subsequently passed same-binary 120-second cached and
+  uncached checks at `0.805 s` and `0.844 s`, plus 600-second checks at `4.514 s`
+  and `6.568 s`. These are mechanical engineering checks only. Full-length
+  clean-source A/B recapture remains before this task can close.
+- [x] T101A Add the FR26 typed speaker-evidence snapshot, common-sample-span
+  embedding cache, session-owned periodic precompute worker, TOML cadence, and
+  phase timing diagnostics. Route TitaNet through a scheduler-owned
+  lowest-priority CUDA stream and warm maximum scratch before live audio.
+  Gate live extraction on a mature active gallery and diar/ASR/VAD common-head
+  catch-up, bound each cycle through typed TOML, and leave the final drain
+  unlimited. Precomputation may extract acoustics only; final mature-gallery
+  scoring and policy order remain authoritative.
+- [x] T101B Replace repeated full voiceprint scans with stable kind indexes,
+  prove exact cached/uncached output identity and lifecycle reset behavior,
+  then pass warning-clean build, all CTest entries, short and 600-second real-
+  WebSocket direct-end checks before spending another full A/B run. The clean
+  build and `68/68` CTest pass; cached and uncached track payloads are exactly
+  equal at both durations. The 120-second track hash is
+  `7b291c32fdd5d40679f5ea1f944e3cc2f508061b1dbeebe1ee5bdf3e3a97634f`,
+  and the 600-second track hash is
+  `a6a7ea95299ea7568977b220715e5b1e6b3ad3c4317cf6c4a8b4d019124aa11b`.
+  Exact equality is a mechanical invariant, not a product-accuracy verdict.
 - [ ] T102 Manually sign the 556-row audible-boundary, overlap, criticality, and
   confidence ledger, then complete the remaining speaker-time, fixed-block,
   per-speaker, critical-turn, confident-wrong, and boundary-offset reviews.

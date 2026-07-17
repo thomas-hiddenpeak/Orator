@@ -177,6 +177,17 @@ class ComprehensiveTimeline {
     std::vector<std::string> speaker_ids;
   };
 
+  // Reduced immutable input for multi-resolution speaker evidence. Periodic
+  // precomputation intentionally excludes raw diar frames and derived output
+  // tracks so a long session does not repeatedly copy unrelated data.
+  struct SpeakerEvidenceSnapshot {
+    std::vector<SpeakerInput> diarization;
+    std::vector<RawTextSeg> asr;
+    std::vector<VadSeg> vad;
+    std::vector<AlignGroup> align;
+    std::vector<Entry> business_speaker;
+  };
+
   // Producer API. ASR finals and alignment groups are append-once by text_id:
   // an identical repeat is idempotent and a conflicting repeat is rejected.
   void DepositDiarization(const std::vector<SpeakerInput>& segments);
@@ -204,6 +215,7 @@ class ComprehensiveTimeline {
   void UnsubscribeAsrFinals(long subscription_id);
 
   TrackSnapshot SnapshotTracks() const;
+  SpeakerEvidenceSnapshot SnapshotSpeakerEvidenceInputs() const;
   std::vector<SpeakerInput> SnapshotDiarization() const;
   std::vector<SpeakerInput> SnapshotPrimarySpeaker() const;
   std::vector<RawTextSeg> SnapshotRawTexts() const;

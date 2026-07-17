@@ -1721,6 +1721,32 @@ subject to the complete acceptance gates in this spec.
   final-frame-to-terminal wait, and whether that observation is eligible for
   the 30-second terminal-latency gate. A `flush`-primed observation MUST NOT
   satisfy that gate.
+- **FR26**: Final multi-resolution speaker evidence MUST NOT defer every
+  TitaNet embedding until `end`. When
+  `speaker_fusion.precompute_interval_sec` is positive, a session-owned worker
+  MUST periodically read only typed `ComprehensiveTimeline` evidence and cache
+  the acoustic embedding for available final evidence spans. Live work MUST
+  wait until the typed diarization snapshot contains at least
+  `minimum_gallery_size` active identities and diarization, ASR, and VAD have
+  all reached the sampled common-clock input head. Each live cycle MUST cache
+  no more than `speaker_fusion.precompute_max_spans_per_cycle` successful spans.
+  Precomputation MUST NOT score a speaker, inspect reference text, mutate a
+  producer track, or publish a business decision. TitaNet extraction MUST use
+  a scheduler-owned background CUDA stream at the device's lowest available
+  priority, and its maximum configured scratch MUST be warmed before live audio
+  starts. Periodic evidence work MUST NOT share the default CUDA stream or grow
+  device scratch during a live session. After every producer and forced-
+  alignment worker drains, the final path MUST ignore the live per-cycle limit,
+  cache every remaining span, rescore all cached embeddings against the mature
+  session and robust galleries, compute any cache miss from the same retained
+  audio, and run the unchanged speaker-fusion policy. The cached and uncached
+  paths MUST produce exactly equal speaker-voiceprint and business-speaker
+  tracks for identical typed inputs, model, and registry state. Periodic
+  cadence and per-cycle limit are typed TOML settings and MUST appear in
+  `resolved_config`. Finalization diagnostics MUST separately expose worker
+  drain, evidence precompute drain, primary construction, voiceprint
+  construction, business reprojection, serialization, and terminal emission
+  wall times; diagnostics are mechanical performance evidence only.
 
 ## 5. Acceptance Gates
 

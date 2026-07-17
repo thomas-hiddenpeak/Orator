@@ -224,6 +224,10 @@ std::string SerializeResolvedConfig(const AuditoryStream::Config& c) {
                      static_cast<double>(c.speaker_fusion_regular_min_margin));
   speaker_fusion.Add("four_view_min_aligned_units",
                      c.speaker_fusion_four_view_min_aligned_units);
+  speaker_fusion.Add("precompute_interval_sec",
+                     c.speaker_fusion_precompute_interval_sec);
+  speaker_fusion.Add("precompute_max_spans_per_cycle",
+                     c.speaker_fusion_precompute_max_spans_per_cycle);
   root.AddObject("speaker_fusion", speaker_fusion.Finish());
 
   JsonObject storage;

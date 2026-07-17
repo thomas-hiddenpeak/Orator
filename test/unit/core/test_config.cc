@@ -166,6 +166,8 @@ short_min_margin = 0.04
 regular_min_score = 0.55
 regular_min_margin = 0.04
 four_view_min_aligned_units = 3
+precompute_interval_sec = 7.5
+precompute_max_spans_per_cycle = 4
 
 [vad]
 model = "/models/vad/custom.safetensors"
@@ -312,6 +314,10 @@ ws_text_log_path = "/tmp/ws-frames.jsonl"
           "cfg.speaker_fusion_regular_min_score == 0.55");
     CHECK(cfg.speaker_fusion_four_view_min_aligned_units == 3,
           "cfg.speaker_fusion_four_view_min_aligned_units == 3");
+    CHECK(cfg.speaker_fusion_precompute_interval_sec == 7.5,
+          "cfg.speaker_fusion_precompute_interval_sec == 7.5");
+    CHECK(cfg.speaker_fusion_precompute_max_spans_per_cycle == 4,
+          "cfg.speaker_fusion_precompute_max_spans_per_cycle == 4");
 
     // [vad]
     CHECK(cfg.vad_model == "/models/vad/custom.safetensors", "cfg.vad_model");
@@ -378,12 +384,16 @@ ws_text_log_path = "/tmp/ws-frames.jsonl"
     CHECK(resolved.find("\"ws_text_log_path\":\"/tmp/ws-frames.jsonl\"") !=
               std::string::npos,
           "resolved config contains transport diagnostics");
-    CHECK(resolved.find("\"minimum_gallery_size\":4") !=
-              std::string::npos,
+    CHECK(resolved.find("\"minimum_gallery_size\":4") != std::string::npos,
           "resolved config contains speaker-fusion tuning");
-    CHECK(resolved.find("\"four_view_min_aligned_units\":3") !=
+    CHECK(
+        resolved.find("\"four_view_min_aligned_units\":3") != std::string::npos,
+        "resolved config contains four-view aligned-unit gate");
+    CHECK(resolved.find("\"precompute_interval_sec\":7.5") != std::string::npos,
+          "resolved config contains speaker-fusion precompute cadence");
+    CHECK(resolved.find("\"precompute_max_spans_per_cycle\":4") !=
               std::string::npos,
-          "resolved config contains four-view aligned-unit gate");
+          "resolved config contains speaker-fusion precompute cycle limit");
     CHECK(resolved.find(
               "\"local_drift_competing_candidate_min_confirmations\":2") !=
               std::string::npos,

@@ -14,6 +14,7 @@
 #include "protocol/session_store.h"
 
 #include <chrono>
+#include <cmath>
 #include <cstdio>
 #include <string>
 #include <unistd.h>
@@ -237,6 +238,15 @@ void AuditoryStream::Start() {
     wpath += "titanet_large.safetensors";
     speaker_embedder_ = std::make_unique<model::TitaNetEmbedder>();
     speaker_embedder_->LoadWeights(wpath);
+    speaker_stream_ = scheduler_.Register(
+        "speaker_embedding", /*priority_index=*/5, /*background=*/true,
+        /*create_stream=*/true);
+    speaker_embedder_->SetStream(speaker_stream_);
+    const double warmup_window_sec =
+        std::max(config_.speaker_max_embed_window_sec,
+                 config_.speaker_fusion_max_embed_window_sec);
+    speaker_embedder_->Warmup(
+        static_cast<int>(std::ceil(warmup_window_sec * config_.sample_rate)));
     speaker_db_ = std::make_unique<model::SpeakerDatabase>(
         /*max_speakers=*/256, speaker_embedder_->dim());
     if (!config_.speaker_registry_path.empty()) {
@@ -298,6 +308,10 @@ void AuditoryStream::Start() {
         config_.speaker_fusion_frame_activity_threshold;
     evidence_config.minimum_gallery_size =
         config_.speaker_fusion_minimum_gallery_size;
+    evidence_config.precompute_interval_sec =
+        config_.speaker_fusion_precompute_interval_sec;
+    evidence_config.precompute_max_spans_per_cycle =
+        config_.speaker_fusion_precompute_max_spans_per_cycle;
     speaker_evidence_stage_ = std::make_unique<SpeakerEvidenceStage>(
         speaker_id_stage_.get(), std::move(evidence_config));
     LOG_INFO("[speaker-id] enabled: %s (registry %s)\n", wpath.c_str(),
@@ -549,11 +563,25 @@ void AuditoryStream::StartWorkers() {
       }
     });
   }
+
+  if (speaker_evidence_stage_) {
+    speaker_evidence_stage_->StartPrecompute(&comp_, [this] {
+      const long target = total_samples_.load();
+      const bool diar_ready =
+          !diar_worker_ || diar_worker_->processed_samples() >= target;
+      const bool asr_ready =
+          !asr_worker_ || asr_worker_->processed_samples() >= target;
+      const bool vad_ready =
+          !vad_detector_ || vad_processed_samples_.load() >= target;
+      return diar_ready && asr_ready && vad_ready;
+    });
+  }
   running_ = true;
 }
 
 void AuditoryStream::StopWorkers() {
   if (!running_) return;
+  const auto finalize_begin = std::chrono::steady_clock::now();
   {
     std::lock_guard<std::mutex> lk(telemetry_mutex_);
     telemetry_stop_ = true;
@@ -574,6 +602,7 @@ void AuditoryStream::StopWorkers() {
   if (diar_thread_.joinable()) diar_thread_.join();
   if (asr_thread_.joinable()) asr_thread_.join();
   if (vad_thread_.joinable()) vad_thread_.join();
+  const auto producers_drained = std::chrono::steady_clock::now();
   // Stop the aligner last: ASR Finalize() deposits final typed records which
   // the comprehensive-timeline subscription enqueues. The aligner must drain
   // after the ASR thread has joined.
@@ -581,19 +610,44 @@ void AuditoryStream::StopWorkers() {
     align_worker_->Stop();
     align_worker_->FinalizeExtent(total_samples_.load());
   }
+  const auto align_drained = std::chrono::steady_clock::now();
   if (speaker_evidence_stage_) {
-    const auto primary = speaker_evidence_stage_->BuildPrimarySpeaker(
-        comp_.SnapshotTracks());
+    const auto primary_build_begin = std::chrono::steady_clock::now();
+    const auto primary =
+        speaker_evidence_stage_->BuildPrimarySpeaker(comp_.SnapshotTracks());
     // Primary top-1 is an independent typed track and can revise exact
     // activity ties. Voiceprint intervals must be generated from that revised
     // business view, otherwise coarse pre-primary source ranges overwrite the
     // more precise projection during the following evidence update.
     comp_.DepositPrimarySpeaker(primary);
+    const auto primary_deposited = std::chrono::steady_clock::now();
+    // Drain after the primary view is deposited so any business intervals it
+    // revises are included in the final acoustic-only precomputation pass.
+    speaker_evidence_stage_->StopPrecompute(/*drain=*/true);
+    const auto precompute_drained = std::chrono::steady_clock::now();
     const auto voiceprint = speaker_evidence_stage_->BuildVoiceprint(
-        comp_.SnapshotTracks());
+        comp_.SnapshotSpeakerEvidenceInputs());
+    const auto voiceprint_built = std::chrono::steady_clock::now();
     comp_.DepositSpeakerVoiceprint(voiceprint);
+    const auto voiceprint_deposited = std::chrono::steady_clock::now();
     LOG_INFO("[speaker-fusion] final evidence: primary=%zu voiceprint=%zu\n",
              primary.size(), voiceprint.size());
+    const auto millis = [](auto end, auto begin) {
+      return std::chrono::duration<double, std::milli>(end - begin).count();
+    };
+    LOG_INFO(
+        "[finalize] producers=%.3fms align=%.3fms "
+        "primary_build_and_deposit=%.3fms precompute_drain=%.3fms "
+        "voiceprint_build=%.3fms "
+        "voiceprint_deposit=%.3fms precomputed=%zu cached=%zu\n",
+        millis(producers_drained, finalize_begin),
+        millis(align_drained, producers_drained),
+        millis(primary_deposited, primary_build_begin),
+        millis(precompute_drained, primary_deposited),
+        millis(voiceprint_built, precompute_drained),
+        millis(voiceprint_deposited, voiceprint_built),
+        speaker_evidence_stage_->precomputed_span_count(),
+        speaker_id_stage_ ? speaker_id_stage_->cached_embedding_count() : 0);
   }
   if (business_speaker_pipeline_) {
     business_speaker_pipeline_->Finalize(total_samples_.load());
@@ -786,7 +840,18 @@ void AuditoryStream::EmitTimeline(bool finalize) {
           extent.common_total_samples, extent.gap_samples);
     }
   }
-  EmitLocked(Serialize());
+  const auto serialize_begin = std::chrono::steady_clock::now();
+  std::string timeline = Serialize();
+  const auto serialize_end = std::chrono::steady_clock::now();
+  EmitLocked(timeline);
+  const auto emit_end = std::chrono::steady_clock::now();
+  LOG_INFO(
+      "[finalize] serialize=%.3fms emit=%.3fms bytes=%zu\n",
+      std::chrono::duration<double, std::milli>(serialize_end - serialize_begin)
+          .count(),
+      std::chrono::duration<double, std::milli>(emit_end - serialize_end)
+          .count(),
+      timeline.size());
 }
 
 // Serialize/SerializeRevision/SerializeGpuTelemetry in serialize.cc.

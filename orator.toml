@@ -230,6 +230,13 @@ short_min_margin = 0.04
 regular_min_score = 0.55
 regular_min_margin = 0.04
 four_view_min_aligned_units = 2
+# Spread acoustic-only TitaNet embedding extraction across idle points in the
+# live session. Work starts only after the gallery is mature and all real-time
+# producer pipelines have reached the common-clock head. Final gallery scoring
+# and speaker selection still run after every producer drains. Set the interval
+# to 0 only for an explicit uncached equivalence diagnostic.
+precompute_interval_sec = 0.5
+precompute_max_spans_per_cycle = 1
 
 # ══════════════════════════════════════════════════════════════════════════════
 # VAD — voice activity detection pipeline

@@ -212,6 +212,8 @@ class AuditoryStream {
     float speaker_fusion_regular_min_score = 0.55f;
     float speaker_fusion_regular_min_margin = 0.04f;
     int speaker_fusion_four_view_min_aligned_units = 2;
+    double speaker_fusion_precompute_interval_sec = 0.0;
+    int speaker_fusion_precompute_max_spans_per_cycle = 1;
 
     // ── Storage ──────────────────────────────────────────────────────
     std::string storage_disk_path = "/tmp/orator/storage/";
@@ -385,6 +387,7 @@ class AuditoryStream {
   // Per-pipeline GPU streams sourced from the scheduler (owned by it).
   cudaStream_t diar_stream_ = nullptr;
   cudaStream_t asr_stream_ = nullptr;
+  cudaStream_t speaker_stream_ = nullptr;
   // VAD pipeline GPU stream, sourced from the scheduler (owned by it, not
   // here).
   cudaStream_t vad_stream_ = nullptr;

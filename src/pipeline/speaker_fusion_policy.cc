@@ -151,14 +151,29 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
 
   std::vector<const SpeakerVoiceprintEvidence*> source_evidence;
   std::vector<const SpeakerVoiceprintEvidence*> evidence;
-  for (const auto& item : pipeline.voiceprint_) {
-    if (item.text_id != text.id || item.source_start < 0 ||
-        item.source_end > character_count ||
+  const auto text_evidence_position =
+      pipeline.voiceprint_by_text_.find(text.id);
+  const std::vector<SpeakerVoiceprintEvidence> empty_text_evidence;
+  const auto& text_voiceprint =
+      text_evidence_position == pipeline.voiceprint_by_text_.end()
+          ? empty_text_evidence
+          : text_evidence_position->second;
+  for (const auto& item : text_voiceprint) {
+    if (item.source_start < 0 || item.source_end > character_count ||
         item.source_end <= item.source_start) {
       continue;
     }
     source_evidence.push_back(&item);
     if (item.embedding_available) evidence.push_back(&item);
+  }
+  std::vector<const SpeakerVoiceprintEvidence*> relevant_voiceprint;
+  relevant_voiceprint.reserve(pipeline.voiceprint_vad_.size() +
+                              text_voiceprint.size());
+  for (const auto& item : pipeline.voiceprint_vad_) {
+    relevant_voiceprint.push_back(&item);
+  }
+  for (const auto& item : text_voiceprint) {
+    relevant_voiceprint.push_back(&item);
   }
   auto priority = [](const std::string& kind) {
     if (kind == "business_interval") return 0;
@@ -250,19 +265,21 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
            pipeline.config_.voiceprint_primary_consensus_min_sec;
   };
   auto native_views_preserve_current = [&](const auto& item,
-                                            const std::string& selected) {
+                                           const std::string& selected) {
     const double duration = item.end - item.start;
     if ((item.kind != "business_interval" &&
          item.kind != "punctuation_phrase") ||
-        duration + 1e-9 < pipeline.config_.voiceprint_primary_consensus_min_sec ||
+        duration + 1e-9 <
+            pipeline.config_.voiceprint_primary_consensus_min_sec ||
         duration + 1e-9 >= pipeline.config_.voiceprint_short_max_sec) {
       return false;
     }
 
     int overlapping_vad_count = 0;
     bool has_containing_vad = false;
-    const double tolerance = pipeline.config_.align_boundary_split_tolerance_sec;
-    for (const auto& evidence_item : pipeline.voiceprint_) {
+    const double tolerance =
+        pipeline.config_.align_boundary_split_tolerance_sec;
+    for (const auto& evidence_item : pipeline.voiceprint_vad_) {
       if (evidence_item.kind != "vad" ||
           Overlap(item.start, item.end, evidence_item.start,
                   evidence_item.end) <= 1e-9) {
@@ -406,7 +423,7 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
     }
 
     const SpeakerVoiceprintEvidence* containing_vad = nullptr;
-    for (const auto& candidate : pipeline.voiceprint_) {
+    for (const auto& candidate : pipeline.voiceprint_vad_) {
       if (candidate.kind != "vad" || !candidate.embedding_available ||
           !candidate.robust_gallery_complete ||
           candidate.start > item.start + tolerance ||
@@ -529,7 +546,7 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
     }
 
     const SpeakerVoiceprintEvidence* containing_vad = nullptr;
-    for (const auto& candidate : pipeline.voiceprint_) {
+    for (const auto& candidate : pipeline.voiceprint_vad_) {
       if (candidate.kind != "vad" || !candidate.embedding_available ||
           !candidate.robust_gallery_complete ||
           candidate.start > item.start + tolerance ||
@@ -633,9 +650,10 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
       return std::nullopt;
     }
 
-    const double tolerance = pipeline.config_.align_boundary_split_tolerance_sec;
+    const double tolerance =
+        pipeline.config_.align_boundary_split_tolerance_sec;
     const SpeakerVoiceprintEvidence* containing_vad = nullptr;
-    for (const auto& candidate : pipeline.voiceprint_) {
+    for (const auto& candidate : pipeline.voiceprint_vad_) {
       if (candidate.kind != "vad" || !candidate.embedding_available ||
           !candidate.robust_gallery_complete ||
           candidate.start > item.start + tolerance ||
@@ -751,9 +769,10 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
       return std::nullopt;
     }
 
-    const double tolerance = pipeline.config_.align_boundary_split_tolerance_sec;
+    const double tolerance =
+        pipeline.config_.align_boundary_split_tolerance_sec;
     const SpeakerVoiceprintEvidence* containing_vad = nullptr;
-    for (const auto& candidate : pipeline.voiceprint_) {
+    for (const auto& candidate : pipeline.voiceprint_vad_) {
       if (candidate.kind != "vad" || !candidate.embedding_available ||
           !candidate.robust_gallery_complete ||
           candidate.start > item.start + tolerance ||
@@ -888,17 +907,17 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
       }
       if (covering_primary != nullptr || primary.speaker != current_slot ||
           primary.speaker_id != current_identity ||
-          primary.start > item.start + 1e-9 ||
-          primary.end + 1e-9 < item.end) {
+          primary.start > item.start + 1e-9 || primary.end + 1e-9 < item.end) {
         return std::nullopt;
       }
       covering_primary = &primary;
     }
     if (covering_primary == nullptr) return std::nullopt;
 
-    const double tolerance = pipeline.config_.align_boundary_split_tolerance_sec;
+    const double tolerance =
+        pipeline.config_.align_boundary_split_tolerance_sec;
     const SpeakerVoiceprintEvidence* containing_vad = nullptr;
-    for (const auto& evidence_item : pipeline.voiceprint_) {
+    for (const auto& evidence_item : pipeline.voiceprint_vad_) {
       if (evidence_item.kind != "vad" ||
           evidence_item.start > item.start + tolerance ||
           evidence_item.end + tolerance < item.end) {
@@ -997,9 +1016,10 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
     }
     const std::string anchor_identity = *session_runner_up;
 
-    const double tolerance = pipeline.config_.align_boundary_split_tolerance_sec;
+    const double tolerance =
+        pipeline.config_.align_boundary_split_tolerance_sec;
     const SpeakerVoiceprintEvidence* anchor = nullptr;
-    for (const auto& candidate : pipeline.voiceprint_) {
+    for (const auto& candidate : text_voiceprint) {
       if (candidate.kind != "punctuation_phrase" ||
           candidate.text_id != item.text_id || !candidate.embedding_available ||
           !candidate.robust_gallery_complete ||
@@ -1248,7 +1268,7 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
     }
 
     const SpeakerVoiceprintEvidence* containing_vad = nullptr;
-    for (const auto& candidate : pipeline.voiceprint_) {
+    for (const auto& candidate : pipeline.voiceprint_vad_) {
       if (candidate.kind != "vad" || !candidate.embedding_available ||
           !candidate.robust_gallery_complete ||
           candidate.start > item.start + tolerance ||
@@ -1430,7 +1450,7 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
 
     const SpeakerVoiceprintEvidence* previous_vad = nullptr;
     const SpeakerVoiceprintEvidence* next_vad = nullptr;
-    for (const auto& candidate : pipeline.voiceprint_) {
+    for (const auto& candidate : pipeline.voiceprint_vad_) {
       if (&candidate == &vad || candidate.kind != "vad") continue;
       if (Overlap(vad.start, vad.end, candidate.start, candidate.end) > 1e-9) {
         return std::nullopt;
@@ -1454,7 +1474,7 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
     }
 
     std::vector<const SpeakerVoiceprintEvidence*> units;
-    for (const auto& candidate : pipeline.voiceprint_) {
+    for (const auto& candidate : pipeline.voiceprint_aligned_units_) {
       if (candidate.kind != "aligned_unit" ||
           candidate.end <= candidate.start) {
         continue;
@@ -1609,7 +1629,7 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
     }
 
     std::vector<const SpeakerVoiceprintEvidence*> units;
-    for (const auto& item : pipeline.voiceprint_) {
+    for (const auto& item : pipeline.voiceprint_aligned_units_) {
       if (item.kind != "aligned_unit" || item.end <= item.start) continue;
       if (Overlap(candidate_run.start, candidate_run.end, item.start,
                   item.end) <= 1e-9) {
@@ -1701,20 +1721,19 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
                                        std::min(island_end, segment.end)});
       }
     }
-    if (CoveredDuration(MergeIntervals(std::move(candidate_intervals))) +
-            1e-9 <
+    if (CoveredDuration(MergeIntervals(std::move(candidate_intervals))) + 1e-9 <
         island_end - island_start) {
       return std::nullopt;
     }
 
-    const double tolerance = pipeline.config_.align_boundary_split_tolerance_sec;
+    const double tolerance =
+        pipeline.config_.align_boundary_split_tolerance_sec;
     const SpeakerVoiceprintEvidence* containing_vad = nullptr;
-    for (const auto& item : pipeline.voiceprint_) {
+    for (const auto& item : pipeline.voiceprint_vad_) {
       if (item.kind != "vad" || !item.embedding_available ||
           !item.robust_gallery_complete ||
           std::abs(item.start - candidate_run.start) > tolerance + 1e-9 ||
-          item.start > island_start + 1e-9 ||
-          item.end + 1e-9 < island_end ||
+          item.start > island_start + 1e-9 || item.end + 1e-9 < island_end ||
           item.end + 1e-9 <
               candidate_run.end +
                   pipeline.config_.voiceprint_primary_consensus_min_sec) {
@@ -1726,7 +1745,7 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
     if (containing_vad == nullptr) return std::nullopt;
 
     const SpeakerVoiceprintEvidence* previous_vad = nullptr;
-    for (const auto& item : pipeline.voiceprint_) {
+    for (const auto& item : pipeline.voiceprint_vad_) {
       if (item.kind != "vad" || &item == containing_vad ||
           item.end > containing_vad->start + 1e-9) {
         continue;
@@ -1835,7 +1854,7 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
 
     const SpeakerVoiceprintEvidence* previous_vad = nullptr;
     const SpeakerVoiceprintEvidence* next_vad = nullptr;
-    for (const auto& candidate : pipeline.voiceprint_) {
+    for (const auto& candidate : pipeline.voiceprint_vad_) {
       if (candidate.kind != "vad") continue;
       if (Overlap(item.start, item.end, candidate.start, candidate.end) >
           1e-9) {
@@ -1862,7 +1881,7 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
     int aligned_unit_count = 0;
     const SpeakerVoiceprintEvidence* previous_unit = nullptr;
     const SpeakerVoiceprintEvidence* next_unit = nullptr;
-    for (const auto& candidate : pipeline.voiceprint_) {
+    for (const auto& candidate : pipeline.voiceprint_aligned_units_) {
       if (candidate.kind != "aligned_unit" ||
           candidate.end <= candidate.start) {
         continue;
@@ -1976,29 +1995,29 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
       return std::nullopt;
     }
 
-    const double tolerance = pipeline.config_.align_boundary_split_tolerance_sec;
+    const double tolerance =
+        pipeline.config_.align_boundary_split_tolerance_sec;
     const SpeakerVoiceprintEvidence* containing_phrase = nullptr;
     const SpeakerVoiceprintEvidence* containing_vad = nullptr;
-    for (const auto& candidate : pipeline.voiceprint_) {
-      const bool contains_time =
-          candidate.start <= item.start + tolerance &&
-          candidate.end + tolerance >= item.end;
+    for (const auto* candidate : relevant_voiceprint) {
+      const bool contains_time = candidate->start <= item.start + tolerance &&
+                                 candidate->end + tolerance >= item.end;
       if (!contains_time) continue;
-      if (candidate.kind == "punctuation_phrase" &&
-          candidate.text_id == item.text_id &&
-          candidate.source_start <= item.source_start &&
-          candidate.source_end >= item.source_end) {
-        if (containing_phrase != nullptr || !candidate.embedding_available ||
-            !candidate.robust_gallery_complete) {
+      if (candidate->kind == "punctuation_phrase" &&
+          candidate->text_id == item.text_id &&
+          candidate->source_start <= item.source_start &&
+          candidate->source_end >= item.source_end) {
+        if (containing_phrase != nullptr || !candidate->embedding_available ||
+            !candidate->robust_gallery_complete) {
           return std::nullopt;
         }
-        containing_phrase = &candidate;
-      } else if (candidate.kind == "vad") {
-        if (containing_vad != nullptr || !candidate.embedding_available ||
-            !candidate.robust_gallery_complete) {
+        containing_phrase = candidate;
+      } else if (candidate->kind == "vad") {
+        if (containing_vad != nullptr || !candidate->embedding_available ||
+            !candidate->robust_gallery_complete) {
           return std::nullopt;
         }
-        containing_vad = &candidate;
+        containing_vad = candidate;
       }
     }
     if (containing_phrase == nullptr || containing_vad == nullptr) {
@@ -2222,35 +2241,36 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
         -> std::optional<std::pair<std::string, std::string>> {
       if (scores.size() < 2) return std::nullopt;
       auto ordered = scores;
-      std::sort(ordered.begin(), ordered.end(), [](const auto& left,
-                                                   const auto& right) {
-        if (!NearEqual(left.score, right.score)) {
-          return left.score > right.score;
-        }
-        return left.speaker_id < right.speaker_id;
-      });
+      std::sort(ordered.begin(), ordered.end(),
+                [](const auto& left, const auto& right) {
+                  if (!NearEqual(left.score, right.score)) {
+                    return left.score > right.score;
+                  }
+                  return left.speaker_id < right.speaker_id;
+                });
       return std::make_pair(ordered[0].speaker_id, ordered[1].speaker_id);
     };
 
     const SpeakerVoiceprintEvidence* phrase = nullptr;
-    const double tolerance = pipeline.config_.align_boundary_split_tolerance_sec;
+    const double tolerance =
+        pipeline.config_.align_boundary_split_tolerance_sec;
     const SpeakerVoiceprintEvidence* containing_vad = nullptr;
-    for (const auto& candidate : pipeline.voiceprint_) {
-      if (candidate.kind == "punctuation_phrase" &&
-          candidate.text_id == text.id) {
-        if (phrase != nullptr || !candidate.embedding_available ||
-            !candidate.robust_gallery_complete) {
+    for (const auto* candidate : relevant_voiceprint) {
+      if (candidate->kind == "punctuation_phrase" &&
+          candidate->text_id == text.id) {
+        if (phrase != nullptr || !candidate->embedding_available ||
+            !candidate->robust_gallery_complete) {
           return std::nullopt;
         }
-        phrase = &candidate;
-      } else if (candidate.kind == "vad" &&
-                 candidate.start <= aligned_start + tolerance &&
-                 candidate.end + tolerance >= aligned_end) {
-        if (containing_vad != nullptr || !candidate.embedding_available ||
-            !candidate.robust_gallery_complete) {
+        phrase = candidate;
+      } else if (candidate->kind == "vad" &&
+                 candidate->start <= aligned_start + tolerance &&
+                 candidate->end + tolerance >= aligned_end) {
+        if (containing_vad != nullptr || !candidate->embedding_available ||
+            !candidate->robust_gallery_complete) {
           return std::nullopt;
         }
-        containing_vad = &candidate;
+        containing_vad = candidate;
       }
     }
     if (phrase == nullptr || containing_vad == nullptr) {
@@ -2660,14 +2680,14 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
     }
   }
 
-  for (const auto& item : pipeline.voiceprint_) {
+  for (const auto& item : pipeline.voiceprint_aligned_units_) {
     const auto selected = isolated_subminimum_unit_vad_challenge(item);
     if (selected) {
       apply(item, *selected,
             "voiceprint_aligned_unit_isolated_initial_slot_vad_override");
     }
   }
-  for (const auto& item : pipeline.voiceprint_) {
+  for (const auto& item : pipeline.voiceprint_aligned_units_) {
     const auto selected = bracketed_primary_unit_challenge(item);
     if (!selected) continue;
     const std::string label = speaker_label(*selected);
@@ -2679,7 +2699,7 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
       labels[index].voiceprint = false;
     }
   }
-  for (const auto& item : pipeline.voiceprint_) {
+  for (const auto& item : pipeline.voiceprint_vad_) {
     const auto selected = isolated_vad_aligned_island_challenge(item);
     if (!selected) continue;
     const std::string label = speaker_label(selected->speaker_id);
@@ -2705,7 +2725,7 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
       labels[index].voiceprint = false;
     }
   }
-  for (const auto& item : pipeline.voiceprint_) {
+  for (const auto& item : pipeline.voiceprint_business_intervals_) {
     const auto selected = isolated_no_vad_interval_challenge(item);
     if (!selected) continue;
     const std::string label = speaker_label(*selected);

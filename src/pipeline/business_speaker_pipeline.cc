@@ -228,6 +228,10 @@ void BusinessSpeakerPipeline::ResetState() {
   texts_.clear();
   align_.clear();
   voiceprint_.clear();
+  voiceprint_vad_.clear();
+  voiceprint_aligned_units_.clear();
+  voiceprint_business_intervals_.clear();
+  voiceprint_by_text_.clear();
   pieces_.clear();
   processed_samples_ = 0;
 }
@@ -257,6 +261,7 @@ void BusinessSpeakerPipeline::SynchronizeAll() {
     align_[group.text_id] = group;
   }
   voiceprint_ = snapshot.speaker_voiceprint;
+  ReindexSpeakerVoiceprint();
   for (const auto& text : texts_) ReprojectText(text, &revisions);
   PublishRevisions(revisions);
 }
@@ -352,7 +357,25 @@ void BusinessSpeakerPipeline::ApplySpeakerVoiceprint(
     const std::vector<SpeakerVoiceprintEvidence>& evidence,
     std::vector<Revision>* revisions) {
   voiceprint_ = evidence;
+  ReindexSpeakerVoiceprint();
   for (const auto& text : texts_) ReprojectText(text, revisions);
+}
+
+void BusinessSpeakerPipeline::ReindexSpeakerVoiceprint() {
+  voiceprint_vad_.clear();
+  voiceprint_aligned_units_.clear();
+  voiceprint_business_intervals_.clear();
+  voiceprint_by_text_.clear();
+  for (const auto& item : voiceprint_) {
+    if (item.kind == "vad") voiceprint_vad_.push_back(item);
+    if (item.kind == "aligned_unit") {
+      voiceprint_aligned_units_.push_back(item);
+    }
+    if (item.kind == "business_interval") {
+      voiceprint_business_intervals_.push_back(item);
+    }
+    if (item.text_id >= 0) voiceprint_by_text_[item.text_id].push_back(item);
+  }
 }
 
 void BusinessSpeakerPipeline::PublishRevisions(

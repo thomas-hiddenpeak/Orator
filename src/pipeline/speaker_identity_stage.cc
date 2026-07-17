@@ -456,23 +456,14 @@ std::vector<float> SpeakerIdentityStage::EmbedSpan(double start_sec,
   // Cap the embedded window: a voiceprint needs only a few seconds, and a long
   // single-speaker turn would otherwise feed huge audio to TitaNet (mel/encoder
   // buffers grow with length) and exhaust GPU memory over a long session.
-  auto [a, b] = EmbeddingWindow(start_sec, end_sec);
-  if (b <= a) return {};
-  std::vector<float> pcm = audio_.ReadSpan(tb_.SampleAt(a), tb_.SampleAt(b));
-  if (pcm.empty()) return {};  // span aged out of the retain window
-  core::AudioChunk chunk;
-  chunk.samples = pcm.data();
-  chunk.num_samples = static_cast<int>(pcm.size());
-  chunk.sample_rate = static_cast<int>(tb_.sample_rate());
-  chunk.t_start_sec = a;
-  std::vector<float> emb = embedder_->Embed(chunk);
-  if (static_cast<int>(emb.size()) != config_.embedding_dim) return {};
-  return emb;
+  return EmbedSpan(start_sec, end_sec, config_.edge_margin_sec,
+                   config_.max_embed_window_sec);
 }
 
-std::vector<float> SpeakerIdentityStage::EmbedSpan(
-    double start_sec, double end_sec, double edge_margin_sec,
-    double max_window_sec) {
+std::vector<float> SpeakerIdentityStage::EmbedSpan(double start_sec,
+                                                   double end_sec,
+                                                   double edge_margin_sec,
+                                                   double max_window_sec) {
   double a = start_sec;
   double b = end_sec;
   if (b - a > 2.0 * edge_margin_sec + 0.5) {
@@ -485,7 +476,16 @@ std::vector<float> SpeakerIdentityStage::EmbedSpan(
     b = middle + 0.5 * max_window_sec;
   }
   if (b <= a) return {};
-  std::vector<float> pcm = audio_.ReadSpan(tb_.SampleAt(a), tb_.SampleAt(b));
+  const long start_sample = tb_.SampleAt(a);
+  const long end_sample = tb_.SampleAt(b);
+  if (end_sample <= start_sample) return {};
+
+  std::lock_guard<std::mutex> lock(embedding_mutex_);
+  const auto key = std::make_pair(start_sample, end_sample);
+  const auto cached = embedding_cache_.find(key);
+  if (cached != embedding_cache_.end()) return cached->second;
+
+  std::vector<float> pcm = audio_.ReadSpan(start_sample, end_sample);
   if (pcm.empty()) return {};
   core::AudioChunk chunk;
   chunk.samples = pcm.data();
@@ -494,7 +494,24 @@ std::vector<float> SpeakerIdentityStage::EmbedSpan(
   chunk.t_start_sec = a;
   std::vector<float> embedding = embedder_->Embed(chunk);
   if (static_cast<int>(embedding.size()) != config_.embedding_dim) return {};
+  embedding_cache_.emplace(key, embedding);
   return embedding;
+}
+
+bool SpeakerIdentityStage::PrecomputeSpan(double start_sec, double end_sec,
+                                          double min_duration_sec,
+                                          double edge_margin_sec,
+                                          double max_window_sec) {
+  if (embedder_ == nullptr || end_sec - start_sec + 1e-9 < min_duration_sec) {
+    return false;
+  }
+  return !EmbedSpan(start_sec, end_sec, edge_margin_sec, max_window_sec)
+              .empty();
+}
+
+std::size_t SpeakerIdentityStage::cached_embedding_count() const {
+  std::lock_guard<std::mutex> lock(embedding_mutex_);
+  return embedding_cache_.size();
 }
 
 SpeakerIdentityStage::SpanEvidence SpeakerIdentityStage::EvaluateSpan(
@@ -721,6 +738,10 @@ void SpeakerIdentityStage::Process(std::vector<core::DiarSegment>& segs) {
 
 void SpeakerIdentityStage::Reset() {
   audio_.Reset();
+  {
+    std::lock_guard<std::mutex> lock(embedding_mutex_);
+    embedding_cache_.clear();
+  }
   local_epochs_.clear();
   pending_competing_.clear();
   global_centroid_.clear();

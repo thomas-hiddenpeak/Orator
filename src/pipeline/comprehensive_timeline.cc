@@ -369,6 +369,26 @@ ComprehensiveTimeline::TrackSnapshot ComprehensiveTimeline::SnapshotTracks()
   return snapshot;
 }
 
+ComprehensiveTimeline::SpeakerEvidenceSnapshot
+ComprehensiveTimeline::SnapshotSpeakerEvidenceInputs() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  SpeakerEvidenceSnapshot snapshot;
+  snapshot.diarization = diarization_;
+  snapshot.asr = asr_;
+  snapshot.vad = vad_;
+  snapshot.align.reserve(align_.size());
+  for (const auto& [text_id, group] : align_) {
+    (void)text_id;
+    snapshot.align.push_back(group);
+  }
+  std::stable_sort(snapshot.align.begin(), snapshot.align.end(),
+                   [](const AlignGroup& a, const AlignGroup& b) {
+                     return a.start < b.start;
+                   });
+  snapshot.business_speaker = BuildBusinessSnapshotLocked();
+  return snapshot;
+}
+
 std::vector<ComprehensiveTimeline::SpeakerInput>
 ComprehensiveTimeline::SnapshotDiarization() const {
   std::lock_guard<std::mutex> lock(mutex_);

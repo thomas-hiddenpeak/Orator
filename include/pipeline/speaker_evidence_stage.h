@@ -5,7 +5,13 @@
 // retained audio and TitaNet gallery. It emits acoustic evidence only; speaker
 // selection remains the responsibility of BusinessSpeakerPipeline.
 
+#include <condition_variable>
+#include <cstddef>
+#include <functional>
+#include <mutex>
+#include <set>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -29,14 +35,25 @@ class SpeakerEvidenceStage {
     std::string punctuation = "，。？！；：、,.?!;:";
     float frame_activity_threshold = 0.5f;
     int minimum_gallery_size = 2;
+    double precompute_interval_sec = 0.0;
+    int precompute_max_spans_per_cycle = 1;
   };
 
   SpeakerEvidenceStage(SpeakerIdentityStage* identity, Config config);
+  ~SpeakerEvidenceStage();
+
+  SpeakerEvidenceStage(const SpeakerEvidenceStage&) = delete;
+  SpeakerEvidenceStage& operator=(const SpeakerEvidenceStage&) = delete;
+
+  void StartPrecompute(ComprehensiveTimeline* timeline,
+                       std::function<bool()> ready);
+  void StopPrecompute(bool drain);
+  std::size_t precomputed_span_count() const;
 
   std::vector<ComprehensiveTimeline::SpeakerInput> BuildPrimarySpeaker(
       const ComprehensiveTimeline::TrackSnapshot& snapshot);
   std::vector<ComprehensiveTimeline::SpeakerVoiceprintEvidence> BuildVoiceprint(
-      const ComprehensiveTimeline::TrackSnapshot& snapshot);
+      const ComprehensiveTimeline::SpeakerEvidenceSnapshot& snapshot);
 
  private:
   friend class TestSpeakerEvidenceStage;
@@ -50,8 +67,24 @@ class SpeakerEvidenceStage {
           intervals,
       double min_embed_sec, double short_max_sec);
 
+  std::vector<ComprehensiveTimeline::SpeakerVoiceprintEvidence>
+  BuildVoiceprintQueries(
+      const ComprehensiveTimeline::SpeakerEvidenceSnapshot& snapshot) const;
+  void Precompute(
+      const ComprehensiveTimeline::SpeakerEvidenceSnapshot& snapshot,
+      std::size_t max_spans);
+  void PrecomputeLoop();
+
   SpeakerIdentityStage* identity_ = nullptr;
   Config config_;
+  ComprehensiveTimeline* timeline_ = nullptr;
+  std::function<bool()> precompute_ready_;
+  std::thread precompute_thread_;
+  mutable std::mutex precompute_mutex_;
+  std::condition_variable precompute_cv_;
+  bool precompute_stop_ = false;
+  bool precompute_drain_ = false;
+  std::set<std::pair<long, long>> precomputed_spans_;
 };
 
 }  // namespace pipeline

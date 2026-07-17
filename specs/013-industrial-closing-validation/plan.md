@@ -2449,24 +2449,86 @@ not close the conjunctive acceptance table.
 
 The remaining work proceeds in this order:
 
-1. make direct `end` after the final audio frame the unified client's default
-   acceptance path; retain `flush -> end` only behind explicit `--test-flush`,
-   and record each request-to-timeline wait plus the direct final-frame-to-
-   terminal interval in both the artifact and manifest, without changing
-   runtime policy;
-2. create and manually sign the audible reference ledger for all 556 rows,
+1. retain direct `end` after the final audio frame as the unified client's
+   default acceptance path and preserve its independent timing evidence. The
+   first full recapture at commit `7721024ceb60` completed all 3615.120 seconds
+   but required `66.915 s` from the final frame to the terminal document. Raw
+   device evidence separates approximately 40 seconds of final TitaNet work
+   from a following single-core fusion/reprojection phase, so that artifact is
+   a signed mechanical failure and T101 remains open;
+2. move acoustic-only TitaNet work off the terminal critical path: a
+   session-owned periodic worker reads the reduced typed speaker-evidence
+   snapshot, caches embeddings by common-clock sample span, and drains after
+   alignment. Final scoring still uses the mature galleries and the unchanged
+   fusion policy. Index immutable evidence by exact kind while retaining its
+   original order so policy scans do not repeatedly traverse unrelated kinds.
+   TitaNet uses the scheduler-owned lowest-priority background CUDA stream,
+   with its maximum configured scratch warmed before the server accepts live
+   audio, so periodic evidence work neither serializes the default stream nor
+   grows device buffers during a session. Live work begins only after the
+   active gallery is mature and diarization, ASR, and VAD have all reached a
+   sampled common-clock input head. It then caches at most one configured batch
+   per cycle, preventing a periodic burst from changing endpoint scheduling.
+   Cadence and cycle size are configured only by
+   `speaker_fusion.precompute_interval_sec` and
+   `speaker_fusion.precompute_max_spans_per_cycle`; a zero interval preserves
+   the uncached fallback. The final drain ignores the live cycle limit;
+3. prove cached/uncached exact output identity in focused tests, record
+   per-phase finalization timings, then rerun short, 600-second, and full A/B
+   direct-end evidence. Neither timing diagnostics nor byte equality may be
+   interpreted as a product-accuracy judgment;
+4. create and manually sign the audible reference ledger for all 556 rows,
    including start/end boundaries, overlap, criticality, and confidence class;
-3. derive speaker-time, fixed-block, per-speaker, critical-turn, confident-
+5. derive speaker-time, fixed-block, per-speaker, critical-turn, confident-
    wrong, and boundary-offset judgments only by complete contextual semantic
    review of that signed ledger;
-4. rerun only the mechanical transport evidence affected by the timing-capture
-   change, while preserving the checked-in TOML and v2.1 profile;
-5. close T084 only when both A and B independently satisfy every applicable
+6. close T084 only when both A and B independently satisfy every applicable
    gate, then complete ASR, browser/microphone, holdout, report review, and
    release-signing work.
 
 No new model or fusion parameter sweep starts while these evidence gaps are the
 blocking issue.
+
+### 8.6 Precompute engineering seal (2026-07-18)
+
+T101A and T101B are implemented on the working tree based on parent commit
+`7721024ceb60`. `ComprehensiveTimeline` exposes a reduced typed speaker-evidence
+snapshot; `SpeakerIdentityStage` caches embeddings by exact common-clock sample
+span; and `SpeakerEvidenceStage` owns the bounded periodic acoustic-only worker
+plus the unlimited final drain. `AuditoryStream` supplies the common-head
+readiness predicate, scheduler-owned lowest-priority CUDA stream, maximum-window
+warmup, finalization order, and per-phase diagnostics. Stable VAD, alignment,
+business-kind, and text indexes remove repeated full evidence scans without
+changing source order or fusion-policy order.
+
+The implementation builds warning-clean and all 68 configured CTest entries
+pass. Focused coverage includes exact cached/uncached evidence scores, cache
+reset, minimum-gallery gating, the one-successful-span live-cycle bound, and
+the unlimited final drain. The following real-WebSocket checks used one binary,
+1.0x incremental input, direct `end`, isolated registries, continuous telemetry,
+and configuration expressed only in TOML:
+
+- at 120 seconds, cached and uncached terminal waits were `0.805 s` and
+  `0.844 s`; all seven track payloads were exactly equal at SHA-256
+  `7b291c32fdd5d40679f5ea1f944e3cc2f508061b1dbeebe1ee5bdf3e3a97634f`,
+  and both comprehensive views were exactly equal at SHA-256
+  `d03abbbf38de27516fe18d2fa68a24d0ee3600ade7d620cdb71628bd72d5aa51`;
+- at 600 seconds, cached and uncached terminal waits were `4.514 s` and
+  `6.568 s`; all seven track payloads were exactly equal at SHA-256
+  `a6a7ea95299ea7568977b220715e5b1e6b3ad3c4317cf6c4a8b4d019124aa11b`,
+  and both comprehensive views were exactly equal at SHA-256
+  `2a09aee6934daa8af04a6ee412aec29f418cefbc94fc18ab3f8b9c7e10d85c0c`.
+
+The 600-second cached path spent `3895.547 ms` in the unlimited final
+precompute drain and `10.886 ms` constructing final voiceprint evidence. The
+uncached path spent `0.010 ms` and `5934.740 ms` in the same phases. The cached
+log reports 618 precompute operations and 640 cached spans at finalization;
+that count includes the final drain and is not a claim that every span was
+processed live. Exact equality, hashes, phase times, and latency are mechanical
+engineering evidence only. They do not evaluate speaker correctness or replace
+complete contextual semantic review. T101 remains open until a clean commit
+completes full-length direct-end A/B recapture and the resulting business views
+receive the required complete-context review.
 
 ## 9. Phase 7: Final Sign-Off
 

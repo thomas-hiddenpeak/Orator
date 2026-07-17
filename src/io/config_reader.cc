@@ -339,6 +339,16 @@ bool ApplyTomlConfig(const std::string& path,
         cfg.speaker_fusion_four_view_min_aligned_units = *n;
       }
     }
+    if (auto v = sec->get("precompute_interval_sec")) {
+      if (auto d = v->value<double>()) {
+        cfg.speaker_fusion_precompute_interval_sec = *d;
+      }
+    }
+    if (auto v = sec->get("precompute_max_spans_per_cycle")) {
+      if (auto n = v->value<int>()) {
+        cfg.speaker_fusion_precompute_max_spans_per_cycle = *n;
+      }
+    }
   }
 
   // ── [vad] ─────────────────────────────────────────────────────────

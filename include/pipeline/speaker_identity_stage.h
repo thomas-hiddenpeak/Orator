@@ -138,6 +138,12 @@ class SpeakerIdentityStage {
                             double edge_margin_sec,
                             double max_window_sec);
 
+  // Cache acoustic-only evidence without consulting either speaker gallery.
+  // Final EvaluateSpan calls still score against the then-current galleries.
+  bool PrecomputeSpan(double start_sec, double end_sec, double min_duration_sec,
+                      double edge_margin_sec, double max_window_sec);
+  std::size_t cached_embedding_count() const;
+
   std::string IdentityAt(int local_speaker, double at_sec) const;
 
   void Reset();
@@ -229,6 +235,12 @@ class SpeakerIdentityStage {
   core::TimeBase tb_;
   SpeakerIdConfig config_;
   RetainedAudioBuffer audio_;
+
+  // TitaNet owns reusable CUDA scratch and is not re-entrant. This mutex also
+  // protects the immutable-audio embedding cache shared by the diar worker and
+  // the speaker-evidence precompute worker.
+  mutable std::mutex embedding_mutex_;
+  std::map<std::pair<long, long>, std::vector<float>> embedding_cache_;
 
   // Diarization-thread-only state (no lock needed). Per local speaker: the best
   // reference embeddings (quality = confidence x duration) + their centroid.

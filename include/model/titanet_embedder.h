@@ -63,6 +63,11 @@ class TitaNetEmbedder : public core::ISpeakerEmbedder {
   std::vector<float> Embed(const core::AudioChunk& chunk) override;
   std::string name() const override { return "titanet_large"; }
 
+  // The stream is scheduler-owned. Warmup allocates maximum session scratch
+  // before live audio starts, avoiding device-wide allocation stalls.
+  void SetStream(cudaStream_t stream) { stream_ = stream; }
+  void Warmup(int num_samples);
+
   const TitaNetConfig& config() const { return config_; }
 
  private:
@@ -98,6 +103,7 @@ class TitaNetEmbedder : public core::ISpeakerEmbedder {
   std::map<std::string, std::unique_ptr<gpu::UnifiedBuffer>> w_;
   std::vector<Block> blocks_;
   mutable gpu::DeviceScratch scratch_;
+  cudaStream_t stream_ = nullptr;  // non-owning; owned by GpuScheduler
   bool loaded_ = false;
 };
 
