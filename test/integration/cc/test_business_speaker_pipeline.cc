@@ -836,6 +836,94 @@ int main() {
           "low-score dual phrase preserves the direct interval");
   }
 
+  // ---- 18a. Generic phrase evidence cannot erase an aligned native speaker
+  // handoff already present inside the exact phrase source range. ----
+  {
+    BusinessSpeakerPipeline::Config config;
+    config.voiceprint_fusion_enabled = true;
+    config.speaker_overlap_tie_policy =
+        BusinessSpeakerPipeline::SpeakerOverlapTiePolicy::kPrimarySpeaker;
+    TestBusinessSpeakerPipeline tl(config);
+    const std::string source = "甲乙丙。";
+    tl.UpsertText(0, 0.0, 1.0, source);
+    tl.ReplaceSpeakers({{0.0, 1.0, "speaker_0", 0.9f, "spk_a"},
+                        {0.2, 1.5, "speaker_1", 0.9f, "spk_b"}});
+    tl.ReplacePrimarySpeakers({{0.0, 0.5, "speaker_0", 0.9f, "spk_a"},
+                               {0.5, 1.0, "speaker_1", 0.9f, "spk_b"}});
+    tl.UpsertAlign(0, 0.0, 1.0,
+                   {{0.0, 0.2, "甲"},
+                    {0.2, 0.4, "乙"},
+                    {0.5, 0.95, "丙"}});
+    ComprehensiveTimeline::SpeakerVoiceprintEvidence phrase;
+    phrase.evidence_id = "punctuation_phrase:0:0";
+    phrase.kind = "punctuation_phrase";
+    phrase.text_id = 0;
+    phrase.source_start = 0;
+    phrase.source_end = 4;
+    phrase.start = 0.0;
+    phrase.end = 0.95;
+    phrase.embedding_available = true;
+    phrase.robust_gallery_complete = true;
+    phrase.session_scores = {{"spk_a", 0.75f}, {"spk_b", 0.60f}};
+    phrase.robust_scores = {{"spk_a", 0.74f}, {"spk_b", 0.59f}};
+    tl.ReplaceVoiceprint({phrase});
+    const auto snap = tl.Snapshot();
+    std::vector<std::string> speaker_sequence;
+    std::string rebuilt;
+    for (const auto& entry : snap) {
+      rebuilt += entry.text;
+      if (speaker_sequence.empty() ||
+          speaker_sequence.back() != entry.speaker_id) {
+        speaker_sequence.push_back(entry.speaker_id);
+      }
+    }
+    CHECK(speaker_sequence == std::vector<std::string>({"spk_a", "spk_b"}),
+          "generic phrase preserves a native multi-identity handoff");
+    CHECK(rebuilt == source,
+          "handoff protection preserves the exact source text");
+  }
+
+  // ---- 18b. A subminimum primary fluctuation does not block an otherwise
+  // eligible generic phrase decision. ----
+  {
+    using Pipeline = orator::pipeline::BusinessSpeakerPipeline;
+    Pipeline::Config config;
+    config.voiceprint_fusion_enabled = true;
+    config.speaker_overlap_tie_policy =
+        Pipeline::SpeakerOverlapTiePolicy::kPrimarySpeaker;
+    TestBusinessSpeakerPipeline tl(config);
+    const std::string source = "甲乙丙。";
+    tl.UpsertText(0, 0.0, 1.2, source);
+    tl.ReplaceSpeakers({{0.0, 1.2, "speaker_0", 0.9f, "spk_a"},
+                        {0.5, 0.7, "speaker_1", 0.9f, "spk_b"}});
+    tl.ReplacePrimarySpeakers({{0.0, 0.5, "speaker_0", 0.9f, "spk_a"},
+                               {0.5, 0.7, "speaker_1", 0.9f, "spk_b"},
+                               {0.7, 1.2, "speaker_0", 0.9f, "spk_a"}});
+    tl.UpsertAlign(0, 0.0, 1.2,
+                   {{0.0, 0.4, "甲"},
+                    {0.5, 0.65, "乙"},
+                    {0.8, 1.1, "丙"}});
+    ComprehensiveTimeline::SpeakerVoiceprintEvidence phrase;
+    phrase.evidence_id = "punctuation_phrase:0:0";
+    phrase.kind = "punctuation_phrase";
+    phrase.text_id = 0;
+    phrase.source_start = 0;
+    phrase.source_end = 4;
+    phrase.start = 0.0;
+    phrase.end = 1.1;
+    phrase.embedding_available = true;
+    phrase.robust_gallery_complete = true;
+    phrase.session_scores = {{"spk_a", 0.75f}, {"spk_b", 0.60f}};
+    phrase.robust_scores = {{"spk_a", 0.74f}, {"spk_b", 0.59f}};
+    tl.ReplaceVoiceprint({phrase});
+    const auto snap = tl.Snapshot();
+    CHECK(!snap.empty() &&
+              std::all_of(snap.begin(), snap.end(), [](const auto& entry) {
+                return entry.speaker_id == "spk_a";
+              }),
+          "subminimum primary fluctuation keeps generic phrase behavior");
+  }
+
   // ---- 19. A session-only phrase still abstains when a direct interval
   // conflicts because it lacks an independent robust-gallery confirmation. ----
   {

@@ -38,6 +38,7 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
   struct CharacterLabel {
     std::string speaker;
     std::string speaker_id;
+    std::string base_speaker_id;
     std::string reason = "diarization_baseline";
     std::size_t owner = 0;
     bool voiceprint = false;
@@ -49,10 +50,54 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
         static_cast<int>(Utf8Offsets(entries[owner].text).size()) - 1;
     for (int index = 0; index < count; ++index) {
       labels.push_back({entries[owner].speaker, entries[owner].speaker_id,
+                        entries[owner].speaker_id,
                         entries[owner].speaker_decision.reason, owner, false});
     }
   }
   if (static_cast<int>(labels.size()) != character_count) return entries;
+
+  struct CharacterTime {
+    bool available = false;
+    double start = 0.0;
+    double end = 0.0;
+  };
+  std::vector<CharacterTime> character_times(character_count);
+  const auto alignment = pipeline.align_.find(text.id);
+  if (alignment != pipeline.align_.end()) {
+    std::size_t source_cursor = 0;
+    for (const auto& unit : alignment->second.units) {
+      const std::vector<std::size_t> unit_offsets = Utf8Offsets(unit.text);
+      std::vector<std::size_t> matched_indices;
+      for (std::size_t unit_index = 0; unit_index + 1 < unit_offsets.size();
+           ++unit_index) {
+        const std::string codepoint = unit.text.substr(
+            unit_offsets[unit_index],
+            unit_offsets[unit_index + 1] - unit_offsets[unit_index]);
+        std::size_t found = std::string::npos;
+        for (std::size_t source_index = source_cursor;
+             source_index + 1 < offsets.size(); ++source_index) {
+          if (text.text.substr(offsets[source_index],
+                               offsets[source_index + 1] -
+                                   offsets[source_index]) == codepoint) {
+            found = source_index;
+            break;
+          }
+        }
+        if (found == std::string::npos) break;
+        matched_indices.push_back(found);
+        source_cursor = found + 1;
+      }
+      if (unit.end > unit.start && !matched_indices.empty()) {
+        const double step =
+            (unit.end - unit.start) / matched_indices.size();
+        for (std::size_t index = 0; index < matched_indices.size(); ++index) {
+          character_times[matched_indices[index]] = {
+              true, unit.start + index * step,
+              unit.start + (index + 1) * step};
+        }
+      }
+    }
+  }
 
   struct Selection {
     std::string speaker_id;
@@ -218,6 +263,54 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
       }
     }
     return false;
+  };
+  auto has_sustained_native_handoff = [&](const auto& item,
+                                          const std::string& selected) {
+    struct NativeRun {
+      std::string speaker_id;
+      int source_start = 0;
+      int source_end = 0;
+    };
+    std::vector<NativeRun> runs;
+    for (int index = item.source_start; index < item.source_end; ++index) {
+      const std::string& speaker_id = labels[index].base_speaker_id;
+      if (speaker_id.empty()) return false;
+      if (runs.empty() || runs.back().speaker_id != speaker_id) {
+        runs.push_back({speaker_id, index, index + 1});
+      } else {
+        runs.back().source_end = index + 1;
+      }
+    }
+    if (runs.size() != 2 ||
+        (runs[0].speaker_id != selected &&
+         runs[1].speaker_id != selected)) {
+      return false;
+    }
+    const NativeRun& competing =
+        runs[0].speaker_id == selected ? runs[1] : runs[0];
+
+    std::vector<std::pair<double, double>> aligned_intervals;
+    std::set<std::size_t> competing_owners;
+    for (int index = competing.source_start; index < competing.source_end;
+         ++index) {
+      competing_owners.insert(labels[index].owner);
+      if (character_times[index].available) {
+        aligned_intervals.push_back(
+            {character_times[index].start, character_times[index].end});
+      }
+    }
+    for (const std::size_t owner : competing_owners) {
+      const auto& base = entries[owner];
+      if (base.speaker_id != competing.speaker_id ||
+          (base.speaker_decision.reason != "primary_speaker_tie_break" &&
+           base.speaker_decision.reason !=
+               "primary_speaker_overlap_refinement")) {
+        return false;
+      }
+    }
+    return CoveredDuration(MergeIntervals(std::move(aligned_intervals))) +
+               1e-9 >=
+           pipeline.config_.voiceprint_primary_consensus_min_sec;
   };
   auto identity_coverage = [&](const std::vector<SpeakerSeg>& segments,
                                double start, double end,
@@ -2652,6 +2745,10 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
       const bool primary_activity_consensus =
           dual_agreement && primary_activity_phrase_consensus(
                                 *item, session->speaker_id);
+      if (!primary_activity_consensus &&
+          has_sustained_native_handoff(*item, session->speaker_id)) {
+        continue;
+      }
       if (direct_conflict && !primary_activity_consensus &&
           (!dual_agreement || !strong_conflict_override)) {
         continue;
@@ -2761,49 +2858,6 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
       labels[index].reason =
           "voiceprint_adjacent_primary_supported_prefix_restore";
       labels[index].voiceprint = true;
-    }
-  }
-
-  struct CharacterTime {
-    bool available = false;
-    double start = 0.0;
-    double end = 0.0;
-  };
-  std::vector<CharacterTime> character_times(character_count);
-  const auto alignment = pipeline.align_.find(text.id);
-  if (alignment != pipeline.align_.end()) {
-    std::size_t source_cursor = 0;
-    for (const auto& unit : alignment->second.units) {
-      const std::vector<std::size_t> unit_offsets = Utf8Offsets(unit.text);
-      std::vector<std::size_t> matched_indices;
-      for (std::size_t unit_index = 0; unit_index + 1 < unit_offsets.size();
-           ++unit_index) {
-        const std::string codepoint = unit.text.substr(
-            unit_offsets[unit_index],
-            unit_offsets[unit_index + 1] - unit_offsets[unit_index]);
-        std::size_t found = std::string::npos;
-        for (std::size_t source_index = source_cursor;
-             source_index + 1 < offsets.size(); ++source_index) {
-          if (text.text.substr(offsets[source_index],
-                               offsets[source_index + 1] -
-                                   offsets[source_index]) == codepoint) {
-            found = source_index;
-            break;
-          }
-        }
-        if (found == std::string::npos) break;
-        matched_indices.push_back(found);
-        source_cursor = found + 1;
-      }
-      if (unit.end > unit.start && !matched_indices.empty()) {
-        const double step =
-            (unit.end - unit.start) / matched_indices.size();
-        for (std::size_t index = 0; index < matched_indices.size(); ++index) {
-          character_times[matched_indices[index]] = {
-              true, unit.start + index * step,
-              unit.start + (index + 1) * step};
-        }
-      }
     }
   }
 

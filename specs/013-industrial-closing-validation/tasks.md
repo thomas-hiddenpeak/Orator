@@ -1664,3 +1664,34 @@
 - [ ] T102 Manually sign the 556-row audible-boundary, overlap, criticality, and
   confidence ledger, then complete the remaining speaker-time, fixed-block,
   per-speaker, critical-turn, confident-wrong, and boundary-offset reviews.
+
+## Phase 10: Critical Handoff Evidence
+
+- [x] T103 Trace the first-block critical speaker residuals through the final
+  business view, forced alignment, activity diarization, primary top-1, VAD,
+  and voiceprint evidence without using a reference-driven executable
+  comparison. `ref-0045`, `ref-0058`, and `ref-0071` retain useful local
+  Sortformer evidence that is erased or displaced by phrase-scale projection;
+  `ref-0049` remains evidence-poor; `ref-0090` exposes a separate forced-
+  alignment placement problem and is not folded into the phrase fix.
+- [x] T104 Implement FR16ABM in the production fusion policy and add focused
+  C++ regression coverage for a dual-gallery phrase spanning a native
+  two-identity handoff. Preserve homogeneous phrase behavior, source text,
+  time-base ownership, policy order, and all checked-in TOML values. The final
+  guard requires exactly two source-ordered base identity runs and existing
+  minimum aligned duration; the complete build and `68/68` CTest pass.
+- [x] T105 Replay the frozen direct-end A and B typed tracks twice with the
+  unchanged TOML. Verify only deterministic and structural contracts by code,
+  then manually read every changed context forward and in reverse before
+  retaining or rejecting the candidate. Both replays are byte-stable and the
+  complete changed-context review retains the bounded rule; see
+  `native-handoff-guard-review-2026-07-18.md`.
+- [ ] T106 If T105 is retained by complete contextual semantic review, pass the
+  warning-clean build, full CTest suite, 120-second and 600-second real-
+  WebSocket promotion runs, then recapture full A/B and perform the complete
+  556-contribution forward/reverse semantic review. Build and CTest are done;
+  real-WebSocket promotion and recapture remain pending.
+- [ ] T107 Investigate the independent forced-alignment/VAD placement defect
+  exposed around `ref-0090` using source-free common-clock evidence. Specify a
+  separate bounded rule before implementation; do not compensate through the
+  phrase-handoff guard or a reference-fitted parameter.

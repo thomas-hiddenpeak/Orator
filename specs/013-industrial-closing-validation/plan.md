@@ -2344,6 +2344,42 @@ preservation. Frozen Run B is replayed twice; automation checks only evidence
 and determinism contracts and arranges every changed context for complete
 manual semantic reading.
 
+### 6.2.40 Native multi-identity phrase protection
+
+FR16ABM addresses an evidence-order defect in the generic punctuation-phrase
+path. `SplitTextByDiarBase` can already project a real handoff inside one ASR
+punctuation phrase from activity overlap, primary top-1 refinement, and forced
+alignment. The later generic phrase voiceprint pass currently treats the
+phrase as one acoustic sample and may repaint all of those source characters
+with its majority identity, discarding the more local handoff evidence.
+
+The projector therefore records the immutable base owner of every source
+character before applying voiceprints. A generic phrase abstains only when its
+selected identity is still present in that base projection and one different
+base identity forms exactly one adjacent source run and survives for at least
+the existing TOML minimum embedding duration in positive forced-alignment time
+through explicit primary tie-break or overlap-refinement provenance. The exact
+phrase must collapse to those two runs; an unknown span, third identity, or
+return transition abstains. This distinguishes a sustained edge handoff from
+short primary churn, internal islands, and a phrase-level correction whose
+selected identity is absent from noisy base fragments. No threshold or TOML
+value changes. Existing narrowly
+specified challenges continue to execute in their established order and may
+cross mixed labels only when their own requirements explicitly allow that
+topology; the broad session/dual-gallery fallback cannot.
+
+Focused C++ coverage constructs one aligned punctuation phrase with exactly one
+sustained primary-refined handoff and eligible dual-gallery phrase evidence,
+then requires both identities and exact source reconstruction to survive. A companion case
+keeps a subminimum primary fluctuation eligible for the generic phrase overlay.
+Homogeneous phrase coverage and the existing primary/activity/dual-gallery
+consensus case remain covered. Frozen A and B typed tracks are replayed twice with the unchanged TOML;
+automation checks only determinism, source/time preservation, raw-track
+isolation, and arranges changed contexts. Every changed conversational context
+is read manually in chronological and reverse order before any real-WebSocket
+promotion. No executable mechanism assigns correctness, aggregates accuracy,
+ranks this rule, or issues an acceptance verdict.
+
 ### 6.3 Decision gate
 
 The contextual reviewers must manually establish that the frozen candidate

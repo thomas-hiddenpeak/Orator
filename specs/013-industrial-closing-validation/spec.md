@@ -1705,6 +1705,29 @@ subject to the complete acceptance gates in this spec.
   leading source interval may be written. No transcript content, identity,
   timestamp, reference value, review result, or executable correctness
   judgment may enter either evidence generation or selection.
+- **FR16ABM**: A generic punctuation-phrase voiceprint decision MUST NOT erase
+  a sustained native multi-identity handoff already present in the exact phrase
+  source range. Before any voiceprint write, the phrase-selected identity MUST
+  occur in the immutable base business projection, and one different known
+  base identity MUST form the only other contiguous identity run. The exact
+  phrase MUST therefore contain two known base-identity runs and exactly one
+  handoff, with no unknown span, return transition, or third identity. The
+  different run MUST retain `primary_speaker_tie_break` or
+  `primary_speaker_overlap_refinement` provenance for at least existing TOML
+  `speaker_fusion.min_embed_sec` of positive-duration forced-alignment coverage
+  inside the phrase. When all conditions hold,
+  the generic `voiceprint_phrase_session`, `voiceprint_phrase_dual_gallery`,
+  and `voiceprint_phrase_dual_gallery_override` paths MUST abstain. A shorter
+  primary fluctuation, an internal identity island, a phrase identity absent
+  from the base projection, or a transition lacking primary provenance MUST
+  NOT activate this guard. This
+  protection does not make primary top-1 authoritative and does not block a
+  separately specified challenge whose evidence contract explicitly admits
+  mixed current identities and independently proves its bounded write. The
+  guard introduces no new score, margin, duration, confidence, lexical,
+  speaker-specific, or reference-derived condition; it reuses only the frozen
+  minimum embedding duration and immutable pre-voiceprint source ownership.
+  Source text, timing, and every raw track MUST remain unchanged.
 
 ### 4.5 Product surface and operations
 
