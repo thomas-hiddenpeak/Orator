@@ -2591,6 +2591,39 @@ business-turn gate, but all T102 ledger-derived gates remain open. The complete
 hashes, changed-context reconciliation, error lists, and permitted claim are in
 `direct-end-full-review-2026-07-18.md`.
 
+This section is the pre-FR16ABM direct-end baseline. The promoted handoff
+candidate and its new full-run evidence are recorded in Section 8.8.
+
+### 8.8 FR16ABM full promotion seal (2026-07-18)
+
+Clean commit `1a475e6b7473` passed the warning-clean build and all 68 CTest
+entries, then advanced through 120-second and 600-second real-WebSocket runs
+with direct terminal waits of `0.808 s` and `4.590 s`. Both promotion runs had
+exact common-clock extents, producer/observer convergence, no contract issue,
+and complete required telemetry coverage.
+
+Full Run A started from an empty isolated registry; full Run B restarted with
+Run A's registry frozen. Both streamed `3615.120` seconds at 1.0x and sent
+`end` without `flush`. Their direct terminal waits were `26.503 s` and
+`26.185 s`; all seven tracks reconciled exactly, observer terminal payloads
+matched, and required telemetry cadence passed. These are mechanical facts.
+
+The reviewer then read every one of the 556 contributions for each run in
+chronological order and reread both complete sessions in reverse fixed windows.
+The manually established natural-turn results are 514 accepted / 42 incorrect
+for Run A (approximately 92.45 percent) and 515 / 41 for Run B (approximately
+92.63 percent). FR16ABM repairs `ref-0071` on both paths without a contextual
+regression. The reread also accepts `ref-0250`: Tang Yunfeng's contribution is
+correctly attributed 0.10 seconds beyond its provisional row boundary, so a
+mechanical interval cutoff cannot reject it. No executable mechanism assigned
+correctness, aggregated the result, ranked the runs, or issued the verdict.
+
+T106 is complete and FR16ABM is retained. T107 next isolates the independent
+forced-alignment/VAD placement defect around `ref-0090`. T102 remains open for
+audible boundary, overlap, criticality, and confidence signing; therefore T084
+and full speaker closure remain open. See
+`native-handoff-full-promotion-review-2026-07-18.md`.
+
 ## 9. Phase 7: Final Sign-Off
 
 Create one closing report containing:

@@ -1,6 +1,6 @@
 # Tasks: Industrial Closing Validation
 
-**Status**: In progress - direct-end full A/B gate recorded 2026-07-18
+**Status**: In progress - FR16ABM full A/B promotion recorded 2026-07-18
 
 ## Phase 0: Governance
 
@@ -1686,11 +1686,17 @@
   retaining or rejecting the candidate. Both replays are byte-stable and the
   complete changed-context review retains the bounded rule; see
   `native-handoff-guard-review-2026-07-18.md`.
-- [ ] T106 If T105 is retained by complete contextual semantic review, pass the
+- [x] T106 If T105 is retained by complete contextual semantic review, pass the
   warning-clean build, full CTest suite, 120-second and 600-second real-
   WebSocket promotion runs, then recapture full A/B and perform the complete
-  556-contribution forward/reverse semantic review. Build and CTest are done;
-  real-WebSocket promotion and recapture remain pending.
+  556-contribution forward/reverse semantic review. Clean commit `1a475e6`
+  passed the warning-clean build and `68/68` CTest, then passed 120-second,
+  600-second, and full direct-end A/B mechanical contracts. Complete manual
+  forward/reverse contextual review establishes Run A at 514 accepted / 42
+  incorrect (approximately 92.45 percent) and Run B at 515 / 41
+  (approximately 92.63 percent). No executable mechanism assigned or
+  aggregated the result. See
+  `native-handoff-full-promotion-review-2026-07-18.md`.
 - [ ] T107 Investigate the independent forced-alignment/VAD placement defect
   exposed around `ref-0090` using source-free common-clock evidence. Specify a
   separate bounded rule before implementation; do not compensate through the

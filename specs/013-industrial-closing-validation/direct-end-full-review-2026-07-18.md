@@ -18,6 +18,11 @@ This report signs the full natural-business-turn speaker-attribution gate and
 the mechanical direct-end latency gate only. It does not sign the remaining
 conjunctive gates in Spec 013 and therefore does not close T084 or Spec 013.
 
+This is the pre-FR16ABM direct-end baseline. The later clean-commit promotion,
+full A/B recapture, and complete contextual review are recorded in
+`native-handoff-full-promotion-review-2026-07-18.md`; this historical report is
+not rewritten with the later result.
+
 ## Frozen inputs and build
 
 | Evidence | SHA-256 |

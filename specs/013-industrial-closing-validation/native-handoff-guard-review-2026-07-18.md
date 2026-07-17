@@ -1,7 +1,7 @@
 # Native Handoff Guard Context Review
 
 **Date:** 2026-07-18  
-**Status:** Frozen replay retained; real-WebSocket promotion pending  
+**Status:** Frozen replay retained; real-WebSocket promotion completed
 **Scope:** FR16ABM generic punctuation-phrase abstention only
 
 ## Evaluation Authority
@@ -91,10 +91,10 @@ not a replacement for a new full real-WebSocket forward/reverse review.
 - Frozen TOML SHA-256 remains
   `d6056d75dc1ac72569a11b1d96b78edb6b8f7bf5fa310c9f6f07cbd49f439538`.
 
-## Promotion Boundary
+## Promotion Result
 
-FR16ABM is retained for real-path validation. It is not yet an accepted
-closeout result. T106 must run the new binary through 120-second and 600-second
-incremental real-WebSocket fixtures, then recapture full direct-end A/B and
-complete the full 556-contribution forward/reverse contextual semantic review.
-T102 and T084 remain open independently.
+FR16ABM completed real-path validation at clean commit `1a475e6b7473`.
+The 120-second and 600-second promotion runs, full direct-end A/B recapture,
+and complete 556-contribution forward/reverse contextual semantic review are
+recorded in `native-handoff-full-promotion-review-2026-07-18.md`. T106 is
+complete. T102 and T084 remain open independently.

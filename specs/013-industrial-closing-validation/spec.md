@@ -1,8 +1,8 @@
 # Spec 013: Industrial Closing Validation
 
-**Status**: Current direct-end clean-commit A/B natural-business-turn and
-terminal-latency gates pass; T084, full canonical closure, release sign-off,
-and industrial readiness remain open
+**Status**: FR16ABM clean-commit A/B natural-business-turn and terminal-latency
+gates pass; T102, T084, full canonical closure, release sign-off, and
+industrial readiness remain open
 **Created**: 2026-07-13
 **Scope**: Re-establish a truthful product baseline, recover full-session business
 accuracy, and define the evidence required before Orator may be declared closed.
@@ -154,6 +154,17 @@ subject to the complete acceptance gates in this spec.
     gate. Speaker-time, fixed-block, per-speaker, criticality, confidence, and
     audible-boundary gates remain unsigned. See
     `direct-end-full-review-2026-07-18.md`.
+14. **FR16ABM full real-path promotion complete; T102/T084 open**: clean commit
+    `1a475e6b7473` passed the warning-clean build, `68/68` CTest, 120-second and
+    600-second real-WebSocket promotion, and full direct-end A/B recapture.
+    Complete 556-contribution forward and reverse contextual semantic review
+    manually records `514/556` for empty-registry Run A and `515/556` for
+    frozen-registry Run B. This includes the repaired sustained handoff at
+    `ref-0071` and a context-based correction of the provisional row boundary
+    at `ref-0250`; no code assigned or aggregated the result. Audible
+    boundaries, speaker-time, fixed blocks, per-speaker review, criticality,
+    confidence, and offsets remain unsigned. See
+    `native-handoff-full-promotion-review-2026-07-18.md`.
 
 ## 4. Requirements
 
