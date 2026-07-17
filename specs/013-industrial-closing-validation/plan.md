@@ -2449,8 +2449,11 @@ not close the conjunctive acceptance table.
 
 The remaining work proceeds in this order:
 
-1. extend the WebSocket evidence manifest to record `flush` and `end` terminal
-   waits independently, without changing runtime policy;
+1. make direct `end` after the final audio frame the unified client's default
+   acceptance path; retain `flush -> end` only behind explicit `--test-flush`,
+   and record each request-to-timeline wait plus the direct final-frame-to-
+   terminal interval in both the artifact and manifest, without changing
+   runtime policy;
 2. create and manually sign the audible reference ledger for all 556 rows,
    including start/end boundaries, overlap, criticality, and confidence class;
 3. derive speaker-time, fixed-block, per-speaker, critical-turn, confident-

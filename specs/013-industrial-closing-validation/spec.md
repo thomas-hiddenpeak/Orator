@@ -1713,6 +1713,14 @@ subject to the complete acceptance gates in this spec.
 - **FR20**: Final acceptance requires two independent full-length runs: one with
   an empty isolated speaker registry and one after process restart with the
   frozen enrolled-registry fixture.
+- **FR25**: The unified real-WebSocket acceptance client MUST send `end`
+  directly after the final audio frame. A preceding `flush` is permitted only
+  in an explicitly requested non-acceptance command-contract scenario. The
+  artifact and sidecar manifest MUST record whether `flush` was requested, its
+  independent request-to-timeline wait, the `end` request-to-timeline wait, the
+  final-frame-to-terminal wait, and whether that observation is eligible for
+  the 30-second terminal-latency gate. A `flush`-primed observation MUST NOT
+  satisfy that gate.
 
 ## 5. Acceptance Gates
 

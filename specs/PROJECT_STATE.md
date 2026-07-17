@@ -283,7 +283,7 @@ See
 | Revisable comprehensive timeline (Spec 004) | Full natural-turn speaker gate passed; closure open | `ComprehensiveTimeline` stores typed diarization, ASR, VAD, alignment, voiceprint, and business tracks and publishes immutable snapshots/typed updates. `BusinessSpeakerPipeline` consumes typed `SpeakerEvidenceStage` output and owns orchestration/publication; the internal `SpeakerFusionPolicy` owns rule execution. Current-source full Run A and Run B pass the complete contextual natural-turn speaker gate. Other Spec 013 speaker gates, ASR, and independent holdout remain open. |
 | Reusable common time base (Spec 004) | Session ownership and final reconciliation implemented; acceptance open | `AuditoryStream` owns one immutable `TimeBase` and injects it into every active private cache, worker, and retained audio store. Finalization reconciles exact sample extents for input, diarization, speaker identity, ASR, VAD, alignment, and business speaker; focused tests and the 2026-07-13 120 s real-WebSocket run reported zero gaps. Full-session repeatability remains open under Spec 013. |
 | Pipeline protocol layer (Spec 004) | ✅ Implemented | Phases 7–12 complete: data types (topic.h, schema.h), pipeline registry, topic router, storage layer (MEMORY + DISK), ProtocolTimeline integration, WS v2 envelope with describe command, --storage-disk-path flag. 25/25 tests pass. |
-| Streaming validation | Full A/B structural capture passed; direct terminal latency open | `ws_unified_test.py` has one socket reader, captures source/config/binary pre/post hashes, continuous `tegrastats`, and runtime telemetry, and rejects source drift, sparse telemetry, mechanical live/final, typed-track, ID, alignment, VAD/diar, and extent violations. Current 3615.120-second empty-registry A and restarted frozen-registry B runs passed these manifest-enforced contracts at 0.983x stream RTF. The client requests `flush` and then `end`, but records only their combined wait, so it cannot yet sign the single-terminal `<= 30 s` gate. Structural checks never evaluate correctness or issue a product verdict. |
+| Streaming validation | Direct-end capture implemented; full A/B latency recapture open | `ws_unified_test.py` has one socket reader, captures source/config/binary pre/post hashes, continuous `tegrastats`, runtime telemetry, and independent terminal-command timing. Acceptance mode now sends `end` directly after the final audio frame; explicit `--test-flush` runs record `flush -> end` but are marked ineligible for the 30-second gate. A 120-second 1.0x real-WebSocket speech run recorded `0.807 s` from final frame to terminal timeline with matching producer/observer hashes, complete telemetry, and no contract issue. The prior full A/B artifacts remain structurally valid but predate this timing contract, so full-length latency is still open. Structural checks never evaluate correctness or issue a product verdict. |
 | Logging system | ✅ Include-level `core/log.h` | Level-based macros (`LOG_DEBUG`/`INFO`/`WARN`/`ERROR`) with compile-time floor (`ORATOR_LOG_LEVEL`) and runtime env-var gate. All 14 `fprintf(stderr)` calls in src/ replaced. |
 | CUDA kernel unit tests | ✅ `test_kernels`: 13/13 passed | GPU kernel operations (Add, Multiply, NormalizeVector, CosineSimilarity, BatchCosineSimilarity) validated against CPU reference; includes edge cases (zero, single-element, large 1M vectors). |
 | CI pipeline | ✅ GitHub Actions | `.github/workflows/ci.yml`: CUDA 12.5, CMake build + ctest + warning check + Python syntax verification. Triggered on push/PR to master. |
@@ -446,14 +446,15 @@ Findings:
 ## 7. Immediate next step
 
 Keep the streaming v2.1 `340/1/188/188` profile fixed. The next work is not a
-parameter sweep. First record `flush` and `end` terminal waits independently.
-Then manually sign all 556 audible boundaries, overlaps, criticality, and
-confidence classes and complete the speaker-time, fixed-block, per-speaker,
-critical-turn, confident-wrong, and boundary-offset reviews. T084 closes only
-after both A and B independently pass every applicable gate. ASR,
-browser/microphone, locked holdout, final-report review, and release signing
-remain later workstreams. The bullets below are historical implementation and
-measurement records unless explicitly marked as current acceptance evidence.
+parameter sweep. Commit the direct-end timing capture, then recapture full-
+length A/B latency from clean source. After that, manually sign all 556 audible
+boundaries, overlaps, criticality, and confidence classes and complete the
+speaker-time, fixed-block, per-speaker, critical-turn, confident-wrong, and
+boundary-offset reviews. T084 closes only after both A and B independently pass
+every applicable gate. ASR, browser/microphone, locked holdout, final-report
+review, and release signing remain later workstreams. The bullets below are
+historical implementation and measurement records unless explicitly marked as
+current acceptance evidence.
 
 - **Spec 012 speaker-business recovery — historical evidence line** (2026-07-09).
   The latest runtime candidate fixes the known full-length regression windows by

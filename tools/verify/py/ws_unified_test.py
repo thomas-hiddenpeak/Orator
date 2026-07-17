@@ -44,6 +44,10 @@ Usage:
   # Verify one producer with observers connected before and during streaming:
   python3 tools/verify/py/ws_unified_test.py --duration 120 --port 8765 \
     --out test_observer.json --test-observer
+
+  # Explicitly exercise non-final flush before end (not latency acceptance):
+  python3 tools/verify/py/ws_unified_test.py --duration 120 --port 8765 \
+    --out test_flush.json --test-flush
 """
 
 import argparse
@@ -67,6 +71,7 @@ from collections import Counter
 GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 SAMPLE_RATE = 16000
 BYTES_PER_SAMPLE = 2  # int16 mono
+TERMINAL_LATENCY_LIMIT_SEC = 30.0
 
 
 def canonical_json_sha256(value) -> str:
@@ -306,8 +311,46 @@ def git_metadata():
     }
 
 
+def terminal_timing_report(push_complete_at, flush_requested_at,
+                           flush_received_at, end_requested_at,
+                           end_received_at):
+    """Build raw command timing evidence without a product verdict."""
+    def elapsed(start, end):
+        if start is None or end is None:
+            return None
+        return round(end - start, 3)
+
+    direct_end = flush_requested_at is None
+    end_received = end_received_at is not None
+    final_frame_to_terminal = elapsed(push_complete_at, end_received_at)
+    eligible = direct_end and end_received
+    return {
+        "mode": "direct_end" if direct_end else "flush_then_end",
+        "limit_sec": TERMINAL_LATENCY_LIMIT_SEC,
+        "flush": {
+            "requested": flush_requested_at is not None,
+            "timeline_received": flush_received_at is not None,
+            "request_to_timeline_sec": elapsed(
+                flush_requested_at, flush_received_at),
+        },
+        "end": {
+            "requested": end_requested_at is not None,
+            "timeline_received": end_received,
+            "request_to_timeline_sec": elapsed(
+                end_requested_at, end_received_at),
+        },
+        "final_frame_to_end_request_sec": elapsed(
+            push_complete_at, end_requested_at),
+        "final_frame_to_terminal_sec": final_frame_to_terminal,
+        "eligible_for_terminal_latency_gate": eligible,
+        "within_terminal_latency_limit": (
+            final_frame_to_terminal <= TERMINAL_LATENCY_LIMIT_SEC
+            if eligible else None),
+    }
+
+
 def write_run_manifest(args, timeline, pcm, artifact_path,
-                       source_evidence):
+                       source_evidence, terminal_timing):
     resolved = timeline.get("resolved_config")
     generated = datetime.datetime.now(datetime.timezone.utc)
     start_git = source_evidence["git"]["client_pre_stream"]
@@ -352,6 +395,7 @@ def write_run_manifest(args, timeline, pcm, artifact_path,
         "server_binary": source_evidence["server_binary"],
         "source_stable_during_run": source_evidence[
             "acceptance_consistent"],
+        "terminal_timing": terminal_timing,
         "client_environment_overrides": {
             key: value for key, value in sorted(os.environ.items())
             if key.startswith("ORATOR_")
@@ -370,6 +414,7 @@ def write_run_manifest(args, timeline, pcm, artifact_path,
             "duration_sec": args.duration,
             "rate": args.rate,
             "frame_ms": args.frame_ms,
+            "test_flush": args.test_flush,
         },
     }
     manifest_path = artifact_path + ".manifest.json"
@@ -948,6 +993,11 @@ def main(args):
     observer_final_timeline = None
     late_observer_final_timeline = None
     contender_error = None
+    push_complete_at = None
+    flush_requested_at = None
+    flush_received_at = None
+    end_requested_at = None
+    end_received_at = None
     try:
         sent = 0
         for off in range(0, len(pcm), frame_bytes):
@@ -992,40 +1042,44 @@ def main(args):
                 slack = target_wall - (time.monotonic() - t0)
                 if slack > 0:
                     time.sleep(slack)
-        push_wall = time.monotonic() - t0
+        push_complete_at = time.monotonic()
+        push_wall = push_complete_at - t0
 
-        flush_index = reader.message_index()
-        observer_flush_index = (
-            observer_reader.message_index()
-            if observer_reader is not None else 0)
-        late_observer_flush_index = (
-            late_observer_reader.message_index()
-            if late_observer_reader is not None else 0)
-        reader.send_frame(0x1, b'{"flush":true}')
-        print("  [flush] waiting for timeline...")
-        flush_timeline = reader.wait_for(
-            lambda message: message.get("type") == "timeline",
-            after_index=flush_index, timeout=args.timeline_timeout)
-        if flush_timeline is not None:
-            print("  [flush] timeline received "
-                  f"({flush_timeline.get('audio_sec', '?')}s)")
-        else:
-            print("  [flush] no timeline (continuing to end)")
-        if observer_reader is not None:
-            observer_flush_timeline = observer_reader.wait_for(
+        if args.test_flush:
+            flush_index = reader.message_index()
+            observer_flush_index = (
+                observer_reader.message_index()
+                if observer_reader is not None else 0)
+            late_observer_flush_index = (
+                late_observer_reader.message_index()
+                if late_observer_reader is not None else 0)
+            flush_requested_at = time.monotonic()
+            reader.send_frame(0x1, b'{"flush":true}')
+            print("  [flush] waiting for timeline...")
+            flush_timeline = reader.wait_for(
                 lambda message: message.get("type") == "timeline",
-                after_index=observer_flush_index,
-                timeout=args.timeline_timeout)
-            if observer_flush_timeline is None:
-                print("  [observer] no flush timeline", file=sys.stderr)
-        if late_observer_reader is not None:
-            late_observer_flush_timeline = late_observer_reader.wait_for(
-                lambda message: message.get("type") == "timeline",
-                after_index=late_observer_flush_index,
-                timeout=args.timeline_timeout)
-            if late_observer_flush_timeline is None:
-                print("  [observer] late observer has no flush timeline",
-                      file=sys.stderr)
+                after_index=flush_index, timeout=args.timeline_timeout)
+            if flush_timeline is not None:
+                flush_received_at = time.monotonic()
+                print("  [flush] timeline received "
+                      f"({flush_timeline.get('audio_sec', '?')}s)")
+            else:
+                print("  [flush] no timeline (continuing to end)")
+            if observer_reader is not None:
+                observer_flush_timeline = observer_reader.wait_for(
+                    lambda message: message.get("type") == "timeline",
+                    after_index=observer_flush_index,
+                    timeout=args.timeline_timeout)
+                if observer_flush_timeline is None:
+                    print("  [observer] no flush timeline", file=sys.stderr)
+            if late_observer_reader is not None:
+                late_observer_flush_timeline = late_observer_reader.wait_for(
+                    lambda message: message.get("type") == "timeline",
+                    after_index=late_observer_flush_index,
+                    timeout=args.timeline_timeout)
+                if late_observer_flush_timeline is None:
+                    print("  [observer] late observer has no flush timeline",
+                          file=sys.stderr)
 
         end_index = reader.message_index()
         observer_end_index = (
@@ -1034,11 +1088,14 @@ def main(args):
         late_observer_end_index = (
             late_observer_reader.message_index()
             if late_observer_reader is not None else 0)
+        end_requested_at = time.monotonic()
         reader.send_frame(0x1, b'{"end":true}')
         print("  [end] waiting for final timeline...")
         final_timeline = reader.wait_for(
             lambda message: message.get("type") == "timeline",
             after_index=end_index, timeout=args.timeline_timeout)
+        if final_timeline is not None:
+            end_received_at = time.monotonic()
         if observer_reader is not None:
             observer_final_timeline = observer_reader.wait_for(
                 lambda message: message.get("type") == "timeline",
@@ -1074,6 +1131,9 @@ def main(args):
             late_observer_reader.join(timeout=2.0)
 
     device_series = tegra_sampler.samples
+    terminal_timing = terminal_timing_report(
+        push_complete_at, flush_requested_at, flush_received_at,
+        end_requested_at, end_received_at)
 
     if final_timeline is None:
         print(f"ERROR: no final timeline received within {args.timeline_timeout:.1f}s",
@@ -1088,6 +1148,15 @@ def main(args):
     diar_compute = diar.get("compute_sec")
     asr_compute = asr.get("compute_sec")
     contract_issues = validate_terminal_contract(reader.events, tl)
+    if (args.test_flush and
+            not terminal_timing["flush"]["timeline_received"]):
+        contract_issues.append(
+            "explicit flush test did not receive a timeline")
+    if (terminal_timing["eligible_for_terminal_latency_gate"] and
+            not terminal_timing["within_terminal_latency_limit"]):
+        contract_issues.append(
+            "direct end terminal timeline exceeded the 30-second limit: "
+            f"{terminal_timing['final_frame_to_terminal_sec']:.3f}s")
     if abs(float(tl.get("audio_sec", -1.0)) - audio_sec) > 0.0015:
         contract_issues.append(
             "terminal audio extent differs from streamed PCM duration")
@@ -1214,6 +1283,7 @@ def main(args):
             "diar_rt_factor": diar.get("real_time_factor"),
             "asr_rt_factor": asr.get("real_time_factor"),
             "contract_issues": contract_issues,
+            "terminal_timing": terminal_timing,
             "resolved_config_sha256": (
                 canonical_json_sha256(tl.get("resolved_config"))
                 if isinstance(tl.get("resolved_config"), dict) else None),
@@ -1237,7 +1307,7 @@ def main(args):
     with open(args.out, "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, indent=2)
     manifest_path, _ = write_run_manifest(
-        args, tl, pcm, args.out, source_evidence)
+        args, tl, pcm, args.out, source_evidence, terminal_timing)
 
     if getattr(args, "rrd", None):
         script = os.path.join(os.path.dirname(__file__), "..", "..",
@@ -1255,6 +1325,11 @@ def main(args):
     print(f"  manifest={manifest_path}")
     print(f"  audio={audio_sec:.2f}s  total_wall={total_wall:.2f}s  "
           f"stream_rt={m['stream_rt_factor']}x")
+    print("  terminal: "
+          f"mode={terminal_timing['mode']} "
+          f"end_wait={terminal_timing['end']['request_to_timeline_sec']}s "
+          "final_frame_to_timeline="
+          f"{terminal_timing['final_frame_to_terminal_sec']}s")
     print(f"  diar: {n_diar} segments, rt={m['diar_rt_factor']}x   "
           f"asr: {n_asr} utterances, rt={m['asr_rt_factor']}x")
 
@@ -1306,6 +1381,10 @@ if __name__ == "__main__":
     ap.add_argument(
         "--test-observer", action="store_true",
         help="verify early and late observer connections against the producer")
+    ap.add_argument(
+        "--test-flush", action="store_true",
+        help="exercise non-final flush before end; this mode is ineligible "
+             "for the terminal-latency acceptance gate")
     ap.add_argument("--command-timeout", type=float, default=30.0,
                     help="Seconds to wait for ready and optional command responses")
     ap.add_argument("--max-total-time", type=float, default=7200.0,

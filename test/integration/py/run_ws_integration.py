@@ -85,7 +85,8 @@ def stop_server(process):
         process.wait(timeout=5)
 
 
-def run_client(args, port, pcm, duration, output, test_observer=False):
+def run_client(args, port, pcm, duration, output, test_observer=False,
+               test_flush=False):
     command = [
         sys.executable,
         str(args.client),
@@ -101,6 +102,8 @@ def run_client(args, port, pcm, duration, output, test_observer=False):
     ]
     if test_observer:
         command.append("--test-observer")
+    if test_flush:
+        command.append("--test-flush")
     result = subprocess.run(
         command, cwd=args.repo, text=True, capture_output=True, timeout=190)
     if result.stdout:
@@ -185,7 +188,8 @@ def main():
             wait_http(f"http://127.0.0.1:{port + 1}/", process, 90)
             run_client(
                 args, port, args.audio, 12,
-                args.artifacts / "speech_12s.json", test_observer=True)
+                args.artifacts / "speech_12s.json", test_observer=True,
+                test_flush=True)
             silence_output = args.artifacts / "silence_30s.json"
             run_client(args, port, silence, 30, silence_output)
             assert_silence_contract(silence_output)

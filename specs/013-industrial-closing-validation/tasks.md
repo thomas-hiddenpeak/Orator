@@ -1631,7 +1631,11 @@
   while the remaining unsigned gates keep T084 and Spec 013 open.
 - [ ] T101 Record `flush` and `end` terminal waits independently in the evidence
   manifest, add focused structural tests, and recapture the affected real-
-  WebSocket latency evidence without changing runtime TOML policy.
+  WebSocket latency evidence without changing runtime TOML policy. The client
+  implementation, focused tests, `68/68` CTest, and a 120-second 1.0x direct-
+  end speech run are complete; the short run recorded `0.807 s` from final
+  frame to terminal timeline with no contract issue. Full-length clean-source
+  A/B recapture remains before this task can close.
 - [ ] T102 Manually sign the 556-row audible-boundary, overlap, criticality, and
   confidence ledger, then complete the remaining speaker-time, fixed-block,
   per-speaker, critical-turn, confident-wrong, and boundary-offset reviews.

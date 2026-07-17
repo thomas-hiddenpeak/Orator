@@ -26,6 +26,48 @@ class UnifiedManifestTest(unittest.TestCase):
             cwd=REPO, text=True, capture_output=True, check=False)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("--require-telemetry", result.stdout)
+        self.assertIn("--test-flush", result.stdout)
+
+    def test_direct_end_timing_is_eligible_for_latency_gate(self):
+        timing = ws_unified_test.terminal_timing_report(
+            push_complete_at=100.0,
+            flush_requested_at=None,
+            flush_received_at=None,
+            end_requested_at=100.1,
+            end_received_at=129.9,
+        )
+        self.assertEqual(timing["mode"], "direct_end")
+        self.assertFalse(timing["flush"]["requested"])
+        self.assertEqual(timing["end"]["request_to_timeline_sec"], 29.8)
+        self.assertEqual(timing["final_frame_to_terminal_sec"], 29.9)
+        self.assertTrue(timing["eligible_for_terminal_latency_gate"])
+        self.assertTrue(timing["within_terminal_latency_limit"])
+
+        late = ws_unified_test.terminal_timing_report(
+            push_complete_at=100.0,
+            flush_requested_at=None,
+            flush_received_at=None,
+            end_requested_at=100.1,
+            end_received_at=130.1,
+        )
+        self.assertTrue(late["eligible_for_terminal_latency_gate"])
+        self.assertFalse(late["within_terminal_latency_limit"])
+
+    def test_flush_primed_timing_is_not_latency_gate_evidence(self):
+        timing = ws_unified_test.terminal_timing_report(
+            push_complete_at=100.0,
+            flush_requested_at=100.1,
+            flush_received_at=125.1,
+            end_requested_at=125.2,
+            end_received_at=130.2,
+        )
+        self.assertEqual(timing["mode"], "flush_then_end")
+        self.assertEqual(
+            timing["flush"]["request_to_timeline_sec"], 25.0)
+        self.assertEqual(timing["end"]["request_to_timeline_sec"], 5.0)
+        self.assertEqual(timing["final_frame_to_terminal_sec"], 30.2)
+        self.assertFalse(timing["eligible_for_terminal_latency_gate"])
+        self.assertIsNone(timing["within_terminal_latency_limit"])
 
     def test_reader_replies_to_ping_with_masked_same_payload_pong(self):
         server_sock, client_sock = socket.socketpair()
