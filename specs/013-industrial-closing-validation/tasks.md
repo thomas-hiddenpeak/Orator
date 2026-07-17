@@ -1,6 +1,6 @@
 # Tasks: Industrial Closing Validation
 
-**Status**: In progress - FR16ABM full A/B promotion recorded 2026-07-18
+**Status**: In progress - FR16ABN frozen replay retained; real-path promotion pending 2026-07-18
 
 ## Phase 0: Governance
 
@@ -1697,7 +1697,36 @@
   (approximately 92.63 percent). No executable mechanism assigned or
   aggregated the result. See
   `native-handoff-full-promotion-review-2026-07-18.md`.
-- [ ] T107 Investigate the independent forced-alignment/VAD placement defect
+- [x] T107 Investigate the independent forced-alignment/VAD placement defect
   exposed around `ref-0090` using source-free common-clock evidence. Specify a
   separate bounded rule before implementation; do not compensate through the
-  phrase-handoff guard or a reference-fitted parameter.
+  phrase-handoff guard or a reference-fitted parameter. The raw A/B topology is
+  identical: the common clock is stable, forced alignment delays a subminimum
+  response across a `1.84 s` internal hole, and containing TitaNet evidence is
+  dominated by following speech. FR16ABN specifies a source-free A-B-A native
+  island plus typed-VAD-gap recovery with no new parameter; see
+  `alignment-lag-root-cause-2026-07-18.md`.
+- [x] T108 Implement FR16ABN in the production fusion policy, pass the existing
+  TOML punctuation set into the business projector without changing its value,
+  and add focused C++ positive/abstention/source-order coverage. Build warning-
+  clean and pass the full CTest suite before generating a candidate. The
+  warning-clean build and all 68 CTest entries pass; the focused matrix covers
+  the positive topology and ten bounded abstention/source-order conditions.
+- [x] T109 Export the promoted full A/B typed tracks, replay FR16ABN twice per
+  run, verify only deterministic structural contracts by code, and manually
+  read every changed context forward and reverse. Reject or retain only by the
+  complete contextual semantic review; do not start another real-WebSocket
+  full run until that review establishes the frozen upper bound. Three replays
+  per path are byte-stable and change only the same short response group.
+  Complete chronological/reverse context review retains that repair and the
+  following substantive turn on both paths; see
+  `delayed-alignment-clause-review-2026-07-18.md`.
+- [ ] T110 Commit and push the retained FR16ABN candidate as a transitional
+  experiment, then pass warning-clean build, full CTest, and 120-second and
+  600-second direct-end real-WebSocket promotion with unchanged TOML values.
+  Verify only mechanical contracts by code and manually review every changed
+  conversational context before retention.
+- [ ] T111 If T110 is retained, recapture full empty-registry Run A and
+  restarted frozen-registry Run B through the production WebSocket path. Read
+  all 556 contributions chronologically and in reverse fixed windows for each
+  run before manually deriving any result or advancing the baseline.

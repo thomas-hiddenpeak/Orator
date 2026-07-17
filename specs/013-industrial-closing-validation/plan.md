@@ -2380,6 +2380,53 @@ is read manually in chronological and reverse order before any real-WebSocket
 promotion. No executable mechanism assigns correctness, aggregates accuracy,
 ranks this rule, or issues an acceptance verdict.
 
+### 6.2.41 Delayed subminimum clause-group recovery
+
+FR16ABN addresses a placement defect that is independent of FR16ABM. In the
+frozen `ref-0090` region, the common session clock is consistent across all
+tracks, but forced alignment leaves a `1.84 s` internal hole after the outgoing
+phrase and collapses the next short response onto `569.26-569.42`. Activity and
+primary have already returned to the surrounding identity at that delayed
+time, so ordinary business projection and the containing TitaNet query both
+support the wrong side of the handoff. Reweighting phrase voiceprint evidence
+cannot repair this topology because the short response has no embedding and
+the available interval/VAD embeddings include the following sustained speech.
+
+The projector will derive punctuation clauses from the existing TOML
+punctuation set and the typed ASR/alignment source map. It may form only a
+source-contiguous prefix of subminimum clauses immediately before the next
+regular-duration clause. The combined group must contain the existing minimum
+aligned-unit count, start after the existing alignment pause, remain below the
+existing embedding floor, and be bracketed in source ownership by one incumbent
+identity. The delayed aligned group must sit at a corroborated incumbent
+activity/primary return onset. Between the preceding aligned unit and that
+onset, one and only one different identity must have at least the existing
+minimum duration of overlapping activity and primary support, then end before
+the incumbent return by the existing pause. One adjacent typed VAD pair must
+also expose a configured VAD gap inside the same alignment hole, with the
+candidate island on its leading side and the incumbent return on its following
+side. This A-B-A topology distinguishes a displaced short response from a
+normal speaker transition, overlap churn, and a legitimate delayed filler.
+
+The implementation adds the existing TOML punctuation string to the read-only
+business-projector config; no checked-in value or threshold changes. The rule
+runs after current fusion challenges and may replace only uniform native or
+typed direct labels in the exact short group. It preserves every producer
+track and the forced-alignment timestamps, so it repairs business speaker
+ownership without claiming to repair audible boundary timing.
+
+Focused C++ coverage includes the complete positive topology and abstention for
+missing source brackets, available/regular-duration phrase evidence,
+insufficient aligned units, missing or competing native islands, activity-only
+or primary-only support, an unseparated candidate, incumbent return outside
+tolerance, absent/ambiguous VAD gaps, candidate activity on the delayed group,
+and arrival-order/source reconstruction. Frozen A and B typed tracks are then
+replayed twice. Automation may verify only deterministic source/time/config and
+raw-track contracts and arrange every changed context. Every affected context
+is read manually in complete chronological and reverse conversation before
+retention; no executable mechanism labels correctness, aggregates a result,
+ranks/selects the rule, or issues a verdict.
+
 ### 6.3 Decision gate
 
 The contextual reviewers must manually establish that the frozen candidate
@@ -2618,11 +2665,35 @@ correctly attributed 0.10 seconds beyond its provisional row boundary, so a
 mechanical interval cutoff cannot reject it. No executable mechanism assigned
 correctness, aggregated the result, ranked the runs, or issued the verdict.
 
-T106 is complete and FR16ABM is retained. T107 next isolates the independent
-forced-alignment/VAD placement defect around `ref-0090`. T102 remains open for
-audible boundary, overlap, criticality, and confidence signing; therefore T084
-and full speaker closure remain open. See
+T106 is complete and FR16ABM is retained. T107-T109 subsequently isolate and
+screen the independent forced-alignment/VAD placement defect around
+`ref-0090`, as recorded in Section 8.9. T102 remains open for audible boundary,
+overlap, criticality, and confidence signing; therefore T084 and full speaker
+closure remain open. See
 `native-handoff-full-promotion-review-2026-07-18.md`.
+
+### 8.9 FR16ABN frozen replay checkpoint (2026-07-18)
+
+FR16ABN reuses the checked-in punctuation, alignment pause/tolerance, minimum
+embedding duration, and aligned-unit count to recover one delayed subminimum
+clause group only when activity, primary, VAD, and forced-alignment evidence
+form the specified source-free A-B-A topology. No TOML value or producer track
+changes. The warning-clean build and all 68 CTest entries pass.
+
+The promoted FR16ABM full A/B typed tracks were exported and replayed three
+times per path. Candidate output is byte-stable within each path and changes
+only the `569.26-569.42` short response speaker sequence. Complete forward and
+reverse conversational review assigns that confirmation group to Xu Zijing
+while preserving Shi Yi's following substantive contribution. The frozen
+candidate is retained for real-WebSocket promotion; it is not yet a new
+production baseline. See
+`delayed-alignment-clause-review-2026-07-18.md`.
+
+T110 next creates a clean transitional experimental commit and runs the
+120-second and 600-second direct-end production WebSocket ladder. T111 may
+start full A/B recapture only after T110's mechanical contracts and complete
+changed-context review retain the candidate. T102 and all remaining conjunctive
+speaker gates remain open.
 
 ## 9. Phase 7: Final Sign-Off
 

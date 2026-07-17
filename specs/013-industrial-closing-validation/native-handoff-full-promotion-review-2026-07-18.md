@@ -160,9 +160,12 @@ FR16ABM is retained in the production fusion policy and T106 is complete. Its
 bounded abstention fixed the target native handoff on both full real paths
 without changing TOML parameters or introducing a contextual regression.
 
-T107 is next: investigate the independent forced-alignment/VAD placement defect
-around `ref-0090` using source-free common-clock evidence and specify a separate
-bounded rule before implementation. In parallel, T102 still requires audible
+T107-T109 subsequently traced the independent forced-alignment/VAD placement
+defect around `ref-0090`, implemented FR16ABN, and retained it through frozen
+A/B replay and complete changed-context review; see
+`delayed-alignment-clause-review-2026-07-18.md`. This report remains the
+authoritative FR16ABM full production baseline until the newer candidate passes
+its own real-WebSocket promotion. In parallel, T102 still requires audible
 review and manual signing of all 556 boundaries, overlaps, criticality, and
 confidence classes before the remaining speaker-time and block gates can be
 derived. Neither task may reuse this natural-turn result as a substitute.

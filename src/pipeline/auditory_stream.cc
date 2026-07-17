@@ -127,6 +127,7 @@ void AuditoryStream::Start() {
       config_.speaker_fusion_phrase_max_sec;
   business_config.voiceprint_four_view_min_aligned_units =
       config_.speaker_fusion_four_view_min_aligned_units;
+  business_config.voiceprint_punctuation = config_.speaker_fusion_punctuation;
   if (config_.timeline_speaker_overlap_tie_policy == "higher_confidence") {
     business_config.speaker_overlap_tie_policy =
         BusinessSpeakerPipeline::SpeakerOverlapTiePolicy::kHigherConfidence;

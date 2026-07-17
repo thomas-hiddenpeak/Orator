@@ -924,6 +924,212 @@ int main() {
           "subminimum primary fluctuation keeps generic phrase behavior");
   }
 
+  // ---- 18c. FR16ABN recovers only a delayed subminimum clause group when
+  // activity, primary, and a typed VAD gap expose one intervening identity.
+  // ----
+  {
+    using Entry = ComprehensiveTimeline::Entry;
+    struct CaseOptions {
+      bool regular_duration_group = false;
+      bool include_second_unit = true;
+      bool include_candidate_primary = true;
+      bool candidate_separated = true;
+      bool return_within_tolerance = true;
+      bool valid_vad_gap = true;
+      bool candidate_on_group = false;
+      bool exact_embedding_available = false;
+      bool competing_native_island = false;
+      bool reverse_evidence = false;
+    };
+    auto run_case = [](const CaseOptions& options) -> std::vector<Entry> {
+      BusinessSpeakerPipeline::Config config;
+      config.voiceprint_fusion_enabled = true;
+      config.speaker_overlap_tie_policy =
+          BusinessSpeakerPipeline::SpeakerOverlapTiePolicy::kPrimarySpeaker;
+      TestBusinessSpeakerPipeline tl(config);
+
+      const double return_start = options.return_within_tolerance ? 2.94 : 2.80;
+      const double candidate_end =
+          options.candidate_on_group
+              ? 3.04
+              : (options.candidate_separated ? 2.00 : 2.80);
+      std::vector<TestBusinessSpeakerPipeline::SpeakerInput> activity = {
+          {0.0, 1.00, "slot_a", 0.9f, "spk_a"},
+          {1.0, candidate_end, "slot_b", 0.9f, "spk_b"},
+          {return_start, 4.40, "slot_a", 0.9f, "spk_a"}};
+      if (options.competing_native_island) {
+        activity.push_back({1.05, 1.85, "slot_c", 0.9f, "spk_c"});
+      }
+      tl.ReplaceSpeakers(activity);
+
+      std::vector<TestBusinessSpeakerPipeline::SpeakerInput> primary = {
+          {0.0, 1.0, "slot_a", 0.9f, "spk_a"},
+          {return_start, 4.40, "slot_a", 0.9f, "spk_a"}};
+      if (options.include_candidate_primary) {
+        primary.push_back({1.02, 2.00, "slot_b", 0.9f, "spk_b"});
+      }
+      if (options.competing_native_island) {
+        primary.push_back({1.08, 1.80, "slot_c", 0.9f, "spk_c"});
+      }
+      tl.ReplacePrimarySpeakers(primary);
+
+      const std::string source = "甲。嗯，对。乙丙。";
+      tl.UpsertText(0, 0.0, 4.40, source);
+      const double first_short_end =
+          options.regular_duration_group ? 3.25 : 3.08;
+      const double second_short_end =
+          options.regular_duration_group ? 3.50 : 3.16;
+      tl.UpsertAlign(0, 0.0, 4.40,
+                     {{0.60, 1.00, "甲"},
+                      {3.00, first_short_end, "嗯"},
+                      {first_short_end, second_short_end, "对"},
+                      {3.70, 4.00, "乙"},
+                      {4.00, 4.30, "丙"}});
+
+      auto aligned_unit = [](int ordinal, int source_start, int source_end,
+                             double start, double end) {
+        ComprehensiveTimeline::SpeakerVoiceprintEvidence item;
+        item.evidence_id = "aligned_unit:0:" + std::to_string(ordinal);
+        item.kind = "aligned_unit";
+        item.text_id = 0;
+        item.source_start = source_start;
+        item.source_end = source_end;
+        item.start = start;
+        item.end = end;
+        return item;
+      };
+      std::vector<ComprehensiveTimeline::SpeakerVoiceprintEvidence> evidence = {
+          aligned_unit(0, 0, 1, 0.60, 1.00),
+          aligned_unit(1, 2, 3, 3.00, first_short_end),
+          aligned_unit(3, 6, 7, 3.70, 4.00), aligned_unit(4, 7, 8, 4.00, 4.30)};
+      if (options.include_second_unit) {
+        evidence.push_back(
+            aligned_unit(2, 4, 5, first_short_end, second_short_end));
+      }
+
+      ComprehensiveTimeline::SpeakerVoiceprintEvidence direct;
+      direct.evidence_id = "business_interval:0:0";
+      direct.kind = "business_interval";
+      direct.text_id = 0;
+      direct.source_start = 2;
+      direct.source_end = 9;
+      direct.start = 3.00;
+      direct.end = 4.30;
+      direct.embedding_available = true;
+      direct.session_scores = {{"spk_a", 0.75f}, {"spk_b", 0.55f}};
+      evidence.push_back(direct);
+
+      auto vad = [](const std::string& id, double start, double end) {
+        ComprehensiveTimeline::SpeakerVoiceprintEvidence item;
+        item.evidence_id = id;
+        item.kind = "vad";
+        item.text_id = -1;
+        item.start = start;
+        item.end = end;
+        return item;
+      };
+      evidence.push_back(vad("vad:0", 0.40, 2.10));
+      evidence.push_back(
+          vad("vad:1", options.valid_vad_gap ? 2.40 : 2.20, 4.40));
+
+      if (options.exact_embedding_available) {
+        ComprehensiveTimeline::SpeakerVoiceprintEvidence phrase;
+        phrase.evidence_id = "punctuation_phrase:0:0";
+        phrase.kind = "punctuation_phrase";
+        phrase.text_id = 0;
+        phrase.source_start = 2;
+        phrase.source_end = 6;
+        phrase.start = 3.00;
+        phrase.end = second_short_end;
+        phrase.embedding_available = true;
+        phrase.robust_gallery_complete = true;
+        phrase.session_scores = {{"spk_a", 0.75f}, {"spk_b", 0.55f}};
+        phrase.robust_scores = {{"spk_a", 0.73f}, {"spk_b", 0.54f}};
+        evidence.push_back(std::move(phrase));
+      }
+      if (options.reverse_evidence) {
+        std::reverse(evidence.begin(), evidence.end());
+      }
+      tl.ReplaceVoiceprint(evidence);
+      return tl.Snapshot();
+    };
+
+    const std::string reason =
+        "sortformer_delayed_subminimum_clause_group_override";
+    auto has_exact_recovery = [&](const std::vector<Entry>& entries) {
+      std::string rebuilt;
+      bool recovered = false;
+      bool following_preserved = false;
+      for (const auto& entry : entries) {
+        rebuilt += entry.text;
+        if (entry.text == "嗯，对。" && entry.speaker_id == "spk_b" &&
+            entry.speaker_decision.reason == reason &&
+            entry.speaker_decision.speaker_source ==
+                "sortformer_activity+primary_top1+vad_boundary+"
+                "forced_alignment") {
+          recovered = true;
+        }
+        if (entry.text.find("乙丙") != std::string::npos &&
+            entry.speaker_id == "spk_a") {
+          following_preserved = true;
+        }
+      }
+      return rebuilt == "甲。嗯，对。乙丙。" && recovered &&
+             following_preserved;
+    };
+    auto abstains = [&](const CaseOptions& options) {
+      const auto entries = run_case(options);
+      return std::none_of(entries.begin(), entries.end(),
+                          [&](const auto& entry) {
+                            return entry.speaker_decision.reason == reason;
+                          });
+    };
+
+    CHECK(has_exact_recovery(run_case({})),
+          "a delayed subminimum clause group recovers the intervening native "
+          "identity only on the exact source range");
+    CaseOptions reversed;
+    reversed.reverse_evidence = true;
+    CHECK(has_exact_recovery(run_case(reversed)),
+          "delayed clause recovery is independent of evidence arrival order");
+    CaseOptions regular;
+    regular.regular_duration_group = true;
+    CHECK(abstains(regular),
+          "a regular-duration clause group preserves current attribution");
+    CaseOptions one_unit;
+    one_unit.include_second_unit = false;
+    CHECK(abstains(one_unit),
+          "insufficient aligned units preserve current attribution");
+    CaseOptions no_primary;
+    no_primary.include_candidate_primary = false;
+    CHECK(abstains(no_primary),
+          "activity-only intervening evidence preserves current attribution");
+    CaseOptions unseparated;
+    unseparated.candidate_separated = false;
+    CHECK(abstains(unseparated),
+          "an unseparated native island preserves current attribution");
+    CaseOptions late_return;
+    late_return.return_within_tolerance = false;
+    CHECK(abstains(late_return),
+          "an incumbent return outside alignment tolerance abstains");
+    CaseOptions no_vad_gap;
+    no_vad_gap.valid_vad_gap = false;
+    CHECK(abstains(no_vad_gap),
+          "a missing configured VAD gap preserves current attribution");
+    CaseOptions active_candidate;
+    active_candidate.candidate_on_group = true;
+    CHECK(abstains(active_candidate),
+          "candidate activity on the delayed group preserves attribution");
+    CaseOptions embeddable;
+    embeddable.exact_embedding_available = true;
+    CHECK(abstains(embeddable),
+          "an independently embedded exact phrase preserves attribution");
+    CaseOptions competing;
+    competing.competing_native_island = true;
+    CHECK(abstains(competing),
+          "ambiguous intervening native identities preserve attribution");
+  }
+
   // ---- 19. A session-only phrase still abstains when a direct interval
   // conflicts because it lacks an independent robust-gallery confirmation. ----
   {

@@ -1,8 +1,8 @@
 # Spec 013: Industrial Closing Validation
 
-**Status**: FR16ABM clean-commit A/B natural-business-turn and terminal-latency
-gates pass; T102, T084, full canonical closure, release sign-off, and
-industrial readiness remain open
+**Status**: FR16ABN frozen A/B replay retained; real-WebSocket promotion,
+T102, T084, full canonical closure, release sign-off, and industrial readiness
+remain open
 **Created**: 2026-07-13
 **Scope**: Re-establish a truthful product baseline, recover full-session business
 accuracy, and define the evidence required before Orator may be declared closed.
@@ -15,7 +15,9 @@ above 90 percent for the natural-business-turn speaker-attribution gate. Run A
 and Run B were each executed through the real WebSocket path, and all 556
 reference contributions were reconciled under complete conversational context.
 The current direct-end runs also satisfy the terminal-latency gate mechanically.
-These sign two conjunctive gates only. Speaker-time, fixed-block, per-speaker,
+FR16ABN is retained only as a frozen-replay candidate for the next real-path
+promotion ladder; it does not supersede those production runs. These sign two
+conjunctive gates only. Speaker-time, fixed-block, per-speaker,
 critical-turn, confident-wrong, audible-boundary, ASR, release, and independent-
 holdout gates remain open.
 
@@ -165,6 +167,15 @@ subject to the complete acceptance gates in this spec.
     boundaries, speaker-time, fixed blocks, per-speaker review, criticality,
     confidence, and offsets remain unsigned. See
     `native-handoff-full-promotion-review-2026-07-18.md`.
+15. **FR16ABN frozen A/B replay retained; real-path promotion open**: a bounded
+    delayed-clause rule reuses existing TOML punctuation and thresholds to
+    recover one subminimum response only when activity, primary, typed VAD, and
+    forced alignment form the specified A-B-A topology. The warning-clean build
+    and `68/68` CTest pass. Three byte-stable replays per promoted A/B track
+    change only the same short response group. Complete chronological/reverse
+    context review retains that repair while preserving the following
+    substantive turn. This is a frozen candidate, not a new production-run
+    result; see `delayed-alignment-clause-review-2026-07-18.md`.
 
 ## 4. Requirements
 
@@ -1739,6 +1750,39 @@ subject to the complete acceptance gates in this spec.
   speaker-specific, or reference-derived condition; it reuses only the frozen
   minimum embedding duration and immutable pre-voiceprint source ownership.
   Source text, timing, and every raw track MUST remain unchanged.
+- **FR16ABN**: A source-contiguous group of punctuation-delimited clauses whose
+  combined positive forced-alignment duration is shorter than existing TOML
+  `speaker_fusion.min_embed_sec` MAY recover one intervening native identity
+  when forced alignment has placed that complete short group after a native
+  evidence island. The group MUST begin after a gap of at least existing TOML
+  `timeline.align_snap_pause_sec` from the nearest preceding positive-duration
+  aligned unit, MUST end before the next punctuation clause having at least the
+  existing minimum positive aligned duration, and MUST contain at least TOML
+  `speaker_fusion.four_view_min_aligned_units` positive-duration aligned units.
+  Every source character in the group and the immediately adjacent source
+  context on both sides MUST carry one uniform non-empty incumbent identity
+  after the existing fusion rules. The incumbent activity and primary views
+  MUST both cover the delayed aligned group, MUST both begin their covering
+  return run within existing TOML
+  `speaker_fusion.align_boundary_split_tolerance_sec` of the group's aligned
+  onset, and the incumbent activity MUST cover the nearest preceding aligned
+  unit. Inside the alignment gap, exactly one different known identity MUST
+  have at least the existing minimum duration of overlapping activity and
+  primary evidence. That candidate activity MUST end before the incumbent
+  return by at least the existing alignment snap pause, and no third identity
+  may satisfy the native-island requirement. Exactly one adjacent typed VAD
+  pair MUST place a VAD gap of at least the existing alignment snap pause
+  between the preceding aligned unit and the delayed group; the candidate
+  island MUST overlap the leading VAD and the incumbent return MUST overlap the
+  following VAD. Current labels outside typed direct or native
+  activity/primary provenance, an available phrase embedding, insufficient or
+  ambiguous aligned/native/VAD evidence, a non-return transition, a candidate
+  still active on the delayed group, or any edge/source mismatch MUST preserve
+  the current attribution. Only the exact short clause group may change. The
+  rule MUST consume the existing TOML punctuation set and thresholds, add no
+  fitted parameter, alter no raw track or timestamp, and inspect no lexical
+  value, speaker name, known timestamp, reference value, review result, or
+  executable correctness judgment.
 
 ### 4.5 Product surface and operations
 

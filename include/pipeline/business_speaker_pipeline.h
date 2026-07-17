@@ -43,6 +43,7 @@ class BusinessSpeakerPipeline {
     double voiceprint_primary_consensus_min_sec = 0.4;
     double voiceprint_phrase_max_sec = 3.0;
     int voiceprint_four_view_min_aligned_units = 2;
+    std::string voiceprint_punctuation = "，。？！；：、,.?!;:";
     SpeakerOverlapTiePolicy speaker_overlap_tie_policy =
         SpeakerOverlapTiePolicy::kShorterSpan;
   };
