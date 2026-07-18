@@ -10,7 +10,11 @@ passes T131 silence/repeatability and T132 complete 600-second contextual
 review, but its full T133/T134 A/B promotion is rejected at corrected
 `497/556` and the checked-in threshold returns to `0.5`; T135 reconciles the
 T111/T123/T133 ledgers and withdraws the prior all-natural-turn-gates-passed
-claim; T102, T084, full
+claim; FR31 deterministic frozen replay passes but complete changed-context
+review rejects its broad primary-return guard; FR32 exact cross-scale
+primary-return precedence passes deterministic T111/T123 replay, complete
+changed-context review, and the 69-test engineering gate; real-WebSocket
+promotion remains pending; T102, T084, full
 canonical closure, release sign-off, and industrial readiness remain open
 **Created**: 2026-07-13
 **Scope**: Re-establish a truthful product baseline, recover full-session business
@@ -2128,6 +2132,73 @@ subject to the complete acceptance gates in this spec.
   a restarted process. Each full artifact MUST receive its own complete
   chronological 556-contribution review and independent reverse-600-second-
   block review before FR30 may be promoted or rejected.
+- **FR31**: An ordinary punctuation-phrase or complete-source voiceprint write
+  MUST preserve an already projected primary-speaker return island when both
+  immutable Sortformer views corroborate that exact native identity. The
+  protected source character MUST already carry typed
+  `primary_speaker_tie_break` or `primary_speaker_overlap_refinement`
+  provenance before the voiceprint write, have positive forced-alignment time
+  intersecting exactly one primary run with that identity, and that primary run
+  MUST last at least existing TOML `speaker_fusion.min_embed_sec` and less than
+  existing TOML `speaker_fusion.short_max_sec`. The nearest known primary run
+  on each side MUST carry the same different identity selected by the proposed
+  voiceprint write, so the native topology is A-B-A rather than an unresolved
+  transition. Immutable activity diarization with identity B MUST cover the
+  complete primary B run for at least the same existing minimum duration. A
+  missing aligned character time, one-view-only identity, subminimum or regular
+  run, non-return topology, unknown identity, different voiceprint incumbent,
+  or activity coverage gap MUST preserve existing behavior. The guard applies
+  only to ordinary phrase and complete-source repainting; explicit specialized
+  multi-view challenge rules retain their existing precedence. It MUST add no
+  threshold, inspect no transcript value, speaker name, known timestamp,
+  reference datum, or review result, and alter no ASR, VAD, diarization,
+  primary-speaker, alignment, voiceprint, identity, or common-time-base record.
+  Frozen T111 and T123 inputs MUST each replay deterministically. Tools may
+  arrange changed contexts and verify only structural contracts; every changed
+  conversational context MUST be read completely in chronological and reverse
+  order against `test.txt` before FR31 can be retained or enter a real-WebSocket
+  promotion run.
+- **FR32**: A broader punctuation-phrase or complete-source voiceprint write
+  MAY preserve an aligned primary B character only when one exact typed
+  `business_interval` supplies independent cross-scale corroboration for the
+  complete primary B run. The character MUST already carry base
+  `primary_speaker_tie_break` or `primary_speaker_overlap_refinement`
+  provenance, and its positive forced-alignment midpoint MUST lie inside one
+  primary B run lasting at least existing TOML
+  `speaker_fusion.min_embed_sec` and less than existing TOML
+  `speaker_fusion.short_max_sec`. The nearest primary runs on both sides MUST
+  carry the proposed broader-write identity A. Exactly one same-text typed
+  `business_interval` MUST have the same common-clock start and end as the
+  primary B run, have an available embedding and complete robust gallery, and
+  independently select B in both the session-refreshed and robust galleries
+  under the unchanged duration-class score and margin gates. Activity B MUST
+  cover the complete run, and no activity identity other than A or B may
+  overlap it. Missing or non-exact interval evidence, gallery abstention or
+  disagreement, one-view native support, a third activity identity, missing
+  alignment, non-return topology, or an out-of-range duration MUST preserve
+  existing behavior. FR32 MUST add no score, duration, confidence, or fitted
+  threshold; inspect no transcript value, speaker name, timestamp constant,
+  reference datum, or review result; and alter no producer evidence or common
+  clock. Frozen T111 and T123 inputs MUST replay deterministically, and every
+  changed context MUST receive complete chronological and reverse contextual
+  semantic review against `test.txt` before retention or a real-WebSocket run.
+
+The first FR31 implementation passed its focused engineering test and produced
+byte-stable repeated T111 and T123 replays. Complete forward and reverse review
+of every changed source context rejected it: true short returns were restored,
+but the same A-B-A/activity topology also preserved primary boundary leakage
+inside uninterrupted contributions by Xu Zijing, Tang Yunfeng, and Shi Yi.
+FR31 therefore does not enter production or a new audio run. See
+`corroborated-primary-return-review-2026-07-19.md`.
+
+FR32 then produces byte-stable repeated frozen replays. T111 remains unchanged;
+T123 changes only the source containing `ref-0154`. Complete forward and
+reverse contextual review confirms that the exact `不含` answer returns to Tang
+Yunfeng while Shi Yi's question and all following contributions remain
+unchanged. The clean build has no warning/error lines and all 69 CTest entries
+pass as engineering evidence only. FR32 is retained for the real-WebSocket
+promotion ladder; this does not close any full-session acceptance gate. See
+`exact-cross-scale-primary-return-review-2026-07-19.md`.
 
 ## 5. Acceptance Gates
 

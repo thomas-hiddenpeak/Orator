@@ -1,7 +1,9 @@
 # Tasks: Industrial Closing Validation
 
-**Status**: In progress - T135 reconciled T111/T123/T133; no full candidate
-passes all natural-turn gates; T102/T084 remain open 2026-07-19
+**Status**: In progress - T135 reconciled T111/T123/T133; FR31 rejected by
+complete changed-context review; FR32 retained by frozen review and awaiting
+real-WebSocket promotion; no full candidate passes all natural-turn gates;
+T102/T084 remain open 2026-07-19
 
 ## Phase 0: Governance
 
@@ -1996,3 +1998,61 @@ passes all natural-turn gates; T102/T084 remain open 2026-07-19
   gates. The documentation synchronization builds warning-clean and passes all
   `69/69` CTest entries as engineering verification only. See
   `speaker-baseline-reconciliation-2026-07-19.md`.
+- [x] T136 Split every T123-only speaker regression from the completed uniform
+  T111/T123 contextual comparison into missing upstream contribution evidence
+  versus present contribution with changed identity or boundary. Display the
+  immutable activity, primary, alignment, voiceprint, and final-decision
+  evidence without executable correctness judgment. Three contributions are
+  absent before alignment and thirteen remain present. Several present-text
+  contexts expose corroborated short primary returns, while others have no
+  two-view native support or no aligned source character in the return. See
+  `corroborated-primary-return-diagnosis-2026-07-19.md`.
+- [x] T137 Implement FR31 only in the final speaker-fusion policy. Preserve an
+  existing aligned `primary_speaker_*` B character from an ordinary phrase or
+  complete-source A repaint only for a short primary A-B-A return fully covered
+  by activity B. Reuse existing TOML duration bounds, preserve specialized
+  challenge precedence and every producer track, and add positive plus all
+  specified abstention tests. The focused engineering test passed; T138's
+  product review rejected the rule, so this implementation is removed.
+- [x] T138 Replay frozen T111 and T123 typed packages repeatedly through the
+  production C++ projector. Verify only determinism, byte-exact source
+  reconstruction, monotonic time, configuration, and immutable-track
+  contracts. Arrange every changed context, then read each complete surrounding
+  conversation chronologically and in reverse against `test.txt` before
+  retaining or rejecting FR31. No executable mechanism may assign correctness,
+  aggregate a result, rank/select the candidate, or issue the verdict. T123
+  replays were byte-identical at SHA-256
+  `23f92e6bc26b925d07666e9969889251c3202e51bab744db3cf632b232e9f58f`;
+  T111 replays were byte-identical at SHA-256
+  `c15ccd6988fe3c6d4bca9afa9e3d1c37c56bab6402504146c99f609801ba272b`.
+  Complete forward and reverse review rejects FR31 because restored short
+  returns are accompanied by new boundary-leakage attribution errors. See
+  `corroborated-primary-return-review-2026-07-19.md`.
+- [x] T139 Close the conditional FR31 promotion step without a commit or audio
+  run because T138 rejected the candidate. No silence, 120-second, 600-second,
+  or full capture is attributed to FR31.
+- [x] T140 Implement FR32 exact cross-scale primary-return precedence in the
+  final fusion policy. Require one exact primary-run business interval whose
+  session and robust galleries both pass existing gates and select the primary
+  B identity, complete activity B coverage, no third activity identity, aligned
+  source, and A-B-A primary brackets. Add the specified abstention tests without
+  adding a TOML value or changing producer evidence. The focused policy test,
+  warning-clean full build, and all 69 CTest entries pass as engineering gates.
+- [x] T141 Replay frozen T111 and T123 typed packages twice through the
+  production C++ projector. Verify only mechanical contracts, arrange every
+  changed context, and complete forward plus reverse contextual semantic review
+  against `test.txt` before retaining or rejecting FR32. No executable
+  mechanism may assign correctness, aggregate a result, rank/select the
+  candidate, or issue the verdict. T123 repeats are byte-identical at SHA-256
+  `8fb70821df483cf40b28c701b88d38713404472dcb179a2bad10c14d4fd72ef2`
+  and change only `text_id=84`; T111 repeats are byte-identical at SHA-256
+  `646ea91b357cafaf8af82c4f45e5cc771c622a501e71b12f2d1aa1555fb055f2`
+  and leave the business view unchanged. Complete forward and reverse review
+  retains the Tang Yunfeng `不含` repair with no changed neighbor. See
+  `exact-cross-scale-primary-return-review-2026-07-19.md`.
+- [ ] T142 Only if T141 retains FR32, commit and push the transitional
+  experiment, then repeat the silence, independent 120-second, complete
+  600-second, and full empty/frozen-registry real-WebSocket promotion ladder.
+  Each accuracy gate is decided only by complete forward and reverse contextual
+  semantic review; mechanical tooling remains limited to transport, timing,
+  provenance, telemetry, determinism, and evidence arrangement.

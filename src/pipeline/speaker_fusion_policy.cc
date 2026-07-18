@@ -39,6 +39,7 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
     std::string speaker;
     std::string speaker_id;
     std::string base_speaker_id;
+    std::string base_reason;
     std::string reason = "diarization_baseline";
     std::size_t owner = 0;
     bool voiceprint = false;
@@ -51,6 +52,7 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
     for (int index = 0; index < count; ++index) {
       labels.push_back({entries[owner].speaker, entries[owner].speaker_id,
                         entries[owner].speaker_id,
+                        entries[owner].speaker_decision.reason,
                         entries[owner].speaker_decision.reason, owner, false});
     }
   }
@@ -481,10 +483,117 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
     return complete_uncontested_coverage(pipeline.speakers_) &&
            complete_uncontested_coverage(pipeline.primary_speakers_);
   };
+  auto preserves_exact_cross_scale_primary_return =
+      [&](int source_index, const std::string& selected) {
+        if (source_index < 0 || source_index >= character_count ||
+            selected.empty() || !character_times[source_index].available) {
+          return false;
+        }
+        const auto& label = labels[source_index];
+        const bool primary_base =
+            label.base_reason == "primary_speaker_tie_break" ||
+            label.base_reason == "primary_speaker_overlap_refinement";
+        if (!primary_base || label.base_speaker_id.empty() ||
+            label.base_speaker_id == selected) {
+          return false;
+        }
+
+        const double midpoint =
+            0.5 * (character_times[source_index].start +
+                   character_times[source_index].end);
+        const SpeakerSeg* candidate = nullptr;
+        for (const auto& primary : pipeline.primary_speakers_) {
+          if (primary.speaker_id != label.base_speaker_id ||
+              midpoint < primary.start - 1e-9 ||
+              midpoint >= primary.end - 1e-9) {
+            continue;
+          }
+          if (candidate != nullptr) return false;
+          candidate = &primary;
+        }
+        if (candidate == nullptr) return false;
+
+        const double duration = candidate->end - candidate->start;
+        if (duration + 1e-9 <
+                pipeline.config_.voiceprint_primary_consensus_min_sec ||
+            duration + 1e-9 >=
+                pipeline.config_.voiceprint_short_max_sec) {
+          return false;
+        }
+
+        const SpeakerSeg* previous = nullptr;
+        const SpeakerSeg* following = nullptr;
+        for (const auto& primary : pipeline.primary_speakers_) {
+          if (&primary == candidate) continue;
+          if (Overlap(candidate->start, candidate->end, primary.start,
+                      primary.end) > 1e-9) {
+            return false;
+          }
+          if (primary.end <= candidate->start + 1e-9 &&
+              (previous == nullptr || primary.end > previous->end + 1e-9)) {
+            previous = &primary;
+          }
+          if (primary.start + 1e-9 >= candidate->end &&
+              (following == nullptr ||
+               primary.start < following->start - 1e-9)) {
+            following = &primary;
+          }
+        }
+        if (previous == nullptr || following == nullptr ||
+            previous->speaker_id != selected ||
+            following->speaker_id != selected) {
+          return false;
+        }
+
+        const SpeakerVoiceprintEvidence* exact_interval = nullptr;
+        for (const auto* item : source_evidence) {
+          if (item->kind != "business_interval" ||
+              !NearEqual(item->start, candidate->start) ||
+              !NearEqual(item->end, candidate->end)) {
+            continue;
+          }
+          if (exact_interval != nullptr) return false;
+          exact_interval = item;
+        }
+        if (exact_interval == nullptr ||
+            !exact_interval->embedding_available ||
+            !exact_interval->robust_gallery_complete) {
+          return false;
+        }
+        const auto interval_session =
+            select(exact_interval->session_scores, duration, true);
+        const auto interval_robust =
+            select(exact_interval->robust_scores, duration, true);
+        if (!interval_session || !interval_robust ||
+            interval_session->speaker_id != candidate->speaker_id ||
+            interval_robust->speaker_id != candidate->speaker_id) {
+          return false;
+        }
+
+        for (const auto& activity : pipeline.speakers_) {
+          if (Overlap(candidate->start, candidate->end, activity.start,
+                      activity.end) <= 1e-9) {
+            continue;
+          }
+          if (activity.speaker_id != selected &&
+              activity.speaker_id != candidate->speaker_id) {
+            return false;
+          }
+        }
+        return identity_coverage(pipeline.speakers_, candidate->start,
+                                 candidate->end, candidate->speaker_id) +
+                   1e-9 >=
+               duration;
+      };
   auto apply = [&](const auto& item, const std::string& selected,
-                   const std::string& reason) {
+                   const std::string& reason,
+                   bool preserve_exact_primary_returns = false) {
     const std::string label = speaker_label(selected);
     for (int index = item.source_start; index < item.source_end; ++index) {
+      if (preserve_exact_primary_returns &&
+          preserves_exact_cross_scale_primary_return(index, selected)) {
+        continue;
+      }
       labels[index].speaker = label;
       labels[index].speaker_id = selected;
       labels[index].reason = reason;
@@ -3252,7 +3361,8 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
                       ? (direct_conflict
                              ? "voiceprint_phrase_dual_gallery_override"
                              : "voiceprint_phrase_dual_gallery")
-                      : "voiceprint_phrase_session");
+                      : "voiceprint_phrase_session",
+            /*preserve_exact_primary_returns=*/true);
     } else if (item->kind == "complete_source" && dual_agreement) {
       bool one_current_identity = true;
       std::string current;
@@ -3264,7 +3374,8 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
       if (one_current_identity &&
           (current.empty() || current == session->speaker_id)) {
         apply(*item, session->speaker_id,
-              "voiceprint_complete_source_dual_gallery");
+              "voiceprint_complete_source_dual_gallery",
+              /*preserve_exact_primary_returns=*/true);
       }
     }
   }

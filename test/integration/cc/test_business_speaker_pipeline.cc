@@ -924,7 +924,194 @@ int main() {
           "subminimum primary fluctuation keeps generic phrase behavior");
   }
 
-  // ---- 18c. FR16ABN recovers only a delayed subminimum clause group when
+  // ---- 18c. FR32 preserves only an exact business-interval/TitaNet-backed
+  // short primary A-B-A return from an ordinary phrase repaint. ----
+  {
+    using Pipeline = orator::pipeline::BusinessSpeakerPipeline;
+    struct Options {
+      bool partial_candidate_activity = false;
+      bool third_activity = false;
+      bool different_following_primary = false;
+      bool missing_candidate_alignment = false;
+      bool regular_candidate = false;
+      bool non_exact_interval = false;
+      bool duplicate_exact_interval = false;
+      bool missing_interval_embedding = false;
+      bool incomplete_robust_gallery = false;
+      bool gallery_disagreement = false;
+      bool interval_gate_failure = false;
+    };
+    auto run_case = [](const Options& options) {
+      Pipeline::Config config;
+      config.voiceprint_fusion_enabled = true;
+      if (options.interval_gate_failure) {
+        config.voiceprint_short_min_score = 0.5f;
+      }
+      config.speaker_overlap_tie_policy =
+          Pipeline::SpeakerOverlapTiePolicy::kPrimarySpeaker;
+      TestBusinessSpeakerPipeline tl(config);
+
+      const double candidate_end = options.regular_candidate ? 2.0 : 1.0;
+      const double total_end = candidate_end + 0.4;
+      tl.UpsertText(0, 0.0, total_end, "甲乙丙。");
+      std::vector<TestBusinessSpeakerPipeline::SpeakerInput> activity = {
+          {0.0, total_end, "speaker_0", 0.9f, "spk_a"},
+          {options.partial_candidate_activity ? 0.5 : 0.4,
+           options.partial_candidate_activity ? candidate_end - 0.1
+                                              : candidate_end,
+           "speaker_1", 0.9f, "spk_b"}};
+      if (options.third_activity) {
+        activity.push_back({0.6, 0.8, "speaker_2", 0.9f, "spk_c"});
+      }
+      tl.ReplaceSpeakers(activity);
+      tl.ReplacePrimarySpeakers(
+          {{0.0, 0.4, "speaker_0", 0.9f, "spk_a"},
+           {0.4, candidate_end, "speaker_1", 0.9f, "spk_b"},
+           {candidate_end, total_end, "speaker_0", 0.9f,
+            options.different_following_primary ? "spk_c" : "spk_a"}});
+
+      std::vector<ComprehensiveTimeline::AlignUnitSeg> units = {
+          {0.1, 0.3, "甲"},
+          {0.55, options.regular_candidate ? 1.4 : 0.85, "乙"},
+          {candidate_end + 0.1, candidate_end + 0.3, "丙"}};
+      if (options.missing_candidate_alignment) {
+        units.erase(units.begin() + 1);
+      }
+      tl.UpsertAlign(0, 0.0, total_end, units);
+
+      ComprehensiveTimeline::SpeakerVoiceprintEvidence interval;
+      interval.evidence_id = "business_interval:0:0";
+      interval.kind = "business_interval";
+      interval.text_id = 0;
+      interval.source_start = 1;
+      interval.source_end = 2;
+      interval.start = options.non_exact_interval ? 0.41 : 0.4;
+      interval.end = candidate_end;
+      interval.embedding_available = !options.missing_interval_embedding;
+      interval.robust_gallery_complete =
+          !options.incomplete_robust_gallery;
+      const float candidate_score =
+          options.interval_gate_failure ? 0.45f : 0.75f;
+      interval.session_scores =
+          {{"spk_b", candidate_score}, {"spk_a", 0.30f}};
+      interval.robust_scores = options.gallery_disagreement
+                                   ? std::vector<ComprehensiveTimeline::VoiceprintScore>(
+                                         {{"spk_a", 0.75f}, {"spk_b", 0.30f}})
+                                   : std::vector<ComprehensiveTimeline::VoiceprintScore>(
+                                         {{"spk_b", candidate_score},
+                                          {"spk_a", 0.30f}});
+
+      ComprehensiveTimeline::SpeakerVoiceprintEvidence phrase;
+      phrase.evidence_id = "punctuation_phrase:0:0";
+      phrase.kind = "punctuation_phrase";
+      phrase.text_id = 0;
+      phrase.source_start = 0;
+      phrase.source_end = 4;
+      phrase.start = 0.1;
+      phrase.end = candidate_end + 0.3;
+      phrase.embedding_available = true;
+      phrase.robust_gallery_complete = true;
+      phrase.session_scores = {{"spk_a", 0.75f}, {"spk_b", 0.60f}};
+      phrase.robust_scores = {{"spk_a", 0.74f}, {"spk_b", 0.59f}};
+      std::vector<ComprehensiveTimeline::SpeakerVoiceprintEvidence> evidence = {
+          interval, phrase};
+      if (options.duplicate_exact_interval) {
+        interval.evidence_id = "business_interval:0:duplicate";
+        evidence.push_back(interval);
+      }
+      tl.ReplaceVoiceprint(evidence);
+      return tl.Snapshot();
+    };
+    auto speaker_sequence = [](const auto& entries) {
+      std::vector<std::string> ids;
+      for (const auto& entry : entries) {
+        if (ids.empty() || ids.back() != entry.speaker_id) {
+          ids.push_back(entry.speaker_id);
+        }
+      }
+      return ids;
+    };
+    auto rebuilt_source = [](const auto& entries) {
+      std::string source;
+      for (const auto& entry : entries) source += entry.text;
+      return source;
+    };
+
+    const auto retained = run_case({});
+    CHECK(speaker_sequence(retained) ==
+              std::vector<std::string>({"spk_a", "spk_b", "spk_a"}),
+          "exact cross-scale primary return survives ordinary phrase repaint");
+    CHECK(rebuilt_source(retained) == "甲乙丙。",
+          "primary-return protection preserves source text exactly");
+
+    Options partial_activity;
+    partial_activity.partial_candidate_activity = true;
+    CHECK(speaker_sequence(run_case(partial_activity)) ==
+              std::vector<std::string>({"spk_a"}),
+          "incomplete activity coverage makes exact return guard abstain");
+
+    Options third_activity;
+    third_activity.third_activity = true;
+    CHECK(speaker_sequence(run_case(third_activity)) ==
+              std::vector<std::string>({"spk_a"}),
+          "third activity identity makes exact return guard abstain");
+
+    Options different_following;
+    different_following.different_following_primary = true;
+    CHECK(speaker_sequence(run_case(different_following)) ==
+              std::vector<std::string>({"spk_a"}),
+          "non-return primary topology keeps ordinary phrase behavior");
+
+    Options missing_alignment;
+    missing_alignment.missing_candidate_alignment = true;
+    CHECK(speaker_sequence(run_case(missing_alignment)) ==
+              std::vector<std::string>({"spk_a"}),
+          "missing aligned candidate character cannot synthesize a return");
+
+    Options regular_candidate;
+    regular_candidate.regular_candidate = true;
+    CHECK(speaker_sequence(run_case(regular_candidate)) ==
+              std::vector<std::string>({"spk_a"}),
+          "regular-duration primary run remains outside short-return guard");
+
+    Options non_exact_interval;
+    non_exact_interval.non_exact_interval = true;
+    CHECK(speaker_sequence(run_case(non_exact_interval)) ==
+              std::vector<std::string>({"spk_a"}),
+          "non-exact business interval cannot corroborate a primary return");
+
+    Options duplicate_interval;
+    duplicate_interval.duplicate_exact_interval = true;
+    CHECK(speaker_sequence(run_case(duplicate_interval)) ==
+              std::vector<std::string>({"spk_a"}),
+          "duplicate exact business intervals make corroboration ambiguous");
+
+    Options missing_embedding;
+    missing_embedding.missing_interval_embedding = true;
+    CHECK(speaker_sequence(run_case(missing_embedding)) ==
+              std::vector<std::string>({"spk_a"}),
+          "missing exact-interval embedding makes return guard abstain");
+
+    Options incomplete_gallery;
+    incomplete_gallery.incomplete_robust_gallery = true;
+    CHECK(speaker_sequence(run_case(incomplete_gallery)) ==
+              std::vector<std::string>({"spk_a"}),
+          "incomplete robust gallery makes return guard abstain");
+
+    Options gallery_disagreement;
+    gallery_disagreement.gallery_disagreement = true;
+    CHECK(speaker_sequence(run_case(gallery_disagreement)) ==
+              std::vector<std::string>({"spk_a"}),
+          "exact-interval gallery disagreement makes return guard abstain");
+
+    Options gate_failure;
+    gate_failure.interval_gate_failure = true;
+    CHECK(speaker_sequence(run_case(gate_failure)) ==
+              std::vector<std::string>({"spk_a"}),
+          "exact-interval score gate failure makes return guard abstain");
+  }
+
+  // ---- 18d. FR16ABN recovers only a delayed subminimum clause group when
   // activity, primary, and a typed VAD gap expose one intervening identity.
   // ----
   {

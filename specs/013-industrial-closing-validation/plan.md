@@ -3166,6 +3166,92 @@ show complete contextual repairs without changed-context regressions before it
 enters the real-WebSocket promotion ladder. See
 `speaker-baseline-reconciliation-2026-07-19.md`.
 
+### 8.21 Corroborated primary-return preservation
+
+T136 completes the frozen split required by T135. Relative to T111, the T123
+view has three newly wrong contributions whose recognizable speech is absent
+before alignment and thirteen whose recognizable speech is still present but
+whose final identity or boundary changes. Displaying the immutable tracks shows
+that several present-text failures contain a short A-B-A primary-speaker return
+whose B run is independently covered by activity diarization. The base
+projector sometimes retains aligned B characters, after which an ordinary
+punctuation-phrase or complete-source voiceprint write flattens the whole range
+back to A. Other failures have no aligned character in the B run, no agreement
+between the two Sortformer views, or require voiceprint evidence to recover a
+stable identity; they are outside this candidate.
+
+FR31 adds a guard at the final revisable speaker-evidence layer rather than a
+new producer or a global preference for primary top-1. For each source
+character that an ordinary phrase or complete-source voiceprint write proposes
+to change, the projector requires existing typed primary-arbitration
+provenance, positive forced-alignment time inside one short primary B run,
+nearest primary runs on both sides carrying the proposed A identity, and full
+activity coverage of the B run. Duration bounds reuse TOML
+`speaker_fusion.min_embed_sec` and `speaker_fusion.short_max_sec`; no new value
+is introduced. Specialized multi-view challenges remain earlier and retain
+their current authority. The write skips only the corroborated B characters;
+source text, character time, all producer tracks, and the common clock remain
+unchanged.
+
+Focused tests cover the positive A-B-A topology and abstention for missing
+alignment, one-view evidence, short and regular runs, missing brackets,
+different bracket identities, activity gaps, and explicit specialized
+challenge precedence. The production replay probe then runs repeatedly on both
+frozen T111 and T123 typed packages. Automation may compare bytes, hashes,
+source reconstruction, timing, immutable input tracks, and display changed
+contexts only. Every changed context is read in complete surrounding
+conversation forward and reverse against `test.txt`. A rejected candidate is
+removed without an audio run. A retained candidate is committed and pushed
+before repeating the silence, 120-second, 600-second, and full A/B real-
+WebSocket ladder. See
+`corroborated-primary-return-diagnosis-2026-07-19.md`.
+
+The deterministic replays exposed that this native topology is necessary but
+not sufficient. It restored real returns, but it also preserved primary-run
+boundary leakage inside longer single-speaker contributions. Complete manual
+review therefore rejects the broad FR31 guard before any real-WebSocket run.
+The rejected implementation and its focused test are removed; the immutable
+replay artifacts remain diagnostic evidence. See
+`corroborated-primary-return-review-2026-07-19.md`.
+
+### 8.22 Exact cross-scale primary-return precedence
+
+FR32 keeps only the evidence case that can be corroborated independently
+without a fitted confidence threshold. A broader phrase or complete-source
+write selecting A may preserve a base primary B character only when the
+character midpoint lies in a short A-B-A primary run and one same-text typed
+business interval has exactly that run's common-clock bounds. That exact
+interval must have an embedding, a complete robust gallery, and session plus
+robust selections that both pass the existing duration-class gates and agree
+on B. Activity B must cover the run, while any third activity identity vetoes
+the guard.
+
+This is an evidence-precedence rule, not a preference for primary top-1. It
+allows a narrow, exact primary-run TitaNet query corroborated by both galleries
+to survive a later broader query, while ordinary A-B-A islands continue to
+abstain. It reuses only the checked-in TOML duration and score gates and does
+not inspect source text, reference labels, names, or known times. Focused tests
+cover exact agreement and abstention for non-exact bounds, unavailable or
+incomplete galleries, gallery disagreement, gate failure, missing activity,
+third activity, missing alignment, wrong topology, and duration bounds.
+
+The production replay probe then runs twice over each frozen T111 and T123
+package. Automation verifies source/time/configuration and byte determinism and
+arranges raw changed contexts only. Every changed context is read manually in
+full forward and reverse conversation against `test.txt`. Rejection removes
+FR32 without an audio run; retention permits a warning-clean full engineering
+gate and then the existing real-WebSocket promotion ladder.
+
+The frozen result retains FR32. Both T123 replays have SHA-256
+`8fb70821df483cf40b28c701b88d38713404472dcb179a2bad10c14d4fd72ef2` and
+change only `text_id=84`; both T111 replays have SHA-256
+`646ea91b357cafaf8af82c4f45e5cc771c622a501e71b12f2d1aa1555fb055f2`
+and do not change the business view. Complete forward and reverse reading
+against `test.txt` retains the exact Tang Yunfeng `不含` repair with no changed
+neighboring contribution. The warning-clean build and 69/69 CTest pass permit
+the conditional commit and real-WebSocket ladder. See
+`exact-cross-scale-primary-return-review-2026-07-19.md`.
+
 ### 8.15 FR28 120-second outcome and promotion ladder
 
 T117-T121 are complete. The frozen T116 packages replay byte-stably; their
