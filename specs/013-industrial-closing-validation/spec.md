@@ -1851,6 +1851,18 @@ subject to the complete acceptance gates in this spec.
   drain, evidence precompute drain, primary construction, voiceprint
   construction, business reprojection, serialization, and terminal emission
   wall times; diagnostics are mechanical performance evidence only.
+- **FR27**: Periodic GPU telemetry MUST schedule against
+  `std::chrono::steady_clock` absolute deadlines. The first sample deadline is
+  one configured `telemetry.gpu_interval_sec` after the worker starts. After a
+  sample is serialized and emitted, the next deadline MUST be the first
+  original-cadence deadline strictly after the current monotonic time; probe
+  and emission latency MUST NOT shift every later deadline. Expired deadlines
+  are skipped rather than emitted in a catch-up burst, and stop notification
+  MUST remain interruptible while waiting. This change MUST preserve the
+  checked-in TOML interval, telemetry JSON payload, and disabled-by-zero
+  behavior. Focused deterministic timing coverage and a real incremental
+  WebSocket cadence check are mechanical engineering evidence only and MUST
+  NOT evaluate or reopen speaker correctness.
 
 ## 5. Acceptance Gates
 

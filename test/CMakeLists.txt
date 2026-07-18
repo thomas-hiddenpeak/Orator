@@ -75,6 +75,7 @@ add_test(NAME test_diar_async_stream_v21_low
     3)
 orator_add_test(test_auditory_stream unit/pipeline/test_auditory_stream.cc)
 target_link_libraries(test_auditory_stream PRIVATE pthread)
+orator_add_test(test_periodic_deadline unit/pipeline/test_periodic_deadline.cc)
 
 orator_add_test(test_pipeline_audio_cache unit/pipeline/test_pipeline_audio_cache.cc)
 target_link_libraries(test_pipeline_audio_cache PRIVATE pthread)

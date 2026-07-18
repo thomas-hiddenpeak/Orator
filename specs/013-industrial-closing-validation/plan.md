@@ -2736,6 +2736,27 @@ also retains an engineering follow-up to schedule samples against absolute
 deadlines rather than accumulating probe latency. See
 `delayed-alignment-full-promotion-review-2026-07-18.md`.
 
+### 8.11 GPU telemetry absolute-deadline scheduling
+
+T112 changes only the session-owned GPU telemetry timer. The worker records
+`steady_clock::now() + interval` as its first deadline and waits with the
+existing stop condition variable until that absolute point. After serialization
+and emission, a small pipeline scheduling helper advances from the preceding
+deadline by whole configured periods to the first deadline strictly after the
+current monotonic time. Normal probe latency therefore consumes the remaining
+portion of the current period instead of accumulating into every later period.
+If a probe or system pause spans one or more complete periods, those expired
+slots are skipped; the worker never emits a catch-up burst.
+
+The helper has deterministic tests for the initial cadence, ordinary probe
+latency, exact-deadline completion, and multi-period overrun. The production
+thread retains the current zero-disabled behavior, TOML interval, serializer,
+payload, emitter lock, stop notification, and lifecycle join. Validation then
+runs the warning-clean build, full CTest suite, and a real incremental
+WebSocket stream with continuous `tegrastats` to verify cadence and required
+field coverage mechanically. No product label, speaker total, or acceptance
+decision is derived from this timing work.
+
 ## 9. Phase 7: Final Sign-Off
 
 Create one closing report containing:

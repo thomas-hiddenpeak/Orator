@@ -1,5 +1,6 @@
 #include "pipeline/auditory_stream.h"
 #include "pipeline/auditory_stream_subscriptions.h"
+#include "pipeline/periodic_deadline.h"
 
 #include "core/log.h"
 #include "core/registry.h"
@@ -531,17 +532,19 @@ void AuditoryStream::StartWorkers() {
   if (config_.gpu_telemetry_interval_sec > 0.0) {
     telemetry_stop_ = false;
     telemetry_thread_ = std::thread([this] {
-      const auto interval =
-          std::chrono::duration<double>(config_.gpu_telemetry_interval_sec);
+      const auto interval = std::chrono::ceil<PeriodicDeadline::Duration>(
+          std::chrono::duration<double>(config_.gpu_telemetry_interval_sec));
+      PeriodicDeadline schedule(PeriodicDeadline::Clock::now(), interval);
       for (;;) {
         {
           std::unique_lock<std::mutex> lk(telemetry_mutex_);
-          telemetry_cv_.wait_for(lk, interval,
-                                 [this] { return telemetry_stop_; });
+          telemetry_cv_.wait_until(lk, schedule.next(),
+                                   [this] { return telemetry_stop_; });
           if (telemetry_stop_) break;
         }
         const std::string msg = SerializeGpuTelemetry();
         if (!msg.empty()) EmitLocked(msg);
+        schedule.AdvancePast(PeriodicDeadline::Clock::now());
       }
     });
   }
