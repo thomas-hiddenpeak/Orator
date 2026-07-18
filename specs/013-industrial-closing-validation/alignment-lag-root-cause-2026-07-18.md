@@ -1,7 +1,7 @@
 # Delayed Alignment Root-Cause Record
 
 **Date:** 2026-07-18
-**Status:** Investigation complete; FR16ABN implemented and retained by frozen replay
+**Status:** Investigation complete; FR16ABN subsequently passed full promotion
 **Scope:** Source-free common-clock evidence around the `ref-0090` residual
 
 ## Governance

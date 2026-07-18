@@ -2689,11 +2689,52 @@ candidate is retained for real-WebSocket promotion; it is not yet a new
 production baseline. See
 `delayed-alignment-clause-review-2026-07-18.md`.
 
-T110 next creates a clean transitional experimental commit and runs the
-120-second and 600-second direct-end production WebSocket ladder. T111 may
-start full A/B recapture only after T110's mechanical contracts and complete
-changed-context review retain the candidate. T102 and all remaining conjunctive
-speaker gates remain open.
+At this checkpoint, T110 was defined as the clean transitional experimental
+commit plus 120-second and 600-second direct-end production WebSocket ladder;
+T111 was gated on its mechanical contracts and complete changed-context review.
+Both tasks subsequently completed in Section 8.10. T102 and all remaining
+conjunctive speaker gates remain open.
+
+### 8.10 FR16ABN full promotion seal (2026-07-18)
+
+Transitional experimental commit `6b1cb79fa4f5` passed the warning-clean build
+and all 68 CTest entries. It then completed the 120-second and 600-second
+production WebSocket ladder with direct terminal waits of `0.803 s` and
+`4.607 s`. Both artifacts reconciled every common-clock track, converged across
+producer and observers, and met the telemetry contract. Complete forward and
+reverse contextual review found no changed speaker sequence at 120 seconds and
+retained only the intended delayed-confirmation repair at 600 seconds.
+
+Full Run A started from an empty isolated registry. Full Run B restarted the
+server with Run A's registry frozen at SHA-256
+`66461a77755984a08231d06306da7ce9e1eeac07be1927e91f8a772fc54c7b3f`.
+Both streamed `3615.120` seconds at 1.0x and sent direct `end` without `flush`.
+Run A completed at `0.993x` with a `25.849 s` terminal wait. The first Run B
+artifact completed mechanically except that its runtime telemetry cadence was
+`94.965%`, below the unchanged 95 percent gate, so it is retained as an
+excluded failure artifact and received no product verdict. One controlled
+retry used the same source, binary, behavioral TOML values, audio, and frozen
+registry with new isolated storage paths. It completed at `0.993x`, reached
+the terminal timeline in `25.585 s`, and passed telemetry cadence at `95.214%`.
+
+The reviewer read all 556 contributions for Run A and the accepted Run B in
+chronological order, then reread both complete sessions in reverse fixed
+windows. Both manual passes independently establish 517 accepted and 39
+incorrect natural contributions, approximately 92.99 percent. FR16ABN repairs
+`ref-0090` on both paths while preserving the following substantive turn. The
+additional correct `ref-0192`/`ref-0194` evidence in Run A and `ref-0215` in
+Run B are run-specific outcomes and are not attributed to FR16ABN. No
+executable mechanism assigned correctness, aggregated the result, ranked the
+runs, or issued the verdict.
+
+T110 and T111 are complete. The 90 percent natural-turn and mechanical
+terminal-latency gates pass for both accepted full runs. T102 remains open for
+audible boundary, overlap, criticality, and confidence signing; consequently
+speaker-time, fixed-block, per-speaker, critical-turn, confident-wrong,
+boundary-offset, T084, and full speaker closure remain open. The telemetry loop
+also retains an engineering follow-up to schedule samples against absolute
+deadlines rather than accumulating probe latency. See
+`delayed-alignment-full-promotion-review-2026-07-18.md`.
 
 ## 9. Phase 7: Final Sign-Off
 

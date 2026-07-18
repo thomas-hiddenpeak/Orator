@@ -18,10 +18,11 @@ complete conversation around the only changed source group, in chronological
 and reverse order, while carrying forward the already completed 556-item
 baseline review.
 
-This review retains FR16ABN only as the frozen candidate for real-WebSocket
-promotion. It is not a new production-run result. T102 audible boundary review,
-speaker-time and fixed-block gates, T084, full speaker closure, and industrial
-readiness remain open.
+At this historical checkpoint, the review retained FR16ABN only as the frozen
+candidate for real-WebSocket promotion; it was not a production-run result.
+That promotion has since completed and is linked in the successor section.
+T102 audible boundary review, speaker-time and fixed-block gates, T084, full
+speaker closure, and industrial readiness remain open.
 
 ## Root cause and implementation
 
@@ -133,3 +134,11 @@ Only after their mechanical contracts and complete changed-context review pass
 may a new full A/B capture begin. Full-run promotion still requires complete
 556-contribution forward and reverse contextual review; this frozen replay does
 not substitute for it.
+
+## Successor status
+
+That promotion ladder is now complete at transitional experimental commit
+`6b1cb79fa4f5`. T110 and T111 passed their real-WebSocket and complete
+forward/reverse contextual gates. The authoritative full-run evidence is
+`delayed-alignment-full-promotion-review-2026-07-18.md`; this document remains
+the frozen-replay design and changed-context record only.

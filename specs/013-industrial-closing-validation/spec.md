@@ -1,8 +1,7 @@
 # Spec 013: Industrial Closing Validation
 
-**Status**: FR16ABN frozen A/B replay retained; real-WebSocket promotion,
-T102, T084, full canonical closure, release sign-off, and industrial readiness
-remain open
+**Status**: FR16ABN full real-WebSocket natural-turn gate passed; T102, T084,
+full canonical closure, release sign-off, and industrial readiness remain open
 **Created**: 2026-07-13
 **Scope**: Re-establish a truthful product baseline, recover full-session business
 accuracy, and define the evidence required before Orator may be declared closed.
@@ -11,15 +10,15 @@ accuracy, and define the evidence required before Orator may be declared closed.
 ## 1. Objective
 
 Orator's v2.1 speaker-business pipeline now has repeatable full-session evidence
-above 90 percent for the natural-business-turn speaker-attribution gate. Run A
-and Run B were each executed through the real WebSocket path, and all 556
-reference contributions were reconciled under complete conversational context.
-The current direct-end runs also satisfy the terminal-latency gate mechanically.
-FR16ABN is retained only as a frozen-replay candidate for the next real-path
-promotion ladder; it does not supersede those production runs. These sign two
-conjunctive gates only. Speaker-time, fixed-block, per-speaker,
-critical-turn, confident-wrong, audible-boundary, ASR, release, and independent-
-holdout gates remain open.
+above 90 percent for the natural-business-turn speaker-attribution gate. The
+FR16ABN Run A and Run B were each executed through the real WebSocket path, and
+all 556 reference contributions were reconciled under complete forward and
+reverse conversational context. Both runs manually establish 517 accepted and
+39 incorrect contributions, approximately 92.99 percent. Their direct-end runs
+also satisfy the terminal-latency gate mechanically. These sign two conjunctive
+gates only. Speaker-time, fixed-block, per-speaker, critical-turn,
+confident-wrong, audible-boundary, ASR, release, and independent-holdout gates
+remain open.
 
 This spec defines two separate claims:
 
@@ -167,15 +166,32 @@ subject to the complete acceptance gates in this spec.
     boundaries, speaker-time, fixed blocks, per-speaker review, criticality,
     confidence, and offsets remain unsigned. See
     `native-handoff-full-promotion-review-2026-07-18.md`.
-15. **FR16ABN frozen A/B replay retained; real-path promotion open**: a bounded
-    delayed-clause rule reuses existing TOML punctuation and thresholds to
+15. **FR16ABN frozen A/B replay retained; real-path promotion completed later**:
+    a bounded delayed-clause rule reuses existing TOML punctuation and
+    thresholds to
     recover one subminimum response only when activity, primary, typed VAD, and
     forced alignment form the specified A-B-A topology. The warning-clean build
     and `68/68` CTest pass. Three byte-stable replays per promoted A/B track
     change only the same short response group. Complete chronological/reverse
     context review retains that repair while preserving the following
-    substantive turn. This is a frozen candidate, not a new production-run
-    result; see `delayed-alignment-clause-review-2026-07-18.md`.
+    substantive turn. This frozen checkpoint was not a production-run result;
+    its successor promotion is recorded below. See
+    `delayed-alignment-clause-review-2026-07-18.md`.
+16. **FR16ABN full real-path natural-turn gate passed; T102/T084 open**:
+    transitional experimental commit `6b1cb79fa4f5` passed the warning-clean
+    build, `68/68` CTest, and 120-second and 600-second direct-end production
+    WebSocket promotion. Empty-registry Run A and restarted frozen-registry Run
+    B then completed the full `3615.120` seconds at `0.993x`, with direct waits
+    of `25.849 s` and `25.585 s`, exact seven-track extents, observer
+    convergence, and accepted telemetry coverage. One earlier Run B artifact
+    is explicitly excluded because runtime telemetry cadence was `94.965%`;
+    the controlled retry passed at `95.214%` without changing behavioral TOML
+    values. Complete forward/reverse contextual semantic review manually
+    records `517/556` for both accepted runs. FR16ABN repairs `ref-0090` on both
+    paths; other run-specific repairs are not attributed to that rule. Audible
+    boundaries, speaker-time, fixed blocks, per-speaker review, criticality,
+    confidence, and offsets remain unsigned. See
+    `delayed-alignment-full-promotion-review-2026-07-18.md`.
 
 ## 4. Requirements
 

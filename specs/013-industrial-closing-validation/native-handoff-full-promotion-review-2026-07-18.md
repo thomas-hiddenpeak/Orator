@@ -163,9 +163,11 @@ without changing TOML parameters or introducing a contextual regression.
 T107-T109 subsequently traced the independent forced-alignment/VAD placement
 defect around `ref-0090`, implemented FR16ABN, and retained it through frozen
 A/B replay and complete changed-context review; see
-`delayed-alignment-clause-review-2026-07-18.md`. This report remains the
-authoritative FR16ABM full production baseline until the newer candidate passes
-its own real-WebSocket promotion. In parallel, T102 still requires audible
-review and manual signing of all 556 boundaries, overlaps, criticality, and
-confidence classes before the remaining speaker-time and block gates can be
-derived. Neither task may reuse this natural-turn result as a substitute.
+`delayed-alignment-clause-review-2026-07-18.md`. FR16ABN subsequently passed its
+own real-WebSocket promotion and superseded this report as the current
+natural-turn production evidence; see
+`delayed-alignment-full-promotion-review-2026-07-18.md`. This report remains the
+FR16ABM baseline and causality record. T102 still requires audible review and
+manual signing of all 556 boundaries, overlaps, criticality, and confidence
+classes before the remaining speaker-time and block gates can be derived. That
+work may not reuse this natural-turn result as a substitute.

@@ -1,6 +1,6 @@
 # Tasks: Industrial Closing Validation
 
-**Status**: In progress - FR16ABN frozen replay retained; real-path promotion pending 2026-07-18
+**Status**: In progress - FR16ABN full natural-turn gate passed; T102/T084 remain open 2026-07-18
 
 ## Phase 0: Governance
 
@@ -1721,12 +1721,30 @@
   Complete chronological/reverse context review retains that repair and the
   following substantive turn on both paths; see
   `delayed-alignment-clause-review-2026-07-18.md`.
-- [ ] T110 Commit and push the retained FR16ABN candidate as a transitional
+- [x] T110 Commit and push the retained FR16ABN candidate as a transitional
   experiment, then pass warning-clean build, full CTest, and 120-second and
   600-second direct-end real-WebSocket promotion with unchanged TOML values.
   Verify only mechanical contracts by code and manually review every changed
-  conversational context before retention.
-- [ ] T111 If T110 is retained, recapture full empty-registry Run A and
+  conversational context before retention. Commit `6b1cb79fa4f5` is pushed on
+  `master`; its build is warning-clean and `68/68` CTest pass. The 120-second
+  and 600-second runs passed all mechanical contracts with direct waits of
+  `0.803 s` and `4.607 s`. Complete forward/reverse contextual review found no
+  changed sequence at 120 seconds and retained only the intended `ref-0090`
+  repair at 600 seconds.
+- [x] T111 If T110 is retained, recapture full empty-registry Run A and
   restarted frozen-registry Run B through the production WebSocket path. Read
   all 556 contributions chronologically and in reverse fixed windows for each
-  run before manually deriving any result or advancing the baseline.
+  run before manually deriving any result or advancing the baseline. Run A and
+  the accepted Run B retry completed all `3615.120` seconds at `0.993x`, with
+  direct waits of `25.849 s` and `25.585 s`, exact common-clock extents,
+  observer convergence, and accepted telemetry coverage. Complete forward and
+  reverse review manually establishes `517/556` for both runs. The first Run B
+  artifact is preserved but excluded because runtime telemetry cadence was
+  `94.965%`; the controlled retry passed at `95.214%` with unchanged behavioral
+  values. See `delayed-alignment-full-promotion-review-2026-07-18.md`.
+- [ ] T112 Replace relative-delay GPU telemetry sampling with monotonic
+  absolute-deadline scheduling so probe latency cannot accumulate into cadence
+  loss. Preserve the TOML interval and telemetry payload, add focused timing
+  coverage, and verify the mechanical cadence contract through the real
+  WebSocket path. This task does not evaluate speaker correctness or reopen the
+  accepted T111 contextual result.

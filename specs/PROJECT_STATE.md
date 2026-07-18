@@ -14,22 +14,22 @@ work is specified under [specs/](.).
 > pass is the consistency proof. Status lines advance to `Implemented` in the
 > same change that lands the code, with the commit reference.
 
-- **Last updated**: 2026-07-18 (FR16ABN frozen replay checkpoint)
+- **Last updated**: 2026-07-18 (FR16ABN full promotion checkpoint)
 - **Branch**: `master`
 - **Constitution**: v1.7.0
 - **Speaker-business closure**: **NATURAL-TURN GATE PASSED; FULL CANONICAL
-  CLOSURE OPEN**. Clean commit `1a475e6b7473` completed 120-second,
-  600-second, and full-length FR16ABM real-WebSocket promotion. Full Run A used
-  an empty registry and Run B restarted with Run A's registry frozen. All 556
-  contributions in each run were reconciled under complete forward and reverse
-  conversational context. Run A is `514/556` (about 92.45 percent) and Run B
-  is `515/556` (about 92.63 percent). Direct terminal waits of `26.503 s` and
-  `26.185 s` sign the latency gate mechanically. Speaker-time, fixed-block,
-  per-speaker, critical-turn, confidence, and audible-boundary gates remain
-  unsigned, so T102, T084, and Spec 013 remain open. FR16ABN is retained only
-  as a frozen-replay candidate for the next real-WebSocket promotion; it does
-  not supersede these production results. ASR and independent holdout are not
-  implied.
+  CLOSURE OPEN**. Transitional experimental commit `6b1cb79fa4f5` completed
+  warning-clean build, `68/68` CTest, 120-second, 600-second, and full-length
+  FR16ABN real-WebSocket promotion. Full Run A used an empty registry and the
+  accepted Run B restarted with Run A's registry frozen. All 556 contributions
+  in each run were reconciled under complete forward and reverse conversational
+  context. Both runs are `517/556` (about 92.99 percent). Direct terminal waits
+  of `25.849 s` and `25.585 s` sign the latency gate mechanically. The first
+  Run B attempt is retained but excluded because runtime telemetry cadence was
+  `94.965%`; one controlled retry passed at `95.214%` without a behavioral
+  parameter change. Speaker-time, fixed-block, per-speaker, critical-turn,
+  confidence, and audible-boundary gates remain unsigned, so T102, T084, and
+  Spec 013 remain open. ASR and independent holdout are not implied.
 - **Result-evaluation rule**: product accuracy and candidate decisions may be
   produced only by complete item-by-item contextual semantic review. No code,
   test, script, notebook, formula, query, automated metric, or algorithm may
@@ -322,6 +322,22 @@ candidate advances to the 120/600-second real-WebSocket ladder but is not yet a
 new production baseline. T102, T084, and full closure remain open. See
 [delayed-alignment-clause-review-2026-07-18.md](013-industrial-closing-validation/delayed-alignment-clause-review-2026-07-18.md).
 
+**Delayed-alignment full promotion checkpoint (2026-07-18)**: clean
+transitional experimental commit `6b1cb79fa4f5` passed the warning-clean build,
+`68/68` CTest, and 120/600-second real-WebSocket promotion with direct terminal
+waits of `0.803/4.607 s`. Empty-registry Run A and restarted frozen-registry
+Run B then completed all `3615.120` seconds at `0.993x`. The accepted artifacts
+have direct waits of `25.849/25.585 s`, exact seven-track common-clock extents,
+observer convergence, and required telemetry coverage. The first Run B attempt
+is preserved as an excluded mechanical failure because its runtime telemetry
+cadence was `94.965%`; a single controlled retry with unchanged behavioral
+TOML values passed at `95.214%`. Complete forward and reverse contextual review
+of all 556 contributions manually records `517/556` for each accepted run.
+FR16ABN repairs `ref-0090` on both paths without a contextual regression or
+long-range identity drift. T110 and T111 are complete. T102, T084, and full
+closure remain open; telemetry cadence scheduling is tracked separately. See
+[delayed-alignment-full-promotion-review-2026-07-18.md](013-industrial-closing-validation/delayed-alignment-full-promotion-review-2026-07-18.md).
+
 ## 3. Component status
 
 | Component | Status | Notes |
@@ -339,7 +355,7 @@ new production baseline. T102, T084, and full closure remain open. See
 | Revisable comprehensive timeline (Spec 004) | Full natural-turn speaker gate passed; closure open | `ComprehensiveTimeline` stores typed diarization, ASR, VAD, alignment, voiceprint, and business tracks and publishes immutable snapshots/typed updates. `BusinessSpeakerPipeline` consumes typed `SpeakerEvidenceStage` output and owns orchestration/publication; the internal `SpeakerFusionPolicy` owns rule execution. Current-source full Run A and Run B pass the complete contextual natural-turn speaker gate. Other Spec 013 speaker gates, ASR, and independent holdout remain open. |
 | Reusable common time base (Spec 004) | Session ownership and final reconciliation implemented; acceptance open | `AuditoryStream` owns one immutable `TimeBase` and injects it into every active private cache, worker, and retained audio store. Finalization reconciles exact sample extents for input, diarization, speaker identity, ASR, VAD, alignment, and business speaker; focused tests and the 2026-07-13 120 s real-WebSocket run reported zero gaps. Full-session repeatability remains open under Spec 013. |
 | Pipeline protocol layer (Spec 004) | ✅ Implemented | Phases 7–12 complete: data types (topic.h, schema.h), pipeline registry, topic router, storage layer (MEMORY + DISK), ProtocolTimeline integration, WS v2 envelope with describe command, --storage-disk-path flag. 25/25 tests pass. |
-| Streaming validation | Full direct-end A/B latency gate passed mechanically | `ws_unified_test.py` has one socket reader, captures source/config/binary pre/post hashes, continuous `tegrastats`, runtime telemetry, and independent terminal-command timing. Acceptance mode sends `end` directly after the final audio frame; explicit `--test-flush` runs record `flush -> end` but are marked ineligible for the 30-second gate. FR26 moves acoustic-only speaker evidence into bounded background precompute and retains mature-gallery final rescoring. Clean FR16ABM commit `1a475e6b7473` passed 120/600-second promotion and completed full A/B direct-end waits at `26.503/26.185 s`, with exact common-clock extents, observer convergence, and required telemetry coverage. Structural checks never evaluate correctness or issue a product verdict. |
+| Streaming validation | Full direct-end A/B latency gate passed mechanically | `ws_unified_test.py` has one socket reader, captures source/config/binary pre/post hashes, continuous `tegrastats`, runtime telemetry, and independent terminal-command timing. Acceptance mode sends `end` directly after the final audio frame; explicit `--test-flush` runs record `flush -> end` but are marked ineligible for the 30-second gate. FR26 moves acoustic-only speaker evidence into bounded background precompute and retains mature-gallery final rescoring. Transitional FR16ABN commit `6b1cb79fa4f5` passed 120/600-second promotion and completed accepted full A/B direct-end waits at `25.849/25.585 s`, with exact common-clock extents, observer convergence, and required telemetry coverage. The first Run B attempt remains an excluded `94.965%` telemetry-cadence failure. Structural checks never evaluate correctness or issue a product verdict. |
 | Logging system | ✅ Include-level `core/log.h` | Level-based macros (`LOG_DEBUG`/`INFO`/`WARN`/`ERROR`) with compile-time floor (`ORATOR_LOG_LEVEL`) and runtime env-var gate. All 14 `fprintf(stderr)` calls in src/ replaced. |
 | CUDA kernel unit tests | ✅ `test_kernels`: 13/13 passed | GPU kernel operations (Add, Multiply, NormalizeVector, CosineSimilarity, BatchCosineSimilarity) validated against CPU reference; includes edge cases (zero, single-element, large 1M vectors). |
 | CI pipeline | ✅ GitHub Actions | `.github/workflows/ci.yml`: CUDA 12.5, CMake build + ctest + warning check + Python syntax verification. Triggered on push/PR to master. |
@@ -347,7 +363,7 @@ new production baseline. T102, T084, and full closure remain open. See
 | Diar tail parameter experiments | ❌ No accepted fix | 2026-07-10 TOML experiments used `diar_evidence_probe` on full `test.mp3` for strict onset/offset, `min_dur_on=1.2`, `min_dur_on=2.0`, `chunk_left_context=2`, `chunk_right_context=0`, and `left2_right0`. Threshold/min-duration changes deleted evidence without recovering the correct speaker; context variants did not solve 3270-3304 s and some removed the small local-2 hint at 3299.76 s. NeMo full-length reference on the same audio produced the same hard-window spk3 bias (`3270-3304.5`: spk3 313/431 frames; `3240-3360`: spk3 1013/1500 frames). The historical v2 numerical gate passed at that time; its checkpoint and CTest have since been removed. See Spec 012 `diar-tail-toml-experiments-2026-07-10.md`. |
 | TitaNet tail voiceprint review | ❌ No accepted override | 2026-07-10 orthogonal speaker-embedding review used `speaker_embedding_probe` on full `test.mp3` with 600 s, 60 s, and 30 s buckets. The hard-window `L3@3270-3300` bucket remains closest to historical L3 (`L3@3300-3330=0.762`, historical L3 up to 0.724) while best non-L3 alternatives are lower (`L0=0.440`, `L1=0.424`, `L2=0.321`). This rejects direct TitaNet override for 3270-3304 s. See Spec 012 `titanet-tail-evidence-2026-07-10.md`. |
 | OnText protocol matching | ✅ Fixed | Substring `text.find("end")` → JSON key `text.find("\"end\"")` to prevent false positives on partial matches. Same for reset/flush. |
-| GPU telemetry | Runtime/UI and full A/B verified | Compile-time default remains disabled; committed `orator.toml` enables 1 s samples. Runtime emits GPU utilization with source, CUDA unified-memory use, frequency, `VIN` system power, and rails; the client combines these with `tegrastats` CPU/RAM/temperature. Current full Run A and Run B each had 100 percent required-field coverage and above-95-percent cadence; the Web UI displayed GPU, VRAM, and power on desktop and 390-pixel mobile Chromium. |
+| GPU telemetry | Runtime/UI and accepted full A/B verified; cadence scheduling follow-up open | Compile-time default remains disabled; committed `orator.toml` enables 1 s samples. Runtime emits GPU utilization with source, CUDA unified-memory use, frequency, `VIN` system power, and rails; the client combines these with `tegrastats` CPU/RAM/temperature. Accepted FR16ABN Run A and Run B had 100 percent required-field coverage and `95.104%/95.214%` runtime cadence; the Web UI displayed GPU, VRAM, and power on desktop and 390-pixel mobile Chromium. A first Run B attempt failed at `94.965%` because relative waiting plus probe latency can accumulate. T112 tracks absolute-deadline sampling without changing the configured interval. |
 | VAD model path | ✅ Migrated | `models/asr/silero_vad.safetensors` → `models/vad/`. Updated 6 file references across test, include, and tools. |
 | Web UI (Spec 006) | Contract-hardened; graphical timeline and final acceptance open | Static serving, modular state/router, exact PCM file framing, microphone capture, live transcript/evidence, telemetry, developer status, speaker naming, saved sessions, reconnect, authoritative terminal/load rebuild, and exact JSON export are implemented. Node tests and a real Chromium run verify the short path. The main timeline is currently formatted JSON, not the previously documented four-lane Canvas; graphical time-axis controls, physical microphone evidence, and Firefox/Safari evidence remain open. |
 | Configuration consistency | ✅ Typed runtime boundary and resolved capture | Startup applies defaults, TOML, environment, then CLI. Only `ws_main.cc` reads `ORATOR_*` and resolves them into `AuditoryStream::Config`; model, GPU, and transport layers receive typed values. Legacy GEMM A/B environment switches were removed. Every terminal timeline includes the complete canonical `resolved_config`, and `ws_unified_test.py` writes its SHA-256 into a sibling run manifest. |
@@ -497,22 +513,22 @@ Findings:
 - [specs/011-observability/spec.md](011-observability/spec.md) — **Implemented** (2026-06-30): offline [rerun](https://rerun.io) visualization, kept entirely in `tools/` (no runtime third-party dep, Art. I). **Phase 1**: `tools/verify/py/ws_unified_test.py` captures the runtime's periodic `gpu_telemetry`/cursor WS samples into a `telemetry` array; `tools/observability/timeline_to_rerun.py` keys diarization/comprehensive lanes by the global `speaker_id` (`spk_N`) + per-pipeline RTF lanes. **Phase 2 (comprehensive dashboard)**: `TegraSampler` records a continuous `device_series`; the exporter renders six namespaced dimensions on one `audio_time` axis — `pipelines/*`, `comprehensive/<id>` swimlanes, `scheduler/<pipe>/{rtf,compute_sec,active,cuda_priority}`, `cursors/<pipe>/{position_sec,pending_sec}`, `device/{mem,cpu,gpu,temp,power}/*` (extended tegrastats parse; Orin `GR3D_FREQ` optional, omitted on Thor), and `session/summary` — laid out by a `rerun.blueprint` persisted in the `.rrd`. Methodology + best practices in `tools/observability/README.md`. **Config fix**: nested `[telemetry.cursor]` was never read (`config["telemetry.cursor"]` literal-key lookup) → now `config["telemetry"]["cursor"]`, with a `test_config` regression. Validated on a `rate=1` 120 s run: 125 gpu + 125 cursor + 126 device samples, six dimensions populated, stream_rt 0.964×, ctest 47/47, zero warnings. Follow-ups: live WS→rerun consumer, full-hour acceptance recording.
 - [specs/010-speaker-id/spec.md](010-speaker-id/spec.md) — **Implemented, with Phase H experiment not accepted as accuracy fix; local-diar operating profile restored**: speaker identity (TitaNet-Large voiceprint enrollment / re-identification as a post-diarization stage inside the diar pipeline, Art. III). **Phase A complete & committed**: A1 acquire+convert weights → `models/speaker/titanet_large.safetensors` (108 tensors); A2 NeMo oracle (`tools/reference/titanet_oracle.py`, isolated `tools/.venv-nemo`); A3 pure C++/CUDA `model::TitaNetEmbedder` (`include/model/titanet_embedder.h` + `src/model/titanet_embedder.cu`, time-major [T,C]: mel+per_feature → 5-block ContextNet encoder → attentive statistics pooling → 192-d, F32 weights); A4 `test_titanet` validated vs NeMo oracle (**span cosine 1.000000/0.999999/1.000000, cross-span matrix to 4 decimals; ctest 46/46, no warnings**). **Phase B complete & committed**: `pipeline::SpeakerIdentityStage` (clean-segment gate + per-local embed/match/enroll via `SpeakerDatabase` + revisable local→global map), wired into the diar pipeline behind a `DiarizationWorker` segment-processor hook + `[speaker]` config; diar message/track expose a backward-compatible `speaker_id` field. **2026-07-06 validation**: Phase H conservative cross-session candidate (`/tmp/orator_phaseh_full.json`) was rejected by context review [local-diar-review-2026-07-06.md](010-speaker-id/local-diar-review-2026-07-06.md): it reduced wrong late globals into local-only gaps but did not restore attribution. Follow-up restored Sortformer local-diar runtime tuning to the async/no-reset profile (`spkcache_update_period=188`, `chunk_right_context=1`, `spkcache_sil_frames=3`) in `orator.toml`; lower-level `SortformerConfig` defaults remain tied to the existing NeMo oracle fixture. Full-length real WS `/tmp/orator_full_async_default_20260706.json`: 3615 s audio, 3618.487 s wall, stream RT 0.999x, diar 773, ASR 288, VAD 972, 3611 tegrastats samples, stable 4 global ids and no local-only gaps; context review [local-diar-default-188-review-2026-07-06.md](010-speaker-id/local-diar-default-188-review-2026-07-06.md) accepts the stable operating profile but records residual rapid-turn fragmentation in 3000-3615 s and an ASR repeat burst at 1927-1944 s.
 - [specs/012-evidence-fusion-timeline/spec.md](012-evidence-fusion-timeline/spec.md) — **Runtime candidate validated (2026-07-08); tail evidence reviewed and support diagnostics added (2026-07-09)**: evidence-first comprehensive timeline fusion plus TOML-gated runtime adoption. `tools/verify/py/fusion_audit.py` and `speaker_business_review_packet.py` read frozen `ws_unified_test.py` JSON packages, audit ASR/diar/VAD/align consistency, and emit candidate/business-turn views without mutating captured tracks. After the 2026-07-07 context review showed forced alignment alone did not recover speaker-business accuracy, 2026-07-08 fixes added local-speaker drift/competing-identity split and backfill, per-entry comprehensive `speaker_id`, and `[timeline]` align-run split parameters. Full-length real WS run `/tmp/orator_timelinefusion_full_20260708.json`: 3615.0 s audio, 3618.74 s wall, stream RT 0.999x, diar 773, ASR 288, align 288/288. Fusion audit `/tmp/orator_timelinefusion_full_20260708_fusion_bt_timeline.json`: business_turns=728, unknown 171.860 s (4.75%), no mechanical audit issues. Complete contextual review [drift-epoch-review-2026-07-08.md](012-evidence-fusion-timeline/drift-epoch-review-2026-07-08.md) follows [speaker-business-method.md](012-evidence-fusion-timeline/speaker-business-method.md). Follow-up candidate decisions are historical context-review records. All code-derived percentages and evidence scores in Spec 012 are mechanical records only; they may not evaluate accuracy, rank/select a candidate, or issue a product verdict under Constitution 1.7.0.
-- [specs/013-industrial-closing-validation/spec.md](013-industrial-closing-validation/spec.md) - **FR16ABN frozen replay retained; real-path promotion and T102/T084 remain open**: FR16ABM clean commit `1a475e6b7473` remains the full production baseline after passing the warning-clean build, `68/68` CTest, 120/600-second promotion, full direct-end A/B recapture, and complete 556-contribution forward/reverse contextual review at 514/556 and 515/556. FR16ABN then passed the warning-clean build, `68/68` CTest, three deterministic replays per promoted A/B track, and complete review of its sole changed context. It is retained only for the next real-WebSocket promotion ladder. Audible speaker-ledger, ASR, browser/microphone, holdout, report-review, and release-tag gates remain open.
+- [specs/013-industrial-closing-validation/spec.md](013-industrial-closing-validation/spec.md) - **FR16ABN full natural-turn gate passed; T102/T084 remain open**: transitional experimental commit `6b1cb79fa4f5` passed the warning-clean build, `68/68` CTest, 120/600-second promotion, and full direct-end A/B recapture. Complete 556-contribution forward/reverse contextual review manually records `517/556` for both accepted runs. The first Run B attempt is retained as an excluded telemetry-cadence failure; its controlled retry passed without a behavioral parameter change. Audible speaker-ledger, ASR, browser/microphone, holdout, report-review, and release-tag gates remain open.
 
 ## 7. Immediate next step
 
 Keep the streaming v2.1 `340/1/188/188` profile and all TOML values fixed. T110
-is immediate: commit and push FR16ABN as a transitional experiment, then run
-the 120-second and 600-second direct-end production WebSocket ladder and read
-every changed conversational context before retention. T111 may start a new
-full A/B capture only after that gate passes. Independently, manually sign all
-556 audible boundaries, overlaps, criticality, and confidence classes and
-complete the speaker-time, fixed-block, per-speaker, critical-turn,
-confident-wrong, and boundary-offset reviews. T084 closes only after both A and
-B independently pass every applicable gate. ASR,
-browser/microphone, locked holdout, final-report review, and release signing
-remain later workstreams. The bullets below are historical implementation and
-measurement records unless explicitly marked as current acceptance evidence.
+and T111 are complete. T102 is now the product-evaluation priority: manually
+listen to and sign all 556 audible boundaries, overlaps, criticality, and
+confidence classes, then complete the speaker-time, fixed-block, per-speaker,
+critical-turn, confident-wrong, and boundary-offset reviews. In parallel, T112
+must change telemetry sampling to monotonic absolute deadlines so probe latency
+cannot accumulate into cadence loss; the configured interval and payload stay
+unchanged. T084 closes only after both A and B independently pass every
+applicable gate. ASR, browser/microphone, locked holdout, final-report review,
+and release signing remain later workstreams. The bullets below are historical
+implementation and measurement records unless explicitly marked as current
+acceptance evidence.
 
 - **Spec 012 speaker-business recovery — historical evidence line** (2026-07-09).
   The latest runtime candidate fixes the known full-length regression windows by
