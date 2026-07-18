@@ -1861,16 +1861,38 @@
   and silence-only tests before implementation is considered complete. The
   warning/error scan is empty and all `69/69` CTest entries pass; real-stream
   promotion remains T125/T126.
-- [ ] T125 Pass warning-clean build, VAD oracle, all CTest entries, three
+- [x] T125 Pass warning-clean build, VAD oracle, all CTest entries, three
   independent blank-audio real-WebSocket checks, and two independent
   120-second real-WebSocket captures from one clean corrected commit. Compare
   typed tracks mechanically and review every in-scope contribution forward and
-  reverse against `test.txt`; automation may not assign correctness.
-- [ ] T126 Run a new clean 600-second real-WebSocket gate with direct `end`,
+  reverse against `test.txt`; automation may not assign correctness. Commit
+  `7579bc25411c` passes the build and all `69/69` CTest entries. All three
+  silence runs contain zero product records. The two 120-second runs are
+  byte-identical across all seven tracks, and complete forward/reverse review
+  finds no new natural-turn regression.
+- [x] T126 Run a new clean 600-second real-WebSocket gate with direct `end`,
   telemetry, isolated registry, and checked-in behavioral TOML. Review every
   in-scope contribution chronologically and in reverse, explicitly confirming
-  the `ref-0037` and `ref-0073` contexts before permitting a full capture.
-- [ ] T123 If T126 passes, run independent full-length empty-registry Run A and
+  the `ref-0037` and `ref-0073` contexts before permitting a full capture. The
+  mechanical run passes, and complete review of all 93 contributions confirms
+  that `ref-0037` is substantively restored. Promotion is rejected because
+  `ref-0073` remains split Tang/Shi/Tang instead of Shi Yi's complete response.
+- [x] T127 Specify and implement FR29 without changing TOML or producer tracks.
+  Add focused base-projection and fusion-policy positive/abstention tests, pass
+  warning-clean build and all CTest entries, export the T126 typed evidence,
+  and replay it at least twice. Automation may report only structural changes;
+  read every changed context chronologically and in reverse against `test.txt`
+  before retaining or rejecting the correction. Three frozen replays are
+  byte-identical. Complete chronological/reverse review retains the restored
+  `ref-0073` response and confirms that the following Tang Yunfeng contribution
+  remains separate; all `69/69` CTest entries pass. See
+  `cross-view-handoff-review-2026-07-18.md`.
+- [ ] T128 If T127 is retained, commit and push the transitional experiment,
+  repeat two independent 120-second production WebSocket runs, and run one new
+  clean 600-second direct-end gate. Verify mechanical contracts by automation
+  and review every in-scope `test.txt` contribution chronologically and in
+  reverse before any full capture.
+- [ ] T123 If T128 passes, run independent full-length empty-registry Run A and
   restarted frozen-registry Run B from the same clean commit. Freeze complete
   manifests and typed tracks, mechanically verify time-base, transport,
   telemetry, terminal-latency, and repeatability contracts, then manually read

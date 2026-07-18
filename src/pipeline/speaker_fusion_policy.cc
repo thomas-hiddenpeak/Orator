@@ -325,6 +325,72 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
     }
     return CoveredDuration(MergeIntervals(std::move(intervals)));
   };
+  const auto corroborated_handoffs =
+      pipeline.FindCorroboratedStraddledHandoffs(text);
+  auto preserves_corroborated_handoff = [&](const auto& item,
+                                            const std::string& selected) {
+    if (item.kind != "business_interval" || corroborated_handoffs.empty()) {
+      return false;
+    }
+
+    struct BaseRun {
+      std::string speaker_id;
+      int source_start = 0;
+      int source_end = 0;
+    };
+    std::vector<BaseRun> runs;
+    for (int index = item.source_start; index < item.source_end; ++index) {
+      const std::string& speaker_id = labels[index].base_speaker_id;
+      if (speaker_id.empty()) return false;
+      if (runs.empty() || runs.back().speaker_id != speaker_id) {
+        runs.push_back({speaker_id, index, index + 1});
+      } else {
+        runs.back().source_end = index + 1;
+      }
+    }
+    if (runs.size() != 2 || runs[0].speaker_id == runs[1].speaker_id ||
+        selected != runs[1].speaker_id) {
+      return false;
+    }
+
+    const auto handoff = std::find_if(
+        corroborated_handoffs.begin(), corroborated_handoffs.end(),
+        [&](const auto& candidate) {
+          return candidate.boundary > item.start + 1e-9 &&
+                 candidate.boundary < item.end - 1e-9 &&
+                 candidate.preceding_speaker_id == runs[0].speaker_id &&
+                 candidate.following_speaker_id == runs[1].speaker_id;
+        });
+    if (handoff == corroborated_handoffs.end()) return false;
+
+    std::vector<std::pair<double, double>> aligned_intervals;
+    for (int index = runs[0].source_start; index < runs[0].source_end;
+         ++index) {
+      if (character_times[index].available) {
+        aligned_intervals.push_back(
+            {character_times[index].start, character_times[index].end});
+      }
+    }
+    aligned_intervals = MergeIntervals(std::move(aligned_intervals));
+    const double minimum =
+        pipeline.config_.voiceprint_primary_consensus_min_sec;
+    if (CoveredDuration(aligned_intervals) + 1e-9 < minimum) return false;
+
+    auto aligned_coverage = [&](const std::vector<SpeakerSeg>& track) {
+      std::vector<std::pair<double, double>> intersections;
+      for (const auto& interval : aligned_intervals) {
+        for (const auto& segment : track) {
+          if (segment.speaker_id != runs[0].speaker_id) continue;
+          const double start = std::max(interval.first, segment.start);
+          const double end = std::min(interval.second, segment.end);
+          if (end > start) intersections.push_back({start, end});
+        }
+      }
+      return CoveredDuration(MergeIntervals(std::move(intersections)));
+    };
+    return aligned_coverage(pipeline.speakers_) + 1e-9 >= minimum &&
+           aligned_coverage(pipeline.primary_speakers_) + 1e-9 >= minimum;
+  };
   auto local_coverage = [&](double start, double end,
                             const std::string& local_speaker) {
     std::vector<std::pair<double, double>> intervals;
@@ -3132,7 +3198,13 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
               ? "voiceprint_direct_short"
               : "voiceprint_direct_regular";
       const std::string label = speaker_label(session->speaker_id);
+      const bool preserve_handoff =
+          preserves_corroborated_handoff(*item, session->speaker_id);
       for (int index = item->source_start; index < item->source_end; ++index) {
+        if (preserve_handoff &&
+            labels[index].base_speaker_id != session->speaker_id) {
+          continue;
+        }
         const bool conflicts_with_primary =
             labels[index].reason.rfind("primary_speaker_", 0) == 0 &&
             !labels[index].speaker_id.empty() &&

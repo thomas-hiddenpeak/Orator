@@ -2924,6 +2924,64 @@ for both outcomes. The corrected candidate must repeat engineering, silence,
 120-second determinism, and complete 600-second contextual gates before any
 full capture.
 
+### 8.17 Corrected 600-second result and cross-view handoff projection
+
+Clean commit `7579bc25411c` passes a warning-clean build and all 69 CTest
+entries. Three independent 30-second silence WebSocket runs emit no ASR,
+alignment, diarization, VAD, voiceprint, or business records. Two independent
+120-second runs are byte-identical across all seven product tracks, and complete
+chronological and reverse review of the 18 in-scope `test.txt` contributions
+finds no new natural-turn regression. The clean 600-second run passes direct
+end, observer convergence, telemetry, and common-clock contracts. Complete
+chronological and reverse review of all 93 in-scope contributions restores the
+recognizable `ref-0037` sentence to Tang Yunfeng but still rejects promotion at
+`ref-0073`: only the middle of Shi Yi's response is retained as Shi Yi, while
+its onset and `45` remain Tang Yunfeng.
+
+The frozen raw tracks isolate the remaining failure to projection. Sortformer
+activity and primary top-1 both expose Shi Yi before `496.88 s` and Tang
+Yunfeng after it. The current forced alignment extends one character from
+`495.868 s` through `497.148 s`, crossing that handoff and collapsing the next
+characters onto its endpoint. The base projector consequently groups the
+preceding phrase with the following Tang run. A containing TitaNet business
+interval then measures both speakers together and writes the longer Tang
+identity across the complete source range. The accepted T111 alignment places
+the same substantive phrase before the handoff, confirming that the raw native
+boundary remains useful while the current unit end is not a reliable text-run
+boundary.
+
+FR29 corrects only this generic projection failure. The base projector derives
+a corroborated handoff onset from matching activity and primary transitions.
+It uses that onset only when one aligned unit longer than the existing pause
+threshold straddles it, ending the preceding source run after that unit. The
+fusion policy then treats the two immutable base identities as separate write
+domains: a containing business-interval majority may update its matching run
+but may not erase the other run when both native views corroborate at least the
+existing minimum aligned duration. Focused tests cover the positive topology
+and one-view, identity-disagreement, short-following-run, normal-unit,
+insufficient-native-coverage, and source-order abstentions.
+
+The current T126 typed tracks are exported with source hashes and replayed at
+least twice through the production C++ projector. Automation verifies only
+parseability, source reconstruction, deterministic bytes, and the set of
+changed contexts. Every changed conversational context is read completely in
+chronological and reverse order against `test.txt`. A rejected projection is
+removed before any audio rerun. A retained projection must then pass a clean
+build, all CTest entries, repeated 120-second production WebSocket determinism,
+and a new complete 600-second chronological/reverse contextual gate before
+T123 may begin. No behavioral value is added or changed in TOML.
+
+T127 completes that frozen gate. Three production-projector replays are
+byte-identical and expose one speaker-sequence change spanning `ref-0073` and
+its boundary with `ref-0074`; three other displayed rows retain their speaker
+sequence. Complete forward and reverse reading of `ref-0067` through
+`ref-0082`, plus the unchanged `ref-0018` through `ref-0023` context, retains
+the candidate: Shi Yi owns the substantive response through `对，四十五。`,
+and Tang Yunfeng begins the following clause. The warning-clean build and all
+69 CTest entries pass. T128 now owns the two 120-second captures and the new
+600-second complete contextual gate; see
+`cross-view-handoff-review-2026-07-18.md`.
+
 ### 8.15 FR28 120-second outcome and promotion ladder
 
 T117-T121 are complete. The frozen T116 packages replay byte-stably; their

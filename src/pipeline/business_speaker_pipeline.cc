@@ -26,7 +26,9 @@ using business_speaker_internal::Utf8Offsets;
 std::optional<std::vector<std::string>> SliceSourceTextByAlignedUnits(
     const std::string& source,
     const std::vector<ComprehensiveTimeline::AlignUnitSeg>& units,
-    const std::vector<std::size_t>& unit_turns, std::size_t turn_count) {
+    const std::vector<std::size_t>& unit_turns, std::size_t turn_count,
+    const std::vector<double>& straddled_handoff_bounds,
+    const std::string& punctuation) {
   if (units.empty() || units.size() != unit_turns.size() || turn_count == 0) {
     return std::nullopt;
   }
@@ -51,12 +53,59 @@ std::optional<std::vector<std::string>> SliceSourceTextByAlignedUnits(
     source_matches.push_back({match_start, match_end});
   }
 
+  auto closes_at_one_punctuation = [&](std::size_t start, std::size_t end) {
+    if (start >= end || punctuation.empty()) return false;
+    const auto punctuation_offsets = Utf8Offsets(punctuation);
+    std::set<std::string> configured;
+    for (std::size_t i = 0; i + 1 < punctuation_offsets.size(); ++i) {
+      configured.insert(punctuation.substr(
+          punctuation_offsets[i],
+          punctuation_offsets[i + 1] - punctuation_offsets[i]));
+    }
+    const std::string gap = source.substr(start, end - start);
+    const auto gap_offsets = Utf8Offsets(gap);
+    int punctuation_count = 0;
+    for (std::size_t i = 0; i + 1 < gap_offsets.size(); ++i) {
+      const std::string codepoint = gap.substr(
+          gap_offsets[i], gap_offsets[i + 1] - gap_offsets[i]);
+      if (codepoint == " " || codepoint == "\t" || codepoint == "\n" ||
+          codepoint == "\r") {
+        continue;
+      }
+      if (configured.count(codepoint) == 0) return false;
+      ++punctuation_count;
+    }
+    return punctuation_count == 1;
+  };
+  auto previous_unit_straddles_handoff = [&](std::size_t index) {
+    const auto& previous = units[index - 1];
+    return std::any_of(
+        straddled_handoff_bounds.begin(), straddled_handoff_bounds.end(),
+        [&](double boundary) {
+          return previous.start < boundary - 1e-9 &&
+                 previous.end > boundary + 1e-9;
+        });
+  };
+  std::vector<std::size_t> adjusted_turns = unit_turns;
+  for (std::size_t i = 1; i + 1 < units.size(); ++i) {
+    if (!NearEqual(units[i].start, units[i].end) ||
+        !NearEqual(units[i].start, units[i - 1].end) ||
+        unit_turns[i - 1] >= unit_turns[i] ||
+        unit_turns[i + 1] != unit_turns[i] ||
+        !previous_unit_straddles_handoff(i) ||
+        !closes_at_one_punctuation(source_matches[i].second,
+                                   source_matches[i + 1].first)) {
+      continue;
+    }
+    adjusted_turns[i] = unit_turns[i - 1];
+  }
+
   std::vector<std::string> slices(turn_count);
-  std::size_t current_turn = unit_turns.front();
+  std::size_t current_turn = adjusted_turns.front();
   if (current_turn >= turn_count) return std::nullopt;
   std::size_t slice_start = 0;
   for (std::size_t i = 1; i < units.size(); ++i) {
-    const std::size_t next_turn = unit_turns[i];
+    const std::size_t next_turn = adjusted_turns[i];
     if (next_turn >= turn_count || next_turn < current_turn) {
       return std::nullopt;
     }
@@ -786,6 +835,130 @@ void BusinessSpeakerPipeline::MergeEntrySupport(Entry* destination,
   destination->speaker_uncertain = destination->speaker_support != "strong";
 }
 
+std::vector<BusinessSpeakerPipeline::CorroboratedHandoff>
+BusinessSpeakerPipeline::FindCorroboratedStraddledHandoffs(
+    const TextSeg& text) const {
+  std::vector<CorroboratedHandoff> handoffs;
+  const auto alignment = align_.find(text.id);
+  const double tolerance = config_.align_boundary_split_tolerance_sec;
+  const double minimum_run = config_.voiceprint_primary_consensus_min_sec;
+  const double minimum_unit = config_.align_snap_pause_sec;
+  if (alignment == align_.end() || tolerance <= 0.0 || minimum_run <= 0.0 ||
+      minimum_unit <= 0.0) {
+    return handoffs;
+  }
+
+  auto nearest_preceding = [](const std::vector<SpeakerSeg>& track,
+                              double boundary,
+                              const std::string& following_id) {
+    const SpeakerSeg* result = nullptr;
+    for (const auto& segment : track) {
+      if (segment.speaker_id.empty() ||
+          segment.speaker_id == following_id ||
+          segment.end > boundary + 1e-9) {
+        continue;
+      }
+      if (result == nullptr || segment.end > result->end + 1e-9) {
+        result = &segment;
+      } else if (NearEqual(segment.end, result->end) &&
+                 segment.speaker_id != result->speaker_id) {
+        return static_cast<const SpeakerSeg*>(nullptr);
+      }
+    }
+    return result;
+  };
+  auto following_uncontested = [&](const std::vector<SpeakerSeg>& track,
+                                    double boundary,
+                                    const std::string& following_id) {
+    const double protected_end = boundary + minimum_run;
+    return std::none_of(track.begin(), track.end(), [&](const auto& segment) {
+      return !segment.speaker_id.empty() &&
+             segment.speaker_id != following_id &&
+             Overlap(boundary, protected_end, segment.start, segment.end) >
+                 1e-9;
+    });
+  };
+  auto alignment_straddles = [&](double boundary) {
+    return std::any_of(
+        alignment->second.units.begin(), alignment->second.units.end(),
+        [&](const auto& unit) {
+          return unit.end - unit.start > minimum_unit + 1e-9 &&
+                 unit.start < boundary - 1e-9 &&
+                 unit.end > boundary + 1e-9;
+        });
+  };
+
+  for (const auto& activity : speakers_) {
+    if (activity.speaker_id.empty() ||
+        activity.start <= text.start + 1e-9 ||
+        activity.start >= text.end - 1e-9 ||
+        activity.end - activity.start + 1e-9 < minimum_run) {
+      continue;
+    }
+
+    const SpeakerSeg* matching_primary = nullptr;
+    bool ambiguous_primary = false;
+    for (const auto& primary : primary_speakers_) {
+      if (primary.speaker_id != activity.speaker_id ||
+          std::abs(primary.start - activity.start) > tolerance + 1e-9 ||
+          primary.end - primary.start + 1e-9 < minimum_run) {
+        continue;
+      }
+      if (matching_primary != nullptr) {
+        ambiguous_primary = true;
+        break;
+      }
+      matching_primary = &primary;
+    }
+    if (ambiguous_primary || matching_primary == nullptr) continue;
+
+    const double boundary = std::max(activity.start, matching_primary->start);
+    if (boundary <= text.start + 1e-9 || boundary >= text.end - 1e-9 ||
+        !following_uncontested(speakers_, boundary, activity.speaker_id) ||
+        !following_uncontested(primary_speakers_, boundary,
+                               activity.speaker_id)) {
+      continue;
+    }
+
+    const SpeakerSeg* preceding_activity =
+        nearest_preceding(speakers_, boundary, activity.speaker_id);
+    const SpeakerSeg* preceding_primary = nearest_preceding(
+        primary_speakers_, boundary, activity.speaker_id);
+    if (preceding_activity == nullptr || preceding_primary == nullptr ||
+        preceding_activity->speaker_id != preceding_primary->speaker_id ||
+        preceding_activity->speaker_id == activity.speaker_id ||
+        (activity.start - preceding_activity->end + 1e-9 < minimum_unit &&
+         matching_primary->start - preceding_primary->end + 1e-9 <
+             minimum_unit) ||
+        !alignment_straddles(boundary)) {
+      continue;
+    }
+
+    handoffs.push_back({boundary, preceding_activity->speaker_id,
+                        activity.speaker_id});
+  }
+
+  std::sort(handoffs.begin(), handoffs.end(), [](const auto& left,
+                                                  const auto& right) {
+    if (!NearEqual(left.boundary, right.boundary)) {
+      return left.boundary < right.boundary;
+    }
+    if (left.preceding_speaker_id != right.preceding_speaker_id) {
+      return left.preceding_speaker_id < right.preceding_speaker_id;
+    }
+    return left.following_speaker_id < right.following_speaker_id;
+  });
+  handoffs.erase(
+      std::unique(handoffs.begin(), handoffs.end(), [](const auto& left,
+                                                       const auto& right) {
+        return NearEqual(left.boundary, right.boundary) &&
+               left.preceding_speaker_id == right.preceding_speaker_id &&
+               left.following_speaker_id == right.following_speaker_id;
+      }),
+      handoffs.end());
+  return handoffs;
+}
+
 std::vector<BusinessSpeakerPipeline::Entry>
 BusinessSpeakerPipeline::SplitTextByDiar(const TextSeg& text) const {
   std::vector<Entry> entries = SplitTextByDiarBase(text);
@@ -798,6 +971,7 @@ BusinessSpeakerPipeline::SplitTextByDiarBase(const TextSeg& text) const {
   std::vector<double> bounds;
   std::vector<double> primary_refinement_bounds;
   std::vector<double> corroborated_alignment_transition_bounds;
+  std::vector<double> straddled_handoff_bounds;
   bounds.reserve(speakers_.size() * 2 + 2);
   bounds.push_back(text.start);
   bounds.push_back(text.end);
@@ -906,6 +1080,19 @@ BusinessSpeakerPipeline::SplitTextByDiarBase(const TextSeg& text) const {
           corroborated_alignment_transition_bounds.end());
     }
   }
+  for (const auto& handoff : FindCorroboratedStraddledHandoffs(text)) {
+    corroborated_alignment_transition_bounds.push_back(handoff.boundary);
+    straddled_handoff_bounds.push_back(handoff.boundary);
+  }
+  std::sort(corroborated_alignment_transition_bounds.begin(),
+            corroborated_alignment_transition_bounds.end());
+  corroborated_alignment_transition_bounds.erase(
+      std::unique(corroborated_alignment_transition_bounds.begin(),
+                  corroborated_alignment_transition_bounds.end(),
+                  [](double left, double right) {
+                    return NearEqual(left, right);
+                  }),
+      corroborated_alignment_transition_bounds.end());
   std::sort(bounds.begin(), bounds.end());
   bounds.erase(std::unique(bounds.begin(), bounds.end(),
                            [](double a, double b) { return NearEqual(a, b); }),
@@ -1053,8 +1240,9 @@ BusinessSpeakerPipeline::SplitTextByDiarBase(const TextSeg& text) const {
       i = end + 1;
     }
 
-    const auto slices = SliceSourceTextByAlignedUnits(text.text, units,
-                                                      unit_turns, turns.size());
+    const auto slices = SliceSourceTextByAlignedUnits(
+        text.text, units, unit_turns, turns.size(), straddled_handoff_bounds,
+        config_.voiceprint_punctuation);
     if (slices) {
       std::vector<Entry> entries;
       entries.reserve(turns.size());

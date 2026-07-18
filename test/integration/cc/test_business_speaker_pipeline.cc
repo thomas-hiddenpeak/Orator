@@ -3943,6 +3943,126 @@ int main() {
           "reversed alignment times are normalized before publication");
   }
 
+  // ---- 23. FR29 splits only an anomalously long alignment unit crossing a
+  // handoff corroborated by activity and primary views. A collapsed
+  // zero-duration unit that closes the same punctuation clause stays on the
+  // preceding source run. ----
+  {
+    struct CaseOptions {
+      bool include_following_primary = true;
+      std::string primary_following_id = "spk_b";
+      double following_end = 2.0;
+      double crossing_end = 1.4;
+      double activity_preceding_start = 0.2;
+      double primary_preceding_start = 0.2;
+      double preceding_end = 1.1;
+      double primary_preceding_end = 0.85;
+      bool voiceprint = true;
+      std::string source = "甲乙丁。丙";
+      int source_end = 5;
+    };
+    auto run_case = [](const CaseOptions& options) {
+      BusinessSpeakerPipeline::Config config;
+      config.align_snap_pause_sec = 0.25;
+      config.align_boundary_split_tolerance_sec = 0.08;
+      config.voiceprint_primary_consensus_min_sec = 0.4;
+      config.voiceprint_fusion_enabled = options.voiceprint;
+      config.speaker_overlap_tie_policy =
+          BusinessSpeakerPipeline::SpeakerOverlapTiePolicy::kPrimarySpeaker;
+      TestBusinessSpeakerPipeline tl(config);
+      tl.UpsertText(0, 0.2, 2.0, options.source);
+      tl.ReplaceSpeakers(
+          {{options.activity_preceding_start, options.preceding_end, "slot_0",
+            0.9f, "spk_a"},
+           {1.12, options.following_end, "slot_1", 0.9f, "spk_b"}});
+      std::vector<TestBusinessSpeakerPipeline::SpeakerInput> primary = {
+          {options.primary_preceding_start, options.primary_preceding_end,
+           "slot_0", 0.9f, "spk_a"}};
+      if (options.include_following_primary) {
+        primary.push_back({1.12, options.following_end, "slot_1", 0.9f,
+                           options.primary_following_id});
+      }
+      tl.ReplacePrimarySpeakers(primary);
+      tl.UpsertAlign(0, 0.2, 2.0,
+                     {{0.3, 0.4, "甲"},
+                      {0.4, options.crossing_end, "乙"},
+                      {options.crossing_end, options.crossing_end, "丁"},
+                      {1.6, 1.8, "丙"}});
+      if (options.voiceprint) {
+        ComprehensiveTimeline::SpeakerVoiceprintEvidence interval;
+        interval.evidence_id = "business_interval:0:0";
+        interval.kind = "business_interval";
+        interval.text_id = 0;
+        interval.source_start = 0;
+        interval.source_end = options.source_end;
+        interval.start = 0.3;
+        interval.end = 1.8;
+        interval.embedding_available = true;
+        interval.robust_gallery_complete = true;
+        interval.session_scores = {{"spk_a", 0.40f}, {"spk_b", 0.80f}};
+        interval.robust_scores = {{"spk_a", 0.42f}, {"spk_b", 0.78f}};
+        tl.ReplaceVoiceprint({interval});
+      }
+      return tl.Snapshot();
+    };
+    auto retains_corroborated_runs = [](const auto& entries) {
+      return entries.size() == 2 && entries[0].speaker_id == "spk_a" &&
+             entries[0].text == "甲乙丁。" &&
+             entries[1].speaker_id == "spk_b" && entries[1].text == "丙";
+    };
+    auto all_following = [](const auto& entries) {
+      return !entries.empty() &&
+             std::all_of(entries.begin(), entries.end(), [](const auto& entry) {
+               return entry.speaker_id == "spk_b";
+             });
+    };
+
+    CHECK(retains_corroborated_runs(run_case({})),
+          "corroborated straddled handoff preserves both source runs");
+
+    CaseOptions base_only;
+    base_only.voiceprint = false;
+    CHECK(retains_corroborated_runs(run_case(base_only)),
+          "base projection applies the corroborated alignment split");
+
+    CaseOptions one_view;
+    one_view.include_following_primary = false;
+    CHECK(all_following(run_case(one_view)),
+          "one-view handoff cannot protect a mixed business interval");
+
+    CaseOptions disagreeing_view;
+    disagreeing_view.primary_following_id = "spk_c";
+    CHECK(all_following(run_case(disagreeing_view)),
+          "disagreeing following identities cannot protect a handoff");
+
+    CaseOptions short_following;
+    short_following.following_end = 1.4;
+    CHECK(all_following(run_case(short_following)),
+          "subminimum following runs cannot protect a handoff");
+
+    CaseOptions normal_unit;
+    normal_unit.crossing_end = 1.0;
+    CHECK(all_following(run_case(normal_unit)),
+          "normally timed alignment units preserve existing fusion behavior");
+
+    CaseOptions insufficient_preceding_coverage;
+    insufficient_preceding_coverage.activity_preceding_start = 0.9;
+    insufficient_preceding_coverage.primary_preceding_start = 0.7;
+    CHECK(all_following(run_case(insufficient_preceding_coverage)),
+          "insufficient preceding native coverage cannot block voiceprint");
+
+    CaseOptions unaligned_gap_content;
+    unaligned_gap_content.source = "甲乙丁。未丙";
+    unaligned_gap_content.source_end = 6;
+    const auto unaligned_gap_entries = run_case(unaligned_gap_content);
+    CHECK(unaligned_gap_entries.size() == 2 &&
+              unaligned_gap_entries[0].speaker_id == "spk_a" &&
+              unaligned_gap_entries[0].text == "甲乙" &&
+              unaligned_gap_entries[1].speaker_id == "spk_b" &&
+              unaligned_gap_entries[1].text == "丁。未丙",
+          "unaligned source content blocks punctuation-edge inheritance");
+  }
+
   if (g_fail == 0) {
     std::printf("BusinessSpeakerPipeline test PASSED\n");
     return 0;

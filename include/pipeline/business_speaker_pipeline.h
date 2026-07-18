@@ -115,6 +115,12 @@ class BusinessSpeakerPipeline {
     std::string text;
   };
 
+  struct CorroboratedHandoff {
+    double boundary = 0.0;
+    std::string preceding_speaker_id;
+    std::string following_speaker_id;
+  };
+
   void OnEvidence(const ComprehensiveTimeline::EvidenceUpdate& update);
   void SynchronizeAll();
   void ApplyDiarization(const std::vector<SpeakerInput>& segments,
@@ -149,6 +155,8 @@ class BusinessSpeakerPipeline {
                   const std::string& text_projection_source,
                   const std::string& primary_reason = "") const;
   void MergeEntrySupport(Entry* dst, const Entry& src) const;
+  std::vector<CorroboratedHandoff> FindCorroboratedStraddledHandoffs(
+      const TextSeg& text) const;
   std::vector<Entry> SplitTextByDiar(const TextSeg& text) const;
   std::vector<Entry> SplitTextByDiarBase(const TextSeg& text) const;
   std::vector<Entry> ApplyVoiceprintEvidence(

@@ -1,10 +1,11 @@
 # Spec 013: Industrial Closing Validation
 
 **Status**: FR16ABN full real-WebSocket natural-turn gate and T112 telemetry
-cadence passed; FR16ABO full promotion rejected; FR28 scheduling stability
-passes its 120-second gate but fails its first 600-second contextual gate;
-the deterministic trailing-context correction awaits real-stream promotion;
-T102, T084, full
+cadence passed; FR16ABO full promotion rejected; FR28 scheduling stability and
+its deterministic trailing-context correction pass the silence and repeated
+120-second gates, but the corrected 600-second contextual gate still fails at
+`ref-0073`; the FR29 cross-view handoff projection passes frozen-evidence
+forward/reverse review and awaits T128 real-stream promotion; T102, T084, full
 canonical closure, release sign-off, and industrial readiness remain open
 **Created**: 2026-07-13
 **Scope**: Re-establish a truthful product baseline, recover full-session business
@@ -44,8 +45,16 @@ permitted a 600-second promotion run only. That clean run passed every
 mechanical contract, but complete forward/reverse review found new speaker
 regressions at `ref-0037` and `ref-0073`. FR28 therefore did not advance to a
 full run. Its successor preserves short-gap decoder audio and terminal
-source-clock context while retaining publication-order determinism; it must
-repeat the real-stream ladder and does not alter the full T111 result.
+source-clock context while retaining publication-order determinism. Three
+silence runs and two byte-identical 120-second runs pass, and a new 600-second
+run restores the substantive `ref-0037` contribution. Complete chronological
+and reverse review still rejects promotion because `ref-0073` remains split
+across Tang Yunfeng, Shi Yi, and Tang Yunfeng. At that point both Sortformer
+views support Shi Yi, but one anomalously extended forced-alignment unit crosses
+their corroborated handoff into Tang Yunfeng and allows a containing voiceprint
+interval to erase the useful native boundary. The next correction is therefore
+confined to the business projection; it does not alter FR28, any producer
+track, or the full T111 result.
 
 This spec defines two separate claims:
 
@@ -1975,6 +1984,34 @@ subject to the complete acceptance gates in this spec.
   identical ASR reset positions, fed sample ranges, finals, and typed time
   codes. These exact-equality checks are mechanical determinism evidence only;
   they MUST NOT assign transcript, speaker, endpoint, or product correctness.
+- **FR29**: The business projection MUST preserve a speaker handoff corroborated
+  by both immutable Sortformer activity and primary-speaker views when a
+  forced-alignment unit anomalously crosses that handoff. The following
+  identity and onset MUST agree in both views within existing TOML
+  `timeline.align_boundary_split_tolerance_sec`; each following run MUST last
+  at least existing TOML `speaker_fusion.min_embed_sec`; the nearest preceding
+  known identity in both views MUST agree and differ from the following
+  identity; at least one view MUST expose a preceding-to-following gap of at
+  least existing TOML `timeline.align_snap_pause_sec`; and the crossing aligned
+  unit MUST begin before the corroborated
+  onset, end after it, and last longer than existing TOML
+  `timeline.align_snap_pause_sec`. Only then MAY the base projector terminate
+  the preceding aligned source run at that unit and begin later aligned source
+  content with the following native run. If the first following aligned unit
+  has zero duration exactly at the crossing unit's end and closes before the
+  next unit at one punctuation mark from existing TOML
+  `speaker_fusion.punctuation`, that unit and intervening punctuation MUST stay
+  on the preceding source run; later source content remains on the following
+  run. A containing `business_interval`
+  voiceprint decision MUST NOT repaint both immutable base-identity runs with
+  its majority identity when the competing base run retains at least existing
+  TOML `speaker_fusion.min_embed_sec` of positive aligned time corroborated by
+  both native views. Missing, ambiguous, one-view-only, overlapping,
+  subminimum, normally timed, return-transition, unknown-identity, or
+  source-order evidence MUST preserve existing behavior. This rule MUST add no
+  fitted parameter; inspect no transcript value, speaker name, known timestamp,
+  reference datum, or review result; and alter no ASR, alignment, diarization,
+  primary-speaker, VAD, voiceprint, identity, or common-time-base record.
 
 ## 5. Acceptance Gates
 
