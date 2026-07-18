@@ -3,9 +3,9 @@
 **Status**: FR16ABN full real-WebSocket natural-turn gate and T112 telemetry
 cadence passed; FR16ABO full promotion rejected; FR28 scheduling stability and
 its deterministic trailing-context correction pass the silence and repeated
-120-second gates, but the corrected 600-second contextual gate still fails at
-`ref-0073`; the FR29 cross-view handoff projection passes frozen-evidence
-forward/reverse review and awaits T128 real-stream promotion; T102, T084, full
+120-second gates, but the corrected 600-second contextual gate fails at
+`ref-0073`; FR29 passes repeated 120-second and complete 600-second real-stream
+forward/reverse review; T102, T084, full
 canonical closure, release sign-off, and industrial readiness remain open
 **Created**: 2026-07-13
 **Scope**: Re-establish a truthful product baseline, recover full-session business
@@ -2011,7 +2011,14 @@ subject to the complete acceptance gates in this spec.
   source-order evidence MUST preserve existing behavior. This rule MUST add no
   fitted parameter; inspect no transcript value, speaker name, known timestamp,
   reference datum, or review result; and alter no ASR, alignment, diarization,
-  primary-speaker, VAD, voiceprint, identity, or common-time-base record.
+  primary-speaker, VAD, identity, or common-time-base record. The existing
+  final speaker-evidence stage intentionally derives `business_interval`
+  voiceprint query partitions from the revised base business view after the
+  final primary-speaker deposit. A retained handoff therefore MAY replace one
+  containing derived business-interval query with source-complete queries on
+  the two revised business runs. That derived-evidence change MUST be confined
+  to the corroborated handoff; it MUST NOT modify any upstream producer record,
+  model output, common-clock value, or TOML value.
 
 ## 5. Acceptance Gates
 

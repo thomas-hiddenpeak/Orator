@@ -26,6 +26,13 @@ class TestSpeakerEvidenceStage {
         intervals, min_embed_sec, short_max_sec);
   }
 
+  static std::vector<ComprehensiveTimeline::SpeakerVoiceprintEvidence>
+  BuildVoiceprintQueries(
+      const SpeakerEvidenceStage& stage,
+      const ComprehensiveTimeline::SpeakerEvidenceSnapshot& snapshot) {
+    return stage.BuildVoiceprintQueries(snapshot);
+  }
+
   static void Precompute(
       SpeakerEvidenceStage* stage,
       const ComprehensiveTimeline::SpeakerEvidenceSnapshot& snapshot,

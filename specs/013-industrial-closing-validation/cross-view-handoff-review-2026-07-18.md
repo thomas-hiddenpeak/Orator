@@ -1,8 +1,8 @@
 # Cross-View Handoff Projection Review
 
 **Date:** 2026-07-18
-**Status:** Frozen projection retained; real-WebSocket promotion remains T128
-**Scope:** FR29 projection only; no producer track or TOML value changed
+**Status:** Real-WebSocket 120/600 promotion passed; full T123 remains open
+**Scope:** FR29 projection only; no upstream model track or TOML value changed
 
 ## Evaluation Authority
 
@@ -108,7 +108,78 @@ is unchanged. No other frozen 600-second conversation context changes.
 
 The frozen FR29 projection is retained for real-path promotion because complete
 forward and reverse contextual review restores the failed contribution without
-introducing a new changed-context speaker error. This does not advance the
-accepted T111 full-session baseline and does not close a 600-second or full
-gate. T128 must recapture two independent 120-second production WebSocket runs
-and one clean 600-second run before T123 can start.
+introducing a new changed-context speaker error. This frozen result alone does
+not advance the accepted T111 full-session baseline.
+
+## T128 Real-WebSocket Gate
+
+Clean commit `2ce4a12b7973381be68a22028e4b01b5d1e645a7` was built once and
+used for two independent 120-second captures and one 600-second capture. Every
+run used `test.mp3`, 100 ms incremental frames at 1.0x pacing, Sortformer v2.1,
+an isolated empty registry and protocol store, direct `end`, early/transient/
+late observers, runtime telemetry, and `tegrastats`. Each manifest records a
+clean unchanged Git commit, unchanged TOML source, and unchanged server binary.
+Only registry and storage paths differ from checked-in `orator.toml`.
+
+| Evidence | 120 A | 120 B | 600 |
+|---|---:|---:|---:|
+| Audio | `120.000 s` | `120.000 s` | `600.000 s` |
+| Total wall time | `121.21 s` | `121.21 s` | `603.33 s` |
+| Direct terminal wait | `1.213 s` | `1.208 s` | `3.329 s` |
+| Runtime / tegrastats samples | `119 / 120` | `119 / 120` | `599 / 601` |
+| Common-clock final samples | `1,920,000` | `1,920,000` | `9,600,000` |
+| Extent gaps | `0` | `0` | `0` |
+
+The two 120-second seven-track entry bundles have the same SHA-256,
+`e8613dfbdffbbb3394d5e80955eb73d30e7f200c4ffb4b3058df3a1b805928b8`.
+Complete chronological and reverse reading of `ref-0001` through `ref-0018`
+finds no new contextual speaker regression. Existing cold-start, micro-turn,
+and boundary defects remain visible and are not relabeled as correct.
+
+The 600-second artifact is
+`/tmp/orator-spec013/release-2ce4a12-t128/run-600-ws.json`, SHA-256
+`47567fa23ba58b49d4dde58ba1e46a1f0936765395122e115997a568a58aeeae`.
+All observer terminal views converge, required telemetry coverage passes, and
+all seven extents close on the common sample count. These are mechanical
+contracts only.
+
+## Derived Evidence Clarification
+
+The real capture exposed one stale assumption in the frozen-review contract.
+Diarization, primary-speaker, ASR, VAD, and alignment entries are byte-identical
+to T126. Speaker voiceprint is not wholly upstream of the business projection:
+`SpeakerEvidenceSnapshot` intentionally includes `business_speaker`, and
+`SpeakerEvidenceStage::BuildVoiceprintQueries()` uses those entries after the
+final primary-speaker deposit to form acoustic query ranges.
+
+FR29 changes the base source partition at the corroborated handoff. The final
+evidence stage consequently replaces the old containing
+`business_interval:43:11` (`source 50-73`, `495.788-498.908 s`) with two derived
+queries (`source 50-56`, `495.788-497.148 s`; and `source 56-73`,
+`497.308-498.908 s`). Later business-interval ordinals for that text shift by
+one; their acoustic spans and scores remain unchanged. This is the intended
+one-pass base-projection-to-acoustic-evidence dependency, not an upstream model
+mutation or a feedback cycle. The specification and code comments now state
+that contract explicitly. A focused unit contract verifies that two base
+business source runs generate two derived query ranges and that joining those
+runs generates one range. The final full build emits no warning or error, and
+all `69/69` CTest entries pass in `53.13 s`.
+
+## Complete 600-Second Context Review
+
+Every in-scope contribution, `ref-0001` through `ref-0093`, was read first in
+chronological order and then from `ref-0093` back to `ref-0001`. The complete
+conversation preserves the same known cold-start, missed micro-turn, and
+cross-boundary defects seen in T126. The two speaker-sequence changes are one
+continuous exchange:
+
+- `ref-0073`: Shi Yi owns the substantive answer `否决了，对，四十五。`; the
+  very short aligned onset remains attached to the preceding Tang Yunfeng run.
+- `ref-0074`: Tang Yunfeng begins at `嗯，如果说我和你加起来...`; Shi Yi is
+  not carried into the following contribution.
+
+The reverse read confirms both handoff directions. `ref-0037` remains
+substantively assigned to Tang Yunfeng. No other contextual speaker regression
+is introduced. This manual semantic result passes T128's 600-second gate; it
+does not calculate an accuracy percentage and does not advance the accepted
+full-session T111 baseline. T123 remains the next full-session gate.

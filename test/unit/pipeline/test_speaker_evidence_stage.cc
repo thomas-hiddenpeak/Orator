@@ -148,6 +148,54 @@ int main() {
     evidence_config.minimum_gallery_size = 2;
     orator::pipeline::SpeakerEvidenceStage stage(&identity, evidence_config);
 
+    orator::pipeline::ComprehensiveTimeline::SpeakerEvidenceSnapshot
+        query_snapshot;
+    query_snapshot.asr.push_back({7, 0.0, 4.0, "甲乙丙丁"});
+    query_snapshot.align.push_back(
+        {7,
+         0.0,
+         4.0,
+         {{0.0, 1.0, "甲"},
+          {1.0, 2.0, "乙"},
+          {2.0, 3.0, "丙"},
+          {3.0, 4.0, "丁"}}});
+    orator::pipeline::ComprehensiveTimeline::Entry leading;
+    leading.start = 0.0;
+    leading.end = 2.0;
+    leading.speaker_id = "spk_0";
+    leading.text = "甲乙";
+    leading.text_id = 7;
+    orator::pipeline::ComprehensiveTimeline::Entry following;
+    following.start = 2.0;
+    following.end = 4.0;
+    following.speaker_id = "spk_1";
+    following.text = "丙丁";
+    following.text_id = 7;
+    query_snapshot.business_speaker = {leading, following};
+
+    auto business_ranges = [](const auto& queries) {
+      std::vector<Range> ranges;
+      for (const auto& query : queries) {
+        if (query.kind == "business_interval") {
+          ranges.push_back({query.source_start, query.source_end});
+        }
+      }
+      return ranges;
+    };
+    const auto split_queries =
+        TestSpeakerEvidenceStage::BuildVoiceprintQueries(stage, query_snapshot);
+    CHECK(business_ranges(split_queries) ==
+              std::vector<Range>({{0, 2}, {2, 4}}),
+          "business projection partitions derived voiceprint queries");
+
+    leading.end = 4.0;
+    leading.text = "甲乙丙丁";
+    query_snapshot.business_speaker = {leading};
+    const auto joined_queries =
+        TestSpeakerEvidenceStage::BuildVoiceprintQueries(stage, query_snapshot);
+    CHECK(business_ranges(joined_queries) == std::vector<Range>({{0, 4}}),
+          "joined business projection emits one derived query");
+
     orator::pipeline::ComprehensiveTimeline::SpeakerEvidenceSnapshot snapshot;
     snapshot.diarization.push_back(
         {.start = 0.0, .end = 1.0, .speaker_id = "spk_0"});

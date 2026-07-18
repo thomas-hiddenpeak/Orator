@@ -179,9 +179,10 @@ class ComprehensiveTimeline {
     std::vector<std::string> speaker_ids;
   };
 
-  // Reduced immutable input for multi-resolution speaker evidence. Periodic
-  // precomputation intentionally excludes raw diar frames and derived output
-  // tracks so a long session does not repeatedly copy unrelated data.
+  // Reduced typed input for multi-resolution speaker evidence. The current
+  // business projection defines business-interval query ranges. Raw diar frames
+  // and previously derived voiceprint evidence are excluded so a long session
+  // does not repeatedly copy unrelated data or feed evidence into itself.
   struct SpeakerEvidenceSnapshot {
     std::vector<SpeakerInput> diarization;
     std::vector<RawTextSeg> asr;

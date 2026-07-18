@@ -1887,11 +1887,21 @@
   `ref-0073` response and confirms that the following Tang Yunfeng contribution
   remains separate; all `69/69` CTest entries pass. See
   `cross-view-handoff-review-2026-07-18.md`.
-- [ ] T128 If T127 is retained, commit and push the transitional experiment,
+- [x] T128 If T127 is retained, commit and push the transitional experiment,
   repeat two independent 120-second production WebSocket runs, and run one new
   clean 600-second direct-end gate. Verify mechanical contracts by automation
   and review every in-scope `test.txt` contribution chronologically and in
-  reverse before any full capture.
+  reverse before any full capture. Commit `2ce4a12b7973` passes both 120-second
+  runs with byte-identical seven-track entries and complete `ref-0001` through
+  `ref-0018` review. Its 600-second run closes all tracks at `9,600,000`
+  samples; complete forward/reverse review of all 93 contributions restores
+  the substantive `ref-0073` Shi Yi response, keeps `ref-0074` with Tang
+  Yunfeng, and finds no new contextual speaker regression. Code inspection
+  corrects the stale assumption that business-interval voiceprint queries are
+  upstream records: the final evidence stage intentionally derives them from
+  the revised base business view. The resulting one-record partition is
+  confined to the retained handoff and is covered by a focused unit contract.
+  No behavioral TOML value changes.
 - [ ] T123 If T128 passes, run independent full-length empty-registry Run A and
   restarted frozen-registry Run B from the same clean commit. Freeze complete
   manifests and typed tracks, mechanically verify time-base, transport,

@@ -1,9 +1,11 @@
 #pragma once
 
-// Final/revisable speaker evidence producer. It reads immutable producer tracks
-// from ComprehensiveTimeline snapshots and reuses the diarization pipeline's
-// retained audio and TitaNet gallery. It emits acoustic evidence only; speaker
-// selection remains the responsibility of BusinessSpeakerPipeline.
+// Final/revisable speaker evidence producer. It reads upstream producer tracks
+// and the current base business projection from ComprehensiveTimeline, then
+// reuses the diarization pipeline's retained audio and TitaNet gallery. Business
+// intervals follow the projection's source partition. The stage emits acoustic
+// evidence only; speaker selection remains BusinessSpeakerPipeline's
+// responsibility.
 
 #include <condition_variable>
 #include <cstddef>

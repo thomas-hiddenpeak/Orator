@@ -2982,6 +2982,32 @@ and Tang Yunfeng begins the following clause. The warning-clean build and all
 600-second complete contextual gate; see
 `cross-view-handoff-review-2026-07-18.md`.
 
+T128 completes the real-stream gate from clean commit `2ce4a12b7973`. Two
+independent 120-second captures use isolated empty registries and storage,
+direct `end`, observers, telemetry, 100 ms frames, and 1.0x pacing. Their seven
+typed product-track entry bundles are byte-identical. Complete chronological
+and reverse reading of `ref-0001` through `ref-0018` retains the known
+cold-start, micro-turn, and boundary defects but finds no new speaker-business
+regression. The clean 600-second capture completes in `603.33 s`, receives its
+terminal timeline `3.329 s` after direct `end`, and closes every pipeline at
+`9,600,000` samples without a gap. Complete chronological and reverse reading
+of all 93 in-scope contributions restores the substantive `ref-0073` Shi Yi
+answer and keeps `ref-0074` with Tang Yunfeng; no other contextual speaker
+regression is introduced.
+
+The real run also corrects an earlier documentation assumption. Diarization,
+primary speaker, ASR, VAD, and alignment entries are byte-identical to T126.
+The speaker-voiceprint track is intentionally downstream of the base business
+projection: `SpeakerEvidenceSnapshot::business_speaker` supplies source ranges
+to `SpeakerEvidenceStage::BuildVoiceprintQueries()` after the final primary
+deposit. FR29 therefore partitions the old containing `495.788-498.908 s`
+business-interval query into `495.788-497.148 s` and `497.308-498.908 s`
+queries. This adds one derived record and shifts later ordinals for the same
+text; it does not mutate an upstream producer or introduce a feedback cycle.
+The code comments and focused unit contract are updated to make that existing
+dependency explicit. No behavioral TOML value changes. T123 may begin from the
+next clean documentation-and-test commit.
+
 ### 8.15 FR28 120-second outcome and promotion ladder
 
 T117-T121 are complete. The frozen T116 packages replay byte-stably; their
