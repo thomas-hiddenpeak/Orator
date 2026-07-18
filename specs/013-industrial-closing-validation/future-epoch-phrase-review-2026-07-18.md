@@ -138,3 +138,17 @@ contains the late repaired context, they cannot establish the speaker benefit.
 If they pass, a full A/B capture is justified, and each new full artifact must
 receive complete 556-contribution forward and reverse contextual semantic
 review before any accepted gate or baseline changes.
+
+## T116 successor outcome
+
+T116 subsequently passed the 120/600-second real-WebSocket ladder and completed
+new full Run A and Run B captures at clean transitional commit `f49a8278e0d8`.
+Both full artifacts received complete 556-contribution chronological and
+tail-to-start contextual semantic review against the human-listened `test.txt`.
+The manually checked result is `518/556` for each run, one contribution below
+the accepted T111 baseline, and their error sets differ. FR16ABO still repairs
+`ref-0504` in both runs, but the full promotion is rejected and the checked-in
+TOML switch is returned to zero. See
+`future-epoch-full-promotion-review-2026-07-18.md` for the frozen evidence,
+manual ledgers, and decision. No executable mechanism produced that result or
+verdict.

@@ -2797,7 +2797,7 @@ alignment-unit count and duration bounds complete the guard. The rule changes
 only the exact phrase and records a dedicated decision reason; it never moves
 an identity epoch or mutates producer evidence.
 
-The checked-in experimental value is `120.0` seconds, matching the already
+The T116 experimental value is frozen at `120.0` seconds, matching the already
 frozen identity-stage competing-candidate backfill horizon while remaining a
 separately owned fusion switch. Zero disables the rule. Focused tests cover the
 positive topology and every evidence abstention. The production replay probe
@@ -2808,6 +2808,32 @@ forward and reverse order against `test.txt`; no executable mechanism assigns
 correctness, totals an accuracy result, selects the candidate, or issues a
 promotion verdict. A rejected candidate is removed before any model or real
 WebSocket run.
+
+T116 passed the warning-clean build, all 69 CTest entries, the 120/600-second
+real-WebSocket ladder, and full empty/frozen-registry A/B capture at clean
+transitional commit `f49a8278e0d8`. Complete chronological and tail-to-start
+contextual review of all 556 `test.txt` contributions in each run manually
+records `518/556` for both paths. This is one contribution below the accepted
+T111 baseline, and the A/B error sets differ. FR16ABO is therefore rejected for
+promotion and the checked-in TOML switch returns to `0.0`; see
+`future-epoch-full-promotion-review-2026-07-18.md`.
+
+### 8.13 Cross-pipeline evidence stability before the next speaker rule
+
+The next investigation does not add another fusion heuristic. It freezes the
+T116 full artifacts and separates raw divergence by typed track: diarization,
+primary speaker, speaker-identity epochs, ASR, forced alignment, voiceprint,
+and business projection. Structural tooling may locate and display the first
+different record, changed boundaries, and replay determinism, but it may not
+label either side correct, aggregate an accuracy result, or choose a candidate.
+
+Each full artifact is exported to the existing typed replay format. Replaying
+the same package must be byte-stable before projection work proceeds. The A/B
+raw-track comparison then determines whether the differing error contexts are
+fed by producer variance or introduced by final projection. Only a source-free
+correction that preserves frozen-input determinism and passes complete forward
+and reverse contextual semantic review against `test.txt` may enter another
+120/600/full promotion ladder.
 
 ## 9. Phase 7: Final Sign-Off
 

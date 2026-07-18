@@ -1,9 +1,9 @@
 # Spec 013: Industrial Closing Validation
 
 **Status**: FR16ABN full real-WebSocket natural-turn gate and T112 telemetry
-cadence passed; FR16ABO frozen A/B semantic review retained for real-WebSocket
-promotion; T102, T084, full canonical closure, release sign-off, and industrial
-readiness remain open
+cadence passed; FR16ABO full real-WebSocket promotion rejected and disabled;
+T102, T084, full canonical closure, release sign-off, and industrial readiness
+remain open
 **Created**: 2026-07-13
 **Scope**: Re-establish a truthful product baseline, recover full-session business
 accuracy, and define the evidence required before Orator may be declared closed.
@@ -23,6 +23,13 @@ also satisfy the terminal-latency gate mechanically. These sign two conjunctive
 gates only. Speaker-time, fixed-block, per-speaker, critical-turn,
 confident-wrong, source-time-offset, ASR, release, and independent-holdout gates
 remain open.
+
+The later FR16ABO full promotion does not replace that baseline. Clean
+transitional commit `f49a8278e0d8` passed the 120/600-second and full A/B
+mechanical ladder, but complete 556-contribution forward/reverse semantic
+review against `test.txt` manually records `518/556` for each run. The two
+error sets also differ. FR16ABO is therefore disabled in the checked-in TOML,
+and T111 remains the accepted speaker-business baseline.
 
 This spec defines two separate claims:
 
@@ -216,6 +223,17 @@ subject to the complete acceptance gates in this spec.
     exact one-second runtime steps, and complete required-field coverage. This
     is mechanical evidence only and does not reopen or extend the T111 product
     result. See `gpu-telemetry-deadline-review-2026-07-18.md`.
+18. **FR16ABO full real-path promotion rejected; T102/T084 unchanged**:
+    clean transitional commit `f49a8278e0d8` passed the warning-clean build,
+    all `69/69` CTest entries, 120/600-second direct-end promotion, and full
+    empty/frozen-registry A/B capture. Both full runs satisfy common-clock,
+    terminal-latency, observer, provenance, and telemetry contracts. Complete
+    review of all 556 contributions in chronological and tail-to-start order
+    against the human-listened `test.txt` manually records `518/556` for each
+    run, below the accepted `519/556` baseline, with different A/B error sets.
+    No code assigned or aggregated the result. The default TOML lookahead is
+    restored to zero. See
+    `future-epoch-full-promotion-review-2026-07-18.md`.
 
 ## 4. Requirements
 

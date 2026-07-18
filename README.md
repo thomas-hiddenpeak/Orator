@@ -51,6 +51,13 @@ FR16ABN 修复了两轮 `ref-0090` 的延迟短确认，且没有形成长程或
 遥测修复证据见
 [gpu-telemetry-deadline-review-2026-07-18.md](specs/013-industrial-closing-validation/gpu-telemetry-deadline-review-2026-07-18.md)。
 
+后续 FR16ABO 未来身份 epoch 补证实验已完成真实 WebSocket 的 120/600 秒及
+全长 A/B 晋级。两轮机械契约均通过，但依据 `test.txt` 对两轮各 556 条进行完整
+正向和反向上下文人工语义复核后，结果均为 `518/556`（约 `93.17%`），低于
+已接受的 `519/556`，且两轮错误集合不同。该候选不晋级，默认
+`speaker_fusion.future_epoch_lookahead_sec` 已恢复为 `0.0`。完整记录见
+[future-epoch-full-promotion-review-2026-07-18.md](specs/013-industrial-closing-validation/future-epoch-full-promotion-review-2026-07-18.md)。
+
 所有正式结果评估必须使用完整上下文人工语义复核。代码、脚本、查询、公式、
 指标和算法只能运行系统、验证机械契约或整理未判定证据，不得判断正确性、
 汇总准确率、选择候选或给出验收结论。正式运行必须使用 `test.mp3`、人工参考

@@ -1791,8 +1791,24 @@
   paths are byte-stable across two replays. Complete semantic review retains
   one real repair and one identity-neutral activation without a changed-context
   regression; see `future-epoch-phrase-review-2026-07-18.md`.
-- [ ] T116 If T115 retains FR16ABO, commit the transitional experiment and pass
+- [x] T116 If T115 retains FR16ABO, commit the transitional experiment and pass
   the warning-clean build, full CTest suite, and 120/600-second real-WebSocket
   ladder before deciding whether a new full A/B capture is justified. A full
   capture must receive complete 556-contribution forward/reverse contextual
-  review before any gate or baseline advances.
+  review before any gate or baseline advances. Clean commit `f49a8278e0d8`
+  passed all engineering and mechanical gates and completed full A/B. Complete
+  chronological and tail-to-start semantic review against the human-listened
+  `test.txt` manually records `518/556` for each run, one below T111, with
+  different A/B error sets. Promotion is rejected and the default TOML switch
+  returns to zero; see
+  `future-epoch-full-promotion-review-2026-07-18.md`.
+
+## Phase 12: Cross-Pipeline Evidence Stability
+
+- [ ] T117 Freeze and export both T116 full typed-track packages, prove
+  same-input business replay byte stability, and mechanically locate the first
+  A/B divergence in each raw producer track and in final projection. Tools may
+  display structural evidence only. Determine the business meaning of every
+  implicated context solely by complete forward/reverse semantic comparison
+  with `test.txt`; do not add another runtime rule or start another full audio
+  run until the producer-versus-projection source is established.

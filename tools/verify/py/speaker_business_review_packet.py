@@ -253,6 +253,36 @@ def _speaker_sequence_signature(
     return signature
 
 
+def _reference_in_window(
+    block: RefBlock, start: float, end: float,
+) -> bool:
+    if block.end > block.start:
+        return _overlap(block.start, block.end, start, end) > 0.0
+    return start <= block.start < end
+
+
+def _order_references(
+    refs: list[RefBlock],
+    windows: list[tuple[float, float]] | None,
+) -> list[RefBlock]:
+    if windows is None:
+        return refs
+
+    ordered: list[RefBlock] = []
+    emitted: set[int] = set()
+    for start, end in windows:
+        for index, block in enumerate(refs):
+            if index in emitted or not _reference_in_window(block, start, end):
+                continue
+            ordered.append(block)
+            emitted.add(index)
+
+    # Explicit windows control review order, not evidence completeness.
+    ordered.extend(block for index, block in enumerate(refs)
+                   if index not in emitted)
+    return ordered
+
+
 def _render(
     timeline_path: Path,
     reference_path: Path,
@@ -296,13 +326,14 @@ def _render_by_reference(
     refs: list[RefBlock],
     entries: list[ViewEntry],
     max_chars: int,
+    windows: list[tuple[float, float]] | None = None,
     comparison_path: Path | None = None,
     comparison_entries: list[ViewEntry] | None = None,
     only_changed: bool = False,
     speaker_sequence_only: bool = False,
 ) -> str:
     selected: list[tuple[RefBlock, float, float, bool | None]] = []
-    for block in refs:
+    for block in _order_references(refs, windows):
         evidence_start, evidence_end = _evidence_window(block, audio_sec)
         changed = None
         if comparison_entries is not None:
@@ -381,7 +412,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument(
         "--by-reference",
         action="store_true",
-        help="render one section for every reference row",
+        help=("render one section for every reference row, ordered by the "
+              "review windows"),
     )
     parser.add_argument(
         "--window-sec",
@@ -392,7 +424,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument(
         "--windows",
         default="",
-        help="comma-separated second ranges, for example 0-600,1800-2400",
+        help=("comma-separated second ranges in review order; with "
+              "--by-reference, uncovered rows are still retained"),
     )
     parser.add_argument(
         "--max-chars",
@@ -432,6 +465,7 @@ def main(argv: list[str]) -> int:
     )
     if args.by_reference:
         render_args.update(
+            windows=windows,
             comparison_path=comparison_path,
             comparison_entries=comparison_entries,
             only_changed=args.only_changed,

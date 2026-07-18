@@ -135,6 +135,33 @@ three
         self.assertEqual(
             signature(coarse, 0.0, 4.0), signature(refined, 0.0, 4.0))
 
+    def test_reference_render_honors_explicit_reverse_window_order(self):
+        refs = [
+            speaker_business_review_packet.RefBlock(
+                "ref-0001", 0.0, 2.0, "A", "one"),
+            speaker_business_review_packet.RefBlock(
+                "ref-0002", 2.0, 4.0, "B", "two"),
+            speaker_business_review_packet.RefBlock(
+                "ref-0003", 4.0, 6.0, "C", "three"),
+        ]
+        rendered = speaker_business_review_packet._render_by_reference(
+            timeline_path=pathlib.Path("candidate.json"),
+            reference_path=pathlib.Path("reference.txt"),
+            audio_sec=6.0,
+            refs=refs,
+            entries=[],
+            max_chars=100,
+            windows=[(4.0, 6.0), (2.0, 4.0)],
+        )
+        self.assertLess(rendered.index("## ref-0003"),
+                        rendered.index("## ref-0002"))
+        self.assertLess(rendered.index("## ref-0002"),
+                        rendered.index("## ref-0001"))
+        self.assertEqual(rendered.count("## ref-0001"), 1)
+        self.assertEqual(rendered.count("## ref-0002"), 1)
+        self.assertEqual(rendered.count("## ref-0003"), 1)
+        self.assertNotIn("accuracy score", rendered.lower())
+
 
 if __name__ == "__main__":
     unittest.main()
