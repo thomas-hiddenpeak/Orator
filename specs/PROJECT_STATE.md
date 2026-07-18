@@ -14,7 +14,7 @@ work is specified under [specs/](.).
 > pass is the consistency proof. Status lines advance to `Implemented` in the
 > same change that lands the code, with the commit reference.
 
-- **Last updated**: 2026-07-18 (FR29 full T123 promotion rejected)
+- **Last updated**: 2026-07-19 (FR30 engineering gates passed; T131 pending)
 - **Branch**: `master`
 - **Constitution**: v1.7.0
 - **Speaker-business closure**: **NATURAL-TURN GATE PASSED; FULL CANONICAL
@@ -77,6 +77,17 @@ work is specified under [specs/](.).
   margin fail. FR29 full promotion is rejected and T111 remains the accepted
   baseline. See
   `013-industrial-closing-validation/cross-view-handoff-full-promotion-review-2026-07-18.md`.
+  Frozen T111/T123 diagnosis then finds identical Sortformer diarization and
+  primary-speaker tracks and zero current-projector speaker-sequence changes
+  when the T111 typed inputs are replayed. The first causal loss is upstream:
+  FR28 now correctly skips audio outside stable VAD evidence, exposing
+  low-energy speech gaps that T111 consumed only through scheduling. A one-
+  variable FR30 candidate lowers TOML `vad.threshold` from `0.5` to `0.3`;
+  temporary production probes expose the reviewed missing intervals and retain
+  zero VAD segments on the frozen silence fixture. The checked-in candidate
+  passes `test_vad`, a warning-clean build, and all `69/69` CTest entries. This
+  is not yet a promoted configuration or product result; see
+  `013-industrial-closing-validation/vad-sensitivity-diagnosis-2026-07-19.md`.
 - **Result-evaluation rule**: product accuracy and candidate decisions may be
   produced only by complete item-by-item contextual semantic review. No code,
   test, script, notebook, formula, query, automated metric, or algorithm may
@@ -614,20 +625,23 @@ advance the baseline and its checked-in TOML lookahead is zero. T102 has signed
 fixed-block and per-speaker turn recall as passed and critical-speaker and
 confident-wrong attribution as failed.
 
-T125 through T128 and T123 are complete. T127 retains FR29 after three
+T125 through T130 and T123 are complete. T127 retains FR29 after three
 byte-identical frozen production-projector replays and complete changed-context
 review. T128 passes two independent 120-second real-WebSocket captures and one
 clean 600-second gate. T123 then completes independent full empty/frozen-
 registry A/B paths with identical seven-track entries, but complete forward and
 reverse review manually records `506/556` for each and rejects promotion.
-Do not start another full audio run. Use the frozen T123 and T111 tracks to trace
-the first changed source interval in each failed late block through VAD-gated
-ASR finalization, forced alignment, voiceprint queries, and business revision
-order. Structural tools may display differences only; complete contextual
-semantic review against `test.txt` remains the sole authority for business
-meaning. Speaker-time, per-speaker time, and source-time offsets remain to be
-manually signed at `test.txt`'s recorded precision; no duplicate listening or
-invented sub-second boundary is required.
+Do not start another full audio run. T130 changes only checked-in TOML
+`vad.threshold` from `0.5` to `0.3` and passes the VAD oracle, clean build, full
+CTest, and frozen-silence gates. Execute T131 next from its clean transitional
+commit: three real-WebSocket silence gates and two repeated 120-second captures.
+Structural tools may display differences only; complete contextual semantic
+review against `test.txt` remains the sole authority for business meaning. A
+600-second run is authorized only after T131 passes, and a full A/B run only
+after the complete 600-second review is manually retained.
+Speaker-time, per-speaker time, and source-time offsets remain to be manually
+signed at `test.txt`'s recorded precision; no duplicate listening or invented
+sub-second boundary is required.
 T112 is complete and does not alter the speaker baseline. T084 closes only
 after both A and B independently pass every applicable gate.
 ASR, browser/microphone, locked holdout, final-report review, and release signing

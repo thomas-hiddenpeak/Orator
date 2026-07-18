@@ -5,7 +5,8 @@ cadence passed; FR16ABO full promotion rejected; FR28 scheduling stability and
 its deterministic trailing-context correction pass the silence and repeated
 120-second gates, but the corrected 600-second contextual gate fails at
 `ref-0073`; FR29 passes repeated 120-second and complete 600-second real-stream
-review but its full T123 A/B promotion is rejected; T102, T084, full
+review but its full T123 A/B promotion is rejected; FR30 VAD-sensitivity
+promotion is in progress; T102, T084, full
 canonical closure, release sign-off, and industrial readiness remain open
 **Created**: 2026-07-13
 **Scope**: Re-establish a truthful product baseline, recover full-session business
@@ -44,6 +45,17 @@ review manually records `506/556` for each run. The full average remains above
 attribution, confident-wrong attribution, and the 93-percent development margin
 fail. FR29 therefore remains transitional and T111 remains the accepted
 speaker-business baseline.
+
+Frozen T111/T123 diagnosis isolates the full-session regression upstream of
+the deterministic business projector. Sortformer diarization and primary-
+speaker tracks are identical. The current projector reproduces every T111
+reference-interval speaker sequence when given T111 typed inputs, while the
+T123 typed inputs reproduce the T123 view. At manually reviewed low-energy
+utterances, the checked-in `vad.threshold = 0.5` leaves stable VAD gaps that
+FR28 must now skip; T111 had consumed the same audio only because its ASR worker
+ran ahead of the VAD frontier. A one-variable FR30 TOML candidate lowers only
+the production VAD threshold to `0.3`. It is not accepted until silence,
+determinism, real-stream, and complete contextual gates pass.
 
 T117-T121 subsequently prove that the T116 A/B producer difference begins in
 scheduling-sensitive VAD-gated ASR rather than Sortformer or the deterministic
@@ -284,6 +296,21 @@ subject to the complete acceptance gates in this spec.
     passes `69/69` CTest as mechanical verification. T111 remains the accepted
     baseline; see
     `cross-view-handoff-full-promotion-review-2026-07-18.md`.
+20. **T123 regression boundary isolated without a new audio run**: frozen
+    T111 and T123 Run A have byte-identical Sortformer diarization and primary-
+    speaker exports. Replaying T111 typed tracks through the current projector
+    changes zero reference-interval speaker sequences, while replaying T123
+    typed tracks reproduces its 1,707-entry final view apart from sub-microsecond
+    text-split serialization. At the manually reviewed `2752-2754 s` and
+    `3278-3284 s` contexts, production VAD at TOML threshold `0.5` leaves the
+    speech outside stable evidence, so FR28 deterministically omits it from ASR.
+    Production `GpuVad` probes changing only the TOML threshold to `0.4` and
+    then `0.3` expose additional raw speech intervals; `0.3` also retains zero
+    VAD segments on the frozen 30-second silence fixture. The checked-in `0.3`
+    candidate then passes the VAD numerical test, a warning-clean build, and
+    all `69/69` CTest entries. These are causal and mechanical observations
+    only, not candidate accuracy or acceptance. See
+    `vad-sensitivity-diagnosis-2026-07-19.md`.
 
 ## 4. Requirements
 
@@ -2044,6 +2071,20 @@ subject to the complete acceptance gates in this spec.
   the two revised business runs. That derived-evidence change MUST be confined
   to the corroborated handoff; it MUST NOT modify any upstream producer record,
   model output, common-clock value, or TOML value.
+- **FR30**: The production Silero VAD sensitivity used by FR28 MUST remain a
+  typed TOML value and MUST be validated as a single-variable candidate. The
+  candidate changes only `vad.threshold` from `0.5` to `0.3`; model weights,
+  minimum speech, minimum silence, padding, ASR lead, ASR trail, ASR feed
+  quantum, and every speaker-fusion value remain unchanged. The production
+  `GpuVad` path MUST remain deterministic and time-base valid, the frozen
+  silence fixture and three independent real-WebSocket silence sessions MUST
+  emit no product records, and repeated 120-second real-WebSocket runs MUST
+  have identical seven-track entries before a 600-second contextual gate may
+  begin. A 600-second candidate MUST receive complete chronological and reverse
+  review against all in-scope `test.txt` contributions. No interval count,
+  coverage calculation, transcript comparison, or other automated result may
+  rank or accept this threshold. A new full A/B run is forbidden until the
+  600-second contextual gate is manually retained.
 
 ## 5. Acceptance Gates
 

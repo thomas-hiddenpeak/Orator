@@ -3034,6 +3034,51 @@ block and traces it through VAD-gated ASR finalization, alignment, voiceprint
 query construction, and revision order. A new source-free rule must first pass
 deterministic replay plus complete changed-context review on both frozen paths.
 
+### 8.19 FR30 VAD-sensitivity recovery
+
+The frozen diagnosis is now complete enough to reject another fusion-policy
+patch. Replaying T111 diarization, primary, ASR, alignment, and voiceprint
+tracks through the current projector changes no reference-interval speaker
+sequence from the original T111 final view. Replaying T123 tracks reproduces
+the T123 final view apart from sub-microsecond split-point serialization. The
+same projector therefore preserves the accepted baseline when its upstream
+evidence is preserved.
+
+The first causal loss is in the FR28 input frontier. T111 consumed undecided
+audio while ASR happened to lead VAD, including low-energy speech that Silero
+did not finalize. FR28 correctly removed that scheduling dependency and now
+feeds only stable typed VAD evidence. With the checked-in TOML threshold `0.5`,
+the manually reviewed `2752-2754 s` contribution falls between VAD segments
+ending at `2751.996 s` and starting at `2754.724 s`; another reviewed utterance
+inside `3278-3284 s` falls between segments ending at `3277.980 s` and starting
+at `3284.132 s`. This omission propagates into ASR text boundaries, forced
+alignment, short-window TitaNet evidence, and final business revisions.
+
+FR30 tests one production parameter only. A temporary TOML with
+`vad.threshold = 0.4` exposes `2753.668-2754.076 s` and
+`3278.276-3278.844 s`. A second temporary TOML with threshold `0.3` exposes
+`2753.540-2754.140 s`, `3278.276-3278.908 s`, and
+`3281.124-3281.628 s`; the last interval agrees mechanically with independent
+Sortformer activity at `3281.040-3281.920 s`. The threshold-0.3 production VAD
+probe emits zero segments for the frozen 30-second silence fixture. These raw
+interval observations justify one candidate but do not evaluate correctness.
+
+The checked-in candidate changes only `vad.threshold` to `0.3`. It first passes
+the VAD numerical oracle, warning-clean build, all CTest entries, the frozen
+silence probe, three real-WebSocket silence runs, and two independent
+120-second captures with exact seven-track repeatability. Every 120-second
+reference contribution is then read chronologically and in reverse. Only if
+those gates pass does one 600-second real-WebSocket capture receive complete
+93-contribution chronological/reverse contextual review. A full A/B capture is
+not authorized before that manual gate is retained.
+
+The checked-in candidate completes the pre-commit engineering portion of T130:
+its full-audio VAD export is byte-identical to the temporary threshold-0.3
+probe, its frozen-silence export is empty, the VAD numerical test passes, the
+clean build warning/error scan is empty, and all `69/69` CTest entries pass.
+See `vad-sensitivity-diagnosis-2026-07-19.md` for frozen hashes and the claim
+boundary.
+
 ### 8.15 FR28 120-second outcome and promotion ladder
 
 T117-T121 are complete. The frozen T116 packages replay byte-stably; their

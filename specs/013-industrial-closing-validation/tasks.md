@@ -1920,3 +1920,30 @@
   synchronization builds warning-clean and passes all `69/69` CTest entries;
   these are mechanical checks only. See
   `cross-view-handoff-full-promotion-review-2026-07-18.md`.
+- [x] T129 Diagnose the T123 regression from frozen T111/T123 typed tracks
+  without rerunning audio. Prove only mechanical causality: identical
+  Sortformer/primary inputs, zero current-projector speaker-sequence changes on
+  T111 inputs, T123 replay reproduction, and stable VAD gaps at manually
+  reviewed lost-utterance contexts. Probe TOML thresholds `0.4` and `0.3` one
+  at a time and retain no product verdict. Threshold `0.3` exposes the two
+  reviewed low-energy regions and emits zero VAD segments on the frozen
+  30-second silence fixture.
+- [x] T130 Implement FR30 by changing only checked-in TOML `vad.threshold` from
+  `0.5` to `0.3`. Keep every model, code path, and other behavioral value
+  unchanged. Pass the VAD oracle, warning-clean build, all CTest entries, and
+  the frozen silence probe, then commit and push the candidate explicitly as a
+  transitional experiment. The full-audio production VAD export is byte-
+  identical to the temporary threshold-0.3 probe, the frozen-silence export is
+  empty, `test_vad` passes, the clean warning/error scan is empty, and all
+  `69/69` CTest entries pass. See
+  `vad-sensitivity-diagnosis-2026-07-19.md`.
+- [ ] T131 From the clean T130 commit, run three independent real-WebSocket
+  silence sessions and two independent 120-second production captures with
+  isolated registries, direct `end`, telemetry, and complete manifests. Verify
+  structural and repeatability contracts mechanically, then read every
+  in-scope `test.txt` contribution chronologically and in reverse. Automation
+  may not assign correctness or acceptance.
+- [ ] T132 Only if T131 is manually retained, run one clean 600-second
+  production WebSocket capture and perform complete chronological and reverse
+  contextual review of all 93 contributions. Do not authorize a full A/B run
+  or alter T111 unless this gate passes.
