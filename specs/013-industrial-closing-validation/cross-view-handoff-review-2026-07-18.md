@@ -33,7 +33,7 @@ The producer tracks retain useful evidence at the second failure:
   run, and a containing business-interval voiceprint writes its Tang majority
   across both native identities.
 
-The accepted T111 evidence places the same substantive response before the
+The frozen T111 evidence places the same substantive response before the
 handoff. The regression is therefore in projection robustness, not a missing
 diarization speaker transition.
 
@@ -83,7 +83,7 @@ The two speaker-sequence changes form one continuous exchange:
 
 - `ref-0073`: the candidate retains Shi Yi for `否决了，对，四十五。` instead
   of assigning `对，四十五` to Tang Yunfeng. The very short aligned onset
-  remains attached to Tang, as in the accepted T111 boundary, but the complete
+  remains attached to Tang, as in the retained T111 boundary, but the complete
   substantive response is again Shi Yi.
 - `ref-0074`: the clause-closing punctuation stays with Shi Yi, then Tang
   Yunfeng begins with `嗯，如果说我和你加起来也能否决我`. The candidate
@@ -109,7 +109,7 @@ is unchanged. No other frozen 600-second conversation context changes.
 The frozen FR29 projection is retained for real-path promotion because complete
 forward and reverse contextual review restores the failed contribution without
 introducing a new changed-context speaker error. This frozen result alone does
-not advance the accepted T111 full-session baseline.
+not advance the frozen T111 full-session comparison.
 
 ## T128 Real-WebSocket Gate
 

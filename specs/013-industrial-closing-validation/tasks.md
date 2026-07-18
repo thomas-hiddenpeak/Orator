@@ -1,6 +1,7 @@
 # Tasks: Industrial Closing Validation
 
-**Status**: In progress - FR16ABN full natural-turn gate passed; T102/T084 remain open 2026-07-18
+**Status**: In progress - T135 reconciled T111/T123/T133; no full candidate
+passes all natural-turn gates; T102/T084 remain open 2026-07-19
 
 ## Phase 0: Governance
 
@@ -1743,12 +1744,13 @@
   restarted frozen-registry Run B through the production WebSocket path. Read
   all 556 contributions chronologically and in reverse fixed windows for each
   run before manually deriving any result or advancing the baseline. Run A and
-  the accepted Run B retry completed all `3615.120` seconds at `0.993x`, with
+  the retained Run B retry completed all `3615.120` seconds at `0.993x`, with
   direct waits of `25.849 s` and `25.585 s`, exact common-clock extents,
   observer convergence, and accepted telemetry coverage. Complete forward and
   reverse review, followed by T102 reconciliation of the `ref-0160` source-label
-  conflict and the `ref-0182` boundary-only judgment, manually establishes
-  `519/556` for both runs. The first Run B
+  conflict and the `ref-0182` boundary-only judgment, originally established
+  `519/556` for both runs. T135 supersedes that incomplete ledger with
+  `514/556`. The first Run B
   artifact is preserved but excluded because runtime telemetry cadence was
   `94.965%`; the controlled retry passed at `95.214%` with unchanged behavioral
   values. See `delayed-alignment-full-promotion-review-2026-07-18.md`.
@@ -1761,7 +1763,7 @@
   clean 120-second 1.0x real-WebSocket run records 119 runtime samples
   (`99.167%` cadence), 120 tegrastats samples, exact one-second runtime steps,
   and 100 percent required-field coverage. This task does not evaluate speaker
-  correctness or reopen the accepted T111 contextual result; see
+  correctness or reopen the frozen T111 contextual result; see
   `gpu-telemetry-deadline-review-2026-07-18.md`.
 
 ## Phase 11: Future-Epoch Corroboration
@@ -1772,8 +1774,9 @@
   galleries, and identity epochs. Correct the boundary-only `ref-0182`
   judgment without scoring ASR wording, retain `ref-0249` as a critical mixed-
   identity failure, and reject a global 20-second identity backfill because it
-  rewrites unrelated epoch boundaries. The signed manual baseline is 519
-  accepted and 37 incorrect contributions for each frozen run; see
+  rewrites unrelated epoch boundaries. This task originally signed 519
+  accepted and 37 incorrect contributions for each frozen run; T135's complete
+  uniform reread supersedes it with 514 accepted and 42 incorrect; see
   `speaker-gate-breakdown-review-2026-07-18.md`.
 - [x] T114 Implement FR16ABO with an explicit zero-disabled
   `[speaker_fusion].future_epoch_lookahead_sec` typed configuration field.
@@ -1913,10 +1916,12 @@
   completes both full paths at `0.995x` with direct-end waits of `16.540 s` and
   `17.499 s`, exact seven-track extents, observer convergence, complete
   telemetry, and identical normalized seven-track entries. Complete independent
-  chronological and reverse-block semantic review manually records `506/556`
-  for each run. Two fixed blocks, two canonical speakers, critical attribution,
+  chronological and reverse-block semantic review originally records
+  `506/556`; T135 adds the omitted `ref-0099` error and corrects each run to
+  `505/556`. Two fixed blocks, two canonical speakers, critical attribution,
   confident-wrong attribution, and the development margin fail, so FR29 is not
-  promoted and T111 remains the accepted baseline. The final documentation
+  promoted and T111 remains the best frozen comparison, not a closing result.
+  The final documentation
   synchronization builds warning-clean and passes all `69/69` CTest entries;
   these are mechanical checks only. See
   `cross-view-handoff-full-promotion-review-2026-07-18.md`.
@@ -1973,8 +1978,21 @@
   every required speaker-business gate, compare the two complete judgments to
   T111 and the rejected T123 result, and then retain or reject FR30. No code,
   script, query, formula, metric, or model score may assign any result or
-  promotion verdict. Complete independent forward and reverse review manually
-  records `498/556` for both runs. Two fixed blocks, three canonical speakers,
+  promotion verdict. Complete independent forward and reverse review originally
+  records `498/556`; T135 adds the omitted `ref-0099` error and corrects both
+  runs to `497/556`. Two fixed blocks, three canonical speakers,
   the full 90-percent floor, critical attribution, and confident-wrong
   attribution fail. FR30 is rejected and checked-in `vad.threshold` returns to
   `0.5`; see `vad-sensitivity-full-promotion-review-2026-07-19.md`.
+- [x] T135 Reaudit the frozen T111 Run A and Run B artifacts under the same
+  complete-context material-fragment rule used for T123 and T133. Read all 556
+  contributions chronologically and in reverse 600-second blocks for each run,
+  reconcile every ambiguous mixed-identity natural turn, then manually compare
+  the three full ledgers without code-based labels or aggregation. Add
+  `ref-0099` to all three ledgers and add `ref-0239`, `ref-0426`, `ref-0503`,
+  and `ref-0518` to T111. Corrected results are T111 `514/556`, T123 `505/556`,
+  and T133 `497/556`. T111 remains the best frozen comparison but fails the
+  3000-3600 block, 朱杰 recall, critical attribution, and confident-wrong
+  gates. The documentation synchronization builds warning-clean and passes all
+  `69/69` CTest entries as engineering verification only. See
+  `speaker-baseline-reconciliation-2026-07-19.md`.

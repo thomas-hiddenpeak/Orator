@@ -1,5 +1,12 @@
 # FR30 VAD Sensitivity Diagnosis (2026-07-19)
 
+> **Causal boundary corrected 2026-07-19.** T135 confirms that T111 already
+> assigns most of `ref-0503` to the wrong speaker. The VAD gap below is the
+> first changed producer evidence in T123, but it is not the root cause of the
+> original speaker-attribution failure. FR30 was subsequently rejected at the
+> corrected `497/556`, and checked-in `vad.threshold` is restored to `0.5`.
+> See `speaker-baseline-reconciliation-2026-07-19.md`.
+
 ## Scope and authority
 
 This report records the frozen root-cause diagnosis that follows the rejected
@@ -28,7 +35,7 @@ frozen typed-input sets with the checked-in projector and TOML policy:
 | T111 tracks, current projector | `646ea91b357cafaf8af82c4f45e5cc771c622a501e71b12f2d1aa1555fb055f2` | Zero reference-interval speaker-sequence changes from the original T111 view |
 
 This rules out a new session-wide business-projector policy regression. Given
-the accepted T111 evidence, the current projector preserves its speaker
+the frozen T111 evidence, the current projector preserves its speaker
 sequence. The causal difference must enter through changed producer evidence.
 
 ## First causal loss
@@ -44,12 +51,12 @@ T123 intervals:
 | Context from completed manual review | Stable VAD evidence at threshold 0.5 | Propagation observed in frozen tracks |
 |---|---|---|
 | `ref-0409`, source `2752-2754 s` | Prior segment ends `2751.996`; next starts `2754.724` | T123 ASR closes at `2752.996` and omits the remainder of the contribution; alignment and business text are consequently absent |
-| `ref-0503`, source inside `3278-3284 s` | Prior segment ends `3277.980`; next starts `3284.132` | T123 ASR has no audio for the intervening utterance; T111 ASR had retained it while ahead of VAD |
+| `ref-0503`, source inside `3278-3284 s` | Prior segment ends `3277.980`; next starts `3284.132` | T123 ASR has no audio for the intervening utterance; T111 ASR retained more words while still assigning most of the recognizable turn to the wrong speaker |
 
 Sortformer independently exposes activity at `3281.040-3281.920 s`. This is a
 raw cross-pipeline time-base observation, not a correctness score. It confirms
-that the second VAD gap contains non-silence evidence and that another fusion-
-policy exception would act after the first data loss.
+that the second VAD gap contains non-silence evidence. It does not show that
+admitting that audio would repair speaker attribution.
 
 The loss propagates in one direction:
 
@@ -96,10 +103,8 @@ These are engineering and mechanical gates only.
 
 ## Decision boundary
 
-FR30 is a transitional experiment, not an accepted configuration. The next
-step is T131 from one clean commit: three independent real-WebSocket silence
-runs and two independent 120-second real-WebSocket captures, followed by
-complete chronological and reverse contextual review of every in-scope
-`test.txt` contribution. A 600-second run is forbidden until T131 is manually
-retained, and no full A/B run is authorized until the complete 600-second
-contextual gate passes.
+T131 through T134 later completed the required ladder. The full A/B contextual
+review rejected FR30, and checked-in `vad.threshold` returned to `0.5`. The
+next diagnosis must separate T123-only upstream evidence losses from speaker
+fusion errors already present in T111. No bounded VAD rescue may be promoted
+as a `ref-0503` speaker fix without complete changed-context evidence.

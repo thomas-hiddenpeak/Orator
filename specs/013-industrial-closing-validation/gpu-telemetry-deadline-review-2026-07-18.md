@@ -4,7 +4,7 @@
 
 This record closes T112 as an engineering timing task. It verifies the GPU
 telemetry timer, payload coverage, and real-WebSocket mechanical contract. It
-does not evaluate speaker correctness, revise the accepted T111 contextual
+does not evaluate speaker correctness or revise the frozen T111 contextual
 result, or advance T102/T084.
 
 ## Root cause

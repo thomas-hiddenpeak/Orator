@@ -71,5 +71,6 @@ exchange in both directions; the display tool did not assign it.
 T131 is retained. FR30 may proceed to exactly one clean 600-second production
 real-WebSocket capture, followed by complete chronological and reverse
 contextual review of all 93 in-scope contributions. FR30 remains transitional,
-T111 remains the accepted full-session baseline, and no full A/B capture is
+T111 remains the best frozen full-session comparison, not an accepted closing
+result, and no full A/B capture is
 authorized until T132 is manually retained.

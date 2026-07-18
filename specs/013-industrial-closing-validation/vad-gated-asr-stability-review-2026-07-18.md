@@ -173,8 +173,8 @@ product tracks in two independent real-WebSocket runs, removes the
 pre-reference blank-audio transcript, and introduces no contextual speaker
 regression in the complete 120-second gate.
 
-This is not a full-length speaker result and does not alter the accepted T111
-`519/556` baseline. A clean 600-second run and then independent full-length A/B
+This is not a full-length speaker result and does not alter the corrected T111
+`514/556` frozen comparison. A clean 600-second run and then independent full-length A/B
 captures remain mandatory. Any full candidate must receive complete 556-item
 forward and reverse contextual semantic review before the speaker baseline or
 closure status can advance.

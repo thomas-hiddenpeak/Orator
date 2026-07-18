@@ -1,5 +1,10 @@
 # Delayed Alignment Full Promotion Review (2026-07-18)
 
+> **Reconciled 2026-07-19.** T135's new complete A/B forward-and-reverse
+> reread adds five omitted errors and corrects T111 to `514/556`. The corrected
+> list and conclusion below supersede the original `519/556` claim. See
+> `speaker-baseline-reconciliation-2026-07-19.md`.
+
 ## Scope and claim boundary
 
 This record completes T110 and T111 for FR16ABN at clean transitional
@@ -21,16 +26,17 @@ script, query, formula, notebook, metric, or algorithm assigned correctness,
 aggregated accuracy, ranked a candidate, or issued the result. Tools captured
 the runs, verified mechanical contracts and hashes, and displayed unjudged
 evidence. The reviewer read all 556 contributions in chronological order for
-each accepted full run, then reread each complete session in six reverse fixed
+each retained full run, then reread each complete session in six reverse fixed
 windows and reconciled the two passes.
 
-This report signs the 90 percent natural-business-turn speaker-attribution gate
-for these two exact runs. `test.txt` is the human-listened reference and all 556
-rows were already read twice against each run; no duplicate audio transcription
-or boundary-listening pass is required. This report does not yet sign
-speaker-time, fixed-block, per-speaker, criticality, confidence, or source-time-
-offset breakdowns. T102, T084, canonical closure, release sign-off, and
-industrial readiness remain open.
+This report signs only the standalone 90 percent full-session natural-turn
+floor for these two exact runs. `test.txt` is the human-listened reference and
+all 556 rows were already read twice against each run; no duplicate audio
+transcription or boundary-listening pass is required. T135 later signs and
+fails one fixed block, 朱杰 recall, criticality, and confidence. Speaker-time,
+per-speaker time, and source-time-offset breakdowns remain unsigned. T102,
+T084, canonical closure, release sign-off, and industrial readiness remain
+open.
 
 ## Frozen inputs and build
 
@@ -47,7 +53,7 @@ industrial readiness remain open.
 | Frozen registry | `66461a77755984a08231d06306da7ce9e1eeac07be1927e91f8a772fc54c7b3f` |
 
 The source commit, worktree, binary, configuration, audio, and registry
-provenance remained stable throughout each accepted run. No environment
+provenance remained stable throughout each retained run. No environment
 override changed the resolved runtime behavior.
 
 ## T110 promotion ladder
@@ -95,7 +101,7 @@ The immutable review packets are:
 | Runtime / `tegrastats` samples | `3438 / 3631` | `3442 / 3631` |
 | Runtime / `tegrastats` cadence | `95.104% / 100%` | `95.214% / 100%` |
 
-Both accepted artifacts report no contract issue. Every registered track ends
+Both retained artifacts report no contract issue. Every registered track ends
 at `57,841,920` common-clock samples with zero gap; `timebase_ok`,
 `timebase_reconciled`, and `wall_clock_ok` are true. Producer, early observer,
 and late observer terminal payloads agree. Required GPU utilization, GPU
@@ -142,7 +148,7 @@ time display edges did not override the conversational handoff.
 
 ## Manual natural-turn result
 
-FR16ABN repairs `ref-0090` in both accepted full runs: the short Xu Zijing
+FR16ABN repairs `ref-0090` in both retained full runs: the short Xu Zijing
 confirmation at `569.26-569.42` is assigned to `spk_2`, while Shi Yi's
 following substantive calculation remains `spk_3`. The complete forward and
 reverse reads found no session-wide identity permutation and no tail-wide
@@ -154,28 +160,29 @@ Run A also contains correct Zhu Jie and Xu Zijing contributions at
 the FR16ABN rule.
 
 The initial T111 pass listed the same 39 contributions as incorrect in each
-accepted run. The T102 breakdown reread then reconciled `ref-0160`: its source
+retained run. The T102 breakdown reread then reconciled `ref-0160`: its source
 line says 石一, but the surrounding board-attendance exchange unambiguously
 identifies 唐云峰, and both runs assign it to `spk_1`. It also reconciled
 `ref-0182`: complete conversation context contains the recognizable 徐子景
 contribution under `spk_2`, despite imperfect wording and a shifted display
-edge. The final 37 incorrect
+edge. T135's uniform material-fragment reread adds `ref-0099`, `ref-0239`,
+`ref-0426`, `ref-0503`, and `ref-0518`. The final 42 incorrect
 contributions in each run are:
 
 `ref-0009`, `ref-0024`, `ref-0045`, `ref-0049`, `ref-0058`, `ref-0061`,
-`ref-0102`, `ref-0118`, `ref-0135`, `ref-0221`,
+`ref-0099`, `ref-0102`, `ref-0118`, `ref-0135`, `ref-0221`, `ref-0239`,
 `ref-0241`, `ref-0249`, `ref-0252`, `ref-0253`, `ref-0296`, `ref-0298`,
 `ref-0313`, `ref-0327`, `ref-0331`, `ref-0333`, `ref-0338`, `ref-0341`,
-`ref-0354`, `ref-0375`, `ref-0390`, `ref-0417`, `ref-0442`, `ref-0444`,
-`ref-0457`, `ref-0461`, `ref-0499`, `ref-0504`, `ref-0505`, `ref-0506`,
-`ref-0507`, `ref-0509`, and `ref-0537`.
+`ref-0354`, `ref-0375`, `ref-0390`, `ref-0417`, `ref-0426`, `ref-0442`,
+`ref-0444`, `ref-0457`, `ref-0461`, `ref-0499`, `ref-0503`, `ref-0504`,
+`ref-0505`, `ref-0506`, `ref-0507`, `ref-0509`, `ref-0518`, and `ref-0537`.
 
-For each run, the reconciled review manually establishes 519 accepted and 37
-incorrect natural contributions and manually calculates `519 / 556`,
-approximately `93.35%`. Both accepted full runs therefore pass the 90 percent real-runtime
-natural-turn product gate independently. This does not sign any other
-conjunctive Spec 013 gate. Fixed-block, per-speaker, criticality, and confidence
-details are in `speaker-gate-breakdown-review-2026-07-18.md`.
+For each run, the reconciled review manually establishes 514 accepted and 42
+incorrect natural contributions and manually calculates `514 / 556`,
+approximately `92.45%`. Both retained full runs pass only the standalone 90
+percent full-session natural-turn floor. The 3000-3600 fixed block, 朱杰
+recall, criticality, and confidence gates fail. Details are in
+`speaker-gate-breakdown-review-2026-07-18.md`.
 
 ## Promotion decision and next boundary
 
@@ -184,13 +191,11 @@ complete, and this report supersedes the frozen-replay-only status in
 `delayed-alignment-clause-review-2026-07-18.md`. The result is a transitional
 experimental checkpoint, not a release or complete speaker-business closure.
 
-T102 remains the next product-evaluation gate: reuse the completed 556-row
-forward and reverse contextual judgments against the human-audited `test.txt`
-reference, classify criticality and confident-wrong/uncertain outcomes from
-complete context, and manually derive the speaker-time, fixed-block,
-per-speaker, critical-turn, confident-wrong, and source-time-offset breakdowns
-for Run A and Run B independently. Source-time review uses `test.txt` at its
+T135 completes the corrected natural-turn, fixed-block, per-speaker,
+criticality, and confident-wrong reconciliation. T102 remains open only for the
+manual speaker-time, per-speaker time, and source-time-offset breakdowns for
+Run A and Run B independently. Source-time review uses `test.txt` at its
 recorded whole-second precision and must not invent sub-second reference truth.
-T112 subsequently closed the telemetry scheduling follow-up. Neither follow-up
-may reinterpret the natural-turn result above or use code to assign a product
+T112 separately closed the telemetry scheduling follow-up. No follow-up may
+reinterpret the natural-turn result above or use code to assign a product
 verdict.

@@ -1,5 +1,11 @@
 # Future-Epoch Full Promotion Review (2026-07-18)
 
+> **Comparison superseded 2026-07-19.** T135 corrects the T111 ledger to
+> `514/556`. The T116 `518/556` ledger has not received the same reconciliation,
+> so its numerical rank against T111 is withdrawn. FR16ABO remains rejected for
+> its independently established A/B inconsistency and critical/confident-wrong
+> failures. See `speaker-baseline-reconciliation-2026-07-19.md`.
+
 ## Scope and evaluation authority
 
 This record completes T116 for FR16ABO. Transitional experimental commit
@@ -87,9 +93,9 @@ the already completed semantic judgments.
 
 ## Complete contextual findings
 
-The accepted T111 baseline has 519 accepted and 37 incorrect contributions in
-each run. Its error ledger contains 31 confident-wrong (`CW`), five missing
-(`M`), and one uncertain (`U`) contribution. The T116 review did not carry a
+The historical pre-T135 T111 ledger used by this review had 519 accepted and 37
+incorrect contributions in each run. T135 supersedes it with 514 accepted and
+42 incorrect. The T116 review did not carry a
 changed-row shortcut forward as a verdict: every reference contribution was
 reread in both directions before these differences were signed.
 
@@ -144,11 +150,13 @@ The final Run B error references are:
 
 ## Manual totals and decision
 
-Each full run contains 518 accepted and 38 incorrect contributions, manually
-classified as 32 `CW`, five `M`, and one `U`. The manually checked natural-turn
+The historical T116 ledger contains 518 accepted and 38 incorrect
+contributions, manually classified as 32 `CW`, five `M`, and one `U`. The
+manually checked natural-turn
 result is therefore `518/556`, approximately `93.17%`, for both Run A and Run
-B. Each remains above the 90 percent natural-turn floor but is one contribution
-below the accepted T111 `519/556` result. The confident-wrong share also rises
+B. T135 did not reaudit these artifacts under the corrected material-fragment
+rule, so this total is not ranked against T111. The confident-wrong share in
+the historical ledger also rises
 to approximately `5.76%`, above the at-most-two-percent gate, and known wrong
 critical attributions remain, so the zero-critical-error gate still fails.
 
@@ -163,8 +171,8 @@ change.
 
 T116 passes its engineering, transport, latency, telemetry, time-base, and
 evidence-completeness contracts but fails product promotion. Neither full run
-advances the accepted baseline or any speaker gate. The active baseline remains
-the T111 FR16ABN result at `519/556`; the checked-in TOML returns
+advances a speaker gate. The best uniformly reconciled frozen comparison is
+the T111 FR16ABN result at corrected `514/556`; the checked-in TOML returns
 `speaker_fusion.future_epoch_lookahead_sec` to `0.0`. The implementation remains
 dormant for evidence tracing and cannot activate in the default runtime.
 

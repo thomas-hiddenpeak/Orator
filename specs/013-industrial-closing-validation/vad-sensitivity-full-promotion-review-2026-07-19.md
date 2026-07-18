@@ -1,5 +1,11 @@
 # FR30 Full Promotion Review (2026-07-19)
 
+> **Reconciled 2026-07-19.** The complete cross-version audit applies the
+> material-fragment rule to `ref-0099`, which was split between 石一 and 朱杰.
+> The corrected T133 result is `497/556`, not `498/556`; the tables below
+> include the correction. See
+> `speaker-baseline-reconciliation-2026-07-19.md`.
+
 ## Scope and authority
 
 This report completes T133 and T134 for clean commit
@@ -35,7 +41,7 @@ unjudged reference and runtime evidence beside each other for reading.
 | Direct-end terminal wait | `15.624 s` | `15.476 s` |
 | Runtime / tegrastats samples | `3615 / 3620` | `3615 / 3620` |
 | Product-track contract issues | None | None |
-| Manual natural-turn result | `498/556` | `498/556` |
+| Manual natural-turn result | `497/556` | `497/556` |
 | Promotion decision | Reject | Reject |
 
 The first Run B attempt is excluded. Its copied registry retained read-only
@@ -104,6 +110,7 @@ ledger for each run is:
 | 0061 | 0-600 | 石一 | CW | No | Duplicate-time preface is merged into 唐云峰's following turn |
 | 0066 | 0-600 | 唐云峰 | CW | Fail | `你们俩可以` is absorbed into 石一's calculation |
 | 0071 | 0-600 | 石一 | CW | Fail | `才44、45` is assigned to 唐云峰 |
+| 0099 | 600-1200 | 石一 | CW | Fail | The first clause is assigned to 石一, but the substantive governance consequence is assigned to 朱杰 |
 | 0102 | 600-1200 | 唐云峰 | CW | Fail | Governance conclusion is assigned to 石一 |
 | 0118 | 600-1200 | 唐云峰 | CW | Fail | Fifteen-percent confirmation is predominantly assigned to 石一 |
 | 0135 | 600-1200 | 石一 | CW | No | Calculation tag question is assigned to 唐云峰 |
@@ -156,10 +163,10 @@ ledger for each run is:
 | 0518 | 3000-3600 | 朱杰 | CW | Fail | `老师最有发言权` is assigned to 唐云峰 |
 | 0537 | 3000-3600 | 唐云峰 | CW | No | `甩手掌柜` response is assigned to 石一 |
 
-The ledger contains 51 confident-wrong, six missing, and one uncertain
-contribution. Thirty-six confident-wrong contributions and two missing
+The ledger contains 52 confident-wrong, six missing, and one uncertain
+contribution. Thirty-seven confident-wrong contributions and two missing
 contributions carry critical business meaning. The critical-speaker gate fails.
-The manually derived confident-wrong share is `51/556`, approximately `9.17%`,
+The manually derived confident-wrong share is `52/556`, approximately `9.35%`,
 so both confident-wrong requirements fail.
 
 ## Manually checked gate breakdowns
@@ -169,7 +176,7 @@ so both confident-wrong requirements fail.
 | Block | Run A | Run B | Gate |
 |---|---:|---:|---|
 | 0-600 | `86/93` (92.47%) | `86/93` (92.47%) | Pass |
-| 600-1200 | `79/84` (94.05%) | `79/84` (94.05%) | Pass |
+| 600-1200 | `78/84` (92.86%) | `78/84` (92.86%) | Pass |
 | 1200-1800 | `73/80` (91.25%) | `73/80` (91.25%) | Pass |
 | 1800-2400 | `72/80` (90.00%) | `72/80` (90.00%) | Pass |
 | 2400-3000 | `109/129` (84.50%) | `109/129` (84.50%) | Fail |
@@ -183,27 +190,27 @@ so both confident-wrong requirements fail.
 | 朱杰 | `68/83` (81.93%) | `68/83` (81.93%) | Fail |
 | 唐云峰 | `166/189` (87.83%) | `166/189` (87.83%) | Fail |
 | 徐子景 | `65/73` (89.04%) | `65/73` (89.04%) | Fail |
-| 石一 | `199/211` (94.31%) | `199/211` (94.31%) | Pass |
+| 石一 | `198/211` (93.84%) | `198/211` (93.84%) | Pass |
 
 ### Full session and baseline comparison
 
-Each independently reviewed run has 498 accepted and 58 incorrect natural
-contributions. The manually derived full-session result is `498/556`,
-approximately `89.57%`. It fails the 90-percent industrial floor.
+Each independently reviewed run has 497 accepted and 59 incorrect natural
+contributions. The manually derived full-session result is `497/556`,
+approximately `89.39%`. It fails the 90-percent industrial floor.
 
-Relative to rejected T123, FR30 repairs `ref-0063` and `ref-0499`, but adds
+Relative to corrected rejected T123, FR30 repairs `ref-0063` and `ref-0499`, but adds
 errors at `ref-0009`, `ref-0250`, `ref-0261`, `ref-0280`, `ref-0377`,
 `ref-0388`, `ref-0459`, `ref-0460`, `ref-0463`, and `ref-0491`. The resulting
-ledger is eight contributions below T123's `506/556` and 21 below accepted
-T111's `519/556`. Those comparisons were counted manually after every changed
+ledger is eight contributions below T123's `505/556` and 17 below corrected
+T111's `514/556`. Those comparisons were counted manually after every changed
 context had been read in both directions; the assignment-only display did not
 produce them.
 
 ## Decision and next evidence boundary
 
 T133 and T134 are complete. FR30 full promotion is rejected. The checked-in
-TOML returns `vad.threshold` to `0.5`; T111 remains the accepted
-speaker-business evidence baseline. The retained FR29 code is still a
+TOML returns `vad.threshold` to `0.5`; T111 remains the best frozen comparison
+baseline, not an accepted closing result. The retained FR29 code is still a
 transitional experiment, not a closed production configuration.
 
 The result rejects a global VAD-sensitivity change as the recovery mechanism.

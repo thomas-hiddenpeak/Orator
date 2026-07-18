@@ -7,8 +7,10 @@ its deterministic trailing-context correction pass the silence and repeated
 `ref-0073`; FR29 passes repeated 120-second and complete 600-second real-stream
 review but its full T123 A/B promotion is rejected; FR30 VAD-sensitivity
 passes T131 silence/repeatability and T132 complete 600-second contextual
-review, but its full T133/T134 A/B promotion is rejected at `498/556` and the
-checked-in threshold returns to `0.5`; T102, T084, full
+review, but its full T133/T134 A/B promotion is rejected at corrected
+`497/556` and the checked-in threshold returns to `0.5`; T135 reconciles the
+T111/T123/T133 ledgers and withdraws the prior all-natural-turn-gates-passed
+claim; T102, T084, full
 canonical closure, release sign-off, and industrial readiness remain open
 **Created**: 2026-07-13
 **Scope**: Re-establish a truthful product baseline, recover full-session business
@@ -17,36 +19,40 @@ accuracy, and define the evidence required before Orator may be declared closed.
 
 ## 1. Objective
 
-Orator's v2.1 speaker-business pipeline now has repeatable full-session evidence
-above 90 percent for the natural-business-turn speaker-attribution gate. The
-FR16ABN Run A and Run B were each executed through the real WebSocket path, and
+Orator's v2.1 speaker-business pipeline has repeatable full-session evidence,
+but no frozen run passes every natural-business-turn speaker-attribution gate.
+The FR16ABN Run A and Run B were each executed through the real WebSocket path,
+and
 all 556 reference contributions were reconciled under complete forward and
 reverse conversational context. The T102 breakdown reread reconciles the
 `ref-0160` source-label conflict and the `ref-0182` boundary-only judgment, and
-manually establishes 519 accepted and 37 incorrect contributions for each run,
-approximately 93.35 percent. Their direct-end runs also satisfy the terminal-
-latency gate mechanically. Fixed-block and per-speaker natural-turn gates are
-signed separately by T102. Speaker-time, per-speaker time, critical-turn,
-confident-wrong, source-time-offset, ASR, release, and independent-holdout gates
-remain open.
+the T135 complete A/B reread corrects five omitted errors. Each run has 514
+accepted and 42 incorrect contributions, approximately 92.45 percent. Their
+direct-end runs also satisfy the terminal-latency gate mechanically. The
+3000-3600 fixed block, 朱杰 natural-turn recall, critical-turn, and
+confident-wrong gates fail. Speaker-time, per-speaker time,
+source-time-offset, ASR, release, and independent-holdout gates remain open.
 
 The later FR16ABO full promotion does not replace that baseline. Clean
 transitional commit `f49a8278e0d8` passed the 120/600-second and full A/B
 mechanical ladder, but complete 556-contribution forward/reverse semantic
 review against `test.txt` manually records `518/556` for each run. The two
-error sets also differ. FR16ABO is therefore disabled in the checked-in TOML,
-and T111 remains the accepted speaker-business baseline.
+error sets also differ. That historical total predates T135's uniform
+material-fragment reconciliation and is not used for cross-version ranking.
+FR16ABO is disabled in the checked-in TOML, and T111 remains only the best
+fully reconciled frozen comparison baseline.
 
 FR29 also does not replace T111. Clean commit `2ff9ce3655b2a12e90a5d0def25c0a30f171f2d9`
 completed independent empty-registry and restarted frozen-registry full runs.
 All mechanical, terminal-latency, telemetry, observer, provenance, and
 repeatability contracts pass, and the seven product-track entry bundles are
 identical between runs. Complete chronological and reverse-block contextual
-review manually records `506/556` for each run. The full average remains above
+review, corrected by T135 for `ref-0099`, manually records `505/556` for each
+run. The full average remains above
 90 percent, but two fixed blocks, 朱杰 and 唐云峰 turn recall, critical
 attribution, confident-wrong attribution, and the 93-percent development margin
-fail. FR29 therefore remains transitional and T111 remains the accepted
-speaker-business baseline.
+fail. FR29 therefore remains transitional and T111 remains the best frozen
+comparison baseline, not an accepted closing result.
 
 Frozen T111/T123 diagnosis isolates the full-session regression upstream of
 the deterministic business projector. Sortformer diarization and primary-
@@ -55,7 +61,10 @@ reference-interval speaker sequence when given T111 typed inputs, while the
 T123 typed inputs reproduce the T123 view. At manually reviewed low-energy
 utterances, the checked-in `vad.threshold = 0.5` leaves stable VAD gaps that
 FR28 must now skip; T111 had consumed the same audio only because its ASR worker
-ran ahead of the VAD frontier. A one-variable FR30 TOML candidate lowers only
+ran ahead of the VAD frontier. T135 establishes that the strongest
+`ref-0503` speaker error was already present in T111, so this upstream evidence
+difference is not itself a speaker-attribution repair. A one-variable FR30 TOML
+candidate lowers only
 the production VAD threshold to `0.3`. It passes three independent
 real-WebSocket silence sessions, exact seven-track repeatability across two
 independent 120-second runs, and complete forward and reverse review of all 18
@@ -64,11 +73,12 @@ in-scope contributions without a new natural-turn regression. Its clean
 reverse review of all 93 contributions plus all ten T128 sequence changes
 finds no new natural-turn regression. The subsequently authorized full
 empty-registry and frozen-registry paths are mechanically repeatable, but
-complete independent forward and reverse review manually records `498/556`
+complete independent forward and reverse review, corrected by T135 for
+`ref-0099`, manually records `497/556`
 for each. The full 90-percent floor, two fixed blocks, three canonical
 speakers, critical attribution, and confident-wrong attribution fail. FR30 is
 therefore rejected, its checked-in threshold returns to `0.5`, and T111
-remains the accepted speaker-business baseline.
+remains the best frozen comparison baseline without satisfying closing.
 
 T117-T121 subsequently prove that the T116 A/B producer difference begins in
 scheduling-sensitive VAD-gated ASR rather than Sortformer or the deterministic
@@ -256,7 +266,7 @@ subject to the complete acceptance gates in this spec.
     substantive turn. This frozen checkpoint was not a production-run result;
     its successor promotion is recorded below. See
     `delayed-alignment-clause-review-2026-07-18.md`.
-16. **FR16ABN full real-path natural-turn gate passed; T102/T084 open**:
+16. **FR16ABN full real-path captured; T135 corrects the gate result**:
     transitional experimental commit `6b1cb79fa4f5` passed the warning-clean
     build, `68/68` CTest, and 120-second and 600-second direct-end production
     WebSocket promotion. Empty-registry Run A and restarted frozen-registry Run
@@ -266,15 +276,16 @@ subject to the complete acceptance gates in this spec.
     is explicitly excluded because runtime telemetry cadence was `94.965%`;
     the controlled retry passed at `95.214%` without changing behavioral TOML
     values. Complete forward/reverse contextual semantic review, followed by the
-    T102 `ref-0160` and `ref-0182` context reconciliations, manually records
-    `519/556` for both
-    accepted runs. FR16ABN repairs `ref-0090` on both
+    T102 `ref-0160` and `ref-0182` context reconciliations, originally recorded
+    `519/556`. T135's complete A/B reread corrects five omitted errors and
+    supersedes that total with `514/556` for both frozen runs. FR16ABN repairs `ref-0090` on both
     paths; other run-specific repairs are not attributed to that rule.
-    Fixed-block and per-speaker turn gates pass, while critical and confident-
-    wrong gates fail. Speaker-time, per-speaker time, and source-time-offset
+    The 3000-3600 fixed block, 朱杰 recall, critical, and confident-wrong gates
+    fail. Speaker-time, per-speaker time, and source-time-offset
     results remain unsigned. See
     `delayed-alignment-full-promotion-review-2026-07-18.md` and
-    `speaker-gate-breakdown-review-2026-07-18.md`.
+    `speaker-gate-breakdown-review-2026-07-18.md` and
+    `speaker-baseline-reconciliation-2026-07-19.md`.
 17. **GPU telemetry absolute cadence verified; T102/T084 unchanged**:
     transitional experimental commit `d610de36ed13` replaces relative waiting
     with monotonic absolute deadlines while preserving the one-second TOML
@@ -290,8 +301,10 @@ subject to the complete acceptance gates in this spec.
     empty/frozen-registry A/B capture. Both full runs satisfy common-clock,
     terminal-latency, observer, provenance, and telemetry contracts. Complete
     review of all 556 contributions in chronological and tail-to-start order
-    against the human-listened `test.txt` manually records `518/556` for each
-    run, below the accepted `519/556` baseline, with different A/B error sets.
+    against the human-listened `test.txt` historically records `518/556` for
+    each run, with different A/B error sets. That total predates T135's uniform
+    material-fragment reconciliation and is no longer used to rank it against
+    the corrected T111 baseline.
     No code assigned or aggregated the result. The default TOML lookahead is
     restored to zero. See
     `future-epoch-full-promotion-review-2026-07-18.md`.
@@ -303,11 +316,12 @@ subject to the complete acceptance gates in this spec.
     and satisfy observer, provenance, and telemetry contracts. Their seven
     normalized product-track entry bundles are identical. Complete independent
     chronological and reverse-block review of all 556 `test.txt` contributions
-    manually records `506/556` for each run. The 2400-3000 and 3000-3600 fixed
+    originally recorded `506/556`; T135 adds the omitted `ref-0099` error and
+    corrects each run to `505/556`. The 2400-3000 and 3000-3600 fixed
     blocks fail, as do 朱杰 and 唐云峰 turn recall, critical attribution, and
     confident-wrong attribution. Final synchronization builds warning-clean and
-    passes `69/69` CTest as mechanical verification. T111 remains the accepted
-    baseline; see
+    passes `69/69` CTest as mechanical verification. T111 remains the best
+    frozen comparison baseline, not a closing result; see
     `cross-view-handoff-full-promotion-review-2026-07-18.md`.
 20. **T123 regression boundary isolated without a new audio run**: frozen
     T111 and T123 Run A have byte-identical Sortformer diarization and primary-
@@ -317,6 +331,9 @@ subject to the complete acceptance gates in this spec.
     text-split serialization. At the manually reviewed `2752-2754 s` and
     `3278-3284 s` contexts, production VAD at TOML threshold `0.5` leaves the
     speech outside stable evidence, so FR28 deterministically omits it from ASR.
+    T135 later establishes that T111 already misattributes the sustained
+    `ref-0503` turn despite retaining more words there; this observation is an
+    upstream evidence diagnosis, not a speaker-correctness explanation.
     Production `GpuVad` probes changing only the TOML threshold to `0.4` and
     then `0.3` expose additional raw speech intervals; `0.3` also retains zero
     VAD segments on the frozen 30-second silence fixture. The checked-in `0.3`
@@ -324,6 +341,15 @@ subject to the complete acceptance gates in this spec.
     all `69/69` CTest entries. These are causal and mechanical observations
     only, not candidate accuracy or acceptance. See
     `vad-sensitivity-diagnosis-2026-07-19.md`.
+21. **T111/T123/T133 natural-turn ledgers uniformly reconciled**: both frozen
+    T111 A/B artifacts receive a new complete 556-contribution chronological
+    read and reverse-block read. The material-fragment rule adds `ref-0099` to
+    all three ledgers and adds `ref-0239`, `ref-0426`, `ref-0503`, and
+    `ref-0518` to the previously incomplete T111 ledger. Corrected results are
+    T111 `514/556`, T123 `505/556`, and T133 `497/556`. T111 remains the best
+    frozen comparison, but its 3000-3600 block, 朱杰 recall, critical
+    attribution, and confident-wrong gates fail. See
+    `speaker-baseline-reconciliation-2026-07-19.md`.
 
 ## 4. Requirements
 

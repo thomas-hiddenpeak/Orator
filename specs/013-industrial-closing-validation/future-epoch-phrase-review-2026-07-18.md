@@ -1,11 +1,17 @@
 # Future-Epoch Phrase Frozen Replay Review (2026-07-18)
 
+> **Numerical carry-forward superseded 2026-07-19.** T135 corrects the source
+> T111 ledger to `514/556`; therefore the `520/556` design-stage carry-forward
+> below is withdrawn. The contextual `ref-0504` repair remains evidence, but it
+> is not a full-session result. See
+> `speaker-baseline-reconciliation-2026-07-19.md`.
+
 ## Scope and claim boundary
 
 This record completes T114 and T115 for FR16ABO in the dirty-worktree
 candidate based on source commit `94ea937`. It covers the typed configuration,
 production projection rule, focused abstention matrix, complete engineering
-test suite, deterministic replay of both accepted T111 full-run typed-track
+test suite, deterministic replay of both retained T111 full-run typed-track
 sets, and complete forward/reverse conversational review of every changed
 region against the human-listened `test.txt`.
 
@@ -124,9 +130,10 @@ Run A and Run B present the same context and retain the same repair.
 
 The complete changed-context judgment therefore retains FR16ABO. Carrying this
 single repaired contribution forward from the signed T111 ledger gives the
-frozen candidate 520 accepted and 36 incorrect contributions in each path.
-This manual carry-forward is a design-stage result only; it does not replace a
-new full-run review or advance the accepted 519/556 production baseline.
+frozen candidate 520 accepted and 36 incorrect contributions in each path under
+the then-current ledger. T135 supersedes that source ledger, so this numerical
+carry-forward is withdrawn. The changed-context repair remains a design-stage
+finding only; it does not replace a new full-run review or advance a baseline.
 
 ## Retention and next gate
 
@@ -145,8 +152,9 @@ T116 subsequently passed the 120/600-second real-WebSocket ladder and completed
 new full Run A and Run B captures at clean transitional commit `f49a8278e0d8`.
 Both full artifacts received complete 556-contribution chronological and
 tail-to-start contextual semantic review against the human-listened `test.txt`.
-The manually checked result is `518/556` for each run, one contribution below
-the accepted T111 baseline, and their error sets differ. FR16ABO still repairs
+The historical manually checked result is `518/556` for each run, and their
+error sets differ. T135 did not uniformly reaudit those artifacts, so their
+numerical rank against T111 is withdrawn. FR16ABO still repairs
 `ref-0504` in both runs, but the full promotion is rejected and the checked-in
 TOML switch is returned to zero. See
 `future-epoch-full-promotion-review-2026-07-18.md` for the frozen evidence,

@@ -111,4 +111,5 @@ registry. Both artifacts must pass direct-end, provenance, observer, telemetry,
 common-clock, and repeatability contracts. Each artifact then requires its own
 complete 556-contribution chronological review and independent reverse
 600-second-block review before FR30 can be promoted or rejected. T111 remains
-the accepted full-session baseline until all of those manual gates pass.
+the best frozen full-session comparison, not an accepted closing result, until
+all of those manual gates pass.

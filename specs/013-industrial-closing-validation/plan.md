@@ -2722,24 +2722,26 @@ retry used the same source, binary, behavioral TOML values, audio, and frozen
 registry with new isolated storage paths. It completed at `0.993x`, reached
 the terminal timeline in `25.585 s`, and passed telemetry cadence at `95.214%`.
 
-The reviewer read all 556 contributions for Run A and the accepted Run B in
+The reviewer read all 556 contributions for Run A and the retained Run B in
 chronological order, then reread both complete sessions in reverse fixed
 windows. The T102 breakdown reread reconciles the `ref-0160` source-label
-conflict and the `ref-0182` boundary-only judgment, and manually establishes
-519 accepted and 37 incorrect natural contributions for each run,
-approximately 93.35 percent. FR16ABN repairs
+conflict and the `ref-0182` boundary-only judgment. T135's later complete A/B
+reread corrects five omitted errors and manually establishes 514 accepted and
+42 incorrect natural contributions for each run, approximately 92.45 percent.
+FR16ABN repairs
 `ref-0090` on both paths while preserving the following substantive turn. The
 additional correct `ref-0192`/`ref-0194` evidence in Run A and `ref-0215` in
 Run B are run-specific outcomes and are not attributed to FR16ABN. No
 executable mechanism assigned correctness, aggregated the result, ranked the
 runs, or issued the verdict.
 
-T110 and T111 are complete. The 90 percent natural-turn and mechanical
-terminal-latency gates pass for both accepted full runs. T102 remains open for
-the manual speaker-time, fixed-block, per-speaker, critical-turn,
-confident-wrong, and source-time-offset breakdowns from the already completed
-`test.txt` contextual judgments. Fixed-block and per-speaker turn recall pass,
-while critical-speaker and confident-wrong attribution fail; consequently T084
+T110, T111, and the T135 reconciliation are complete. The standalone 90
+percent full natural-turn and mechanical terminal-latency gates pass for both
+frozen full runs. T102 remains open for
+the manual speaker-time, per-speaker time, and source-time-offset breakdowns
+from the already completed `test.txt` contextual judgments. The 3000-3600 fixed
+block, 朱杰 recall, critical-speaker, and confident-wrong attribution fail;
+consequently T084
 and full speaker closure remain open. See
 `speaker-gate-breakdown-review-2026-07-18.md`. The telemetry loop
 also retains an engineering follow-up to schedule samples against absolute
@@ -2813,8 +2815,9 @@ T116 passed the warning-clean build, all 69 CTest entries, the 120/600-second
 real-WebSocket ladder, and full empty/frozen-registry A/B capture at clean
 transitional commit `f49a8278e0d8`. Complete chronological and tail-to-start
 contextual review of all 556 `test.txt` contributions in each run manually
-records `518/556` for both paths. This is one contribution below the accepted
-T111 baseline, and the A/B error sets differ. FR16ABO is therefore rejected for
+historically records `518/556` for both paths. T135 did not uniformly reaudit
+those artifacts, so their numerical rank against T111 is withdrawn; the A/B
+error sets differ. FR16ABO is therefore rejected for
 promotion and the checked-in TOML switch returns to `0.0`; see
 `future-epoch-full-promotion-review-2026-07-18.md`.
 
@@ -2945,7 +2948,7 @@ Yunfeng after it. The current forced alignment extends one character from
 characters onto its endpoint. The base projector consequently groups the
 preceding phrase with the following Tang run. A containing TitaNet business
 interval then measures both speakers together and writes the longer Tang
-identity across the complete source range. The accepted T111 alignment places
+identity across the complete source range. The frozen T111 alignment places
 the same substantive phrase before the handoff, confirming that the raw native
 boundary remains useful while the current unit end is not a reliable text-run
 boundary.
@@ -3019,12 +3022,15 @@ and produce identical normalized entries in all seven product tracks.
 
 Each run receives a complete chronological review of all 556 human-listened
 `test.txt` contributions followed by an independent reverse-600-second-block
-review. The manually reconciled result is `506/556` for each run. The full
+review. T135's uniform material-fragment reconciliation corrects the result to
+`505/556` for each run. The full
 natural-turn average remains above 90 percent, but the 2400-3000 and 3000-3600
 fixed blocks, 朱杰 and 唐云峰 turn recall, the 93-percent development margin,
 critical attribution, and confident-wrong attribution fail. FR29 promotion is
-therefore rejected and T111 remains the accepted baseline; see
-`cross-view-handoff-full-promotion-review-2026-07-18.md`.
+therefore rejected and T111 remains the best frozen comparison baseline, not
+an accepted closing result; see
+`cross-view-handoff-full-promotion-review-2026-07-18.md` and
+`speaker-baseline-reconciliation-2026-07-19.md`.
 
 No new full audio run follows this rejection. The frozen T123 and T111 exports
 show identical Sortformer diarization and primary-speaker views while ASR,
@@ -3041,7 +3047,7 @@ patch. Replaying T111 diarization, primary, ASR, alignment, and voiceprint
 tracks through the current projector changes no reference-interval speaker
 sequence from the original T111 final view. Replaying T123 tracks reproduces
 the T123 final view apart from sub-microsecond split-point serialization. The
-same projector therefore preserves the accepted baseline when its upstream
+same projector therefore preserves the frozen T111 view when its upstream
 evidence is preserved.
 
 The first causal loss is in the FR28 input frontier. T111 consumed undecided
@@ -3053,6 +3059,10 @@ ending at `2751.996 s` and starting at `2754.724 s`; another reviewed utterance
 inside `3278-3284 s` falls between segments ending at `3277.980 s` and starting
 at `3284.132 s`. This omission propagates into ASR text boundaries, forced
 alignment, short-window TitaNet evidence, and final business revisions.
+T135 later confirms that T111 already assigns most of the sustained
+`ref-0503` speaker turn to the wrong identity despite retaining more ASR
+evidence. The VAD observation therefore explains changed evidence availability,
+not the original speaker failure.
 
 FR30 tests one production parameter only. A temporary TOML with
 `vad.threshold = 0.4` exposes `2753.668-2754.076 s` and
@@ -3114,8 +3124,10 @@ registry and valid Run B restarts from Run A's frozen registry. Both complete
 at `0.996x`, pass direct-end, exact common-clock, provenance, observer,
 telemetry, and normalized seven-track repeatability contracts. Each artifact
 then receives a complete 556-contribution chronological read and an independent
-reverse-block read. The two manually reconciled ledgers agree at `498/556`.
-Two fixed blocks, three canonical speakers, the full 90-percent floor,
+reverse-block read. The two manually reconciled ledgers originally agreed at
+`498/556`. T135's uniform material-fragment reconciliation adds `ref-0099` and
+corrects both ledgers to `497/556`. Two fixed blocks, three canonical speakers,
+the full 90-percent floor,
 critical attribution, and confident-wrong attribution fail. FR30 is rejected
 and checked-in `vad.threshold` returns to `0.5`; see
 `vad-sensitivity-full-promotion-review-2026-07-19.md`.
@@ -3126,6 +3138,33 @@ whether only low-energy gaps corroborated by independent speaker activity can
 be admitted on the common time base without merging neighboring VAD/ASR
 sessions. Any candidate must be source-free and pass complete changed-context
 review before another real-audio promotion run.
+
+### 8.20 Uniform baseline reconciliation and next evidence split
+
+T135 reopens no model output and changes no runtime behavior. It reads both
+frozen T111 artifacts across all 556 contributions chronologically and again
+in reverse 600-second blocks, then applies the same material-fragment rule to
+the already completed T123 and T133 reviews. The corrected natural-turn
+results are T111 `514/556`, T123 `505/556`, and T133 `497/556`. T111 is the
+best frozen comparison but fails the 3000-3600 block, 朱杰 recall, critical
+attribution, and confident-wrong gates.
+
+The corrected comparison prevents the next implementation from treating
+`ref-0503` as a new VAD-caused speaker regression. T111 already retains more
+words there while assigning most of the sustained turn to the wrong identity.
+The next diagnosis therefore separates two evidence classes on frozen tracks:
+
+1. T123-only errors whose recognizable contribution is absent before forced
+   alignment because deterministic VAD gating withheld ASR evidence.
+2. Errors already present with usable T111 text, where Sortformer, primary,
+   voiceprint, and business fusion disagree or a later projection rewrites a
+   supported identity.
+
+No global threshold change or full capture follows directly from this audit.
+The next candidate must be source-free, preserve the common sample clock, and
+show complete contextual repairs without changed-context regressions before it
+enters the real-WebSocket promotion ladder. See
+`speaker-baseline-reconciliation-2026-07-19.md`.
 
 ### 8.15 FR28 120-second outcome and promotion ladder
 
@@ -3141,7 +3180,7 @@ reverse contextual review of `ref-0001` through `ref-0018` finds no natural-turn
 speaker regression. It also confirms that the pre-reference `0-3 s` transcript
 is removed while existing cold-start identity and short-interjection defects
 remain visible. FR28 therefore advances to a clean 600-second gate; this does
-not establish full-session accuracy or change the accepted T111 baseline. See
+not establish full-session accuracy or change the frozen T111 comparison. See
 `vad-gated-asr-stability-review-2026-07-18.md`.
 
 The retained code is committed before the next run so every longer artifact is

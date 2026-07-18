@@ -1,5 +1,11 @@
 # FR29 Full Promotion Review (2026-07-18)
 
+> **Reconciled 2026-07-19.** The complete cross-version audit applies the
+> report's own material-fragment rule to `ref-0099`, which was split between
+> 石一 and 朱杰. The corrected T123 result is `505/556`, not `506/556`; the
+> tables below include the correction. See
+> `speaker-baseline-reconciliation-2026-07-19.md`.
+
 ## Scope and authority
 
 This report completes T123 for clean commit
@@ -103,6 +109,7 @@ and signed independently.
 | 0063 | 0-600 | 石一 | M | No | Confirmation is absent |
 | 0066 | 0-600 | 唐云峰 | CW | Fail | `你们俩可以` is absorbed into 石一's calculation |
 | 0071 | 0-600 | 石一 | CW | Fail | `才44、45` is assigned to 唐云峰 |
+| 0099 | 600-1200 | 石一 | CW | Fail | The first clause is assigned to 石一, but the substantive governance consequence is assigned to 朱杰 |
 | 0102 | 600-1200 | 唐云峰 | CW | Fail | Governance conclusion is assigned to 石一 |
 | 0118 | 600-1200 | 唐云峰 | CW | Fail | Fifteen-percent confirmation is predominantly assigned to 石一 |
 | 0135 | 600-1200 | 石一 | CW | No | Calculation tag question is assigned to 唐云峰 |
@@ -147,11 +154,11 @@ and signed independently.
 | 0518 | 3000-3600 | 朱杰 | CW | Fail | `老师最有发言权` is assigned to 唐云峰 |
 | 0537 | 3000-3600 | 唐云峰 | CW | No | `甩手掌柜` response is assigned to 石一 |
 
-The manual classification is 43 confident-wrong, six missing, and one
-uncertain contribution. Thirty-one confident-wrong contributions and two
+The manual classification is 44 confident-wrong, six missing, and one
+uncertain contribution. Thirty-two confident-wrong contributions and two
 missing contributions carry critical business meaning. The critical-speaker
 gate therefore fails. The confident-wrong result is manually derived as
-`43/556`, approximately `7.73%`, so it also fails the at-most-two-percent gate.
+`44/556`, approximately `7.91%`, so it also fails the at-most-two-percent gate.
 
 The complete reread accepts `ref-0009`, `ref-0024`, `ref-0045`, `ref-0249`,
 `ref-0253`, `ref-0296`, and `ref-0338`, which were errors in T111. It also
@@ -166,7 +173,7 @@ regressions listed above.
 | Block | Run A | Run B | Gate |
 |---|---:|---:|---|
 | 0-600 | 86 / 93 (92.47%) | 86 / 93 (92.47%) | Pass |
-| 600-1200 | 79 / 84 (94.05%) | 79 / 84 (94.05%) | Pass |
+| 600-1200 | 78 / 84 (92.86%) | 78 / 84 (92.86%) | Pass |
 | 1200-1800 | 74 / 80 (92.50%) | 74 / 80 (92.50%) | Pass |
 | 1800-2400 | 74 / 80 (92.50%) | 74 / 80 (92.50%) | Pass |
 | 2400-3000 | 114 / 129 (88.37%) | 114 / 129 (88.37%) | Fail |
@@ -174,7 +181,7 @@ regressions listed above.
 | 3600-3615.12 | 3 / 3, reported only | 3 / 3, reported only | Not a full-block gate |
 
 The block denominators total 556. The manually reconciled accepted totals are
-506 for each run. The two failed fixed blocks independently reject promotion.
+505 for each run. The two failed fixed blocks independently reject promotion.
 
 ### Canonical speakers
 
@@ -183,26 +190,27 @@ The block denominators total 556. The manually reconciled accepted totals are
 | 朱杰 | 70 / 83 (84.34%) | 70 / 83 (84.34%) | Fail |
 | 唐云峰 | 170 / 189 (89.95%) | 170 / 189 (89.95%) | Fail |
 | 徐子景 | 67 / 73 (91.78%) | 67 / 73 (91.78%) | Pass |
-| 石一 | 199 / 211 (94.31%) | 199 / 211 (94.31%) | Pass |
+| 石一 | 198 / 211 (93.84%) | 198 / 211 (93.84%) | Pass |
 
 The speaker denominators total 556 and the accepted totals independently total
-506. This signs turn recall only; per-speaker time remains unsigned.
+505. This signs turn recall only; per-speaker time remains unsigned.
 
 ### Full session
 
-Each independently reviewed run has 506 accepted and 50 incorrect natural
-contributions. The manually derived full-session result is `506/556`,
-approximately `91.01%`. It clears the standalone 90-percent full-session turn
+Each independently reviewed run has 505 accepted and 51 incorrect natural
+contributions. The manually derived full-session result is `505/556`,
+approximately `90.83%`. It clears the standalone 90-percent full-session turn
 threshold, but it is below the 93-percent development margin and below the
-accepted T111 `519/556` result. More importantly, two fixed blocks, two
+corrected T111 `514/556` result. More importantly, two fixed blocks, two
 canonical speakers, critical attribution, and confident-wrong attribution all
 fail. No conjunctive closing or promotion claim follows from the full average.
 
 ## Decision and next diagnosis
 
 T123 is complete and FR29 full-session promotion is rejected. T111 remains the
-accepted speaker-business baseline. The checked-in FR29 code remains a
-transitional experiment because it passes focused, 120-second, and 600-second
+best frozen comparison baseline, not an accepted closing result. The checked-in
+FR29 code remains a transitional experiment because it passes focused,
+120-second, and 600-second
 gates and repairs `ref-0073`, but it is not an accepted closing behavior.
 T102, T084, canonical closure, and industrial readiness remain open.
 

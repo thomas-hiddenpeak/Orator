@@ -1,5 +1,11 @@
 # Speaker Gate Breakdown Review (2026-07-18)
 
+> **Reconciled 2026-07-19.** A new complete A/B forward-and-reverse reread
+> found five omissions in this ledger: `ref-0099`, `ref-0239`, `ref-0426`,
+> `ref-0503`, and `ref-0518`. The corrected T111 result is `514/556`, not
+> `519/556`. The tables and decision below include the correction; see
+> `speaker-baseline-reconciliation-2026-07-19.md` for the cross-version audit.
+
 ## Scope and method
 
 This review continues T102 from the already completed T111 full-session review.
@@ -30,8 +36,8 @@ evidence. Every total below was counted, calculated, and checked manually.
 | Run B forward/reverse packets | `38ba63459d3aea6aed9b3ac3e5b8100488bfa3d509d3d25b52954401f0da9c4f` / `4d571aede4d5498d867fea011f29e88145a18682dbde7597599c52f00648e4d5` |
 | Runtime identity map | `spk_0=朱杰`, `spk_1=唐云峰`, `spk_2=徐子景`, `spk_3=石一` |
 
-The 37 final error contexts and their candidate evidence are identical between
-the two accepted runs. The judgments and gate decisions below were nevertheless
+The 42 final error contexts and their candidate evidence are identical between
+the two retained runs. The judgments and gate decisions below were nevertheless
 checked and signed for Run A and Run B independently.
 
 ## Reference reconciliation
@@ -80,10 +86,12 @@ not make the speaker of the complete business question usable.
 | 0049 | 0-600 | 唐云峰 | CW | Fail | Endorsement of the 50-billion proposal assigned to 石一 |
 | 0058 | 0-600 | 唐云峰 | CW | Fail | `相差0.7` assigned to 石一 |
 | 0061 | 0-600 | 石一 | CW | Noncritical | Duplicate source time; preface merged into 唐云峰's following turn |
+| 0099 | 600-1200 | 石一 | CW | Fail | The first clause is assigned to 石一, but the substantive governance consequence is assigned to 朱杰 |
 | 0102 | 600-1200 | 唐云峰 | CW | Fail | Governance conclusion assigned to 石一 |
 | 0118 | 600-1200 | 唐云峰 | CW | Fail | Fifteen-percent confirmation is predominantly assigned to 石一; duplicate source time |
 | 0135 | 600-1200 | 石一 | CW | Noncritical | Calculation tag question assigned to 唐云峰; duplicate source time |
 | 0221 | 1200-1800 | 徐子景 | CW | Noncritical | Opening is correct, but the recognizable main fragment is assigned to 唐云峰 |
+| 0239 | 1200-1800 | 徐子景 | CW | Noncritical | Backchannel is assigned to 唐云峰 |
 | 0241 | 1200-1800 | 徐子景 | CW | Noncritical | Hat question is assigned to 唐云峰 |
 | 0249 | 1200-1800 | 朱杰 | CW | Fail | The company-split question is fragmented across one correct and three wrong/unknown identities |
 | 0252 | 1200-1800 | 朱杰 | CW | Fail | Decision-ownership statement is split across 石一 and 唐云峰 |
@@ -100,24 +108,27 @@ not make the speaker of the complete business question usable.
 | 0375 | 2400-3000 | 徐子景 | CW | Fail | Approval to discuss the split is divided after one correct syllable and assigned to 石一 |
 | 0390 | 2400-3000 | 唐云峰 | CW | Fail | Negotiation confirmation assigned to 石一; duplicate source time |
 | 0417 | 2400-3000 | 唐云峰 | M | Noncritical | Clarification prompt is absent; duplicate source time |
+| 0426 | 2400-3000 | 石一 | CW | Fail | B/C packaging proposal is assigned across 唐云峰 and 徐子景 |
 | 0442 | 2400-3000 | 朱杰 | M | Fail | First price question is absent at the source-time edge |
 | 0444 | 2400-3000 | 朱杰 | CW | Fail | Repeated price question is fragmented across three wrong known speakers |
 | 0457 | 2400-3000 | 石一 | CW | Noncritical | Clarification is reduced to a short fragment and assigned to 徐子景 |
 | 0461 | 2400-3000 | 唐云峰 | CW | Fail | Financial-approval responsibility statement assigned to 石一 |
 | 0499 | 3000-3600 | 石一 | CW | Fail | Spouse-finance conclusion split between 唐云峰 and `unknown` |
+| 0503 | 3000-3600 | 朱杰 | CW | Fail | Most of the sustained nominee-ownership proposal is assigned to 石一 |
 | 0504 | 3000-3600 | 唐云峰 | CW | Fail | Ownership correction assigned to 朱杰/石一 |
 | 0505 | 3000-3600 | 唐云峰 | CW | Fail | Hangzhou-stake statement occurs before its display edge and is assigned to 石一 |
 | 0506 | 3000-3600 | 唐云峰 | U | Noncritical | Interjection is explicitly `unknown` |
 | 0507 | 3000-3600 | 唐云峰 | CW | Fail | `5.6个亿` expectation assigned to 朱杰 |
 | 0509 | 3000-3600 | 唐云峰 | CW | Fail | Strategy confirmation assigned to 石一 |
+| 0518 | 3000-3600 | 朱杰 | CW | Fail | `老师最有发言权` is assigned to 唐云峰 |
 | 0537 | 3000-3600 | 唐云峰 | CW | Noncritical | `甩手掌柜` response assigned to 石一 |
 
-The manual classification contains 31 confident-wrong turns, five missing
-turns, and one uncertain turn. Twenty-two of the confident-wrong turns carry
+The manual classification contains 36 confident-wrong turns, five missing
+turns, and one uncertain turn. Twenty-six of the confident-wrong turns carry
 business-critical meaning. One more critical turn is missing. The critical
 speaker gate therefore fails regardless of the still-unneeded complete critical
-denominator. The confident-wrong result is manually calculated as `31 / 556`,
-approximately `5.58%`; it fails the at-most-two-percent gate, and its 22
+denominator. The confident-wrong result is manually calculated as `36 / 556`,
+approximately `6.47%`; it fails the at-most-two-percent gate, and its 26
 critical confident errors also fail the zero-critical requirement.
 
 ## Manually checked turn breakdowns
@@ -127,40 +138,42 @@ critical confident errors also fail the zero-critical requirement.
 | Block | Run A | Run B | Manual result |
 |---|---:|---:|---|
 | 0-600 | 87 / 93 (93.55%) | 87 / 93 (93.55%) | Pass |
-| 600-1200 | 81 / 84 (96.43%) | 81 / 84 (96.43%) | Pass |
-| 1200-1800 | 75 / 80 (93.75%) | 75 / 80 (93.75%) | Pass |
+| 600-1200 | 80 / 84 (95.24%) | 80 / 84 (95.24%) | Pass |
+| 1200-1800 | 74 / 80 (92.50%) | 74 / 80 (92.50%) | Pass |
 | 1800-2400 | 74 / 80 (92.50%) | 74 / 80 (92.50%) | Pass |
-| 2400-3000 | 119 / 129 (92.25%) | 119 / 129 (92.25%) | Pass |
-| 3000-3600 | 80 / 87 (91.95%) | 80 / 87 (91.95%) | Pass |
+| 2400-3000 | 118 / 129 (91.47%) | 118 / 129 (91.47%) | Pass |
+| 3000-3600 | 78 / 87 (89.66%) | 78 / 87 (89.66%) | Fail |
 | 3600-3615.12 | 3 / 3, reported only | 3 / 3, reported only | Not a full-block gate |
 
 The block denominators sum to 556. The accepted block totals sum independently
-to 519 for each run.
+to 514 for each run.
 
 ### Canonical speakers
 
 | Speaker | Run A | Run B | Manual result |
 |---|---:|---:|---|
-| 朱杰 | 75 / 83 (90.36%) | 75 / 83 (90.36%) | Pass |
+| 朱杰 | 73 / 83 (87.95%) | 73 / 83 (87.95%) | Fail |
 | 唐云峰 | 173 / 189 (91.53%) | 173 / 189 (91.53%) | Pass |
-| 徐子景 | 70 / 73 (95.89%) | 70 / 73 (95.89%) | Pass |
-| 石一 | 201 / 211 (95.26%) | 201 / 211 (95.26%) | Pass |
+| 徐子景 | 69 / 73 (94.52%) | 69 / 73 (94.52%) | Pass |
+| 石一 | 199 / 211 (94.31%) | 199 / 211 (94.31%) | Pass |
 
 The four speaker denominators sum to 556 and the four accepted totals sum to
-519 for each run. This signs per-speaker natural-turn recall, not per-speaker
+514 for each run. This signs per-speaker natural-turn recall, not per-speaker
 speaker time.
 
 ### Full session
 
-After reconciling `ref-0160` and `ref-0182`, each run has 519 accepted and 37
-incorrect natural contributions. The manually calculated full-session result is
-`519 / 556`, approximately `93.35%`. Run A and Run B independently pass the full natural-turn,
-every fixed-block natural-turn, and every per-speaker natural-turn gate.
+After reconciling `ref-0160`, `ref-0182`, and the five omitted errors, each run
+has 514 accepted and 42 incorrect natural contributions. The manually
+calculated full-session result is `514 / 556`, approximately `92.45%`. Run A
+and Run B independently pass the standalone full natural-turn gate, but the
+3000-3600 fixed block and 朱杰 per-speaker natural-turn gate fail.
 
 ## Gate decision and next diagnosis
 
-The accepted runs currently pass the full, fixed-block, and per-speaker natural-
-turn gates. They fail both the critical-speaker and confident-wrong gates.
+The frozen runs pass the standalone full natural-turn gate. They fail one
+fixed-block gate, the 朱杰 per-speaker gate, the critical-speaker gate, and the
+confident-wrong gate.
 Speaker-time, per-speaker time, and source-time-offset totals remain unsigned;
 the whole-second source display indicates that the residuals are short, but that
 observation is not substituted for the required manual time result.
