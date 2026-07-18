@@ -2,7 +2,9 @@
 
 **Status**: FR16ABN full real-WebSocket natural-turn gate and T112 telemetry
 cadence passed; FR16ABO full promotion rejected; FR28 scheduling stability
-passes its 120-second gate and awaits 600/full promotion; T102, T084, full
+passes its 120-second gate but fails its first 600-second contextual gate;
+the deterministic trailing-context correction awaits real-stream promotion;
+T102, T084, full
 canonical closure, release sign-off, and industrial readiness remain open
 **Created**: 2026-07-13
 **Scope**: Re-establish a truthful product baseline, recover full-session business
@@ -38,7 +40,12 @@ undecided ASR audio. It passes the warning-clean build, VAD oracle, all 69 CTest
 entries, and two independent 120-second production WebSocket runs whose seven
 canonical product tracks are identical. Complete forward/reverse review of all
 18 in-scope reference contributions finds no new speaker regression. This
-permits a 600-second promotion run only; it does not alter the full T111 result.
+permitted a 600-second promotion run only. That clean run passed every
+mechanical contract, but complete forward/reverse review found new speaker
+regressions at `ref-0037` and `ref-0073`. FR28 therefore did not advance to a
+full run. Its successor preserves short-gap decoder audio and terminal
+source-clock context while retaining publication-order determinism; it must
+repeat the real-stream ladder and does not alter the full T111 result.
 
 This spec defines two separate claims:
 
@@ -1953,8 +1960,15 @@ subject to the complete acceptance gates in this spec.
   pending buffer. On a new speech region, ASR MUST begin at the typed onset
   minus TOML `asr.vad_lead_ms`; it MUST consume decided speech using TOML
   `asr.vad_gate_chunk_ms` batches so publication timing cannot alter decoder
-  call boundaries. Confirmed silence is skipped, and the existing TOML trailing
-  interval determines whether adjacent speech remains in one ASR segment.
+  call boundaries. Confirmed silence beyond the existing TOML trailing
+  interval is skipped. If another stable speech region begins within that
+  interval, every intervening source sample MUST remain in the same decoder
+  session; the gate MUST NOT concatenate the two speech regions after removing
+  their natural pause. If no speech resumes within the interval, the final ASR
+  record MUST retain the confirmed trailing source-clock bound for downstream
+  forced alignment without requiring silence-only decoder input. The gate MUST
+  reserve TOML `asr.vad_lead_ms` for the next segment when lead and trailing
+  windows would otherwise overlap.
   Session finalization MUST freeze the final VAD evidence before ASR drains its
   pending tail and emits finals. Focused tests MUST feed identical audio and
   identical final VAD evidence under different publication orders and require

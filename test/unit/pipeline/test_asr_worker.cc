@@ -87,7 +87,8 @@ GateTrace RunPublicationSchedule(int schedule) {
   std::vector<float> audio(100);
   std::iota(audio.begin(), audio.end(), 0.0f);
   const auto publish_final = [&evidence] {
-    evidence.DepositVad({0.2, 0.5});
+    evidence.DepositVad({0.2, 0.4});
+    evidence.DepositVad({0.45, 0.5});
     evidence.UpdateVadState(false, 1.0);
     evidence.AdvanceVadHorizon(1.0);
   };
@@ -104,6 +105,62 @@ GateTrace RunPublicationSchedule(int schedule) {
     evidence.UpdateVadState(true, 0.8, 0.2, 0.45);
     worker.ProcessSpan(audio.data(), 50);
     publish_final();
+    worker.ProcessSpan(audio.data() + 50, 50);
+  }
+  worker.Finalize();
+
+  trace.reset_positions = asr.reset_positions;
+  trace.chunk_sizes = asr.chunk_sizes;
+  trace.fed_samples = asr.fed_samples;
+  return trace;
+}
+
+GateTrace RunLongGapPublicationSchedule(int schedule) {
+  FakeAsr asr;
+  orator::pipeline::ComprehensiveTimeline evidence;
+  orator::pipeline::AsrWorker::Params params;
+  params.sample_rate = 100;
+  params.segment_sec = 0.0;
+  params.asr_vad_gate = true;
+  params.asr_vad_lead_ms = 100;
+  params.asr_vad_gate_chunk_ms = 100;
+  params.asr_vad_trail_sec = 0.1;
+  params.asr_vad_min_overlap_sec = 0.01;
+
+  GateTrace trace;
+  orator::pipeline::AsrWorker worker(
+      &asr, params,
+      [&trace](const std::string& event) { trace.events.push_back(event); },
+      orator::core::TimeBase(100), /*stream=*/0, &evidence);
+  worker.set_text_sink([&trace](long id, double start, double end,
+                                const std::string& text, bool final) {
+    if (final) trace.finals.push_back({id, start, end, text});
+  });
+
+  std::vector<float> audio(100);
+  std::iota(audio.begin(), audio.end(), 0.0f);
+  const auto publish_all = [&evidence] {
+    evidence.DepositVad({0.2, 0.4});
+    evidence.DepositVad({0.55, 0.7});
+    evidence.UpdateVadState(false, 1.0);
+    evidence.AdvanceVadHorizon(1.0);
+  };
+
+  if (schedule == 0) {
+    publish_all();
+    worker.ProcessSpan(audio.data(), 100);
+  } else if (schedule == 1) {
+    worker.ProcessSpan(audio.data(), 10);
+    publish_all();
+    worker.ProcessSpan(audio.data() + 10, 90);
+  } else {
+    evidence.DepositVad({0.2, 0.4});
+    evidence.UpdateVadState(false, 0.5);
+    evidence.AdvanceVadHorizon(0.5);
+    worker.ProcessSpan(audio.data(), 50);
+    evidence.DepositVad({0.55, 0.7});
+    evidence.UpdateVadState(false, 1.0);
+    evidence.AdvanceVadHorizon(1.0);
     worker.ProcessSpan(audio.data() + 50, 50);
   }
   worker.Finalize();
@@ -215,15 +272,36 @@ int main() {
           "VAD publication order preserves typed ASR finals");
     CHECK(early.reset_positions == std::vector<long>{10},
           "ASR reset starts at VAD onset minus TOML lead");
-    CHECK(early.chunk_sizes == std::vector<int>({10, 10, 10, 10}),
-          "decided speech uses the TOML fixed feed quantum");
+    CHECK(early.chunk_sizes == std::vector<int>({10, 10, 10, 5, 5}),
+          "decided speech and retained gap use deterministic feed quanta");
     CHECK(early.fed_samples.size() == 40 &&
               early.fed_samples.front() == 10.0f &&
               early.fed_samples.back() == 49.0f,
-          "only lead plus finalized VAD speech reaches the decoder");
+          "lead, finalized speech, and retained gap reach the decoder");
     CHECK(early.finals.size() == 1 && early.finals[0].start == 0.1 &&
-              early.finals[0].end == 0.5,
-          "typed final uses deterministic lead and endpoint time codes");
+              early.finals[0].end == 0.6,
+          "typed final retains the deterministic trailing source bound");
+  }
+
+  {
+    const GateTrace early = RunLongGapPublicationSchedule(0);
+    const GateTrace late = RunLongGapPublicationSchedule(1);
+    const GateTrace endpoint_first = RunLongGapPublicationSchedule(2);
+    CHECK(early.reset_positions == late.reset_positions &&
+              early.reset_positions == endpoint_first.reset_positions &&
+              early.reset_positions == std::vector<long>({10, 45}),
+          "long-gap publication order preserves lead-backed reset positions");
+    CHECK(early.chunk_sizes == late.chunk_sizes &&
+              early.chunk_sizes == endpoint_first.chunk_sizes,
+          "long-gap publication order preserves decoder calls");
+    CHECK(early.fed_samples == late.fed_samples &&
+              early.fed_samples == endpoint_first.fed_samples,
+          "long-gap publication order preserves exact decoder samples");
+    CHECK(early.events == late.events &&
+              early.events == endpoint_first.events &&
+              early.finals == late.finals &&
+              early.finals == endpoint_first.finals,
+          "long-gap publication order preserves events and typed finals");
   }
 
   {
@@ -287,7 +365,11 @@ int main() {
     short_gap_worker.Finalize();
     CHECK(
         short_gap_asr.reset_positions == std::vector<long>{10} &&
-            short_gap_finals.size() == 1,
+            short_gap_asr.fed_samples ==
+                std::vector<float>(sequence.begin() + 10,
+                                   sequence.begin() + 60) &&
+            short_gap_finals.size() == 1 && short_gap_finals[0].start == 0.1 &&
+            short_gap_finals[0].end == 0.7,
         "speech returning within the trailing interval keeps one ASR session");
 
     FakeAsr long_gap_asr;
@@ -306,10 +388,45 @@ int main() {
         });
     long_gap_worker.ProcessSpan(sequence.data(), 100);
     long_gap_worker.Finalize();
-    CHECK(
-        long_gap_asr.reset_positions == std::vector<long>({10, 45}) &&
-            long_gap_finals.size() == 2,
-        "speech after the trailing interval starts a new lead-backed session");
+    CHECK(long_gap_asr.reset_positions == std::vector<long>({10, 45}) &&
+              long_gap_finals.size() == 2 && long_gap_finals[0].start == 0.1 &&
+              long_gap_finals[0].end == 0.5 &&
+              long_gap_finals[1].start == 0.45 && long_gap_finals[1].end == 0.8,
+          "long-gap close preserves the next segment's TOML lead");
+  }
+
+  {
+    FakeAsr terminal_asr;
+    orator::pipeline::ComprehensiveTimeline terminal_evidence;
+    terminal_evidence.DepositVad({0.8, 0.95});
+    terminal_evidence.UpdateVadState(false, 1.0);
+    terminal_evidence.AdvanceVadHorizon(1.0);
+    params.sample_rate = 100;
+    params.segment_sec = 0.0;
+    params.asr_vad_gate = true;
+    params.asr_vad_lead_ms = 100;
+    params.asr_vad_gate_chunk_ms = 100;
+    params.asr_vad_trail_sec = 0.2;
+    std::vector<float> terminal_audio(100);
+    std::iota(terminal_audio.begin(), terminal_audio.end(), 0.0f);
+    std::vector<FinalRecord> terminal_finals;
+    orator::pipeline::AsrWorker terminal_worker(
+        &terminal_asr, params, [](const std::string&) {},
+        orator::core::TimeBase(100), /*stream=*/0, &terminal_evidence);
+    terminal_worker.set_text_sink(
+        [&terminal_finals](long id, double start, double end,
+                           const std::string& text, bool final) {
+          if (final) terminal_finals.push_back({id, start, end, text});
+        });
+    terminal_worker.ProcessSpan(terminal_audio.data(), 100);
+    terminal_worker.Finalize();
+    CHECK(terminal_asr.reset_positions == std::vector<long>{70} &&
+              terminal_asr.fed_samples ==
+                  std::vector<float>(terminal_audio.begin() + 70,
+                                     terminal_audio.begin() + 95) &&
+              terminal_finals.size() == 1 && terminal_finals[0].start == 0.7 &&
+              terminal_finals[0].end == 1.0,
+          "terminal drain retains only the available trailing source bound");
   }
 
   if (failures == 0) {

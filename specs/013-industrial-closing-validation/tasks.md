@@ -1844,13 +1844,33 @@
   identical across the two runs. Complete `ref-0001`-`ref-0018` forward and
   reverse review finds no FR28 speaker regression and retains it for the next
   gate; see `vad-gated-asr-stability-review-2026-07-18.md`.
-- [ ] T122 Commit the retained FR28 implementation as a transitional
+- [x] T122 Commit the retained FR28 implementation as a transitional
   experiment, then run one clean 600-second production real-WebSocket capture
   from that exact commit with direct `end`, telemetry, an isolated registry,
   and the checked-in behavioral TOML. Pass all mechanical contracts and review
   every in-scope `test.txt` contribution forward and reverse before permitting
-  a full capture. Automation may arrange evidence only.
-- [ ] T123 If T122 passes, run independent full-length empty-registry Run A and
+  a full capture. Automation may arrange evidence only. Commit `1d511a9`
+  passes the mechanical contracts, but complete forward/reverse review rejects
+  promotion: `ref-0037` and `ref-0073` are new contextual speaker regressions.
+- [x] T124 Correct FR28's retained-gap handling without restoring the
+  scheduling race. Feed every source sample between speech regions separated
+  by no more than TOML `asr.vad_trail_sec`; retain the confirmed trailing
+  source-clock bound for a closing region; preserve the next TOML lead when
+  the two context windows overlap; continue skipping all remaining confirmed
+  silence. Add exact publication-order, short-gap, long-gap, terminal-tail,
+  and silence-only tests before implementation is considered complete. The
+  warning/error scan is empty and all `69/69` CTest entries pass; real-stream
+  promotion remains T125/T126.
+- [ ] T125 Pass warning-clean build, VAD oracle, all CTest entries, three
+  independent blank-audio real-WebSocket checks, and two independent
+  120-second real-WebSocket captures from one clean corrected commit. Compare
+  typed tracks mechanically and review every in-scope contribution forward and
+  reverse against `test.txt`; automation may not assign correctness.
+- [ ] T126 Run a new clean 600-second real-WebSocket gate with direct `end`,
+  telemetry, isolated registry, and checked-in behavioral TOML. Review every
+  in-scope contribution chronologically and in reverse, explicitly confirming
+  the `ref-0037` and `ref-0073` contexts before permitting a full capture.
+- [ ] T123 If T126 passes, run independent full-length empty-registry Run A and
   restarted frozen-registry Run B from the same clean commit. Freeze complete
   manifests and typed tracks, mechanically verify time-base, transport,
   telemetry, terminal-latency, and repeatability contracts, then manually read

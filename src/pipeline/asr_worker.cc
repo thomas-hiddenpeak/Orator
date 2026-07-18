@@ -145,10 +145,21 @@ void AsrWorker::DrainVadGate(bool final) {
       const long endpoint = last_speech_end_sample_ + trail_samples;
       const long next_start =
           next == nullptr ? std::numeric_limits<long>::max() : next->start;
-      if (next_start > endpoint && decision_limit >= endpoint) {
+      if (next_start > endpoint && (decision_limit >= endpoint || final)) {
+        // Keep the source-clock tail for forced alignment, but leave those
+        // samples pending. A later speech onset may need them as its TOML lead;
+        // retaining the cursor makes that overlap independent of when the
+        // later VAD region is published.
+        inc_seg_end_sample_ = std::min(endpoint, received_samples_);
         ProcessIncremental(nullptr, 0, /*finalize=*/true);
         last_speech_end_sample_ = -1;
         continue;
+      }
+      if (next_start > endpoint) {
+        // Do not consume a partially confirmed tail yet. A later VAD update
+        // may still reveal speech inside the trailing interval, in which case
+        // the exact gap samples must be fed to the same decoder session.
+        break;
       }
     }
 
@@ -164,7 +175,11 @@ void AsrWorker::DrainVadGate(bool final) {
 
     if (inc_abs_pos_ < next->start) {
       if (inc_in_segment_) {
-        SkipPendingUntil(std::min(next->start, decision_limit));
+        // Speech resumed inside the TOML trailing interval. Preserve the
+        // natural pause in the decoder input instead of concatenating two
+        // regions whose source time still contains that pause.
+        FeedPendingUntil(std::min(next->start, decision_limit),
+                         /*exact_end=*/true);
         continue;
       }
       const long lead_start = std::max(0L, next->start - lead_samples);

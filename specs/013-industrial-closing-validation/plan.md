@@ -2863,8 +2863,11 @@ their typed evidence contract and controller lifecycle:
 3. Replace `AsrWorker`'s unused ring and scheduling-sensitive unconfirmed-audio
    fallback with one worker-owned pending buffer. Consume finalized or stable
    active speech in source order, prepend TOML `vad_lead_ms` only when opening a
-   new VAD group, skip typed confirmed silence, and retain a segment across a
-   gap no longer than TOML `vad_trail_sec`.
+   new VAD group, skip typed confirmed silence beyond the retained source
+   context, and retain a segment across a gap no longer than TOML
+   `vad_trail_sec`. Every sample in a retained gap is decoder input; otherwise
+   ASR would hear speech regions concatenated on a clock that still contains
+   the removed pause.
 4. Feed decided speech in TOML `vad_gate_chunk_ms` quanta. Hold an incomplete
    active quantum until more stable evidence arrives; consume the exact final
    remainder only after a finalized VAD boundary exists. This makes decoder
@@ -2886,6 +2889,40 @@ with the same TOML and isolated registries. Structural tools may compare track
 hashes and first differences only. Changed conversational content, if any, is
 reviewed forward and reverse against `test.txt` before a 600-second or
 full-length promotion decision.
+
+### 8.16 FR28 600-second failure and trailing-context correction
+
+The clean `1d511a9` 600-second real-WebSocket run passes direct-end, telemetry,
+observer convergence, and common-clock contracts. Complete chronological and
+reverse contextual review nevertheless rejects promotion. In addition to the
+known first-block errors, `ref-0037` changes the recognizable Tang Yunfeng
+sentence `不能再等了` to Zhu Jie, and `ref-0073` changes Shi Yi's response
+`我可以否决了，对，45` to Tang Yunfeng. Both contributions were correctly
+attributed in the preceding accepted evidence.
+
+Raw-track inspection shows that Sortformer itself is unchanged at the first
+failure. The earlier comprehensive view corrected its local-channel error from
+phrase voiceprint evidence after forced alignment. FR28 ends the new isolated
+ASR source at the padded VAD endpoint, leaving no configured trailing
+source-clock context for alignment. At the second failure, several finalized
+VAD regions are inside one TOML trailing group, but FR28 advances the common
+clock across each short pause without feeding those samples to the decoder.
+The decoder therefore receives concatenated speech while the aligner later
+works on the unmodified source clock, moving the phrase boundary across the
+speaker transition.
+
+The correction remains inside the FR28 ownership boundary. `AsrWorker` holds
+an undecided gap until typed VAD proves either that speech resumes within
+`vad_trail_sec` or that the endpoint is final. A short gap is then fed in fixed
+quanta as part of the same decoder session. A confirmed long gap closes the
+record at the trailing source-clock bound but does not send terminal
+silence-only samples through the decoder; excess silence is skipped. If the
+next region's TOML lead overlaps that bound, the close point moves earlier so
+the lead is preserved without replaying or duplicating samples. Publication
+order tests compare decoder samples, calls, resets, finals, and source bounds
+for both outcomes. The corrected candidate must repeat engineering, silence,
+120-second determinism, and complete 600-second contextual gates before any
+full capture.
 
 ### 8.15 FR28 120-second outcome and promotion ladder
 

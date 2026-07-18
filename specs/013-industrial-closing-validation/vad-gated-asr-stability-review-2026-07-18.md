@@ -178,3 +178,57 @@ This is not a full-length speaker result and does not alter the accepted T111
 captures remain mandatory. Any full candidate must receive complete 556-item
 forward and reverse contextual semantic review before the speaker baseline or
 closure status can advance.
+
+## T122: Clean 600-Second Gate
+
+Transitional commit `1d511a946b291347d0d52eea0ee17e137cee65f0` ran
+`600.000 s` of `test.mp3` through the production WebSocket with 100 ms frames
+at 1.0x pacing, direct `end`, an isolated empty registry, observers, runtime
+telemetry, and `tegrastats`. The run completed in `603.064 s`; direct terminal
+wait was `3.064 s`. All seven tracks ended at exactly `9,600,000` samples with
+zero extent gaps, observer terminal hashes converged, telemetry cadence passed,
+and no mechanical contract issue was recorded. The captured artifact is
+`/tmp/orator-spec013/release-1d511a9-t122/fr28-600-ws.json`, SHA-256
+`ac312cbcb132f5b827e275e5d97a6615197f659399962d6fa1b4bf3251cba2c9`.
+
+The reviewer then read every in-scope human contribution, `ref-0001` through
+`ref-0093`, first chronologically and then from the last contribution back to
+the first. The review preserves the known short-turn defects already present
+in the accepted evidence, but finds two new business-speaker regressions:
+
+- In `ref-0037`, Tang Yunfeng's continuation `不能再等了` is assigned to Zhu
+  Jie. The raw Sortformer interval has the same local-channel error as the
+  earlier evidence, but the earlier comprehensive view corrected it using
+  ASR-derived phrase voiceprint evidence.
+- In `ref-0073`, Shi Yi answers Tang Yunfeng with `我可以否决了，对，45`.
+  The new view assigns the recognizable response to Tang Yunfeng, breaking the
+  question/answer exchange and the following Shi Yi calculation.
+
+This semantic result rejects the 600-second promotion. No full capture was
+started, and T111 remains unchanged.
+
+## T124: Deterministic Trailing-Context Correction
+
+FR28 had preserved the absolute clock while feeding only VAD speech regions.
+Short natural pauses inside one trailing group were therefore removed from the
+decoder input, while forced alignment still operated on the original source
+clock. A closing source also ended at the padded VAD boundary instead of
+retaining the configured trailing alignment context. The two tracks were
+mechanically valid but no longer described the same acoustic sequence at turn
+boundaries.
+
+The successor keeps an undecided gap pending until typed VAD establishes one
+of two outcomes. Speech returning within TOML `asr.vad_trail_sec` receives
+every intervening sample in the same fixed-quantum decoder session. A confirmed
+long gap closes at the trailing source-clock bound without sending terminal
+silence-only audio to the decoder. Those unconsumed samples remain available
+for the next TOML lead, so pre-published and endpoint-first VAD schedules retain
+identical decoder calls, reset positions, samples, events, finals, and source
+bounds without replaying audio.
+
+The warning/error build scan is empty and all `69/69` registered CTest entries
+pass. Focused tests include pre-published, late-published, active-then-final,
+endpoint-first long-gap, short-gap, confirmed-silence, and truncated terminal
+tail schedules. This is engineering evidence only. Blank-audio and new
+120/600-second real-WebSocket gates remain mandatory before the correction can
+be retained for a full run.
