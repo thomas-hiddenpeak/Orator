@@ -3109,6 +3109,24 @@ checked-in behavioral TOML. Each artifact receives an independent complete
 556-contribution chronological read and reverse 600-second-block read. Only the
 manually reconciled ledgers may promote or reject FR30.
 
+T133 and T134 complete from clean commit `a96e278ea340`. Run A uses an empty
+registry and valid Run B restarts from Run A's frozen registry. Both complete
+at `0.996x`, pass direct-end, exact common-clock, provenance, observer,
+telemetry, and normalized seven-track repeatability contracts. Each artifact
+then receives a complete 556-contribution chronological read and an independent
+reverse-block read. The two manually reconciled ledgers agree at `498/556`.
+Two fixed blocks, three canonical speakers, the full 90-percent floor,
+critical attribution, and confident-wrong attribution fail. FR30 is rejected
+and checked-in `vad.threshold` returns to `0.5`; see
+`vad-sensitivity-full-promotion-review-2026-07-19.md`.
+
+The next diagnosis does not lower the global VAD threshold again. It preserves
+the threshold-`0.5` segmentation and uses frozen typed-track evidence to test
+whether only low-energy gaps corroborated by independent speaker activity can
+be admitted on the common time base without merging neighboring VAD/ASR
+sessions. Any candidate must be source-free and pass complete changed-context
+review before another real-audio promotion run.
+
 ### 8.15 FR28 120-second outcome and promotion ladder
 
 T117-T121 are complete. The frozen T116 packages replay byte-stably; their

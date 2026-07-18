@@ -1958,16 +1958,23 @@
   all 93 contributions retains `ref-0037` and `ref-0073`, and complete reading
   of all ten T128 sequence changes finds no new natural-turn regression. See
   `vad-sensitivity-600-context-review-2026-07-19.md`.
-- [ ] T133 Commit the retained T132 evidence, then use that exact clean
+- [x] T133 Commit the retained T132 evidence, then use that exact clean
   revision for one full-length empty-registry production WebSocket capture and
   one independently restarted full-length capture using Run A's frozen
   registry. Both runs use checked-in behavioral TOML, 100 ms frames, 1.0x
   pacing, direct `end`, observers, telemetry, isolated protocol storage, and
   complete manifests. Automation may verify only mechanical contracts and
-  repeatability.
-- [ ] T134 Read all 556 `test.txt` contributions for each full artifact in
+  repeatability. Clean commit `a96e278ea340` completes valid Run A and Run B
+  at `0.996x`; both pass direct-end, common-clock, provenance, observer,
+  telemetry, and exact seven-track repeatability contracts. The first Run B
+  attempt is excluded because its copied registry was not writable.
+- [x] T134 Read all 556 `test.txt` contributions for each full artifact in
   chronological order and again in reverse 600-second blocks. Manually derive
   every required speaker-business gate, compare the two complete judgments to
   T111 and the rejected T123 result, and then retain or reject FR30. No code,
   script, query, formula, metric, or model score may assign any result or
-  promotion verdict.
+  promotion verdict. Complete independent forward and reverse review manually
+  records `498/556` for both runs. Two fixed blocks, three canonical speakers,
+  the full 90-percent floor, critical attribution, and confident-wrong
+  attribution fail. FR30 is rejected and checked-in `vad.threshold` returns to
+  `0.5`; see `vad-sensitivity-full-promotion-review-2026-07-19.md`.

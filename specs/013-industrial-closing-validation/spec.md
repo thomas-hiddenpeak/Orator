@@ -6,9 +6,9 @@ its deterministic trailing-context correction pass the silence and repeated
 120-second gates, but the corrected 600-second contextual gate fails at
 `ref-0073`; FR29 passes repeated 120-second and complete 600-second real-stream
 review but its full T123 A/B promotion is rejected; FR30 VAD-sensitivity
-passes T131 silence, repeatability, and complete 120-second contextual review;
-T132 complete 600-second contextual review passes and full A/B is authorized;
-T102, T084, full
+passes T131 silence/repeatability and T132 complete 600-second contextual
+review, but its full T133/T134 A/B promotion is rejected at `498/556` and the
+checked-in threshold returns to `0.5`; T102, T084, full
 canonical closure, release sign-off, and industrial readiness remain open
 **Created**: 2026-07-13
 **Scope**: Re-establish a truthful product baseline, recover full-session business
@@ -62,9 +62,13 @@ independent 120-second runs, and complete forward and reverse review of all 18
 in-scope contributions without a new natural-turn regression. Its clean
 600-second run then passes every mechanical contract, and complete forward and
 reverse review of all 93 contributions plus all ten T128 sequence changes
-finds no new natural-turn regression. This authorizes full empty-registry and
-frozen-registry A/B only; FR30 is not accepted until both full artifacts pass
-independent complete contextual review.
+finds no new natural-turn regression. The subsequently authorized full
+empty-registry and frozen-registry paths are mechanically repeatable, but
+complete independent forward and reverse review manually records `498/556`
+for each. The full 90-percent floor, two fixed blocks, three canonical
+speakers, critical attribution, and confident-wrong attribution fail. FR30 is
+therefore rejected, its checked-in threshold returns to `0.5`, and T111
+remains the accepted speaker-business baseline.
 
 T117-T121 subsequently prove that the T116 A/B producer difference begins in
 scheduling-sensitive VAD-gated ASR rather than Sortformer or the deterministic

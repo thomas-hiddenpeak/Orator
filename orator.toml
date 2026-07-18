@@ -255,7 +255,7 @@ model = "models/vad/silero_vad.safetensors"
 stream = true
 
 # Speech probability threshold (0.0-1.0)
-threshold = 0.3
+threshold = 0.5
 
 # Minimum speech duration (ms) — shorter noise bursts are rejected
 min_speech_ms = 250
