@@ -3079,6 +3079,16 @@ clean build warning/error scan is empty, and all `69/69` CTest entries pass.
 See `vad-sensitivity-diagnosis-2026-07-19.md` for frozen hashes and the claim
 boundary.
 
+T131 is complete at clean commit `5046bccf7ea2`. Three independent 30-second
+real-WebSocket silence sessions emit zero product records, and two independent
+120-second sessions have exact normalized seven-track equality. All 18
+in-scope contributions were then read independently in chronological and
+reverse order. The only speaker-sequence display change from T125 removes a
+short intervening local-label fragment inside `ref-0008`; complete surrounding
+context shows no new natural-turn regression. This manual result authorizes
+one clean 600-second gate only. See
+`vad-sensitivity-120-context-review-2026-07-19.md`.
+
 ### 8.15 FR28 120-second outcome and promotion ladder
 
 T117-T121 are complete. The frozen T116 packages replay byte-stably; their

@@ -1937,12 +1937,17 @@
   empty, `test_vad` passes, the clean warning/error scan is empty, and all
   `69/69` CTest entries pass. See
   `vad-sensitivity-diagnosis-2026-07-19.md`.
-- [ ] T131 From the clean T130 commit, run three independent real-WebSocket
+- [x] T131 From the clean T130 commit, run three independent real-WebSocket
   silence sessions and two independent 120-second production captures with
   isolated registries, direct `end`, telemetry, and complete manifests. Verify
   structural and repeatability contracts mechanically, then read every
   in-scope `test.txt` contribution chronologically and in reverse. Automation
-  may not assign correctness or acceptance.
+  may not assign correctness or acceptance. Commit `5046bccf7ea2` produces
+  zero product records in all three silence sessions and identical normalized
+  seven-track entries in the two 120-second sessions. Complete independent
+  forward and reverse review of all 18 contributions finds no new natural-turn
+  regression from T125. See
+  `vad-sensitivity-120-context-review-2026-07-19.md`.
 - [ ] T132 Only if T131 is manually retained, run one clean 600-second
   production WebSocket capture and perform complete chronological and reverse
   contextual review of all 93 contributions. Do not authorize a full A/B run

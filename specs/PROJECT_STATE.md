@@ -14,7 +14,7 @@ work is specified under [specs/](.).
 > pass is the consistency proof. Status lines advance to `Implemented` in the
 > same change that lands the code, with the commit reference.
 
-- **Last updated**: 2026-07-19 (FR30 engineering gates passed; T131 pending)
+- **Last updated**: 2026-07-19 (FR30 T131 passed; T132 pending)
 - **Branch**: `master`
 - **Constitution**: v1.7.0
 - **Speaker-business closure**: **NATURAL-TURN GATE PASSED; FULL CANONICAL
@@ -85,9 +85,15 @@ work is specified under [specs/](.).
   variable FR30 candidate lowers TOML `vad.threshold` from `0.5` to `0.3`;
   temporary production probes expose the reviewed missing intervals and retain
   zero VAD segments on the frozen silence fixture. The checked-in candidate
-  passes `test_vad`, a warning-clean build, and all `69/69` CTest entries. This
-  is not yet a promoted configuration or product result; see
-  `013-industrial-closing-validation/vad-sensitivity-diagnosis-2026-07-19.md`.
+  passes `test_vad`, a warning-clean build, all `69/69` CTest entries, three
+  independent real-WebSocket silence sessions, and two repeatable 120-second
+  sessions. Complete independent forward and reverse reading of all 18
+  in-scope contributions finds no new natural-turn regression and authorizes
+  one 600-second gate. This is not yet a promoted configuration or full product
+  result; see
+  `013-industrial-closing-validation/vad-sensitivity-diagnosis-2026-07-19.md`
+  and
+  `013-industrial-closing-validation/vad-sensitivity-120-context-review-2026-07-19.md`.
 - **Result-evaluation rule**: product accuracy and candidate decisions may be
   produced only by complete item-by-item contextual semantic review. No code,
   test, script, notebook, formula, query, automated metric, or algorithm may
@@ -633,12 +639,13 @@ registry A/B paths with identical seven-track entries, but complete forward and
 reverse review manually records `506/556` for each and rejects promotion.
 Do not start another full audio run. T130 changes only checked-in TOML
 `vad.threshold` from `0.5` to `0.3` and passes the VAD oracle, clean build, full
-CTest, and frozen-silence gates. Execute T131 next from its clean transitional
-commit: three real-WebSocket silence gates and two repeated 120-second captures.
-Structural tools may display differences only; complete contextual semantic
-review against `test.txt` remains the sole authority for business meaning. A
-600-second run is authorized only after T131 passes, and a full A/B run only
-after the complete 600-second review is manually retained.
+CTest, and frozen-silence gates. T131 then passes three real-WebSocket silence
+gates, two repeated 120-second captures with exact normalized seven-track
+equality, and complete independent forward/reverse contextual reading of all 18
+in-scope contributions. Execute one clean T132 600-second run next. Structural
+tools may display differences only; complete contextual semantic review against
+`test.txt` remains the sole authority for business meaning. A full A/B run is
+authorized only after the complete 600-second review is manually retained.
 Speaker-time, per-speaker time, and source-time offsets remain to be manually
 signed at `test.txt`'s recorded precision; no duplicate listening or invented
 sub-second boundary is required.
