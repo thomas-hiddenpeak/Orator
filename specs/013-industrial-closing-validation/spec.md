@@ -5,7 +5,7 @@ cadence passed; FR16ABO full promotion rejected; FR28 scheduling stability and
 its deterministic trailing-context correction pass the silence and repeated
 120-second gates, but the corrected 600-second contextual gate fails at
 `ref-0073`; FR29 passes repeated 120-second and complete 600-second real-stream
-forward/reverse review; T102, T084, full
+review but its full T123 A/B promotion is rejected; T102, T084, full
 canonical closure, release sign-off, and industrial readiness remain open
 **Created**: 2026-07-13
 **Scope**: Re-establish a truthful product baseline, recover full-session business
@@ -21,9 +21,9 @@ all 556 reference contributions were reconciled under complete forward and
 reverse conversational context. The T102 breakdown reread reconciles the
 `ref-0160` source-label conflict and the `ref-0182` boundary-only judgment, and
 manually establishes 519 accepted and 37 incorrect contributions for each run,
-approximately 93.35 percent. Their direct-end runs
-also satisfy the terminal-latency gate mechanically. These sign two conjunctive
-gates only. Speaker-time, fixed-block, per-speaker, critical-turn,
+approximately 93.35 percent. Their direct-end runs also satisfy the terminal-
+latency gate mechanically. Fixed-block and per-speaker natural-turn gates are
+signed separately by T102. Speaker-time, per-speaker time, critical-turn,
 confident-wrong, source-time-offset, ASR, release, and independent-holdout gates
 remain open.
 
@@ -33,6 +33,17 @@ mechanical ladder, but complete 556-contribution forward/reverse semantic
 review against `test.txt` manually records `518/556` for each run. The two
 error sets also differ. FR16ABO is therefore disabled in the checked-in TOML,
 and T111 remains the accepted speaker-business baseline.
+
+FR29 also does not replace T111. Clean commit `2ff9ce3655b2a12e90a5d0def25c0a30f171f2d9`
+completed independent empty-registry and restarted frozen-registry full runs.
+All mechanical, terminal-latency, telemetry, observer, provenance, and
+repeatability contracts pass, and the seven product-track entry bundles are
+identical between runs. Complete chronological and reverse-block contextual
+review manually records `506/556` for each run. The full average remains above
+90 percent, but two fixed blocks, 朱杰 and 唐云峰 turn recall, critical
+attribution, confident-wrong attribution, and the 93-percent development margin
+fail. FR29 therefore remains transitional and T111 remains the accepted
+speaker-business baseline.
 
 T117-T121 subsequently prove that the T116 A/B producer difference begins in
 scheduling-sensitive VAD-gated ASR rather than Sortformer or the deterministic
@@ -259,6 +270,20 @@ subject to the complete acceptance gates in this spec.
     No code assigned or aggregated the result. The default TOML lookahead is
     restored to zero. See
     `future-epoch-full-promotion-review-2026-07-18.md`.
+19. **FR29 full real-path promotion rejected; T102/T084 unchanged**: clean
+    commit `2ff9ce3655b2a12e90a5d0def25c0a30f171f2d9` completed full empty-registry
+    Run A and restarted frozen-registry Run B. Both runs finish `3615.120`
+    seconds at `0.995x`, receive their direct-end terminal packages in
+    `16.540 s` and `17.499 s`, close all seven tracks at `57,841,920` samples,
+    and satisfy observer, provenance, and telemetry contracts. Their seven
+    normalized product-track entry bundles are identical. Complete independent
+    chronological and reverse-block review of all 556 `test.txt` contributions
+    manually records `506/556` for each run. The 2400-3000 and 3000-3600 fixed
+    blocks fail, as do 朱杰 and 唐云峰 turn recall, critical attribution, and
+    confident-wrong attribution. Final synchronization builds warning-clean and
+    passes `69/69` CTest as mechanical verification. T111 remains the accepted
+    baseline; see
+    `cross-view-handoff-full-promotion-review-2026-07-18.md`.
 
 ## 4. Requirements
 

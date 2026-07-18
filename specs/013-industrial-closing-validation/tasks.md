@@ -1902,11 +1902,21 @@
   the revised base business view. The resulting one-record partition is
   confined to the retained handoff and is covered by a focused unit contract.
   No behavioral TOML value changes.
-- [ ] T123 If T128 passes, run independent full-length empty-registry Run A and
+- [x] T123 If T128 passes, run independent full-length empty-registry Run A and
   restarted frozen-registry Run B from the same clean commit. Freeze complete
   manifests and typed tracks, mechanically verify time-base, transport,
   telemetry, terminal-latency, and repeatability contracts, then manually read
   all 556 contributions chronologically and in reversed fixed blocks against
   `test.txt`. No code may label, aggregate, rank, promote, or reject either
   result. Do not alter the T111 baseline until both complete reviews pass all
-  applicable gates.
+  applicable gates. Clean commit `2ff9ce3655b2a12e90a5d0def25c0a30f171f2d9`
+  completes both full paths at `0.995x` with direct-end waits of `16.540 s` and
+  `17.499 s`, exact seven-track extents, observer convergence, complete
+  telemetry, and identical normalized seven-track entries. Complete independent
+  chronological and reverse-block semantic review manually records `506/556`
+  for each run. Two fixed blocks, two canonical speakers, critical attribution,
+  confident-wrong attribution, and the development margin fail, so FR29 is not
+  promoted and T111 remains the accepted baseline. The final documentation
+  synchronization builds warning-clean and passes all `69/69` CTest entries;
+  these are mechanical checks only. See
+  `cross-view-handoff-full-promotion-review-2026-07-18.md`.

@@ -2969,7 +2969,7 @@ chronological and reverse order against `test.txt`. A rejected projection is
 removed before any audio rerun. A retained projection must then pass a clean
 build, all CTest entries, repeated 120-second production WebSocket determinism,
 and a new complete 600-second chronological/reverse contextual gate before
-T123 may begin. No behavioral value is added or changed in TOML.
+T123 was authorized. No behavioral value is added or changed in TOML.
 
 T127 completes that frozen gate. Three production-projector replays are
 byte-identical and expose one speaker-sequence change spanning `ref-0073` and
@@ -3005,8 +3005,34 @@ business-interval query into `495.788-497.148 s` and `497.308-498.908 s`
 queries. This adds one derived record and shifts later ordinals for the same
 text; it does not mutate an upstream producer or introduce a feedback cycle.
 The code comments and focused unit contract are updated to make that existing
-dependency explicit. No behavioral TOML value changes. T123 may begin from the
-next clean documentation-and-test commit.
+dependency explicit. No behavioral TOML value changes. This authorized T123
+from the next clean documentation-and-test commit.
+
+### 8.18 FR29 full-session outcome and frozen diagnosis
+
+T123 completes from clean commit
+`2ff9ce3655b2a12e90a5d0def25c0a30f171f2d9`. Full Run A uses an empty
+registry; Run B restarts the server with Run A's registry frozen. Both stream
+all `3615.120` seconds through the production WebSocket path at `0.995x`, pass
+the direct-end, common-clock, observer, provenance, and telemetry contracts,
+and produce identical normalized entries in all seven product tracks.
+
+Each run receives a complete chronological review of all 556 human-listened
+`test.txt` contributions followed by an independent reverse-600-second-block
+review. The manually reconciled result is `506/556` for each run. The full
+natural-turn average remains above 90 percent, but the 2400-3000 and 3000-3600
+fixed blocks, 朱杰 and 唐云峰 turn recall, the 93-percent development margin,
+critical attribution, and confident-wrong attribution fail. FR29 promotion is
+therefore rejected and T111 remains the accepted baseline; see
+`cross-view-handoff-full-promotion-review-2026-07-18.md`.
+
+No new full audio run follows this rejection. The frozen T123 and T111 exports
+show identical Sortformer diarization and primary-speaker views while ASR,
+forced alignment, derived voiceprint, and final business tracks differ. The
+next diagnosis locates the first changed source interval in each failed late
+block and traces it through VAD-gated ASR finalization, alignment, voiceprint
+query construction, and revision order. A new source-free rule must first pass
+deterministic replay plus complete changed-context review on both frozen paths.
 
 ### 8.15 FR28 120-second outcome and promotion ladder
 
