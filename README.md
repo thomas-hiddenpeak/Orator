@@ -37,8 +37,12 @@ Spec 013 的唯一收官模型基线是流式 Sortformer v2.1，使用 `orator.t
 通过 `<= 30 s` 门槛。首次 Run B 因运行时遥测采样覆盖仅 `94.965%` 被排除，
 保留失败证据后以相同代码、业务配置、音频和冻结注册表进行一次受控重试，
 重试覆盖为 `95.214%`。ASR 准确率、独立 holdout 和发布签署同样不在上述
-结论内。完整审计见
+结论内。后续过渡实验提交 `d610de36ed13` 已将 GPU 遥测改为单调时钟绝对
+周期；干净 120 秒真实流记录 `99.167%` 运行时采样覆盖和 100% 必需字段覆盖，
+但这项机械修复不改变上述说话人结论。完整审计见
 [delayed-alignment-full-promotion-review-2026-07-18.md](specs/013-industrial-closing-validation/delayed-alignment-full-promotion-review-2026-07-18.md)。
+遥测修复证据见
+[gpu-telemetry-deadline-review-2026-07-18.md](specs/013-industrial-closing-validation/gpu-telemetry-deadline-review-2026-07-18.md)。
 
 所有正式结果评估必须使用完整上下文人工语义复核。代码、脚本、查询、公式、
 指标和算法只能运行系统、验证机械契约或整理未判定证据，不得判断正确性、
@@ -326,7 +330,8 @@ cd build
 ctest --output-on-failure
 ```
 
-当前活跃套件包含 68 项。生产说话人融合与弃权规则由 C++ 测试覆盖；Python
+当前活跃套件包含 69 项。生产说话人融合与弃权规则、GPU 遥测绝对周期由
+C++ 测试覆盖；Python
 只验证证据、回放输入、来源一致性和无判断的人工审阅包。Spec 013 的一次性候选
 生成器、对应测试和非生产 TOML 已移入各自 `archive/`，不会进入 CMake/CTest。
 

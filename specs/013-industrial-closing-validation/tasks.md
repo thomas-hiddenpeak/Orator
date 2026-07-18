@@ -1742,9 +1742,14 @@
   artifact is preserved but excluded because runtime telemetry cadence was
   `94.965%`; the controlled retry passed at `95.214%` with unchanged behavioral
   values. See `delayed-alignment-full-promotion-review-2026-07-18.md`.
-- [ ] T112 Replace relative-delay GPU telemetry sampling with monotonic
+- [x] T112 Replace relative-delay GPU telemetry sampling with monotonic
   absolute-deadline scheduling so probe latency cannot accumulate into cadence
   loss. Preserve the TOML interval and telemetry payload, add focused timing
   coverage, and verify the mechanical cadence contract through the real
-  WebSocket path. This task does not evaluate speaker correctness or reopen the
-  accepted T111 contextual result.
+  WebSocket path. Transitional experimental commit `d610de36ed13` is pushed on
+  `master`, builds warning-clean, and passes all `69/69` CTest entries. Its
+  clean 120-second 1.0x real-WebSocket run records 119 runtime samples
+  (`99.167%` cadence), 120 tegrastats samples, exact one-second runtime steps,
+  and 100 percent required-field coverage. This task does not evaluate speaker
+  correctness or reopen the accepted T111 contextual result; see
+  `gpu-telemetry-deadline-review-2026-07-18.md`.

@@ -2757,6 +2757,14 @@ WebSocket stream with continuous `tegrastats` to verify cadence and required
 field coverage mechanically. No product label, speaker total, or acceptance
 decision is derived from this timing work.
 
+Transitional experimental commit `d610de36ed13` implements this design. Its
+clean warning-free build and all `69/69` CTest entries pass. A clean
+120-second 1.0x production WebSocket run records 119 runtime GPU samples
+(`99.167%` cadence), 120 continuous tegrastats samples, no adjacent runtime
+step outside the one-second cadence, and 100 percent required-field coverage.
+T112 is complete; T102/T084 remain unchanged. See
+`gpu-telemetry-deadline-review-2026-07-18.md`.
+
 ## 9. Phase 7: Final Sign-Off
 
 Create one closing report containing:

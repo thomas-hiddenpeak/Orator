@@ -1,7 +1,8 @@
 # Spec 013: Industrial Closing Validation
 
-**Status**: FR16ABN full real-WebSocket natural-turn gate passed; T102, T084,
-full canonical closure, release sign-off, and industrial readiness remain open
+**Status**: FR16ABN full real-WebSocket natural-turn gate and T112 telemetry
+cadence passed; T102, T084, full canonical closure, release sign-off, and
+industrial readiness remain open
 **Created**: 2026-07-13
 **Scope**: Re-establish a truthful product baseline, recover full-session business
 accuracy, and define the evidence required before Orator may be declared closed.
@@ -192,6 +193,15 @@ subject to the complete acceptance gates in this spec.
     boundaries, speaker-time, fixed blocks, per-speaker review, criticality,
     confidence, and offsets remain unsigned. See
     `delayed-alignment-full-promotion-review-2026-07-18.md`.
+17. **GPU telemetry absolute cadence verified; T102/T084 unchanged**:
+    transitional experimental commit `d610de36ed13` replaces relative waiting
+    with monotonic absolute deadlines while preserving the one-second TOML
+    interval and telemetry payload. The warning-clean build and all `69/69`
+    CTest entries pass. A clean 120-second 1.0x real-WebSocket run records 119
+    runtime GPU samples (`99.167%` cadence), 120 continuous tegrastats samples,
+    exact one-second runtime steps, and complete required-field coverage. This
+    is mechanical evidence only and does not reopen or extend the T111 product
+    result. See `gpu-telemetry-deadline-review-2026-07-18.md`.
 
 ## 4. Requirements
 
