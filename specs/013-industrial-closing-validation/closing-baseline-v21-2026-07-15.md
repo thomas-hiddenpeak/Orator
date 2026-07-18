@@ -150,8 +150,9 @@ blocked. The complete chronological and reverse-block written-context review of
 this exact clean package records 443 correct, 112 incorrect, and one ambiguous
 natural contribution (`79.6763%`), which fails the full-session gate and five
 fixed 600-second block gates. See
-`closing-baseline-v21-context-review-2026-07-15.md`. Exact audible boundaries,
-overlap, criticality, speaker-time, offsets, and independent totals still
-require signed evidence under T031-T035 and T045. The earlier 74.2806 percent
+`closing-baseline-v21-context-review-2026-07-15.md`. The candidate was rejected,
+so speaker-time, overlap, criticality, source-time-offset, and independent
+breakdowns were intentionally not derived for this obsolete artifact. The
+earlier 74.2806 percent
 result remains a historical diagnostic for a different 936-entry artifact; no
 constitutional speaker-time percentage or closing result is claimed here.

@@ -343,11 +343,11 @@ For auditability, the reconciled incorrect row IDs are:
 0537 0551
 ```
 
-This natural-turn review is a valid contextual diagnostic, but not the strict
-speaker-time acceptance result. `test.txt` contains duplicate and backward
-timestamps, and the exact audible start/end boundaries of the 556-row reference
-ledger have not yet been manually adjudicated and signed. No exact
-speaker-duration accuracy is claimed until that ledger is complete.
+This natural-turn review is a valid contextual diagnostic, but not the
+speaker-time acceptance result. `test.txt` is the human-listened reference and
+contains whole-second, duplicate, and one backward timestamp pair that must stay
+in line order. No speaker-time accuracy is claimed for this rejected candidate
+because its source time blocks were not manually reviewed and totaled.
 
 ## Comparison and Decision
 
@@ -370,6 +370,6 @@ improves this scene after comprehensive speaker fusion. v2.1 therefore remains
 the active checkpoint under the inherited profile and is designated as the
 sole closing baseline, but it is not accepted. Its 74.28 percent natural-turn
 result remains 15.72 percentage points
-below the 90 percent industrial floor. Exact speaker-time acceptance remains
-open until the audible-boundary ledger is signed and a selected runtime
-candidate passes the real WebSocket gates.
+below the 90 percent industrial floor. Speaker-time acceptance remains open
+until a selected runtime candidate's human reference blocks are reviewed and
+manually totaled through the real WebSocket gates.

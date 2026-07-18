@@ -66,16 +66,19 @@
 ## Phase 2: Reference Ledger
 
 - [x] T030 Define the immutable ledger schema and manual judgment categories.
-- [ ] T031 Adjudicate all 556 reference turns in chronological order against the
-  audio, including exact speech intervals and overlaps. The v2.1 commit
-  `43523ba` ledger is initialized and hash-validated at 556 rows; all 556 remain
-  unsigned. Seven continuous work batches cover all rows as 93 / 84 / 80 / 80 /
-  129 / 87 / 3 across the six 600-second blocks and final partial block. See
+- [x] T031 Confirm the human-listened `test.txt` as the immutable 556-turn
+  reference and preserve its source speaker, text, timestamp, whole-second
+  precision, and line order. The earlier claim that all rows still required
+  audible adjudication was incorrect; it described an optional empty annotation
+  JSON, not the authority of `test.txt`. See
   `reference-ledger-v21-2026-07-15.md`.
 - [ ] T032 Classify critical turns before candidate-output review.
-- [ ] T033 Perform a second complete review in reversed 600-second block order.
-- [ ] T034 Resolve every disagreement and record ambiguous reference rows without
-  deleting them.
+- [x] T033 Perform a second complete review in reversed 600-second block order.
+  T111 completed this independently for accepted Run A and Run B after each
+  complete chronological pass.
+- [x] T034 Resolve every forward/reverse disagreement and retain duplicate,
+  backward-timestamp, or ambiguous reference rows without deleting them. T111
+  completed this for both accepted runs.
 - [ ] T035 Independently verify the manual time, turn, speaker, criticality, and
   offset totals without code, formulas, queries, or automated aggregation.
 
@@ -100,14 +103,14 @@
   `tegrastats` samples, seven exact zero-gap extents, and exact producer /
   persisted-session / Chromium-rendered / browser-download terminal equality.
   See `closing-baseline-v21-2026-07-15.md`. This completes system evidence only;
-  the unsigned audible ledger keeps T045 and all accuracy gates open.
-- [ ] T045 Complete the 556-row baseline context review and publish all required
-  score breakdowns without any code-inferred judgment or automated total. The exact clean
-  935-entry artifact has now received complete chronological and reverse-block
-  manual written-context review: 443 correct / 112 incorrect / 1 ambiguous
-  (`79.6763%`). Tools only arranged evidence. T045 remains open because audible
-  boundaries, overlap, criticality, speaker-time, offset, uncertainty,
-  per-speaker, and independently verified totals are not signed. See
+  T045 supplied the product judgment.
+- [x] T045 Complete the 556-row baseline context review without any code-inferred
+  judgment or automated total. The exact clean 935-entry artifact received
+  complete chronological and reverse-block manual contextual review: 443
+  correct / 112 incorrect / 1 ambiguous (`79.6763%`). Tools only arranged
+  evidence. The baseline was rejected at the natural-turn gate, so unused
+  speaker-time, criticality, confidence, and source-time-offset breakdowns were
+  not derived for that obsolete artifact. See
   `closing-baseline-v21-context-review-2026-07-15.md`.
 - [x] T046 Canonicalize equal-start overlapping diarization records before the
   typed/live split and retain strict live/terminal equality validation. The
@@ -130,12 +133,11 @@
   base.
 - [x] T053 Build an auditable constrained speaker-decision candidate over frozen
   tracks without reference-specific runtime inputs.
-- [ ] T054 Perform the complete contextual review of the candidate and manually
-  evaluate the 93 percent development gate in every fixed block without code,
-  automated totals, ranking, or acceptance flags. A complete provisional
-  text-context pass now covers all 556 rows and is sufficient to reject the
-  candidate's natural-turn gate; audible-boundary adjudication, the reversed
-  pass, and signed speaker-time totals remain open.
+- [x] T054 Screen the candidate by a complete 556-row chronological contextual
+  pass without code, automated totals, ranking, or acceptance flags. That pass
+  failed the natural-turn gate and was sufficient to reject the historical
+  candidate; the reverse pass and other breakdowns were intentionally not spent
+  on an already failed candidate.
 - [x] T055 Reject the initial frozen candidate and stop tuning its threshold
   family. Its complete provisional text-context diagnostic is `378/556`
   (67.986 percent); the one ambiguous row remains a failure in the mandatory
@@ -1558,7 +1560,7 @@
   audit confirmed this remained open. The 2026-07-18 direct-end A/B recapture
   now signs the terminal-latency gate mechanically and again passes the natural-
   turn gate under complete contextual semantic review. Speaker-time, fixed
-  blocks, per-speaker recall, criticality, confidence, and audible boundaries
+  blocks, per-speaker recall, criticality, confidence, and source-time offsets
   remain unsigned.
 - [ ] T085 Execute the supplemental locked holdout suite after the Constitution
   amendment if an industrial-readiness claim is requested.
@@ -1661,9 +1663,15 @@
   and the 600-second track hash is
   `a6a7ea95299ea7568977b220715e5b1e6b3ad3c4317cf6c4a8b4d019124aa11b`.
   Exact equality is a mechanical invariant, not a product-accuracy verdict.
-- [ ] T102 Manually sign the 556-row audible-boundary, overlap, criticality, and
-  confidence ledger, then complete the remaining speaker-time, fixed-block,
-  per-speaker, critical-turn, confident-wrong, and boundary-offset reviews.
+- [ ] T102 Reuse the completed 556-row forward/reverse contextual judgments
+  against the human-audited `test.txt` reference and manually sign the remaining
+  speaker-time, fixed-block, per-speaker, critical-turn, confident-wrong, and
+  source-time-offset breakdowns for Run A and Run B independently. Do not demand
+  a duplicate audio transcription or invent sub-second reference boundaries.
+  The 2026-07-18 breakdown review signs fixed-block and per-speaker turn recall
+  as passed, but signs critical-speaker and confident-wrong attribution as
+  failed. Speaker-time, per-speaker time, and source-time-offset totals remain
+  open; see `speaker-gate-breakdown-review-2026-07-18.md`.
 
 ## Phase 10: Critical Handoff Evidence
 
@@ -1738,7 +1746,9 @@
   the accepted Run B retry completed all `3615.120` seconds at `0.993x`, with
   direct waits of `25.849 s` and `25.585 s`, exact common-clock extents,
   observer convergence, and accepted telemetry coverage. Complete forward and
-  reverse review manually establishes `517/556` for both runs. The first Run B
+  reverse review, followed by T102 reconciliation of the `ref-0160` source-label
+  conflict and the `ref-0182` boundary-only judgment, manually establishes
+  `519/556` for both runs. The first Run B
   artifact is preserved but excluded because runtime telemetry cadence was
   `94.965%`; the controlled retry passed at `95.214%` with unchanged behavioral
   values. See `delayed-alignment-full-promotion-review-2026-07-18.md`.
@@ -1753,3 +1763,36 @@
   and 100 percent required-field coverage. This task does not evaluate speaker
   correctness or reopen the accepted T111 contextual result; see
   `gpu-telemetry-deadline-review-2026-07-18.md`.
+
+## Phase 11: Future-Epoch Corroboration
+
+- [x] T113 Reconcile the T111 speaker ledger against complete conversational
+  context and trace every remaining critical failure through final business,
+  forced alignment, typed VAD, diarization, primary top-1, both TitaNet
+  galleries, and identity epochs. Correct the boundary-only `ref-0182`
+  judgment without scoring ASR wording, retain `ref-0249` as a critical mixed-
+  identity failure, and reject a global 20-second identity backfill because it
+  rewrites unrelated epoch boundaries. The signed manual baseline is 519
+  accepted and 37 incorrect contributions for each frozen run; see
+  `speaker-gate-breakdown-review-2026-07-18.md`.
+- [x] T114 Implement FR16ABO with an explicit zero-disabled
+  `[speaker_fusion].future_epoch_lookahead_sec` typed configuration field.
+  Preserve raw identity epochs and every producer track. Add focused C++
+  positive and abstention coverage, config/runtime serialization coverage, and
+  pass a warning-clean build plus all registered CTest entries. The candidate
+  passes all `69/69` entries; see
+  `future-epoch-phrase-review-2026-07-18.md`.
+- [x] T115 Replay the frozen T111 A/B typed tracks at least twice per path.
+  Verify only deterministic and structural contracts by code, arrange every
+  changed context, and read all changed conversational contexts manually in
+  forward and reverse order against the human-listened `test.txt`. Retain or
+  reject FR16ABO only from that complete semantic review; no script, metric,
+  formula, query, test, or algorithm may assign correctness or select it. Both
+  paths are byte-stable across two replays. Complete semantic review retains
+  one real repair and one identity-neutral activation without a changed-context
+  regression; see `future-epoch-phrase-review-2026-07-18.md`.
+- [ ] T116 If T115 retains FR16ABO, commit the transitional experiment and pass
+  the warning-clean build, full CTest suite, and 120/600-second real-WebSocket
+  ladder before deciding whether a new full A/B capture is justified. A full
+  capture must receive complete 556-contribution forward/reverse contextual
+  review before any gate or baseline advances.

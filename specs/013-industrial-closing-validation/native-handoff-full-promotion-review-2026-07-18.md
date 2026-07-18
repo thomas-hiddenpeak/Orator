@@ -22,8 +22,9 @@ The reviewer read all 556 contributions in chronological order for each run,
 then independently reread each complete session in six reverse fixed windows.
 
 This report signs T106 and the natural-business-turn gate for these two runs.
-It does not include audible boundary listening and does not sign speaker-time,
-fixed-block, per-speaker, criticality, confidence, or boundary-offset gates.
+It does not derive speaker-time, fixed-block, per-speaker, criticality,
+confidence, or source-time-offset breakdowns from the completed contextual
+judgments.
 T102, T084, canonical closure, and industrial readiness remain open.
 
 ## Frozen inputs and build
@@ -99,11 +100,11 @@ speaker remained a speaker error even when its words were correct.
 
 The full reread also corrects one prior row-boundary judgment. The
 `ref-0250` contribution `不一定啊` is emitted at `1769.10-1769.82` by
-`spk_1`, Tang Yunfeng, immediately after the provisional reference interval
-ends at `1769.00`. Complete conversation context makes this a correct
-attribution in both runs. Rejecting it because it falls 0.10 seconds beyond a
-provisional row boundary would be a mechanical-window judgment and is not
-permitted by the contextual semantic protocol.
+`spk_1`, Tang Yunfeng, immediately after the mechanically displayed
+next-timestamp edge at `1769.00`. Complete conversation context makes this a
+correct attribution in both runs. Rejecting it because it falls 0.10 seconds
+beyond a whole-second source mark would invent unsupported sub-second reference
+precision and is not permitted by the contextual semantic protocol.
 
 ## Manual natural-turn result
 
@@ -167,7 +168,7 @@ A/B replay and complete changed-context review; see
 own real-WebSocket promotion and superseded this report as the current
 natural-turn production evidence; see
 `delayed-alignment-full-promotion-review-2026-07-18.md`. This report remains the
-FR16ABM baseline and causality record. T102 still requires audible review and
-manual signing of all 556 boundaries, overlaps, criticality, and confidence
-classes before the remaining speaker-time and block gates can be derived. That
-work may not reuse this natural-turn result as a substitute.
+FR16ABM baseline and causality record. T102 still requires manual signing of the
+speaker-time, fixed-block, per-speaker, criticality, confidence, and source-time-
+offset breakdowns from the complete 556-row judgments. That work may not reuse
+the natural-turn percentage as a substitute for those separate gates.

@@ -3739,6 +3739,125 @@ int main() {
           "an overlapping following interval blocks restoration");
   }
 
+  // ---- 20d. FR16ABO may use a later stable identity epoch only when native,
+  // alignment, and both gallery views corroborate the exact phrase. ----
+  {
+    struct CaseOptions {
+      double lookahead_sec = 4.0;
+      double future_start = 2.0;
+      bool future_primary = true;
+      bool robust_margin = true;
+      bool session_candidate_top_two = true;
+      bool enough_alignment = true;
+      bool competing_activity = false;
+    };
+    auto run_case = [](const CaseOptions& options) {
+      BusinessSpeakerPipeline::Config config;
+      config.voiceprint_fusion_enabled = true;
+      config.voiceprint_future_epoch_lookahead_sec = options.lookahead_sec;
+      config.voiceprint_four_view_min_aligned_units = 2;
+      TestBusinessSpeakerPipeline tl(config);
+      tl.UpsertText(0, 0.0, 0.8, "甲乙。");
+      std::vector<TestBusinessSpeakerPipeline::SpeakerInput> activity = {
+          {0.0, 0.8, "slot_0", 0.9f, "spk_old"},
+          {options.future_start, options.future_start + 1.0, "slot_0", 0.9f,
+           "spk_new"}};
+      if (options.competing_activity) {
+        activity.push_back({0.2, 0.6, "slot_1", 0.9f, "spk_other"});
+      }
+      tl.ReplaceSpeakers(activity);
+      std::vector<TestBusinessSpeakerPipeline::SpeakerInput> primary = {
+          {0.0, 0.8, "slot_0", 0.9f, "spk_old"}};
+      if (options.future_primary) {
+        primary.push_back({options.future_start, options.future_start + 1.0,
+                           "slot_0", 0.9f, "spk_new"});
+      }
+      tl.ReplacePrimarySpeakers(primary);
+      tl.UpsertAlign(0, 0.0, 0.8,
+                     options.enough_alignment
+                         ? std::vector<TestBusinessSpeakerPipeline::AlignUnitSeg>{
+                               {0.0, 0.3, "甲"}, {0.3, 0.7, "乙"}}
+                         : std::vector<TestBusinessSpeakerPipeline::AlignUnitSeg>{
+                               {0.0, 0.7, "甲乙"}});
+      ComprehensiveTimeline::SpeakerVoiceprintEvidence phrase;
+      phrase.evidence_id = "punctuation_phrase:0:0";
+      phrase.kind = "punctuation_phrase";
+      phrase.text_id = 0;
+      phrase.source_start = 0;
+      phrase.source_end = 3;
+      phrase.start = 0.0;
+      phrase.end = 0.7;
+      phrase.embedding_available = true;
+      phrase.robust_gallery_complete = true;
+      phrase.session_scores = options.session_candidate_top_two
+                                  ? std::vector<ComprehensiveTimeline::VoiceprintScore>{
+                                        {"spk_new", 0.52f},
+                                        {"spk_old", 0.50f},
+                                        {"spk_other", 0.30f}}
+                                  : std::vector<ComprehensiveTimeline::VoiceprintScore>{
+                                        {"spk_other", 0.52f},
+                                        {"spk_third", 0.50f},
+                                        {"spk_new", 0.30f},
+                                        {"spk_old", 0.20f}};
+      phrase.robust_scores = options.robust_margin
+                                 ? std::vector<ComprehensiveTimeline::VoiceprintScore>{
+                                       {"spk_new", 0.70f},
+                                       {"spk_old", 0.50f},
+                                       {"spk_other", 0.30f}}
+                                 : std::vector<ComprehensiveTimeline::VoiceprintScore>{
+                                       {"spk_new", 0.52f},
+                                       {"spk_old", 0.50f},
+                                       {"spk_other", 0.30f}};
+      tl.ReplaceVoiceprint({phrase});
+      return tl.Snapshot();
+    };
+    auto future_epoch_selected = [](const auto& entries) {
+      return entries.size() == 1 && entries[0].speaker_id == "spk_new" &&
+             entries[0].speaker_decision.reason ==
+                 "voiceprint_phrase_future_epoch_robust_override";
+    };
+    auto future_epoch_abstained = [](const auto& entries) {
+      for (const auto& entry : entries) {
+        if (entry.speaker_decision.reason ==
+            "voiceprint_phrase_future_epoch_robust_override") {
+          return false;
+        }
+      }
+      return true;
+    };
+
+    CHECK(future_epoch_selected(run_case({})),
+          "future epoch plus native and gallery evidence selects exact phrase");
+    CaseOptions disabled;
+    disabled.lookahead_sec = 0.0;
+    CHECK(future_epoch_abstained(run_case(disabled)),
+          "zero lookahead disables future-epoch corroboration");
+    CaseOptions too_far;
+    too_far.lookahead_sec = 1.0;
+    CHECK(future_epoch_abstained(run_case(too_far)),
+          "future identity outside the TOML horizon abstains");
+    CaseOptions no_future_primary;
+    no_future_primary.future_primary = false;
+    CHECK(future_epoch_abstained(run_case(no_future_primary)),
+          "future identity without primary support abstains");
+    CaseOptions weak_robust;
+    weak_robust.robust_margin = false;
+    CHECK(future_epoch_abstained(run_case(weak_robust)),
+          "future identity without robust margin abstains");
+    CaseOptions absent_session;
+    absent_session.session_candidate_top_two = false;
+    CHECK(future_epoch_abstained(run_case(absent_session)),
+          "future identity outside session top two abstains");
+    CaseOptions insufficient_alignment;
+    insufficient_alignment.enough_alignment = false;
+    CHECK(future_epoch_abstained(run_case(insufficient_alignment)),
+          "future identity with insufficient alignment abstains");
+    CaseOptions competing;
+    competing.competing_activity = true;
+    CHECK(future_epoch_abstained(run_case(competing)),
+          "overlapping local activity blocks future-epoch corroboration");
+  }
+
   // ---- 21. An identity change surrounded by unaligned punctuation remains
   // source ordered after terminal serialization sorts entries by time. ----
   {

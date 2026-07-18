@@ -476,6 +476,120 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
     }
     return session->speaker_id;
   };
+  auto future_epoch_phrase_challenge = [&](const auto& item)
+      -> std::optional<std::string> {
+    const double duration = item.end - item.start;
+    if (item.kind != "punctuation_phrase" ||
+        pipeline.config_.voiceprint_future_epoch_lookahead_sec <= 0.0 ||
+        duration + 1e-9 <
+            pipeline.config_.voiceprint_primary_consensus_min_sec ||
+        duration > pipeline.config_.voiceprint_phrase_max_sec + 1e-9 ||
+        !item.embedding_available || !item.robust_gallery_complete) {
+      return std::nullopt;
+    }
+
+    std::string current_identity;
+    for (int index = item.source_start; index < item.source_end; ++index) {
+      if (labels[index].speaker_id.empty() || labels[index].voiceprint) {
+        return std::nullopt;
+      }
+      if (current_identity.empty()) {
+        current_identity = labels[index].speaker_id;
+      } else if (labels[index].speaker_id != current_identity) {
+        return std::nullopt;
+      }
+    }
+
+    std::set<std::string> covering_slots;
+    for (const auto& segment : pipeline.speakers_) {
+      if (segment.speaker_id == current_identity &&
+          local_coverage(item.start, item.end, segment.speaker) + 1e-9 >=
+              duration) {
+        covering_slots.insert(segment.speaker);
+      }
+    }
+    if (covering_slots.size() != 1) return std::nullopt;
+    const std::string current_slot = *covering_slots.begin();
+    for (const auto& segment : pipeline.speakers_) {
+      if (Overlap(item.start, item.end, segment.start, segment.end) <= 1e-9) {
+        continue;
+      }
+      if (segment.speaker != current_slot ||
+          segment.speaker_id != current_identity) {
+        return std::nullopt;
+      }
+    }
+
+    const SpeakerSeg* covering_primary = nullptr;
+    int overlapping_primary_count = 0;
+    for (const auto& primary : pipeline.primary_speakers_) {
+      if (Overlap(item.start, item.end, primary.start, primary.end) <= 1e-9) {
+        continue;
+      }
+      ++overlapping_primary_count;
+      if (primary.start <= item.start + 1e-9 &&
+          primary.end + 1e-9 >= item.end) {
+        covering_primary = &primary;
+      }
+    }
+    if (overlapping_primary_count != 1 || covering_primary == nullptr ||
+        covering_primary->speaker != current_slot ||
+        covering_primary->speaker_id != current_identity) {
+      return std::nullopt;
+    }
+
+    const SpeakerSeg* future_epoch = nullptr;
+    for (const auto& segment : pipeline.speakers_) {
+      if (segment.speaker != current_slot || segment.speaker_id.empty() ||
+          segment.speaker_id == current_identity ||
+          segment.start + 1e-9 < item.end ||
+          segment.start - item.end >
+              pipeline.config_.voiceprint_future_epoch_lookahead_sec + 1e-9) {
+        continue;
+      }
+      if (future_epoch == nullptr || segment.start < future_epoch->start) {
+        future_epoch = &segment;
+      }
+    }
+    const double minimum =
+        pipeline.config_.voiceprint_primary_consensus_min_sec;
+    if (future_epoch == nullptr ||
+        future_epoch->end - future_epoch->start + 1e-9 < minimum) {
+      return std::nullopt;
+    }
+
+    std::vector<std::pair<double, double>> future_primary_intervals;
+    for (const auto& primary : pipeline.primary_speakers_) {
+      if (primary.speaker != current_slot ||
+          primary.speaker_id != future_epoch->speaker_id) {
+        continue;
+      }
+      const double start = std::max(future_epoch->start, primary.start);
+      const double end = std::min(future_epoch->end, primary.end);
+      if (end > start) future_primary_intervals.push_back({start, end});
+    }
+    if (CoveredDuration(MergeIntervals(std::move(future_primary_intervals))) +
+            1e-9 <
+        minimum) {
+      return std::nullopt;
+    }
+
+    if (!has_minimum_aligned_units(item.start, item.end)) {
+      return std::nullopt;
+    }
+    const auto session = ranked_pair(item.session_scores, duration);
+    const auto robust = ranked_pair(item.robust_scores, duration);
+    if (!session || !robust ||
+        robust->first.speaker_id != future_epoch->speaker_id ||
+        !robust->first.score_pass || !robust->first.margin_pass ||
+        session->first.speaker_id == current_identity ||
+        robust->first.speaker_id == current_identity ||
+        (session->first.speaker_id != future_epoch->speaker_id &&
+         session->second_id != future_epoch->speaker_id)) {
+      return std::nullopt;
+    }
+    return future_epoch->speaker_id;
+  };
   auto four_view_margin_challenge = [&](const auto& item)
       -> std::optional<std::string> {
     if (item.kind != "punctuation_phrase" ||
@@ -2939,6 +3053,13 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
     if (initial_slot) {
       apply(*item, *initial_slot,
             "voiceprint_phrase_initial_slot_dual_gallery_override");
+      continue;
+    }
+
+    const auto future_epoch = future_epoch_phrase_challenge(*item);
+    if (future_epoch) {
+      apply(*item, *future_epoch,
+            "voiceprint_phrase_future_epoch_robust_override");
       continue;
     }
 

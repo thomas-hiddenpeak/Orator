@@ -178,23 +178,23 @@ contains a canonical `resolved_config` object after defaults, TOML,
 environment, and CLI resolution. The unified client copies that object into a
 sidecar run manifest and hashes the canonical representation.
 
-## 4. Phase 2: Build the Full Reference Turn Ledger
+## 4. Phase 2: Preserve the Full Human Reference and Build the Run Review
 
-The 556 timestamped reference entries are reviewed against the complete audio.
-For each entry, the reviewer records:
+`test.txt` is the completed human-listened reference for all 556 timestamped
+entries; it is not an unreviewed machine transcript. The review record preserves
+each stable reference ID, source line, real speaker, text, timestamp, line order,
+and whole-second source precision. Duplicate and backward timestamps remain
+unchanged and are interpreted from the surrounding conversation rather than
+being reordered or assigned invented sub-second boundaries.
 
-- stable reference ID and source line;
-- real speaker and contextual summary;
-- audible start/end on the absolute sample clock;
-- overlap participants and intervals;
-- critical/non-critical classification decided before candidate output review;
-- acceptable semantic equivalents;
-- any reference ambiguity.
-
-Review occurs in two complete passes: chronological and by reversed 600-second
-block order. Disagreements are resolved by replaying the audio in context. No
-reference row is removed to simplify scoring. Empty, duplicate, or ambiguous
-source rows remain in an adjudication log.
+For each exact run, the reviewer reads the final business view against all 556
+reference entries in two complete passes: chronological order and reversed
+600-second block order. The reviewer then records the contextual speaker
+judgment, critical/non-critical class based on reference meaning, uncertainty or
+confident-wrong class, source-time offset notes, and any genuine ambiguity.
+Disagreements between passes are reconciled from the already captured complete
+context. A new audio transcription or a second audible-boundary pass is not a
+prerequisite for using the authoritative `test.txt` reference.
 
 The review tools may seek audio and display system tracks beside a ledger row.
 They do not assign correctness, total results, calculate percentages, compare
@@ -227,7 +227,8 @@ accuracy claim for closing purposes. The earlier `413/556` result belongs to a
 different 936-entry artifact and remains a historical cut-oriented diagnostic.
 The exact clean 935-entry package has a complete manual written-context result
 of `443/556`; it still is not an accepted speaker-time or closing score because
-the audible ledger and required breakdowns remain unsigned.
+the failed historical candidate was rejected before the remaining manual
+breakdowns were derived.
 
 ## 6. Phase 4: Determine the Existing-Model Upper Bound
 
@@ -2560,11 +2561,13 @@ The remaining work proceeds in this order:
    per-phase finalization timings, then rerun short, 600-second, and full A/B
    direct-end evidence. Neither timing diagnostics nor byte equality may be
    interpreted as a product-accuracy judgment;
-4. create and manually sign the audible reference ledger for all 556 rows,
-   including start/end boundaries, overlap, criticality, and confidence class;
-5. derive speaker-time, fixed-block, per-speaker, critical-turn, confident-
-   wrong, and boundary-offset judgments only by complete contextual semantic
-   review of that signed ledger;
+4. reuse the completed forward and reverse 556-row contextual judgments against
+   the human-audited `test.txt` reference; classify criticality, uncertainty,
+   confident-wrong attribution, and source-time offsets without replaying or
+   retranscribing the reference audio;
+5. manually derive and independently cross-check speaker-time, fixed-block,
+   per-speaker, critical-turn, confident-wrong, and source-time-offset results
+   from those signed contextual judgments at `test.txt`'s recorded precision;
 6. close T084 only when both A and B independently satisfy every applicable
    gate, then complete ASR, browser/microphone, holdout, report review, and
    release-signing work.
@@ -2661,14 +2664,16 @@ The manually established natural-turn results are 514 accepted / 42 incorrect
 for Run A (approximately 92.45 percent) and 515 / 41 for Run B (approximately
 92.63 percent). FR16ABM repairs `ref-0071` on both paths without a contextual
 regression. The reread also accepts `ref-0250`: Tang Yunfeng's contribution is
-correctly attributed 0.10 seconds beyond its provisional row boundary, so a
-mechanical interval cutoff cannot reject it. No executable mechanism assigned
+correctly attributed across the next-timestamp display edge; the whole-second
+`test.txt` mark does not provide a contradictory sub-second reference boundary,
+so a mechanical interval cutoff cannot reject it. No executable mechanism assigned
 correctness, aggregated the result, ranked the runs, or issued the verdict.
 
 T106 is complete and FR16ABM is retained. T107-T109 subsequently isolate and
 screen the independent forced-alignment/VAD placement defect around
-`ref-0090`, as recorded in Section 8.9. T102 remains open for audible boundary,
-overlap, criticality, and confidence signing; therefore T084 and full speaker
+`ref-0090`, as recorded in Section 8.9. T102 remains open for the manual
+fixed-block, per-speaker, speaker-time, criticality, confidence, and
+source-time-offset breakdowns; therefore T084 and full speaker
 closure remain open. See
 `native-handoff-full-promotion-review-2026-07-18.md`.
 
@@ -2719,8 +2724,10 @@ the terminal timeline in `25.585 s`, and passed telemetry cadence at `95.214%`.
 
 The reviewer read all 556 contributions for Run A and the accepted Run B in
 chronological order, then reread both complete sessions in reverse fixed
-windows. Both manual passes independently establish 517 accepted and 39
-incorrect natural contributions, approximately 92.99 percent. FR16ABN repairs
+windows. The T102 breakdown reread reconciles the `ref-0160` source-label
+conflict and the `ref-0182` boundary-only judgment, and manually establishes
+519 accepted and 37 incorrect natural contributions for each run,
+approximately 93.35 percent. FR16ABN repairs
 `ref-0090` on both paths while preserving the following substantive turn. The
 additional correct `ref-0192`/`ref-0194` evidence in Run A and `ref-0215` in
 Run B are run-specific outcomes and are not attributed to FR16ABN. No
@@ -2729,9 +2736,12 @@ runs, or issued the verdict.
 
 T110 and T111 are complete. The 90 percent natural-turn and mechanical
 terminal-latency gates pass for both accepted full runs. T102 remains open for
-audible boundary, overlap, criticality, and confidence signing; consequently
-speaker-time, fixed-block, per-speaker, critical-turn, confident-wrong,
-boundary-offset, T084, and full speaker closure remain open. The telemetry loop
+the manual speaker-time, fixed-block, per-speaker, critical-turn,
+confident-wrong, and source-time-offset breakdowns from the already completed
+`test.txt` contextual judgments. Fixed-block and per-speaker turn recall pass,
+while critical-speaker and confident-wrong attribution fail; consequently T084
+and full speaker closure remain open. See
+`speaker-gate-breakdown-review-2026-07-18.md`. The telemetry loop
 also retains an engineering follow-up to schedule samples against absolute
 deadlines rather than accumulating probe latency. See
 `delayed-alignment-full-promotion-review-2026-07-18.md`.
@@ -2764,6 +2774,40 @@ clean warning-free build and all `69/69` CTest entries pass. A clean
 step outside the one-second cadence, and 100 percent required-field coverage.
 T112 is complete; T102/T084 remain unchanged. See
 `gpu-telemetry-deadline-review-2026-07-18.md`.
+
+### 8.12 Future-epoch corroborated phrase challenge
+
+The T102 evidence trace separates two possible fixes for late local-slot
+identity lag. Increasing `[speaker].local_drift_competing_backfill_gap_sec`
+from 4 seconds to 20 seconds moves the relevant late epoch boundary earlier,
+but it also rewrites unrelated identity boundaries throughout the session.
+That identity-stage experiment is therefore rejected. FR16ABO leaves the raw
+identity state machine untouched and applies later identity evidence only in
+the revisable `business_speaker` view.
+
+For each complete punctuation phrase, the projector first proves that one
+current local slot and identity cover the full phrase in both diarization and
+primary top-1, without another local slot. It then finds the first later
+different identity for that same local slot within the explicit TOML
+`speaker_fusion.future_epoch_lookahead_sec`. The future pair must itself be
+stable for the existing minimum embedding duration in both native views. The
+candidate identity must be robust-gallery top-1 with the existing score and margin,
+session-gallery top-2, and the incumbent must not top either gallery. Existing
+alignment-unit count and duration bounds complete the guard. The rule changes
+only the exact phrase and records a dedicated decision reason; it never moves
+an identity epoch or mutates producer evidence.
+
+The checked-in experimental value is `120.0` seconds, matching the already
+frozen identity-stage competing-candidate backfill horizon while remaining a
+separately owned fusion switch. Zero disables the rule. Focused tests cover the
+positive topology and every evidence abstention. The production replay probe
+then runs twice on each frozen T111 A/B typed package. Automation may verify
+only parsing, determinism, source reconstruction, track isolation, and the set
+of changed contexts. Every changed conversational context is read manually in
+forward and reverse order against `test.txt`; no executable mechanism assigns
+correctness, totals an accuracy result, selects the candidate, or issues a
+promotion verdict. A rejected candidate is removed before any model or real
+WebSocket run.
 
 ## 9. Phase 7: Final Sign-Off
 

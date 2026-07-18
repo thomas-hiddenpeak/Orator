@@ -80,8 +80,9 @@ a label, total, ranking, policy choice, or verdict.
 The final contextual diagnostic is therefore 418 correct, 137 incorrect, and
 one ambiguous natural turn. It equals `418/556 = 75.1799%`, 14.8201 percentage
 points below the 90 percent product floor and 17.8201 points below the 93
-percent frozen-candidate implementation gate. It is not an exact speaker-time
-score because the audible-boundary ledger remains unsigned.
+percent frozen-candidate implementation gate. It is not a speaker-time result
+because no manual source-time-block total was derived for this rejected
+candidate.
 
 ## Reproducibility
 

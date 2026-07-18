@@ -151,6 +151,8 @@ BusinessSpeakerPipeline::BusinessSpeakerPipeline(
       config_.voiceprint_short_max_sec, config_.voiceprint_phrase_max_sec);
   config_.voiceprint_four_view_min_aligned_units =
       std::max(1, config_.voiceprint_four_view_min_aligned_units);
+  config_.voiceprint_future_epoch_lookahead_sec =
+      std::max(0.0, config_.voiceprint_future_epoch_lookahead_sec);
 }
 
 BusinessSpeakerPipeline::~BusinessSpeakerPipeline() { Stop(); }

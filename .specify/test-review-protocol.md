@@ -45,7 +45,10 @@ not be converted into an accuracy conclusion.
 Each review MUST read:
 
 1. **Reference text** (gold)
-   - Example: `test.txt`
+   - Canonical Orator example: the human-listened `test.txt`. Its speaker, text,
+     timestamp, line order, and recorded precision are reference truth. A review
+     must not downgrade it to an unreviewed transcript, require a duplicate
+     audition as a prerequisite, or invent finer timing truth than it records.
 2. **Model outputs**
    - timeline JSON
    - incremental ASR events

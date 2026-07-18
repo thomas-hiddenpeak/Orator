@@ -172,12 +172,12 @@ Spec 013 acceptance verdict.
 | Gate | Current status | Evidence boundary |
 |---|---|---|
 | Full natural-turn speaker accuracy | Passed for A and B | Complete contextual semantic review above |
-| Full speaker-time accuracy | Open | No signed audible-boundary ledger or manual duration total |
+| Full speaker-time accuracy | Open | No manual source-time-block total from the completed contextual judgments |
 | Fixed 600 s speaker blocks | Open | No signed per-block semantic totals |
 | Per-speaker time and turn recall | Open | No signed per-speaker ledger totals |
 | Critical speaker turns | Open | Criticality has not been signed for all 556 rows |
 | Confident wrong attribution | Open | Confidence class has not been signed for all incorrect rows |
-| Boundary offsets | Open | Reference timestamps are provisional; audible starts and ends are unsigned |
+| Source-time offsets | Open | Attribution-affecting offsets have not been manually annotated at `test.txt`'s whole-second precision |
 | ASR and silence gates | Open | Outside this speaker-only review |
 | Forced alignment structure | Passed mechanically for A and B | 275 final ASR IDs and 275 aligned groups in each run; no manifest issue |
 | Common time base | Passed mechanically for A and B | All seven terminal extents reconcile to `3615.120 s` |

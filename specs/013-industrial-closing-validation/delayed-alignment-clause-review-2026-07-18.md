@@ -21,8 +21,9 @@ baseline review.
 At this historical checkpoint, the review retained FR16ABN only as the frozen
 candidate for real-WebSocket promotion; it was not a production-run result.
 That promotion has since completed and is linked in the successor section.
-T102 audible boundary review, speaker-time and fixed-block gates, T084, full
-speaker closure, and industrial readiness remain open.
+T102 speaker-time, fixed-block, per-speaker, criticality, confidence, and
+source-time-offset breakdowns, T084, full speaker closure, and industrial
+readiness remain open.
 
 ## Root cause and implementation
 
@@ -110,13 +111,13 @@ remains independently assigned to `spk_3`, preserving Shi Yi's `ref-0091` and
 the surrounding valuation argument. Run A and Run B have the same local
 conversation and the same result.
 
-The worksheet's provisional timestamp join displays `ref-0091` because the
-forced-aligned group starts at `569.26`. That mechanical row boundary cannot
+The worksheet's next-timestamp display joins `ref-0091` because the
+forced-aligned group starts at `569.26`. That mechanical display edge cannot
 decide the turn: complete conversational context identifies the short
 confirmations as Xu Zijing's preceding contribution and the following
 substantive clause as Shi Yi's contribution. The collapsed group may include a
-brief Shi Yi filler; because audible review is not available here, this record
-does not claim an exact acoustic boundary correction.
+brief Shi Yi filler; because `test.txt` records whole-second source timestamps,
+this record does not claim a finer reference boundary.
 
 The complete contextual judgment retains the sole changed assignment and finds
 no changed-context regression. Carrying this one repaired contribution forward

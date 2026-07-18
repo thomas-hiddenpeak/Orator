@@ -2,11 +2,18 @@
 
 ## Status
 
-Reference-ledger adjudication is in progress for the pushed v2.1 closing
-baseline commit `43523bad75d39134f44adb0851d1062af95508f4`. The immutable
-556-row ledger is initialized and structurally validated. No audible boundary,
-criticality, ambiguity, or reviewer signature has been filled yet, so this
-artifact is not an accuracy denominator and cannot support a closing claim.
+**Corrected 2026-07-18**: `test.txt` is the completed human-listened reference,
+not an unreviewed transcript. The initialized 556-row JSON only mirrored that
+reference into an optional annotation schema. Its empty annotation fields did
+not invalidate `test.txt` and did not create a requirement to listen to or
+transcribe all 556 rows again. This document's earlier `unreviewed` label applies
+only to those auxiliary JSON annotation fields and is superseded by this
+correction.
+
+The source speaker, text, whole-second timestamp, precision, and line order in
+`test.txt` are immutable reference truth. Candidate correctness and all result
+breakdowns still require complete forward and reverse contextual semantic
+review; the correction does not manufacture a missing product judgment.
 
 ## Frozen Inputs
 
@@ -24,22 +31,26 @@ counts are Tang Yunfeng 188, Xu Zijing 73, Zhu Jie 83, and Shi Yi 212.
 Mechanical inspection, without assigning any correctness judgment, found:
 
 - 22 duplicate-timestamp groups covering 46 rows;
-- 25 rows whose next-source-timestamp provisional interval is zero or negative;
+- 25 rows whose mechanically displayed next-source-timestamp interval is zero or
+  negative;
 - one explicit backward timestamp pair: `ref-0446` is stamped 2933 seconds and
   `ref-0447` is stamped 2932 seconds.
 
-These rows remain in the denominator. Their exact audible intervals and overlap
-relationships must be decided by listening in conversational context; no code,
-script, test, notebook, formula, query, metric, or algorithm may repair/reorder
-them, assign a judgment, aggregate accuracy, rank candidates, or issue a
-verdict.
+These rows remain in the denominator and in source line order. Reviewers
+interpret them from the surrounding `test.txt` conversation at the source's
+whole-second precision. No code, script, test, notebook, formula, query, metric,
+or algorithm may repair/reorder them, assign a judgment, aggregate accuracy,
+rank candidates, or issue a verdict. No invented sub-second boundary may be
+treated as reference truth.
 
 ## Review Batches
 
-The complete session is prepared as the six constitutional 600-second blocks
+The complete session was prepared as the six constitutional 600-second blocks
 plus the final 15.12-second partial block. Each directory under
 `/tmp/orator-spec013/closing-v21-43523ba/` contains continuous mono 16 kHz WAV,
-the matching immutable reference rows as JSON/TSV, and an `unreviewed` manifest.
+the matching immutable reference rows as JSON/TSV, and a historically named
+`unreviewed` manifest. These audio batches are optional inspection evidence,
+not a prerequisite for accepting the already human-audited `test.txt`.
 
 | Block | Rows | Continuous WAV SHA-256 |
 |---|---:|---|
@@ -57,8 +68,9 @@ The 16-second `ref-0446/ref-0447` backward-timestamp context clip is stored in
 the 2400-3000-second block at SHA-256
 `d1c7dd26773739c385d27a4f4b3ee636a5038e74a08211b8b539e27793b23018`.
 
-All seven batches remain `unreviewed`. VAD, forced alignment, and existing
-v2.1 timeline data may be displayed as evidence, but none may assign an audible
-boundary, overlap, criticality, ambiguity, signature, total, percentage, or gate
-decision. Every result requires complete contextual semantic review and manual
-verification under Constitution 1.7.0.
+The seven batch manifests were never filled, but that state describes the
+discarded duplicate-audition workflow rather than the reference authority. VAD,
+forced alignment, and existing v2.1 timeline data may be displayed as evidence,
+but none may assign correctness, criticality, ambiguity, totals, percentages, or
+gate decisions. Every run result still requires complete contextual semantic
+review against `test.txt` and manual verification under Constitution 1.7.0.

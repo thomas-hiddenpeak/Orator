@@ -1,8 +1,9 @@
 # Spec 013: Industrial Closing Validation
 
 **Status**: FR16ABN full real-WebSocket natural-turn gate and T112 telemetry
-cadence passed; T102, T084, full canonical closure, release sign-off, and
-industrial readiness remain open
+cadence passed; FR16ABO frozen A/B semantic review retained for real-WebSocket
+promotion; T102, T084, full canonical closure, release sign-off, and industrial
+readiness remain open
 **Created**: 2026-07-13
 **Scope**: Re-establish a truthful product baseline, recover full-session business
 accuracy, and define the evidence required before Orator may be declared closed.
@@ -14,11 +15,13 @@ Orator's v2.1 speaker-business pipeline now has repeatable full-session evidence
 above 90 percent for the natural-business-turn speaker-attribution gate. The
 FR16ABN Run A and Run B were each executed through the real WebSocket path, and
 all 556 reference contributions were reconciled under complete forward and
-reverse conversational context. Both runs manually establish 517 accepted and
-39 incorrect contributions, approximately 92.99 percent. Their direct-end runs
+reverse conversational context. The T102 breakdown reread reconciles the
+`ref-0160` source-label conflict and the `ref-0182` boundary-only judgment, and
+manually establishes 519 accepted and 37 incorrect contributions for each run,
+approximately 93.35 percent. Their direct-end runs
 also satisfy the terminal-latency gate mechanically. These sign two conjunctive
 gates only. Speaker-time, fixed-block, per-speaker, critical-turn,
-confident-wrong, audible-boundary, ASR, release, and independent-holdout gates
+confident-wrong, source-time-offset, ASR, release, and independent-holdout gates
 remain open.
 
 This spec defines two separate claims:
@@ -49,19 +52,23 @@ accepts only its natural-business-turn gate within the claim boundary above.
 - **Final business view**: the terminal user-facing track that states who said
   what and when. Raw ASR, diarization, voiceprint, voice activity detection
   (VAD), and forced-alignment tracks are evidence, not the acceptance target.
-- **Reference turn ledger**: an immutable, manually adjudicated list covering
-  every one of the 556 timestamped reference turns. Each row records the real
-  speaker, audible start/end, overlap, business meaning, criticality, and any
-  uncertainty in the reference.
+- **Reference turn ledger**: the immutable 556-turn human-audited reference in
+  `test.txt`, plus review annotations that do not rewrite it. The source speaker,
+  text, timestamp, line order, and their recorded precision are authoritative.
+  Duplicate or backward timestamps remain in source order and are interpreted
+  from the surrounding conversation; an auxiliary JSON or worksheet only
+  mirrors this reference and arranges system evidence.
 - **Natural business turn**: one speaker's contextually complete contribution,
   including short replies and interruptions when they change or confirm a
   business position.
 - **Critical turn**: a turn containing a decision, commitment, number,
   percentage, negation, ownership position, responsibility, or other content
   whose speaker identity changes the business interpretation.
-- **Correct speaker time**: reference speech duration attributed to the correct
-  real speaker in the final business view. Overlapping speakers are represented
-  as separate reference intervals.
+- **Correct speaker time**: human-reviewed source time blocks in `test.txt`
+  attributed to the correct real speaker in the final business view. Review uses
+  the recorded one-second source precision and surrounding line context.
+  Higher-resolution runtime boundaries may expose an offset but cannot create
+  finer reference truth than `test.txt` provides.
 - **Uncertain output**: an output marked `unknown`, `speaker_uncertain`, or an
   equivalent state. It is safer than a confident wrong attribution, but it does
   not count as correct for the 90 percent gate.
@@ -128,16 +135,19 @@ subject to the complete acceptance gates in this spec.
     clean commit `3b40245` completed the 3615.12-second v2.1 stream in 3616.442
     seconds with exact seven-pipeline extents, zero mechanical issues,
     continuous telemetry, and exact producer/persisted/Web UI/download terminal
-    equality. This closes the capture requirement in T044. It does not close
-    T031 or T045 because all 556 audible ledger rows remain unsigned. See
+    equality. This closes the capture requirement in T044. At that checkpoint an
+    optional annotation JSON was still described as unsigned; the corrected
+    contract recognizes `test.txt` itself as the human-audited reference. T045
+    remained open because that run had not yet received complete result review.
+    See
     `closing-baseline-v21-2026-07-15.md`.
-11. **Clean closing-baseline written-context review complete; audible review
+11. **Clean closing-baseline contextual review complete; detailed breakdowns
     open**: the exact 935-entry clean package received a full chronological
     manual pass and a reverse fixed-block manual pass. The reconciled result is
     443 correct / 112 incorrect / 1 ambiguous (`79.6763%`). Tools only arranged
     evidence and did not assign correctness. The result fails the full-session
-    gate and five fixed 600-second block gates. Exact audible boundaries,
-    speaker-time, offsets, criticality, and independent totals remain unsigned,
+    gate and five fixed 600-second block gates. Speaker-time, source-time
+    offsets, criticality, and independent totals remain unsigned,
     so this is not a constitutional closing score. See
     `closing-baseline-v21-context-review-2026-07-15.md`.
 12. **Current clean-commit natural-turn gate passed; T084 open**: commit
@@ -145,7 +155,7 @@ subject to the complete acceptance gates in this spec.
     Run B over the full real-WebSocket path. Complete contextual semantic review
     manually records `514/556` for Run A and `513/556` for Run B. The complete
     T084 audit leaves speaker-time, fixed-block, per-speaker, criticality,
-    confidence, audible-boundary, and terminal-latency gates unsigned. See
+    confidence, source-time-offset, and terminal-latency gates unsigned. See
     `current-commit-full-review-2026-07-17.md`.
 13. **FR26 direct-end full A/B seal complete; T084 open**: clean commit
     `588bfbe63555` completed the empty-registry and restarted frozen-registry
@@ -154,7 +164,7 @@ subject to the complete acceptance gates in this spec.
     Complete forward/reverse contextual semantic review manually records
     `512/556` for Run A and `509/556` for Run B, so both retain the natural-turn
     gate. Speaker-time, fixed-block, per-speaker, criticality, confidence, and
-    audible-boundary gates remain unsigned. See
+    source-time-offset gates remain unsigned. See
     `direct-end-full-review-2026-07-18.md`.
 14. **FR16ABM full real-path promotion complete; T102/T084 open**: clean commit
     `1a475e6b7473` passed the warning-clean build, `68/68` CTest, 120-second and
@@ -162,10 +172,10 @@ subject to the complete acceptance gates in this spec.
     Complete 556-contribution forward and reverse contextual semantic review
     manually records `514/556` for empty-registry Run A and `515/556` for
     frozen-registry Run B. This includes the repaired sustained handoff at
-    `ref-0071` and a context-based correction of the provisional row boundary
-    at `ref-0250`; no code assigned or aggregated the result. Audible
-    boundaries, speaker-time, fixed blocks, per-speaker review, criticality,
-    confidence, and offsets remain unsigned. See
+    `ref-0071` and a context-based interpretation of the whole-second source-time
+    edge at `ref-0250`; no code assigned or aggregated the result. Speaker-time,
+    fixed blocks, per-speaker review, criticality, confidence, and source-time
+    offsets remain unsigned. See
     `native-handoff-full-promotion-review-2026-07-18.md`.
 15. **FR16ABN frozen A/B replay retained; real-path promotion completed later**:
     a bounded delayed-clause rule reuses existing TOML punctuation and
@@ -187,12 +197,16 @@ subject to the complete acceptance gates in this spec.
     convergence, and accepted telemetry coverage. One earlier Run B artifact
     is explicitly excluded because runtime telemetry cadence was `94.965%`;
     the controlled retry passed at `95.214%` without changing behavioral TOML
-    values. Complete forward/reverse contextual semantic review manually
-    records `517/556` for both accepted runs. FR16ABN repairs `ref-0090` on both
-    paths; other run-specific repairs are not attributed to that rule. Audible
-    boundaries, speaker-time, fixed blocks, per-speaker review, criticality,
-    confidence, and offsets remain unsigned. See
-    `delayed-alignment-full-promotion-review-2026-07-18.md`.
+    values. Complete forward/reverse contextual semantic review, followed by the
+    T102 `ref-0160` and `ref-0182` context reconciliations, manually records
+    `519/556` for both
+    accepted runs. FR16ABN repairs `ref-0090` on both
+    paths; other run-specific repairs are not attributed to that rule.
+    Fixed-block and per-speaker turn gates pass, while critical and confident-
+    wrong gates fail. Speaker-time, per-speaker time, and source-time-offset
+    results remain unsigned. See
+    `delayed-alignment-full-promotion-review-2026-07-18.md` and
+    `speaker-gate-breakdown-review-2026-07-18.md`.
 17. **GPU telemetry absolute cadence verified; T102/T084 unchanged**:
     transitional experimental commit `d610de36ed13` replaces relative waiting
     with monotonic absolute deadlines while preserving the one-second TOML
@@ -272,9 +286,13 @@ subject to the complete acceptance gates in this spec.
 
 ### 4.3 Reference and evaluation
 
-- **FR9**: The reference turn ledger must cover all 556 timestamped turns. No
-  sampling, selected-window substitution, or code-inferred correctness is
-  permitted.
+- **FR9**: `test.txt` is the authoritative human-listened reference and the
+  reference turn ledger must cover all 556 timestamped turns without asking for
+  a second transcription or a new audible-boundary pass. Its source speaker,
+  text, timestamp, precision, and line order are immutable. Duplicate and
+  backward timestamps are interpreted manually from complete context and are
+  never repaired by code. No sampling, selected-window substitution, or
+  code-inferred correctness is permitted.
 - **FR10**: Accuracy judgments must be made item by item in conversational
   context. No compiled program, C++/CUDA test, Python/shell/JavaScript script,
   notebook, spreadsheet formula, query, metric, algorithm, or temporary command
@@ -285,7 +303,9 @@ subject to the complete acceptance gates in this spec.
 - **FR11**: Every reported percentage must be manually derived and manually
   cross-checked from signed contextual ledger rows. Automated counting,
   percentage calculation, threshold comparison, and acceptance booleans are
-  prohibited. Boundary offsets and overlapping speech must remain visible.
+  prohibited. Source-time offsets and overlapping speech must remain visible at
+  the precision supported by `test.txt`; no sub-second reference statistic may
+  be claimed from whole-second source timestamps.
 - **FR12**: Diagnostic model metrics, including local-slot mapping scores,
   diarization error rate, character error rate, unknown duration, and embedding
   similarity, must not replace the final business-view gates.
@@ -1809,6 +1829,29 @@ subject to the complete acceptance gates in this spec.
   fitted parameter, alter no raw track or timestamp, and inspect no lexical
   value, speaker name, known timestamp, reference value, review result, or
   executable correctness judgment.
+- **FR16ABO**: A complete punctuation phrase MAY challenge a uniform current
+  identity when the same Sortformer local slot enters a different stable
+  identity epoch shortly after the phrase. The future epoch is corroborating
+  evidence only: the identity stage, its epoch boundaries, and all raw tracks
+  MUST remain unchanged. The phrase duration MUST be at least TOML
+  `speaker_fusion.min_embed_sec` and at most
+  `speaker_fusion.phrase_max_sec`. Exactly one diarization local slot and one
+  primary-speaker run MUST each cover the complete phrase with the same current
+  identity, and no competing local slot may overlap it. The first later
+  different identity for that same local slot MUST begin within TOML
+  `speaker_fusion.future_epoch_lookahead_sec`; both diarization and primary
+  tracks MUST expose that future local/identity pair for at least the existing
+  minimum embedding duration. The future identity MUST rank first in the
+  robust gallery with the existing duration-class score and margin and MUST appear in
+  the session gallery's top two, while neither gallery may rank the incumbent
+  first. At least the configured number of positive-duration aligned units
+  MUST lie wholly inside the phrase. Missing, ambiguous, out-of-window,
+  voiceprint-rewritten, competing-slot, gallery-conflicting, or insufficiently
+  aligned evidence MUST preserve the current result. Only the exact phrase may
+  change, with a distinct audit reason. The rule MUST inspect no text value,
+  speaker name, known timestamp, reference datum, prior review label, or
+  executable correctness result. Its TOML lookahead is disabled at zero and
+  must be frozen before candidate generation.
 
 ### 4.5 Product surface and operations
 
@@ -1880,13 +1923,13 @@ All gates are conjunctive. A single failure keeps the spec open.
 
 | Area | Required result |
 |---|---|
-| Full speaker-time accuracy | At least 90.0% on the final business view |
+| Full speaker-time accuracy | At least 90.0% on the final business view, using human-reviewed `test.txt` time blocks at their recorded precision |
 | Full natural-turn speaker accuracy | At least 90.0% over all ledger turns |
-| Fixed 600 s speaker blocks | At least 90.0% in every block; final 15.12 s reported separately |
+| Fixed 600 s speaker blocks | At least 90.0% by speaker time and natural turns in every block; final 15.12 s reported separately |
 | Per-speaker recall | At least 90.0% for each real speaker by both time and turn count |
 | Critical speaker turns | 100% correct; uncertain and missing count as failures |
 | Confident wrong attribution | 0 critical turns and at most 2.0% of all turns |
-| Boundary offsets | Median absolute offset <= 0.25 s; 95th percentile <= 0.80 s; every offset > 1.0 s annotated |
+| Source-time offsets | Every attribution-affecting offset is manually annotated against `test.txt` at its one-second precision and counted by the applicable turn/time gate; no unsupported sub-second percentile or threshold is reported |
 | ASR semantic accuracy | At least 90.0% full-length and in every fixed 600 s block |
 | Critical ASR meaning | 100% preservation of critical numbers, negations, names, and decisions after allowed semantic equivalence |
 | Silence hallucination | 0 substantive final transcripts in each of three independent silence runs |

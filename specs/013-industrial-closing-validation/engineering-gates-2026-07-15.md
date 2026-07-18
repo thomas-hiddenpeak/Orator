@@ -72,5 +72,6 @@ public-kernel racecheck/synccheck above. The aborted log is retained at SHA-256
 ## Decision
 
 T042 is complete. No sanitizer finding requires a code change. Product closing
-remains open on the signed audible ledger, contextual accuracy, physical
-microphone acceptance, candidate promotion, and two full acceptance runs.
+remains open on complete contextual accuracy breakdowns against the human-
+audited `test.txt`, physical microphone acceptance, candidate promotion, and two
+full acceptance runs.

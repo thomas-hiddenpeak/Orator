@@ -280,6 +280,8 @@ int main(int argc, char** argv) {
         config.speaker_fusion_phrase_max_sec;
     business_config.voiceprint_four_view_min_aligned_units =
         config.speaker_fusion_four_view_min_aligned_units;
+    business_config.voiceprint_future_epoch_lookahead_sec =
+        config.speaker_fusion_future_epoch_lookahead_sec;
     business_config.voiceprint_punctuation = config.speaker_fusion_punctuation;
     if (config.timeline_speaker_overlap_tie_policy == "higher_confidence") {
       business_config.speaker_overlap_tie_policy =

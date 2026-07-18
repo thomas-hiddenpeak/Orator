@@ -23,12 +23,16 @@ work is specified under [specs/](.).
   FR16ABN real-WebSocket promotion. Full Run A used an empty registry and the
   accepted Run B restarted with Run A's registry frozen. All 556 contributions
   in each run were reconciled under complete forward and reverse conversational
-  context. Both runs are `517/556` (about 92.99 percent). Direct terminal waits
+  context. The T102 breakdown reread corrects the `ref-0160` source-label
+  conflict and the `ref-0182` boundary-only missing judgment; both runs are
+  `519/556` (about 93.35 percent). Direct terminal waits
   of `25.849 s` and `25.585 s` sign the latency gate mechanically. The first
   Run B attempt is retained but excluded because runtime telemetry cadence was
   `94.965%`; one controlled retry passed at `95.214%` without a behavioral
-  parameter change. Speaker-time, fixed-block, per-speaker, critical-turn,
-  confidence, and audible-boundary gates remain unsigned, so T102, T084, and
+  parameter change. `test.txt` is the human-listened reference; speaker-time,
+  fixed-block and per-speaker turn gates pass, while critical-turn and
+  confident-wrong gates fail. Speaker-time, per-speaker time, and source-time-
+  offset breakdowns remain unsigned, so T102, T084, and
   Spec 013 remain open. ASR and independent holdout are not implied.
   Transitional experimental commit `d610de36ed13` separately closes T112 with
   a warning-clean build, `69/69` CTest, and a clean 120-second real-WebSocket
@@ -210,10 +214,9 @@ reverse-block manual review of all 556 written-context rows records 443 correct,
 112 incorrect, and one ambiguous contribution (`79.6763%`). Tools only arranged
 the evidence; no code assigned judgments, calculated the result, ranked a
 candidate, or issued the verdict. The reviewer manually derived and checked the
-totals. The result fails the full-session
-gate and five fixed 600-second block gates. The audible ledger, speaker-time,
-offset, criticality, and independent totals remain unsigned, so T045 and product
-closure remain open. See
+  totals. The result fails the full-session gate and five fixed 600-second block
+  gates. It was therefore rejected without spending more review effort on
+  speaker-time, source-time-offset, criticality, and independent breakdowns. See
 [closing-baseline-v21-context-review-2026-07-15.md](013-industrial-closing-validation/closing-baseline-v21-context-review-2026-07-15.md).
 
 **Engineering closing gates (2026-07-15)**: clean `ce388a7` passed a warning-free
@@ -305,11 +308,12 @@ with direct waits of `26.503 s` and `26.185 s`, exact seven-track extents,
 observer convergence, and complete required telemetry. Complete manual forward
 and reverse contextual review records 514/556 and 515/556. The rule repairs
 `ref-0071` on both paths without a contextual regression. The review also
-accepts `ref-0250`, whose correct Tang Yunfeng evidence begins 0.10 seconds
-beyond a provisional row boundary; a mechanical interval cutoff cannot decide
-that contribution. T106 is complete. T107-T109 subsequently traced and retained
-the separate delayed-alignment candidate described below. The independent
-audible T102 ledger remains open; full speaker closure is not claimed. See
+  accepts `ref-0250`, whose correct Tang Yunfeng evidence crosses a mechanically
+  displayed next-timestamp edge; the whole-second source mark cannot provide a
+  contradictory sub-second boundary. T106 is complete. T107-T109 subsequently
+  traced and retained the separate delayed-alignment candidate described below.
+  T102's manual result breakdowns remain open; full speaker closure is not
+  claimed. See
 [native-handoff-full-promotion-review-2026-07-18.md](013-industrial-closing-validation/native-handoff-full-promotion-review-2026-07-18.md).
 
 **Delayed-alignment frozen replay checkpoint (2026-07-18)**: FR16ABN reuses
@@ -335,7 +339,8 @@ observer convergence, and required telemetry coverage. The first Run B attempt
 is preserved as an excluded mechanical failure because its runtime telemetry
 cadence was `94.965%`; a single controlled retry with unchanged behavioral
 TOML values passed at `95.214%`. Complete forward and reverse contextual review
-of all 556 contributions manually records `517/556` for each accepted run.
+of all 556 contributions, plus the T102 `ref-0160` and `ref-0182` context
+reconciliations, manually records `519/556` for each accepted run.
 FR16ABN repairs `ref-0090` on both paths without a contextual regression or
 long-range identity drift. T110 and T111 are complete. T102, T084, and full
 closure remain open. The separate T112 telemetry cadence fix is now complete.
@@ -527,19 +532,27 @@ Findings:
 - [specs/011-observability/spec.md](011-observability/spec.md) — **Implemented** (2026-06-30): offline [rerun](https://rerun.io) visualization, kept entirely in `tools/` (no runtime third-party dep, Art. I). **Phase 1**: `tools/verify/py/ws_unified_test.py` captures the runtime's periodic `gpu_telemetry`/cursor WS samples into a `telemetry` array; `tools/observability/timeline_to_rerun.py` keys diarization/comprehensive lanes by the global `speaker_id` (`spk_N`) + per-pipeline RTF lanes. **Phase 2 (comprehensive dashboard)**: `TegraSampler` records a continuous `device_series`; the exporter renders six namespaced dimensions on one `audio_time` axis — `pipelines/*`, `comprehensive/<id>` swimlanes, `scheduler/<pipe>/{rtf,compute_sec,active,cuda_priority}`, `cursors/<pipe>/{position_sec,pending_sec}`, `device/{mem,cpu,gpu,temp,power}/*` (extended tegrastats parse; Orin `GR3D_FREQ` optional, omitted on Thor), and `session/summary` — laid out by a `rerun.blueprint` persisted in the `.rrd`. Methodology + best practices in `tools/observability/README.md`. **Config fix**: nested `[telemetry.cursor]` was never read (`config["telemetry.cursor"]` literal-key lookup) → now `config["telemetry"]["cursor"]`, with a `test_config` regression. Validated on a `rate=1` 120 s run: 125 gpu + 125 cursor + 126 device samples, six dimensions populated, stream_rt 0.964×, ctest 47/47, zero warnings. Follow-ups: live WS→rerun consumer, full-hour acceptance recording.
 - [specs/010-speaker-id/spec.md](010-speaker-id/spec.md) — **Implemented, with Phase H experiment not accepted as accuracy fix; local-diar operating profile restored**: speaker identity (TitaNet-Large voiceprint enrollment / re-identification as a post-diarization stage inside the diar pipeline, Art. III). **Phase A complete & committed**: A1 acquire+convert weights → `models/speaker/titanet_large.safetensors` (108 tensors); A2 NeMo oracle (`tools/reference/titanet_oracle.py`, isolated `tools/.venv-nemo`); A3 pure C++/CUDA `model::TitaNetEmbedder` (`include/model/titanet_embedder.h` + `src/model/titanet_embedder.cu`, time-major [T,C]: mel+per_feature → 5-block ContextNet encoder → attentive statistics pooling → 192-d, F32 weights); A4 `test_titanet` validated vs NeMo oracle (**span cosine 1.000000/0.999999/1.000000, cross-span matrix to 4 decimals; ctest 46/46, no warnings**). **Phase B complete & committed**: `pipeline::SpeakerIdentityStage` (clean-segment gate + per-local embed/match/enroll via `SpeakerDatabase` + revisable local→global map), wired into the diar pipeline behind a `DiarizationWorker` segment-processor hook + `[speaker]` config; diar message/track expose a backward-compatible `speaker_id` field. **2026-07-06 validation**: Phase H conservative cross-session candidate (`/tmp/orator_phaseh_full.json`) was rejected by context review [local-diar-review-2026-07-06.md](010-speaker-id/local-diar-review-2026-07-06.md): it reduced wrong late globals into local-only gaps but did not restore attribution. Follow-up restored Sortformer local-diar runtime tuning to the async/no-reset profile (`spkcache_update_period=188`, `chunk_right_context=1`, `spkcache_sil_frames=3`) in `orator.toml`; lower-level `SortformerConfig` defaults remain tied to the existing NeMo oracle fixture. Full-length real WS `/tmp/orator_full_async_default_20260706.json`: 3615 s audio, 3618.487 s wall, stream RT 0.999x, diar 773, ASR 288, VAD 972, 3611 tegrastats samples, stable 4 global ids and no local-only gaps; context review [local-diar-default-188-review-2026-07-06.md](010-speaker-id/local-diar-default-188-review-2026-07-06.md) accepts the stable operating profile but records residual rapid-turn fragmentation in 3000-3615 s and an ASR repeat burst at 1927-1944 s.
 - [specs/012-evidence-fusion-timeline/spec.md](012-evidence-fusion-timeline/spec.md) — **Runtime candidate validated (2026-07-08); tail evidence reviewed and support diagnostics added (2026-07-09)**: evidence-first comprehensive timeline fusion plus TOML-gated runtime adoption. `tools/verify/py/fusion_audit.py` and `speaker_business_review_packet.py` read frozen `ws_unified_test.py` JSON packages, audit ASR/diar/VAD/align consistency, and emit candidate/business-turn views without mutating captured tracks. After the 2026-07-07 context review showed forced alignment alone did not recover speaker-business accuracy, 2026-07-08 fixes added local-speaker drift/competing-identity split and backfill, per-entry comprehensive `speaker_id`, and `[timeline]` align-run split parameters. Full-length real WS run `/tmp/orator_timelinefusion_full_20260708.json`: 3615.0 s audio, 3618.74 s wall, stream RT 0.999x, diar 773, ASR 288, align 288/288. Fusion audit `/tmp/orator_timelinefusion_full_20260708_fusion_bt_timeline.json`: business_turns=728, unknown 171.860 s (4.75%), no mechanical audit issues. Complete contextual review [drift-epoch-review-2026-07-08.md](012-evidence-fusion-timeline/drift-epoch-review-2026-07-08.md) follows [speaker-business-method.md](012-evidence-fusion-timeline/speaker-business-method.md). Follow-up candidate decisions are historical context-review records. All code-derived percentages and evidence scores in Spec 012 are mechanical records only; they may not evaluate accuracy, rank/select a candidate, or issue a product verdict under Constitution 1.7.0.
-- [specs/013-industrial-closing-validation/spec.md](013-industrial-closing-validation/spec.md) - **FR16ABN full natural-turn gate and T112 telemetry cadence passed; T102/T084 remain open**: transitional experimental commit `6b1cb79fa4f5` passed the warning-clean build, `68/68` CTest, 120/600-second promotion, and full direct-end A/B recapture. Complete 556-contribution forward/reverse contextual review manually records `517/556` for both accepted runs. The first Run B attempt is retained as an excluded telemetry-cadence failure; its controlled retry passed without a behavioral parameter change. Separate transitional commit `d610de36ed13` closes T112 with `69/69` CTest and a clean 120-second absolute-cadence WebSocket check. Audible speaker-ledger, ASR, browser/microphone, holdout, report-review, and release-tag gates remain open.
+- [specs/013-industrial-closing-validation/spec.md](013-industrial-closing-validation/spec.md) - **FR16ABN full natural-turn gate and T112 telemetry cadence passed; FR16ABO retained for real-WebSocket promotion; T102/T084 remain open**: transitional experimental commit `6b1cb79fa4f5` passed the warning-clean build, `68/68` CTest, 120/600-second promotion, and full direct-end A/B recapture. Complete 556-contribution forward/reverse contextual review against the human-listened `test.txt` reference, followed by reconciliation of the `ref-0160` source-label conflict and the `ref-0182` boundary-only judgment, manually records `519/556` for both accepted runs. Fixed-block and per-speaker turn recall pass; critical-speaker and confident-wrong attribution fail. The first Run B attempt is retained as an excluded telemetry-cadence failure; its controlled retry passed without a behavioral parameter change. Separate transitional commit `d610de36ed13` closes T112 with `69/69` CTest and a clean 120-second absolute-cadence WebSocket check. FR16ABO then added a strictly corroborated future-epoch phrase challenge without rewriting raw identity epochs. Its frozen T111 A/B inputs are byte-stable across two replays; complete forward/reverse review of both changed contexts against `test.txt` retains one speaker repair and one identity-neutral activation. The frozen candidate passes `69/69` CTest but is not yet a real-run baseline. Speaker-time, per-speaker time, and source-time-offset breakdowns remain open; ASR, browser/microphone, holdout, report-review, and release-tag gates also remain open.
 
 ## 7. Immediate next step
 
-Keep the streaming v2.1 `340/1/188/188` profile and all TOML values fixed. T110
-and T111 are complete. T102 is now the product-evaluation priority: manually
-listen to and sign all 556 audible boundaries, overlaps, criticality, and
-confidence classes, then complete the speaker-time, fixed-block, per-speaker,
-critical-turn, confident-wrong, and boundary-offset reviews. T112 is complete
-and does not alter the speaker baseline. T084 closes only after both A and B
-independently pass every applicable gate. ASR, browser/microphone, locked
-holdout, final-report review, and release signing remain later workstreams. The
-bullets below are historical
+Keep the streaming v2.1 `340/1/188/188` profile and checked-in TOML values fixed.
+T110-T115 are complete. `test.txt` is the human-listened reference, and both
+accepted T111 runs already received complete 556-row forward and reverse
+contextual review. T102 has signed fixed-block and per-speaker turn recall as
+passed and critical-speaker and confident-wrong attribution as failed. FR16ABO
+is retained from deterministic frozen A/B replay only: complete review of every
+changed context preserves one speaker repair and one identity-neutral
+activation. Execute T116 as a committed transitional experiment through the
+120/600-second real-WebSocket ladder; if its runtime contracts pass, perform a
+new full A/B capture and complete 556-contribution forward/reverse semantic
+review before changing the accepted `519/556` baseline. Speaker-time,
+per-speaker time, and source-time offsets remain to be manually signed at
+`test.txt`'s recorded precision; no duplicate listening or invented sub-second
+boundary is required. T112 is complete and does not alter the speaker baseline.
+T084 closes only after both A and B independently pass every applicable gate.
+ASR, browser/microphone, locked holdout, final-report review, and release signing
+remain later workstreams. The bullets below are historical
 implementation and measurement records unless explicitly marked as current
 acceptance evidence.
 

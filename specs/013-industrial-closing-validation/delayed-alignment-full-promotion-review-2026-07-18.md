@@ -25,9 +25,11 @@ each accepted full run, then reread each complete session in six reverse fixed
 windows and reconciled the two passes.
 
 This report signs the 90 percent natural-business-turn speaker-attribution gate
-for these two exact runs. It does not include audible boundary listening and
-does not sign speaker-time, fixed-block, per-speaker, criticality, confidence,
-or boundary-offset gates. T102, T084, canonical closure, release sign-off, and
+for these two exact runs. `test.txt` is the human-listened reference and all 556
+rows were already read twice against each run; no duplicate audio transcription
+or boundary-listening pass is required. This report does not yet sign
+speaker-time, fixed-block, per-speaker, criticality, confidence, or source-time-
+offset breakdowns. T102, T084, canonical closure, release sign-off, and
 industrial readiness remain open.
 
 ## Frozen inputs and build
@@ -135,8 +137,8 @@ The contextual identity mapping is `spk_0 = Zhu Jie`, `spk_1 = Tang
 Yunfeng`, `spk_2 = Xu Zijing`, and `spk_3 = Shi Yi`. ASR wording errors were
 not treated as speaker errors when the natural speaker attribution remained
 clear. Conversely, a recognizable contribution assigned to the wrong speaker
-remained a speaker error even when its words were correct. Provisional
-timestamp boundaries did not override the conversational handoff.
+remained a speaker error even when its words were correct. Whole-second source-
+time display edges did not override the conversational handoff.
 
 ## Manual natural-turn result
 
@@ -151,22 +153,29 @@ Run A also contains correct Zhu Jie and Xu Zijing contributions at
 `ref-0215`. Those are run-specific captured outcomes and are not attributed to
 the FR16ABN rule.
 
-The same 39 contributions were manually confirmed incorrect in each accepted
-run:
+The initial T111 pass listed the same 39 contributions as incorrect in each
+accepted run. The T102 breakdown reread then reconciled `ref-0160`: its source
+line says 石一, but the surrounding board-attendance exchange unambiguously
+identifies 唐云峰, and both runs assign it to `spk_1`. It also reconciled
+`ref-0182`: complete conversation context contains the recognizable 徐子景
+contribution under `spk_2`, despite imperfect wording and a shifted display
+edge. The final 37 incorrect
+contributions in each run are:
 
 `ref-0009`, `ref-0024`, `ref-0045`, `ref-0049`, `ref-0058`, `ref-0061`,
-`ref-0102`, `ref-0118`, `ref-0135`, `ref-0160`, `ref-0182`, `ref-0221`,
+`ref-0102`, `ref-0118`, `ref-0135`, `ref-0221`,
 `ref-0241`, `ref-0249`, `ref-0252`, `ref-0253`, `ref-0296`, `ref-0298`,
 `ref-0313`, `ref-0327`, `ref-0331`, `ref-0333`, `ref-0338`, `ref-0341`,
 `ref-0354`, `ref-0375`, `ref-0390`, `ref-0417`, `ref-0442`, `ref-0444`,
 `ref-0457`, `ref-0461`, `ref-0499`, `ref-0504`, `ref-0505`, `ref-0506`,
 `ref-0507`, `ref-0509`, and `ref-0537`.
 
-For each run, the reviewer manually established 517 accepted and 39 incorrect
-natural contributions and manually calculated `517 / 556`, approximately
-`92.99%`. Both accepted full runs therefore pass the 90 percent real-runtime
+For each run, the reconciled review manually establishes 519 accepted and 37
+incorrect natural contributions and manually calculates `519 / 556`,
+approximately `93.35%`. Both accepted full runs therefore pass the 90 percent real-runtime
 natural-turn product gate independently. This does not sign any other
-conjunctive Spec 013 gate.
+conjunctive Spec 013 gate. Fixed-block, per-speaker, criticality, and confidence
+details are in `speaker-gate-breakdown-review-2026-07-18.md`.
 
 ## Promotion decision and next boundary
 
@@ -175,10 +184,13 @@ complete, and this report supersedes the frozen-replay-only status in
 `delayed-alignment-clause-review-2026-07-18.md`. The result is a transitional
 experimental checkpoint, not a release or complete speaker-business closure.
 
-T102 remains the next product-evaluation gate: manually listen to and sign all
-556 audible boundaries, overlaps, criticality, and confidence classes, then
-derive the speaker-time, fixed-block, per-speaker, critical-turn,
-confident-wrong, and boundary-offset results from complete context. The
-telemetry loop also requires an absolute-deadline scheduling follow-up so probe
-latency cannot accumulate into cadence loss. Neither follow-up may reinterpret
-the natural-turn result above or use code to assign a product verdict.
+T102 remains the next product-evaluation gate: reuse the completed 556-row
+forward and reverse contextual judgments against the human-audited `test.txt`
+reference, classify criticality and confident-wrong/uncertain outcomes from
+complete context, and manually derive the speaker-time, fixed-block,
+per-speaker, critical-turn, confident-wrong, and source-time-offset breakdowns
+for Run A and Run B independently. Source-time review uses `test.txt` at its
+recorded whole-second precision and must not invent sub-second reference truth.
+T112 subsequently closed the telemetry scheduling follow-up. Neither follow-up
+may reinterpret the natural-turn result above or use code to assign a product
+verdict.

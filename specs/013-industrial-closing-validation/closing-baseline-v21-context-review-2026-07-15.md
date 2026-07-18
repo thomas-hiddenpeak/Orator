@@ -19,10 +19,12 @@ remains assigned to the correct speaker. A complete or major proposition under
 another speaker, a cross-speaker merge that makes the core identity unreliable,
 or an unknown identity for a known proposition fails the row.
 
-This review does not replace the audible reference ledger. It cannot determine
-exact audible boundaries, overlap ownership, speaker-time accuracy, offset
-bins, or criticality signatures from text alone. Those constitutional gates
-remain open under T031-T035 and T045.
+`test.txt` is the human-listened reference; no separate audible transcription is
+required. This historical review did not manually derive speaker-time,
+source-time-offset, overlap, or criticality breakdowns from its completed
+contextual judgments, so those separate gates were not signed for this rejected
+baseline. The source timestamps support only their recorded whole-second
+precision.
 
 ## Frozen Evidence
 
@@ -128,7 +130,7 @@ identifies its speaker as 唐云峰: the contribution says that below ten percen
 he would not join the board, and 石一 immediately answers by asking whether he
 does not want to argue with them in the board office. The runtime assigns the
 contribution to `spk_1`/唐云峰. This row is therefore contextually correct and
-is retained as a source-speaker conflict for the later audible ledger.
+is retained as an explicit source-speaker/context conflict in the review record.
 
 The second pass also rejected mechanical boundary reasoning in both directions.
 Rows such as `ref-0351` and `ref-0425` remain correct because the relevant core
@@ -160,6 +162,6 @@ semantic record. The difference comes from reviewing the exact clean artifact
 and judging complete semantic contributions rather than mechanically penalizing
 every imperfect split. It is not evidence that the model improved.
 
-No candidate is promoted. The current baseline fails the natural-turn gate,
-and no constitutional speaker-time accuracy or closing result is claimed until
-the audible ledger and its independently checked totals are complete.
+No candidate is promoted. The current baseline fails the natural-turn gate, so
+no speaker-time accuracy or closing result is claimed and no further product
+breakdowns are required for this rejected historical artifact.

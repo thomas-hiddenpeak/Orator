@@ -14,8 +14,9 @@ verdict. Every product judgment below was made by reading the complete affected
 conversation in chronological order and then rereading the affected contexts in
 reverse order for both Run A and Run B.
 
-This review does not include audible boundary listening and does not close the
-T102 ledger or any full real-WebSocket acceptance gate.
+This changed-context review does not derive T102's full-session speaker-time,
+fixed-block, per-speaker, criticality, confidence, or source-time-offset
+breakdowns and does not close any full real-WebSocket acceptance gate.
 
 ## Root Cause
 
