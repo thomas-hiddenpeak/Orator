@@ -3089,6 +3089,26 @@ context shows no new natural-turn regression. This manual result authorizes
 one clean 600-second gate only. See
 `vad-sensitivity-120-context-review-2026-07-19.md`.
 
+T132 is complete at clean commit `30162d1c844d`. Its production 600-second
+real-WebSocket artifact closes all seven common-clock extents at `9,600,000`
+samples without a gap, converges the producer and both observer terminal
+hashes, and has complete required telemetry coverage. All 93 contributions
+were read chronologically and again in reverse 60-second windows. The retained
+`ref-0037` and `ref-0073` exchanges remain substantively correct. Complete
+forward/reverse reading of all ten speaker-sequence changes from T128 finds no
+new natural-turn regression and restores several early contributions. This
+manual result authorizes a full empty-registry/frozen-registry A/B gate; it does
+not promote FR30 or replace T111. See
+`vad-sensitivity-600-context-review-2026-07-19.md`.
+
+The full gate starts from the clean commit containing the T132 record. Run A
+uses an empty isolated registry. After Run A ends, its registry is frozen and a
+new server process and protocol store produce Run B. Both runs use 100 ms
+frames, 1.0x pacing, direct `end`, observers, telemetry, and unchanged
+checked-in behavioral TOML. Each artifact receives an independent complete
+556-contribution chronological read and reverse 600-second-block read. Only the
+manually reconciled ledgers may promote or reject FR30.
+
 ### 8.15 FR28 120-second outcome and promotion ladder
 
 T117-T121 are complete. The frozen T116 packages replay byte-stably; their

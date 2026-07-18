@@ -7,7 +7,8 @@ its deterministic trailing-context correction pass the silence and repeated
 `ref-0073`; FR29 passes repeated 120-second and complete 600-second real-stream
 review but its full T123 A/B promotion is rejected; FR30 VAD-sensitivity
 passes T131 silence, repeatability, and complete 120-second contextual review;
-its T132 600-second promotion is pending; T102, T084, full
+T132 complete 600-second contextual review passes and full A/B is authorized;
+T102, T084, full
 canonical closure, release sign-off, and industrial readiness remain open
 **Created**: 2026-07-13
 **Scope**: Re-establish a truthful product baseline, recover full-session business
@@ -58,9 +59,12 @@ ran ahead of the VAD frontier. A one-variable FR30 TOML candidate lowers only
 the production VAD threshold to `0.3`. It passes three independent
 real-WebSocket silence sessions, exact seven-track repeatability across two
 independent 120-second runs, and complete forward and reverse review of all 18
-in-scope contributions without a new natural-turn regression. This authorizes
-one 600-second gate only; FR30 is not accepted until that complete contextual
-review passes.
+in-scope contributions without a new natural-turn regression. Its clean
+600-second run then passes every mechanical contract, and complete forward and
+reverse review of all 93 contributions plus all ten T128 sequence changes
+finds no new natural-turn regression. This authorizes full empty-registry and
+frozen-registry A/B only; FR30 is not accepted until both full artifacts pass
+independent complete contextual review.
 
 T117-T121 subsequently prove that the T116 A/B producer difference begins in
 scheduling-sensitive VAD-gated ASR rather than Sortformer or the deterministic
@@ -2089,7 +2093,11 @@ subject to the complete acceptance gates in this spec.
   review against all in-scope `test.txt` contributions. No interval count,
   coverage calculation, transcript comparison, or other automated result may
   rank or accept this threshold. A new full A/B run is forbidden until the
-  600-second contextual gate is manually retained.
+  600-second contextual gate is manually retained. After retention, Run A MUST
+  use an empty isolated registry and Run B MUST use Run A's frozen registry in
+  a restarted process. Each full artifact MUST receive its own complete
+  chronological 556-contribution review and independent reverse-600-second-
+  block review before FR30 may be promoted or rejected.
 
 ## 5. Acceptance Gates
 

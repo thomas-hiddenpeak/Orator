@@ -1948,7 +1948,26 @@
   forward and reverse review of all 18 contributions finds no new natural-turn
   regression from T125. See
   `vad-sensitivity-120-context-review-2026-07-19.md`.
-- [ ] T132 Only if T131 is manually retained, run one clean 600-second
+- [x] T132 Only if T131 is manually retained, run one clean 600-second
   production WebSocket capture and perform complete chronological and reverse
   contextual review of all 93 contributions. Do not authorize a full A/B run
-  or alter T111 unless this gate passes.
+  or alter T111 unless this gate passes. Clean commit `30162d1c844d`
+  completes the real stream in `603.342 s`, closes every pipeline at
+  `9,600,000` samples without a gap, converges all observer terminal hashes,
+  and has complete required telemetry. Complete forward and reverse reading of
+  all 93 contributions retains `ref-0037` and `ref-0073`, and complete reading
+  of all ten T128 sequence changes finds no new natural-turn regression. See
+  `vad-sensitivity-600-context-review-2026-07-19.md`.
+- [ ] T133 Commit the retained T132 evidence, then use that exact clean
+  revision for one full-length empty-registry production WebSocket capture and
+  one independently restarted full-length capture using Run A's frozen
+  registry. Both runs use checked-in behavioral TOML, 100 ms frames, 1.0x
+  pacing, direct `end`, observers, telemetry, isolated protocol storage, and
+  complete manifests. Automation may verify only mechanical contracts and
+  repeatability.
+- [ ] T134 Read all 556 `test.txt` contributions for each full artifact in
+  chronological order and again in reverse 600-second blocks. Manually derive
+  every required speaker-business gate, compare the two complete judgments to
+  T111 and the rejected T123 result, and then retain or reject FR30. No code,
+  script, query, formula, metric, or model score may assign any result or
+  promotion verdict.
