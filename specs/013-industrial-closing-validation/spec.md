@@ -1,9 +1,9 @@
 # Spec 013: Industrial Closing Validation
 
 **Status**: FR16ABN full real-WebSocket natural-turn gate and T112 telemetry
-cadence passed; FR16ABO full real-WebSocket promotion rejected and disabled;
-T102, T084, full canonical closure, release sign-off, and industrial readiness
-remain open
+cadence passed; FR16ABO full promotion rejected; FR28 scheduling stability
+passes its 120-second gate and awaits 600/full promotion; T102, T084, full
+canonical closure, release sign-off, and industrial readiness remain open
 **Created**: 2026-07-13
 **Scope**: Re-establish a truthful product baseline, recover full-session business
 accuracy, and define the evidence required before Orator may be declared closed.
@@ -30,6 +30,15 @@ mechanical ladder, but complete 556-contribution forward/reverse semantic
 review against `test.txt` manually records `518/556` for each run. The two
 error sets also differ. FR16ABO is therefore disabled in the checked-in TOML,
 and T111 remains the accepted speaker-business baseline.
+
+T117-T121 subsequently prove that the T116 A/B producer difference begins in
+scheduling-sensitive VAD-gated ASR rather than Sortformer or the deterministic
+business projector. FR28 publishes stable typed VAD frontiers and buffers
+undecided ASR audio. It passes the warning-clean build, VAD oracle, all 69 CTest
+entries, and two independent 120-second production WebSocket runs whose seven
+canonical product tracks are identical. Complete forward/reverse review of all
+18 in-scope reference contributions finds no new speaker regression. This
+permits a 600-second promotion run only; it does not alter the full T111 result.
 
 This spec defines two separate claims:
 
@@ -1934,6 +1943,24 @@ subject to the complete acceptance gates in this spec.
   behavior. Focused deterministic timing coverage and a real incremental
   WebSocket cadence check are mechanical engineering evidence only and MUST
   NOT evaluate or reopen speaker correctness.
+- **FR28**: VAD-gated ASR segmentation MUST be invariant to the relative
+  scheduling of the independent ASR and VAD workers. VAD MUST publish its
+  active padded speech onset, a stable active-speech decision horizon, finalized
+  speech segments, and a monotonic confirmed-silence horizon only through the
+  typed `ComprehensiveTimeline`. ASR MUST NOT read `GpuVad`, receive a direct
+  VAD callback, wait on a VAD cursor, or feed audio beyond that typed stable
+  evidence. Audio ahead of the decision horizon MUST remain in an ASR-owned
+  pending buffer. On a new speech region, ASR MUST begin at the typed onset
+  minus TOML `asr.vad_lead_ms`; it MUST consume decided speech using TOML
+  `asr.vad_gate_chunk_ms` batches so publication timing cannot alter decoder
+  call boundaries. Confirmed silence is skipped, and the existing TOML trailing
+  interval determines whether adjacent speech remains in one ASR segment.
+  Session finalization MUST freeze the final VAD evidence before ASR drains its
+  pending tail and emits finals. Focused tests MUST feed identical audio and
+  identical final VAD evidence under different publication orders and require
+  identical ASR reset positions, fed sample ranges, finals, and typed time
+  codes. These exact-equality checks are mechanical determinism evidence only;
+  they MUST NOT assign transcript, speaker, endpoint, or product correctness.
 
 ## 5. Acceptance Gates
 

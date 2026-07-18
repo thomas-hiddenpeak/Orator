@@ -2835,6 +2835,83 @@ correction that preserves frozen-input determinism and passes complete forward
 and reverse contextual semantic review against `test.txt` may enter another
 120/600/full promotion ladder.
 
+### 8.14 Deterministic VAD-gated ASR plan
+
+T117 establishes that the T116 A/B activity-diarization and primary-speaker
+tracks are byte-identical, and that replaying either frozen typed package
+through the production business projector is byte-stable. The first raw A/B
+divergence is ASR source `text_id=49`: one run opens at `658.7 s` and the other
+at `658.8 s`, while the surrounding finalized VAD intervals are identical. The
+existing gate feeds audio beyond the VAD horizon immediately, so its next
+decoder reset is selected by worker scheduling. The configured
+`asr.vad_lead_ms` is not applied by that path. Forced alignment, ASR-span
+voiceprint evidence, and final business differences are downstream effects of
+that source variance, not evidence that the deterministic projector is random.
+
+The implementation keeps all runtime pipelines independent and changes only
+their typed evidence contract and controller lifecycle:
+
+1. Extend `IVad` with one model-independent state snapshot containing the
+   processed sample frontier, active padded onset, active stable-speech frontier,
+   and confirmed-silence frontier. `GpuVad` derives each value from its existing
+   512-sample endpoint state, configured minimum speech/silence durations, and
+   configured speech padding.
+2. Store the active onset/frontier beside the existing VAD state, finalized
+   segments, and silence horizon in `ComprehensiveTimeline`. All values are
+   converted by the session `TimeBase`; snapshot reads remain immutable and
+   non-blocking.
+3. Replace `AsrWorker`'s unused ring and scheduling-sensitive unconfirmed-audio
+   fallback with one worker-owned pending buffer. Consume finalized or stable
+   active speech in source order, prepend TOML `vad_lead_ms` only when opening a
+   new VAD group, skip typed confirmed silence, and retain a segment across a
+   gap no longer than TOML `vad_trail_sec`.
+4. Feed decided speech in TOML `vad_gate_chunk_ms` quanta. Hold an incomplete
+   active quantum until more stable evidence arrives; consume the exact final
+   remainder only after a finalized VAD boundary exists. This makes decoder
+   input calls independent of how often ASR observes an advancing typed
+   frontier.
+5. Remove ASR finalization from the ASR cache-consumer thread. During terminal
+   lifecycle, join that collector and the VAD producer, then drain/finalize ASR
+   once from the controller using the frozen final typed VAD snapshot. Keep the
+   aligner alive until those ASR finals have been deposited.
+
+No worker waits on another worker, and no direct pipeline callback, shared
+cursor, or model downcast is introduced. Focused tests first run the same
+samples with VAD evidence pre-published and late-published and compare reset
+positions, chunk sizes, fed sample values, events, and typed finals exactly.
+Timeline tests cover snapshot immutability and monotonic frontiers; VAD
+numerical tests remain against the existing CPU oracle. After a warning-clean
+build and full CTest, run two independent 120-second real-WebSocket captures
+with the same TOML and isolated registries. Structural tools may compare track
+hashes and first differences only. Changed conversational content, if any, is
+reviewed forward and reverse against `test.txt` before a 600-second or
+full-length promotion decision.
+
+### 8.15 FR28 120-second outcome and promotion ladder
+
+T117-T121 are complete. The frozen T116 packages replay byte-stably; their
+first business divergence traces from scheduling-sensitive ASR `text_id=49`
+through alignment and voiceprint evidence into `ref-0102`. FR28 replaces that
+path with typed VAD frontiers and an ASR-owned pending buffer. The warning-clean
+build, VAD numerical oracle, and all 69 CTest entries pass.
+
+Two independent 120-second production real-WebSocket captures then produce
+identical canonical entries for all seven product tracks. Complete forward and
+reverse contextual review of `ref-0001` through `ref-0018` finds no natural-turn
+speaker regression. It also confirms that the pre-reference `0-3 s` transcript
+is removed while existing cold-start identity and short-interjection defects
+remain visible. FR28 therefore advances to a clean 600-second gate; this does
+not establish full-session accuracy or change the accepted T111 baseline. See
+`vad-gated-asr-stability-review-2026-07-18.md`.
+
+The retained code is committed before the next run so every longer artifact is
+bound to one clean source revision. One 600-second run must pass direct-end,
+common-clock, telemetry, and complete in-scope forward/reverse context review.
+Only then may the same revision run a full empty-registry capture followed by a
+restarted frozen-registry capture. Each full artifact receives its own complete
+556-contribution chronological and reversed-block semantic review. No runtime
+or replay tool may convert structural equality into a product decision.
+
 ## 9. Phase 7: Final Sign-Off
 
 Create one closing report containing:

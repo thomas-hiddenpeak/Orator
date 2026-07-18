@@ -82,6 +82,7 @@ class GpuVad : public core::IVad {
   // Real-time VAD state: true when the endpoint state machine is currently
   // inside a speech segment (after min_speech confirmation).
   bool is_in_speech() const override { return in_speech_; }
+  core::VadStateResult state() const override;
 
   // Numeric-gate probe: from a fresh state, return the per-window speech
   // probability for every full window in [pcm, pcm+n). Used by test_vad to

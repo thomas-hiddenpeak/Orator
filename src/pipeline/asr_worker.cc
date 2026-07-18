@@ -4,7 +4,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdio>
-#include <thread>
+#include <limits>
 
 #include "gpu/gpu_lock.h"
 #include "pipeline/comprehensive_timeline.h"
@@ -20,14 +20,21 @@ struct VadSnapshot {
   std::shared_ptr<const std::vector<ComprehensiveTimeline::VadSeg>> segments;
   double horizon = -1e9;
   bool in_speech = false;
-  double state_observed_at = -1e9;
+  double active_start = -1e9;
+  double active_horizon = -1e9;
+};
+
+struct VadRegion {
+  long start = 0;
+  long end = 0;
+  bool finalized = false;
 };
 
 VadSnapshot ReadVadSnapshot(const ComprehensiveTimeline* timeline) {
   if (timeline == nullptr) return {};
   const auto evidence = timeline->SnapshotVadEvidence();
   return {evidence.segments, evidence.horizon, evidence.in_speech,
-          evidence.state_observed_at};
+          evidence.active_start, evidence.active_horizon};
 }
 
 double VadOverlapSec(
@@ -46,7 +53,8 @@ bool VadSupportsLiveText(double start, double end, const VadSnapshot& vad) {
   if (vad.segments && VadOverlapSec(start, end, *vad.segments) > 0.0) {
     return true;
   }
-  return vad.in_speech && vad.state_observed_at + 1e-9 >= start;
+  return vad.in_speech && vad.active_start < end &&
+         vad.active_horizon + 1e-9 >= start;
 }
 
 }  // namespace
@@ -61,8 +69,7 @@ AsrWorker::AsrWorker(core::IAsr* asr, const Params& params, Emit emit,
       emit_(std::move(emit)),
       tb_(tb),
       timeline_(timeline),
-      stream_(stream),
-      ring_buffer_(kRingBufferSamples) {}
+      stream_(stream) {}
 
 void AsrWorker::ProcessSpan(const float* samples, int n) {
   if (samples == nullptr || n <= 0) return;
@@ -73,178 +80,157 @@ void AsrWorker::ProcessSpan(const float* samples, int n) {
     return;
   }
 
-  // Event-driven, non-blocking VAD gate. The incoming span may be a few
-  // milliseconds (real-time pacing) or several minutes (flooded ingest, when
-  // WaitAndRead returns the whole backlog). Cut it at the VAD segment
-  // boundaries that fall inside it so each sub-span lies entirely within one
-  // VAD region, then act per sub-span in ProcessGateSubSpan. Because the cut
-  // points are VAD audio times, coverage no longer depends on the span size:
-  // previously a large flooded span whose END landed in a silence gap was
-  // dropped in full
-  // (`inc_abs_pos_ += n; return`), discarding all the speech inside it -- the
-  // measured flood coverage collapse. inc_abs_pos_ advances by exactly the
-  // consumed audio per sub-span, so it stays equal to the absolute clock head
-  // and the cut math below is exact.
-  const long span_start = inc_abs_pos_;
-  const long span_end = inc_abs_pos_ + n;
-  const std::vector<long> cuts = VadCutSamples(span_start, span_end);
-  long pos = span_start;
-  size_t ci = 0;
-  while (pos < span_end) {
-    while (ci < cuts.size() && cuts[ci] <= pos) ++ci;
-    long next = span_end;
-    if (ci < cuts.size() && cuts[ci] < next) next = cuts[ci];
-    const int sub_n = static_cast<int>(next - pos);
-    ProcessGateSubSpan(samples + (pos - span_start), sub_n);
-    pos = next;
-  }
+  pending_audio_.insert(pending_audio_.end(), samples, samples + n);
+  received_samples_ += n;
+  processed_samples_.store(received_samples_);
+  DrainVadGate(/*final=*/false);
 }
 
-// Absolute sample indices of the VAD segment boundaries (each segment's start
-// and end) that fall strictly inside (span_start, span_end), sorted unique.
-// These are the only points where the speech/silence classification can change,
-// so cutting the span here makes each sub-span homogeneous.
-std::vector<long> AsrWorker::VadCutSamples(long span_start,
-                                           long span_end) const {
-  std::vector<long> cuts;
+void AsrWorker::DrainVadGate(bool final) {
   const VadSnapshot vad = ReadVadSnapshot(timeline_);
-  if (!vad.segments) return cuts;
-  cuts.reserve(vad.segments->size() * 2);
-  for (const auto& segment : *vad.segments) {
-    const long ss = tb_.SampleAt(segment.start);
-    const long es = tb_.SampleAt(segment.end);
-    if (ss > span_start && ss < span_end) cuts.push_back(ss);
-    if (es > span_start && es < span_end) cuts.push_back(es);
-  }
-  std::sort(cuts.begin(), cuts.end());
-  cuts.erase(std::unique(cuts.begin(), cuts.end()), cuts.end());
-  return cuts;
-}
+  std::vector<VadRegion> regions;
+  long decision_limit = -1;
 
-// Act on one VAD-boundary-aligned sub-span [inc_abs_pos_, inc_abs_pos_+sub_n).
-// Policy (priority: never drop speech > save GPU on confirmed silence; exact
-// segmentation is irrelevant -- downstream alignment provides the time codes):
-//   * speech                 -> feed the engine;
-//   * confirmed silence       -> commit the open utterance after its trailing
-//                                window, then skip the rest (the GPU saving);
-//   * unconfirmed (past the VAD horizon, e.g. the first flooded span before VAD
-//                                has caught up) -> feed, never skip.
-// Non-blocking: it only reads what VAD has already published (Constitution
-// Art. III -- ASR does not wait for VAD).
-void AsrWorker::ProcessGateSubSpan(const float* sub, int sub_n) {
-  if (sub_n <= 0) return;
-  const VadSnapshot vad = ReadVadSnapshot(timeline_);
-  const long base = inc_abs_pos_;
-  const double mid_sec = tb_.SecondsAt(base + sub_n / 2);
-  const double end_sec = tb_.SecondsAt(base + sub_n);
-  // Horizon = how far VAD has confirmed its decision. Use the later of the last
-  // published speech segment's end (always valid) and the VAD progress horizon
-  // (advances through silence at real-time pacing). A silence sub-span is
-  // skippable only when its end is within this horizon.
-  double horizon =
-      !vad.segments || vad.segments->empty() ? -1e9 : vad.segments->back().end;
-  horizon = std::max(horizon, vad.horizon);
-
-  bool is_speech = false;
   if (vad.segments) {
+    regions.reserve(vad.segments->size() + 1);
     for (const auto& segment : *vad.segments) {
-      if (mid_sec >= segment.start && mid_sec < segment.end) {
-        is_speech = true;
+      const long start = std::max(0L, tb_.SampleAt(segment.start));
+      const long end = std::min(received_samples_, tb_.SampleAt(segment.end));
+      if (end <= start) continue;
+      regions.push_back({start, end, true});
+      decision_limit = std::max(decision_limit, end);
+    }
+  }
+  if (vad.horizon > -1e8) {
+    decision_limit = std::max(
+        decision_limit, std::min(received_samples_, tb_.SampleAt(vad.horizon)));
+  }
+  if (vad.in_speech && vad.active_start > -1e8 &&
+      vad.active_horizon + 1e-9 >= vad.active_start) {
+    const long start = std::max(0L, tb_.SampleAt(vad.active_start));
+    const long end =
+        std::min(received_samples_, tb_.SampleAt(vad.active_horizon));
+    if (end > start) {
+      regions.push_back({start, end, false});
+      decision_limit = std::max(decision_limit, end);
+    }
+  }
+  if (final) decision_limit = received_samples_;
+  if (decision_limit < inc_abs_pos_) return;
+  decision_limit = std::min(decision_limit, received_samples_);
+
+  std::stable_sort(regions.begin(), regions.end(),
+                   [](const VadRegion& a, const VadRegion& b) {
+                     if (a.start != b.start) return a.start < b.start;
+                     return a.end < b.end;
+                   });
+
+  const long lead_samples =
+      std::max<long>(0, static_cast<long>(params_.asr_vad_lead_ms) *
+                            params_.sample_rate / 1000);
+  const long trail_samples = std::max<long>(
+      0, static_cast<long>(
+             std::llround(params_.asr_vad_trail_sec * params_.sample_rate)));
+
+  while (inc_abs_pos_ < decision_limit && PendingSamples() > 0) {
+    const VadRegion* next = nullptr;
+    for (const auto& region : regions) {
+      if (region.end > inc_abs_pos_ && region.start < decision_limit) {
+        next = &region;
         break;
       }
     }
-  }
 
-  if (is_speech) {
-    ProcessIncremental(sub, sub_n, /*finalize=*/false);
-    processed_samples_.fetch_add(sub_n);
-    vad_state_ = VadState::PROCESSING;
-    last_speech_end_sec_ = end_sec;
-    return;
-  }
-
-  // VAD speech endpoint (horizon-independent). A silence sub-span whose
-  // distance from the last speech end has reached the trailing window is a real
-  // utterance endpoint -> close the open segment now. This is the fix that
-  // makes ASR honor VAD speech endpoints in real time: the confirmed/horizon
-  // test below gates only the GPU *skip* of silence, and must NOT gate the
-  // *close*. In steady real-time the ASR head runs in lockstep with VAD, so
-  // `end_sec <= horizon` (which needs ASR to lag VAD by the 0.3 s guard)
-  // essentially never holds; relying on it left segments to close only at the
-  // time cap, ignoring every VAD endpoint.
-  // VAD speech endpoint, driven by VAD's own confirmed state rather than the
-  // ASR processing position. Close the open segment once VAD has confirmed at
-  // least the trailing window of silence after its last published speech
-  // segment -- i.e. the VAD progress horizon has advanced `asr_vad_trail_sec`
-  // past that segment's end. This is what makes ASR honor VAD speech endpoints
-  // in real time: the earlier `end_sec <= horizon` test could not fire because
-  // the ASR head runs ahead of the lagging horizon, so segments closed only at
-  // the time cap. Using VAD's own signals avoids that race.
-  // `last_endpoint_vad_end_` makes it fire once per speech burst, not on every
-  // silence sub-span. Feeding the trailing window before finalize retains
-  // acoustic context for the last word; silence-only segments the leading-edge
-  // processing may open are dropped at emit time (no VAD speech overlap).
-  const double last_vad_end =
-      !vad.segments || vad.segments->empty() ? -1e9 : vad.segments->back().end;
-  const double vad_horizon = vad.horizon;
-  if (inc_in_segment_ && last_vad_end > -1e8 &&
-      last_vad_end > last_endpoint_vad_end_ &&
-      (vad_horizon - last_vad_end) >= params_.asr_vad_trail_sec) {
-    // NOTE: do NOT feed the trailing window before finalize here.
-    // The silence sub-span contains no speech — feeding it causes the
-    // decoder to hallucinate on pure silence, overwriting inc_live_text_
-    // with garbage before StreamFinalize.  Path B (confirmed silence)
-    // feeds the trailing window only when ASR is lagging behind VAD;
-    // in steady real-time (path A) the speech audio has already been
-    // fully consumed by prior speech sub-spans, so finalize is clean.
-    ProcessIncremental(nullptr, 0, /*finalize=*/true);
-    last_endpoint_vad_end_ = last_vad_end;
-    inc_abs_pos_ += sub_n;
-    processed_samples_.fetch_add(sub_n);
-    vad_state_ = VadState::IDLE;
-    return;
-  }
-
-  // Gap / silence sub-span. "Confirmed" means VAD has already labeled this far
-  // (its end is within the published range), i.e. it is genuinely a gap between
-  // known speech segments -- safe to skip. Beyond the horizon VAD may still
-  // detect speech here, so we must process rather than drop.
-  const bool confirmed = end_sec <= horizon;
-  if (confirmed) {
-    if (inc_in_segment_) {
-      // Feed the trailing window (acoustic context for the last word), commit,
-      // then skip the remaining silence.
-      const long trail_end =
-          tb_.SampleAt(last_speech_end_sec_ + params_.asr_vad_trail_sec);
-      const long feed_l =
-          std::min<long>(sub_n, std::max<long>(0, trail_end - base));
-      const int feed_n = static_cast<int>(feed_l);
-      if (feed_n > 0) ProcessIncremental(sub, feed_n, /*finalize=*/false);
-      ProcessIncremental(nullptr, 0, /*finalize=*/true);
-      inc_abs_pos_ += (sub_n - feed_n);
-    } else {
-      inc_abs_pos_ += sub_n;  // nothing open; skip the whole gap
+    if (inc_in_segment_ && last_speech_end_sample_ >= 0) {
+      const long endpoint = last_speech_end_sample_ + trail_samples;
+      const long next_start =
+          next == nullptr ? std::numeric_limits<long>::max() : next->start;
+      if (next_start > endpoint && decision_limit >= endpoint) {
+        ProcessIncremental(nullptr, 0, /*finalize=*/true);
+        last_speech_end_sample_ = -1;
+        continue;
+      }
     }
-    processed_samples_.fetch_add(sub_n);
-    vad_state_ = VadState::IDLE;
-    return;
-  }
 
-  // Unconfirmed silence past the VAD horizon: the leading edge VAD has not
-  // labelled yet. Process it (never skip) so a real speech onset is not lost --
-  // VAD always lags the real-time head, so onsets are always first seen here.
-  // Spurious silence-only segments that this may open are discarded at emit
-  // time in EmitIncrementalChunk (no VAD speech overlap -> not emitted).
-  ProcessIncremental(sub, sub_n, /*finalize=*/false);
-  processed_samples_.fetch_add(sub_n);
-  vad_state_ = VadState::PROCESSING;
+    if (next == nullptr) {
+      long skip_end = decision_limit;
+      if (!final) {
+        skip_end = std::max(inc_abs_pos_, decision_limit - lead_samples);
+      }
+      if (skip_end <= inc_abs_pos_) break;
+      SkipPendingUntil(skip_end);
+      continue;
+    }
+
+    if (inc_abs_pos_ < next->start) {
+      if (inc_in_segment_) {
+        SkipPendingUntil(std::min(next->start, decision_limit));
+        continue;
+      }
+      const long lead_start = std::max(0L, next->start - lead_samples);
+      if (inc_abs_pos_ < lead_start) {
+        SkipPendingUntil(std::min(lead_start, decision_limit));
+        continue;
+      }
+    }
+
+    const long before = inc_abs_pos_;
+    FeedPendingUntil(std::min(next->end, decision_limit),
+                     next->finalized || final);
+    if (inc_abs_pos_ == before) break;
+    last_speech_end_sample_ = inc_abs_pos_;
+  }
 }
 
 void AsrWorker::Finalize() {
-  vad_state_ = VadState::IDLE;
   finalizing_ = true;
+  if (params_.asr_vad_gate) DrainVadGate(/*final=*/true);
   ProcessIncremental(nullptr, 0, /*finalize=*/true);
   finalizing_ = false;
+}
+
+void AsrWorker::FeedPendingUntil(long end_sample, bool exact_end) {
+  const long chunk_samples =
+      std::max<long>(1, static_cast<long>(params_.asr_vad_gate_chunk_ms) *
+                            params_.sample_rate / 1000);
+  while (inc_abs_pos_ < end_sample && PendingSamples() > 0) {
+    const long remaining = end_sample - inc_abs_pos_;
+    if (!exact_end && remaining < chunk_samples) return;
+    const int take = static_cast<int>(
+        std::min({remaining, chunk_samples, PendingSamples()}));
+    if (take <= 0) return;
+    ProcessIncremental(PendingData(), take, /*finalize=*/false);
+    ConsumePending(take);
+  }
+}
+
+void AsrWorker::SkipPendingUntil(long end_sample) {
+  const long take = std::min(end_sample - inc_abs_pos_, PendingSamples());
+  if (take <= 0) return;
+  inc_abs_pos_ += take;
+  ConsumePending(take);
+}
+
+void AsrWorker::ConsumePending(long n) {
+  if (n <= 0) return;
+  pending_offset_ += static_cast<size_t>(n);
+  if (pending_offset_ == pending_audio_.size()) {
+    pending_audio_.clear();
+    pending_offset_ = 0;
+  } else if (pending_offset_ >= 65536 &&
+             pending_offset_ * 2 >= pending_audio_.size()) {
+    pending_audio_.erase(pending_audio_.begin(),
+                         pending_audio_.begin() + pending_offset_);
+    pending_offset_ = 0;
+  }
+}
+
+long AsrWorker::PendingSamples() const {
+  return static_cast<long>(pending_audio_.size() - pending_offset_);
+}
+
+const float* AsrWorker::PendingData() const {
+  return pending_audio_.data() + pending_offset_;
 }
 
 // Incremental KV-cache path: continuous audio is fed into the engine's
@@ -290,18 +276,9 @@ void AsrWorker::EmitIncrementalChunk(const float* samples, int n,
       inc_live_text_ = asr_->StreamFinalize(stream_);
       inc_in_segment_ = false;
     }
-    // Time-based segment cap. The VAD-gated path otherwise relies on the
-    // silence-confirmed close (ProcessGateSubSpan), but in steady real-time
-    // ingest the ASR processing head stays ahead of the VAD progress horizon
-    // (which lags by the guard interval), so `end_sec <= horizon` rarely holds
-    // and segments are not closed on speech endpoints. Without a time bound a
-    // single segment then grows until the KV-cache token cap (~115 s), which
-    // (a) gives the UI no incremental finals and (b) approaches the decoder's
-    // ~1800-token illegal-access threshold once generated text is added. Bound
-    // each segment to `segment_sec` so finals arrive regularly and the KV-cache
-    // never nears the crash threshold. Splitting a long utterance here is safe:
-    // it is the intended sliding-window cadence and downstream forced alignment
-    // supplies the fine time codes.
+    // VAD groups still need a hard duration cap for continuous speech and
+    // decoder-cache safety. Downstream forced alignment supplies fine time
+    // codes when a long utterance is split here.
     if (inc_in_segment_ && params_.segment_sec > 0.0 &&
         inc_seg_samples_ >=
             static_cast<long>(params_.segment_sec * params_.sample_rate)) {
@@ -331,14 +308,9 @@ void AsrWorker::EmitIncrementalChunk(const float* samples, int n,
   if (segment_closed) {
     const double seg_start = tb_.SecondsAt(inc_seg_start_sample_);
     const double seg_end = tb_.SecondsAt(inc_seg_end_sample_);
-    // Discard a closed segment that overlaps no VAD speech. The leading-edge
-    // processing (unconfirmed branch) must feed audio VAD has not labelled yet
-    // so onsets are never lost, but that also opens segments over pure
-    // inter-utterance silence on which the engine hallucinates text. Such a
-    // segment overlaps no published VAD speech window, so drop it rather than
-    // emit garbage. Guard: only when the VAD gate is active and VAD has
-    // actually published segments (an empty cache means VAD is not ready --
-    // keep the text so nothing is lost before VAD warms up).
+    // The deterministic gate feeds only typed VAD-backed audio. Keep the
+    // overlap guard as a final defense against a time-capped provisional active
+    // segment whose endpoint is later rejected by finalized VAD evidence.
     bool keep = true;
     if (params_.asr_vad_gate && timeline_) {
       const VadSnapshot vad = ReadVadSnapshot(timeline_);
@@ -427,46 +399,10 @@ void AsrWorker::Reset() {
   compute_sec_.store(0.0, std::memory_order_relaxed);
   asr_->Reset();
 
-  vad_state_ = VadState::IDLE;
-  vad_trail_start_sec_ = 0.0;
-  last_speech_end_sec_ = -1e9;
-  last_endpoint_vad_end_ = -1e9;
-  ring_write_pos_ = 0;
-  ring_count_ = 0;
-  ring_base_abs_pos_ = 0;
-  std::fill(ring_buffer_.begin(), ring_buffer_.end(), 0.0f);
-}
-
-void AsrWorker::RingPush(const float* samples, int n, long abs_pos) {
-  if (n <= 0) return;
-  for (int i = 0; i < n; ++i) {
-    ring_buffer_[ring_write_pos_] = samples[i];
-    ring_write_pos_ = (ring_write_pos_ + 1) % kRingBufferSamples;
-    if (ring_count_ < kRingBufferSamples) {
-      ring_count_++;
-    }
-  }
-  ring_base_abs_pos_ = abs_pos;
-}
-
-void AsrWorker::RingPop(int n, std::vector<float>* out) {
-  if (n <= 0 || ring_count_ == 0) return;
-  const int pop = std::min(n, ring_count_);
-  out->reserve(out->size() + pop);
-
-  int read_pos;
-  if (ring_count_ == kRingBufferSamples) {
-    read_pos = ring_write_pos_;
-  } else {
-    read_pos = (ring_write_pos_ - ring_count_ + kRingBufferSamples) %
-               kRingBufferSamples;
-  }
-
-  for (int i = 0; i < pop; ++i) {
-    out->push_back(ring_buffer_[read_pos]);
-    read_pos = (read_pos + 1) % kRingBufferSamples;
-  }
-  ring_count_ -= pop;
+  pending_audio_.clear();
+  pending_offset_ = 0;
+  received_samples_ = 0;
+  last_speech_end_sample_ = -1;
 }
 
 }  // namespace pipeline

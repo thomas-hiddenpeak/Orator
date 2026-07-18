@@ -35,6 +35,8 @@ class AsrWorker {
         1500;  // KV-cache safety cap (prevents crash above ~1768 tokens)
     bool asr_vad_gate = true;   // enable VAD-gated processing
     int asr_vad_lead_ms = 200;  // lead buffer (ms) before VAD speech onset
+    int asr_vad_gate_chunk_ms =
+        100;  // deterministic decoder feed quantum for decided speech
     double asr_vad_trail_sec =
         1.5;  // trailing window (sec) after VAD silence before commit
     double asr_vad_min_overlap_sec =
@@ -69,18 +71,15 @@ class AsrWorker {
   void ProcessIncremental(const float* samples, int n, bool finalize);
   void EmitIncrementalChunk(const float* samples, int n, bool finalize);
 
-  // Event-driven VAD gate. ProcessSpan cuts the incoming audio span at the VAD
-  // segment boundaries that fall inside it (VadCutSamples) so each sub-span
-  // lies wholly within one VAD region, then ProcessGateSubSpan acts on it:
-  // process speech and UNCONFIRMED audio (never drop speech), skip only
-  // CONFIRMED silence (the GPU saving), committing the open utterance after its
-  // trailing window. Cut points are VAD audio times, so coverage does not
-  // depend on how large the span is (chunk-invariant): a flooded multi-minute
-  // span is no longer skipped wholesale because its end happens to land in a
-  // silence gap. This never blocks on VAD -- it only consults what VAD has
-  // already published.
-  void ProcessGateSubSpan(const float* sub, int sub_n);
-  std::vector<long> VadCutSamples(long span_start, long span_end) const;
+  // The VAD gate buffers audio ahead of the typed decision frontier, then
+  // consumes stable speech in deterministic TOML-sized quanta. It never waits
+  // for VAD and never reads detector state directly.
+  void DrainVadGate(bool final);
+  void FeedPendingUntil(long end_sample, bool exact_end);
+  void SkipPendingUntil(long end_sample);
+  void ConsumePending(long n);
+  long PendingSamples() const;
+  const float* PendingData() const;
 
   core::IAsr* asr_;
   Params params_;
@@ -108,28 +107,12 @@ class AsrWorker {
   std::string inc_delivered_text_;
   bool finalizing_ = false;
 
-  // Push samples into the ring buffer (thread-safe within worker thread).
-  void RingPush(const float* samples, int n, long abs_pos);
-  // Pop the last `n` samples from the ring buffer into *out.
-  void RingPop(int n, std::vector<float>* out);
-  static constexpr int kRingBufferSamples = 8000;
-  std::vector<float> ring_buffer_;
-  int ring_write_pos_ = 0;
-  int ring_count_ = 0;
-  long ring_base_abs_pos_ = 0;  // absolute sample of ring_buffer_[0]
-
-  // VAD gate state: IDLE = skipping silence / between utterances; PROCESSING =
-  // an engine segment is being fed. (TRAILING is retained for ABI but unused by
-  // the event-driven gate, which commits inline at confirmed silence.)
-  enum class VadState { IDLE, PROCESSING, TRAILING };
-  VadState vad_state_ = VadState::IDLE;
-  double vad_trail_start_sec_ = 0.0;  // retained; unused by event-driven gate
-  // End (common clock, sec) of the most recently fed speech, for the trailing
-  // window measurement at a confirmed silence gap.
-  double last_speech_end_sec_ = -1e9;
-  // End of the last VAD speech segment we already closed a segment at, so the
-  // horizon-driven endpoint fires once per speech burst, not every sub-span.
-  double last_endpoint_vad_end_ = -1e9;
+  // Pending audio covers [inc_abs_pos_, received_samples_) on the common clock.
+  // `pending_offset_` avoids front-erasing on every fixed feed quantum.
+  std::vector<float> pending_audio_;
+  size_t pending_offset_ = 0;
+  long received_samples_ = 0;
+  long last_speech_end_sample_ = -1;
 };
 
 }  // namespace pipeline

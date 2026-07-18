@@ -14,7 +14,7 @@ work is specified under [specs/](.).
 > pass is the consistency proof. Status lines advance to `Implemented` in the
 > same change that lands the code, with the commit reference.
 
-- **Last updated**: 2026-07-18 (FR16ABN full promotion and T112 telemetry cadence)
+- **Last updated**: 2026-07-18 (FR28 VAD-gated ASR 120-second stability gate)
 - **Branch**: `master`
 - **Constitution**: v1.7.0
 - **Speaker-business closure**: **NATURAL-TURN GATE PASSED; FULL CANONICAL
@@ -37,6 +37,13 @@ work is specified under [specs/](.).
   Transitional experimental commit `d610de36ed13` separately closes T112 with
   a warning-clean build, `69/69` CTest, and a clean 120-second real-WebSocket
   cadence check; it changes no speaker behavior or product conclusion.
+  T117-T121 then identify scheduling-sensitive VAD-gated ASR as the source of
+  the rejected T116 A/B producer variance and implement FR28 typed VAD
+  frontiers plus an ASR-owned pending buffer. The warning-clean build, VAD
+  oracle, and `69/69` CTest pass. Two independent 120-second production
+  WebSocket runs have identical canonical entries in all seven product tracks;
+  complete forward/reverse review of `ref-0001`-`ref-0018` finds no new speaker
+  regression. FR28 advances to 600 seconds only and does not change T111.
 - **Result-evaluation rule**: product accuracy and candidate decisions may be
   produced only by complete item-by-item contextual semantic review. No code,
   test, script, notebook, formula, query, automated metric, or algorithm may
@@ -370,6 +377,22 @@ assigned, aggregated, or selected that result. FR16ABO remains dormant in code
 for evidence tracing, while checked-in TOML sets its lookahead to zero. See
 [future-epoch-full-promotion-review-2026-07-18.md](013-industrial-closing-validation/future-epoch-full-promotion-review-2026-07-18.md).
 
+**FR28 VAD-gated ASR stability checkpoint (2026-07-18)**: frozen replay of each
+T116 full typed package is byte-stable. Diarization and primary-speaker tracks
+are identical across T116 A/B, while ASR first differs at `text_id=49` around
+`658.7/658.8 s`; alignment, ASR-derived voiceprint evidence, and business
+projection then diverge. Forward/reverse semantic review of the implicated
+`ref-0098`-`ref-0103` context confirms a real `ref-0102` speaker consequence.
+FR28 adds typed VAD active/silence frontiers, buffers undecided ASR audio, and
+freezes final VAD before ASR drain. Focused tests, the VAD oracle, a warning-
+clean build, and all `69/69` CTest entries pass. Two isolated 120-second real-
+WebSocket runs at `0.991x` have direct waits of `1.115/1.113 s`, exact common-
+clock extents, and identical entries in every product track. Complete
+chronological and reverse review of all 18 in-scope `test.txt` contributions
+finds no FR28 natural-turn speaker regression. FR28 is retained for the
+600-second gate; no full accuracy result or closure claim follows. See
+[vad-gated-asr-stability-review-2026-07-18.md](013-industrial-closing-validation/vad-gated-asr-stability-review-2026-07-18.md).
+
 ## 3. Component status
 
 | Component | Status | Notes |
@@ -382,9 +405,9 @@ for evidence tracing, while checked-in TOML sets its lookahead to zero. See
 | Decoupling (interfaces + registry) | Contract corrected; product acceptance open | Model interfaces and registry construction are in place. VAD→ASR, ASR→forced-align, and raw evidence→business speaker now flow only through typed `ComprehensiveTimeline` reads/subscriptions. The registered `business_speaker` pipeline owns fusion policy and writes its own track; protocol topics mirror committed records for persistence and transport. Full product validation remains open under Spec 013. |
 | `OverlapTimelineMerger` / `ITimelineMerger` | 🗑️ Removed | The old one-shot max-overlap merger and its orphaned interface were deleted — superseded by `ComprehensiveTimeline` (Spec 004). |
 | WebSocket server (libwebsockets v4.3.3) | ✅ Refactored | Replaced hand-rolled POSIX WS with libwebsockets (multi-client, RFC 6455/7692). One connection owns audio production while browser and diagnostic observers receive the same broadcast stream without resetting it; concurrent producer bytes are rejected. Eliminated file-scope static variables (`serve_server`, `serve_factory`, `pss_list_head`) → instance members via `lws_context_user`. Thread-safe `SendText` with wakeup/cancel-service. ServeOnce mode for unit tests. |
-| ASR + WS integration | Implemented; full-session acceptance open | `AuditoryStream` owns one private `PipelineAudioCache` per active producer and uses separate worker threads. One session-owned `TimeBase` is injected into all active stores and workers. Final ASR live emission and its typed sink reuse one `text_id`; partial rejection emits a matching retract, and the terminal ASR track serializes the ID. ASR reads immutable VAD evidence snapshots from `ComprehensiveTimeline`; forced alignment consumes finalized ASR records there. Registered WS/Node tests and a real Chromium run verify short-path revision/export/reconnect/UI convergence. Full repeatability and contextual accuracy remain open. |
+| ASR + WS integration | FR28 120-second stability gate passed; full acceptance open | `AuditoryStream` owns one private `PipelineAudioCache` per active producer and uses separate worker threads. One session-owned `TimeBase` is injected into all active stores and workers. Final ASR live emission and its typed sink reuse one `text_id`; partial rejection emits a matching retract, and the terminal ASR track serializes the ID. ASR now buffers undecided audio, reads typed stable VAD frontiers from `ComprehensiveTimeline`, applies TOML lead/chunk settings, and drains only after final VAD is frozen; forced alignment consumes the resulting finalized ASR records. Focused publication-order tests and two independent 120-second real-WebSocket runs produce identical canonical product tracks. Full repeatability and contextual accuracy remain open. |
 | Incremental KV-cache ASR streaming (Spec 003) | ✅ Implemented, verified, committed (8cc31ab); params refined 2026-07-03 | Persistent KV cache + prefix caching + chunk-local windowed encoder; partial-emission every 1 s via WebSocket. Full 1hr CER 16.1% / 6.22x; beats production Silero-VAD at every scale. **Current params**: `kStreamWindowMel=100` (1 s), `max_new_tokens=32`, `unfixed_chunks=2`, `unfixed_tokens=15`, `segment_sec=24.0`, `vad_min_overlap_sec=0.12`. 2026-07-03 real WS `test.mp3` 600 s A/B after the VAD-overlap filter: `segment_sec=24` produced 49 ASR finals vs 67 at 12 s, with the same final comprehensive count (115) and better `To C` wording; default restored to 24 s for ASR semantic stability. |
-| Revisable comprehensive timeline (Spec 004) | T111 natural-turn baseline retained; closure open | `ComprehensiveTimeline` stores typed diarization, ASR, VAD, alignment, voiceprint, and business tracks and publishes immutable snapshots/typed updates. `BusinessSpeakerPipeline` consumes typed `SpeakerEvidenceStage` output and owns orchestration/publication; the internal `SpeakerFusionPolicy` owns rule execution. Accepted T111 full Run A and Run B pass the complete contextual natural-turn speaker gate at `519/556`. The later FR16ABO full A/B candidate manually records `518/556` and is rejected; its TOML switch is disabled. Other Spec 013 speaker gates, ASR, and independent holdout remain open. |
+| Revisable comprehensive timeline (Spec 004) | T111 baseline retained; FR28 120-second stability passed; closure open | `ComprehensiveTimeline` stores typed diarization, ASR, VAD, alignment, voiceprint, and business tracks and publishes immutable snapshots/typed updates. Its VAD snapshot now includes observed, active, and confirmed-silence frontiers used by scheduling-invariant ASR gating. `BusinessSpeakerPipeline` consumes typed `SpeakerEvidenceStage` output and owns orchestration/publication; the internal `SpeakerFusionPolicy` owns rule execution. Accepted T111 full Run A and Run B pass the complete contextual natural-turn speaker gate at `519/556`. The later FR16ABO full A/B candidate manually records `518/556` and is rejected; its TOML switch is disabled. FR28 awaits 600/full promotion. Other Spec 013 speaker gates, ASR, and independent holdout remain open. |
 | Reusable common time base (Spec 004) | Session ownership and final reconciliation implemented; acceptance open | `AuditoryStream` owns one immutable `TimeBase` and injects it into every active private cache, worker, and retained audio store. Finalization reconciles exact sample extents for input, diarization, speaker identity, ASR, VAD, alignment, and business speaker; focused tests and the 2026-07-13 120 s real-WebSocket run reported zero gaps. Full-session repeatability remains open under Spec 013. |
 | Pipeline protocol layer (Spec 004) | ✅ Implemented | Phases 7–12 complete: data types (topic.h, schema.h), pipeline registry, topic router, storage layer (MEMORY + DISK), ProtocolTimeline integration, WS v2 envelope with describe command, --storage-disk-path flag. 25/25 tests pass. |
 | Streaming validation | Full direct-end A/B latency gate passed mechanically | `ws_unified_test.py` has one socket reader, captures source/config/binary pre/post hashes, continuous `tegrastats`, runtime telemetry, and independent terminal-command timing. Acceptance mode sends `end` directly after the final audio frame; explicit `--test-flush` runs record `flush -> end` but are marked ineligible for the 30-second gate. FR26 moves acoustic-only speaker evidence into bounded background precompute and retains mature-gallery final rescoring. Transitional FR16ABN commit `6b1cb79fa4f5` passed 120/600-second promotion and completed accepted full A/B direct-end waits at `25.849/25.585 s`, with exact common-clock extents, observer convergence, and required telemetry coverage. The first Run B attempt remains an excluded `94.965%` telemetry-cadence failure. Structural checks never evaluate correctness or issue a product verdict. |

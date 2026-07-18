@@ -86,6 +86,7 @@ class AuditoryStream {
     // ── ASR pipeline ─────────────────────────────────────────────────
     bool asr_vad_gate = true;
     int asr_vad_lead_ms = 200;
+    int asr_vad_gate_chunk_ms = 100;
     double asr_vad_trail_sec = 1.0;
     double asr_vad_min_overlap_sec = 0.12;
     int asr_max_audio_tokens = 1500;

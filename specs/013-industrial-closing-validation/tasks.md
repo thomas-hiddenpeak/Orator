@@ -1805,10 +1805,56 @@
 
 ## Phase 12: Cross-Pipeline Evidence Stability
 
-- [ ] T117 Freeze and export both T116 full typed-track packages, prove
+- [x] T117 Freeze and export both T116 full typed-track packages, prove
   same-input business replay byte stability, and mechanically locate the first
   A/B divergence in each raw producer track and in final projection. Tools may
   display structural evidence only. Determine the business meaning of every
   implicated context solely by complete forward/reverse semantic comparison
   with `test.txt`; do not add another runtime rule or start another full audio
-  run until the producer-versus-projection source is established.
+  run until the producer-versus-projection source is established. Both frozen
+  packages replay byte-stably. Diarization and primary speaker are identical;
+  ASR first differs at `text_id=49` around `658.7/658.8 s`, followed by
+  alignment, voiceprint, and business projection. Forward/reverse review of
+  `ref-0098`-`ref-0103` confirms a real `ref-0102` speaker divergence. See
+  `vad-gated-asr-stability-review-2026-07-18.md`.
+- [x] T118 Specify and implement FR28's typed VAD state snapshot. Publish the
+  active padded onset and stable active/silence decision frontiers through the
+  canonical `ComprehensiveTimeline`; preserve worker independence and all
+  existing TOML endpoint values. `VadStateResult`, `GpuVad`, and
+  `ComprehensiveTimeline` now carry the typed frontiers without a direct worker
+  dependency.
+- [x] T119 Replace scheduling-sensitive unconfirmed ASR feeding with a
+  worker-owned pending buffer, restore TOML `asr.vad_lead_ms`, add TOML
+  `asr.vad_gate_chunk_ms`, preserve trailing-group behavior, and finalize only
+  after the terminal VAD snapshot is frozen. The pending buffer and fixed gate
+  quanta are owned by `AsrWorker`; terminal VAD is joined and frozen before ASR
+  drains.
+- [x] T120 Add focused publication-order, chunk-boundary, lead-buffer,
+  confirmed-silence, short-gap, endpoint, reset, and terminal-tail tests. Pass a
+  warning-clean build, the VAD numerical oracle gate, and every registered
+  CTest. Exact equality is mechanical determinism evidence only. The
+  warning-clean build, VAD oracle, and all `69/69` CTest entries pass.
+- [x] T121 Run two independent 120-second production real-WebSocket captures
+  with unchanged behavioral TOML except the explicit gate chunk, isolated
+  registries, direct `end`, telemetry, and complete manifests. Mechanically
+  compare typed tracks and locate differences without assigning correctness.
+  Read every changed conversational context forward and reverse against
+  `test.txt` before retaining, revising, or rejecting FR28 and before any
+  600-second or full-length promotion. All seven canonical product tracks are
+  identical across the two runs. Complete `ref-0001`-`ref-0018` forward and
+  reverse review finds no FR28 speaker regression and retains it for the next
+  gate; see `vad-gated-asr-stability-review-2026-07-18.md`.
+- [ ] T122 Commit the retained FR28 implementation as a transitional
+  experiment, then run one clean 600-second production real-WebSocket capture
+  from that exact commit with direct `end`, telemetry, an isolated registry,
+  and the checked-in behavioral TOML. Pass all mechanical contracts and review
+  every in-scope `test.txt` contribution forward and reverse before permitting
+  a full capture. Automation may arrange evidence only.
+- [ ] T123 If T122 passes, run independent full-length empty-registry Run A and
+  restarted frozen-registry Run B from the same clean commit. Freeze complete
+  manifests and typed tracks, mechanically verify time-base, transport,
+  telemetry, terminal-latency, and repeatability contracts, then manually read
+  all 556 contributions chronologically and in reversed fixed blocks against
+  `test.txt`. No code may label, aggregate, rank, promote, or reject either
+  result. Do not alter the T111 baseline until both complete reviews pass all
+  applicable gates.

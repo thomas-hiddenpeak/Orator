@@ -401,6 +401,7 @@ void AuditoryStream::StartWorkers() {
     p.asr_vad_gate = config_.asr_vad_gate && config_.vad_stream &&
                      !config_.vad_model.empty();
     p.asr_vad_lead_ms = config_.asr_vad_lead_ms;
+    p.asr_vad_gate_chunk_ms = config_.asr_vad_gate_chunk_ms;
     p.asr_vad_trail_sec = config_.asr_vad_trail_sec;
     p.asr_vad_min_overlap_sec = config_.asr_vad_min_overlap_sec;
     p.max_audio_tokens = config_.asr_max_audio_tokens;
@@ -425,7 +426,6 @@ void AuditoryStream::StartWorkers() {
         asr_worker_->ProcessSpan(chunk.data(), static_cast<int>(chunk.size()));
         progress_cv_.notify_all();
       }
-      asr_worker_->Finalize();
       progress_cv_.notify_all();
     });
   }
@@ -476,12 +476,9 @@ void AuditoryStream::StartWorkers() {
             [this](const std::string& json) { EmitLocked(json); }, tb, &segs,
             finalize);
       };
-      // VAD progress heartbeat: while VAD is in confirmed silence, advance the
-      // horizon it publishes so ASR can skip silence at real-time pacing. The
-      // guard keeps the horizon a safe margin behind the fed edge so a just-
-      // starting onset (detected a frame later) is never skipped; throttling
-      // bounds the heartbeat rate.
-      constexpr double kGuardSec = 0.3;
+      // Publish only the detector-owned stable silence frontier. Its lookback
+      // covers onset confirmation and configured padding, so later speech can
+      // never revise audio that ASR has already consumed.
       constexpr double kMinAdvanceSec = 0.25;
       double last_horizon = -1e9;
       long span_start_abs = 0;
@@ -490,10 +487,21 @@ void AuditoryStream::StartWorkers() {
       while (vad_audio_->WaitAndRead(&chunk, &span_start_abs)) {
         vad_detector_->Push(chunk.data(), static_cast<int>(chunk.size()));
         const long fed = span_start_abs + static_cast<long>(chunk.size());
-        comp_.UpdateVadState(vad_detector_->is_in_speech(), tb.SecondsAt(fed));
         drain(/*finalize=*/false);
-        if (!vad_detector_->is_in_speech()) {
-          const double h = tb.SecondsAt(fed) - kGuardSec;
+        const core::VadStateResult state = vad_detector_->state();
+        const double active_start =
+            state.active_start_sample >= 0
+                ? tb.SecondsAt(state.active_start_sample)
+                : -1e9;
+        const double active_horizon =
+            state.active_stable_until_sample >= 0
+                ? tb.SecondsAt(state.active_stable_until_sample)
+                : -1e9;
+        comp_.UpdateVadState(state.in_speech,
+                             tb.SecondsAt(state.observed_until_sample),
+                             active_start, active_horizon);
+        if (!state.in_speech && state.silence_stable_until_sample >= 0) {
+          const double h = tb.SecondsAt(state.silence_stable_until_sample);
           if (h >= last_horizon + kMinAdvanceSec) {
             PublishVadProgress(comp_, protocol_timeline_.get(),
                                vad_handle_.get(), h);
@@ -506,7 +514,7 @@ void AuditoryStream::StartWorkers() {
         // connections; the UI only needs the transitions (it drives a speech
         // LED).
         {
-          const bool sp = vad_detector_->is_in_speech();
+          const bool sp = state.in_speech;
           if (first_vad_state || sp != vad_speech_emitted) {
             char buf[64];
             std::snprintf(buf, sizeof(buf),
@@ -521,6 +529,16 @@ void AuditoryStream::StartWorkers() {
         progress_cv_.notify_all();
       }
       drain(/*finalize=*/true);
+      const core::VadStateResult final_state = vad_detector_->state();
+      comp_.UpdateVadState(
+          final_state.in_speech,
+          tb.SecondsAt(final_state.observed_until_sample),
+          final_state.active_start_sample >= 0
+              ? tb.SecondsAt(final_state.active_start_sample)
+              : -1e9,
+          final_state.active_stable_until_sample >= 0
+              ? tb.SecondsAt(final_state.active_stable_until_sample)
+              : -1e9);
       // Final horizon = everything fed is now decided; lets ASR skip any
       // trailing silence before its own finalize.
       const long final_processed =
@@ -608,6 +626,13 @@ void AuditoryStream::StopWorkers() {
   if (diar_thread_.joinable()) diar_thread_.join();
   if (asr_thread_.joinable()) asr_thread_.join();
   if (vad_thread_.joinable()) vad_thread_.join();
+  // The ASR collector never waits for VAD. Once both independent producers
+  // have stopped, drain its pending tail from the final typed VAD snapshot.
+  // The aligner remains alive to consume the finals emitted here.
+  if (asr_worker_) {
+    asr_worker_->Finalize();
+    progress_cv_.notify_all();
+  }
   const auto producers_drained = std::chrono::steady_clock::now();
   // Stop the aligner last: ASR Finalize() deposits final typed records which
   // the comprehensive-timeline subscription enqueues. The aligner must drain

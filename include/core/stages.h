@@ -157,6 +157,17 @@ struct VadSegmentResult {
   long end_sample = 0;
 };
 
+// Current endpoint-detector state on the common sample clock. The active
+// frontiers distinguish samples that are safe for a downstream streaming
+// consumer from the detector's still-revisable onset/endpoint lookback.
+struct VadStateResult {
+  bool in_speech = false;
+  long observed_until_sample = 0;
+  long active_start_sample = -1;
+  long active_stable_until_sample = -1;
+  long silence_stable_until_sample = -1;
+};
+
 // Voice Activity Detection: segments audio into speech/non-speech regions.
 // Generalizes any VAD model (Silero, energy-based, etc.); the pipeline
 // depends only on this contract, never on a concrete detector.
@@ -182,6 +193,15 @@ class IVad {
 
   // Whether the latest processed samples are classified as speech.
   virtual bool is_in_speech() const = 0;
+
+  // Typed streaming state. Detectors that do not expose provisional endpoint
+  // evidence retain the conservative default; finalized segments remain
+  // available through DrainSegments().
+  virtual VadStateResult state() const {
+    VadStateResult result;
+    result.in_speech = is_in_speech();
+    return result;
+  }
 
   // Cumulative GPU compute time for this VAD instance.
   virtual double compute_sec() const = 0;

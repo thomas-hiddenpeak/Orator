@@ -37,6 +37,10 @@ vad_gate = true
 # Lead buffer (ms) extracted before VAD speech onset — avoids cutting first syllable
 vad_lead_ms = 200
 
+# Stable VAD-backed speech is fed to ASR in fixed batches so worker scheduling
+# cannot change decoder call boundaries.
+vad_gate_chunk_ms = 100
+
 # Trailing window (seconds) after VAD silence before committing a segment
 # Smaller = less trailing silence but may cut early if VAD lags
 # We tested: 1.5 (v5/v6), 1.0 (v7) — 16~18 ASR segs / 38 VAD segs

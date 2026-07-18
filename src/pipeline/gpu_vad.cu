@@ -428,6 +428,34 @@ void GpuVad::EmitPaddedSegment(
   last_emitted_end_abs_ = padded_end;
 }
 
+core::VadStateResult GpuVad::state() const {
+  core::VadStateResult result;
+  result.in_speech = in_speech_;
+  result.observed_until_sample = next_window_abs_;
+
+  const long pad = static_cast<long>(params_.silero_speech_pad_ms) *
+                   params_.sample_rate / 1000;
+  if (in_speech_) {
+    result.active_start_sample =
+        std::max(last_emitted_end_abs_, std::max(0L, seg_start_abs_ - pad));
+    const int min_silence =
+        params_.silero_min_silence_ms * params_.sample_rate / 1000;
+    const long endpoint_confirmation =
+        static_cast<long>(CeilDiv(min_silence, kWindow)) * kWindow;
+    const long endpoint_holdback = std::max(0L, endpoint_confirmation - pad);
+    result.active_stable_until_sample = std::max(
+        result.active_start_sample, next_window_abs_ - endpoint_holdback);
+  } else {
+    const int min_speech =
+        params_.silero_min_speech_ms * params_.sample_rate / 1000;
+    const long onset_lookback =
+        static_cast<long>(CeilDiv(min_speech, kWindow)) * kWindow + pad;
+    result.silence_stable_until_sample = std::max(
+        last_emitted_end_abs_, std::max(0L, next_window_abs_ - onset_lookback));
+  }
+  return result;
+}
+
 void GpuVad::Reset() {
   buf_.assign(kContext, 0.0f);
   win_start_ = kContext;
@@ -435,6 +463,7 @@ void GpuVad::Reset() {
   in_speech_ = false;
   speech_samples_ = 0;
   silence_samples_ = 0;
+  seg_start_abs_ = 0;
   last_emitted_end_abs_ = 0;
   if (d_h_) CUDA_CHECK(cudaMemset(d_h_, 0, kHidden * sizeof(float)));
   if (d_c_) CUDA_CHECK(cudaMemset(d_c_, 0, kHidden * sizeof(float)));

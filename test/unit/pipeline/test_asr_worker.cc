@@ -2,6 +2,7 @@
 // typed text sink without loading a model.
 
 #include <cstdio>
+#include <numeric>
 #include <string>
 #include <vector>
 
@@ -22,17 +23,96 @@ class FakeAsr final : public orator::core::IAsr {
     return {};
   }
   void set_max_new_tokens(int) override {}
-  void StreamReset(long) override { current_ = "speech"; }
-  std::string StreamChunk(const float*, int, cudaStream_t) override {
+  void StreamReset(long base_sample) override {
+    reset_positions.push_back(base_sample);
+    current_ = "speech";
+  }
+  std::string StreamChunk(const float* pcm, int n, cudaStream_t) override {
+    chunk_sizes.push_back(n);
+    fed_samples.insert(fed_samples.end(), pcm, pcm + n);
     return current_;
   }
   std::string StreamFinalize(cudaStream_t) override { return current_; }
   int stream_audio_tokens() const override { return 1; }
   std::string name() const override { return "fake_asr"; }
 
+  std::vector<long> reset_positions;
+  std::vector<int> chunk_sizes;
+  std::vector<float> fed_samples;
+
  private:
   std::string current_;
 };
+
+struct FinalRecord {
+  long id = -1;
+  double start = 0.0;
+  double end = 0.0;
+  std::string text;
+
+  bool operator==(const FinalRecord&) const = default;
+};
+
+struct GateTrace {
+  std::vector<long> reset_positions;
+  std::vector<int> chunk_sizes;
+  std::vector<float> fed_samples;
+  std::vector<std::string> events;
+  std::vector<FinalRecord> finals;
+  size_t events_before_evidence = 0;
+};
+
+GateTrace RunPublicationSchedule(int schedule) {
+  FakeAsr asr;
+  orator::pipeline::ComprehensiveTimeline evidence;
+  orator::pipeline::AsrWorker::Params params;
+  params.sample_rate = 100;
+  params.segment_sec = 0.0;
+  params.asr_vad_gate = true;
+  params.asr_vad_lead_ms = 100;
+  params.asr_vad_gate_chunk_ms = 100;
+  params.asr_vad_trail_sec = 0.1;
+  params.asr_vad_min_overlap_sec = 0.01;
+
+  GateTrace trace;
+  orator::pipeline::AsrWorker worker(
+      &asr, params,
+      [&trace](const std::string& event) { trace.events.push_back(event); },
+      orator::core::TimeBase(100), /*stream=*/0, &evidence);
+  worker.set_text_sink([&trace](long id, double start, double end,
+                                const std::string& text, bool final) {
+    if (final) trace.finals.push_back({id, start, end, text});
+  });
+
+  std::vector<float> audio(100);
+  std::iota(audio.begin(), audio.end(), 0.0f);
+  const auto publish_final = [&evidence] {
+    evidence.DepositVad({0.2, 0.5});
+    evidence.UpdateVadState(false, 1.0);
+    evidence.AdvanceVadHorizon(1.0);
+  };
+
+  if (schedule == 0) {
+    publish_final();
+    worker.ProcessSpan(audio.data(), static_cast<int>(audio.size()));
+  } else if (schedule == 1) {
+    worker.ProcessSpan(audio.data(), 10);
+    trace.events_before_evidence = trace.events.size();
+    publish_final();
+    worker.ProcessSpan(audio.data() + 10, 90);
+  } else {
+    evidence.UpdateVadState(true, 0.8, 0.2, 0.45);
+    worker.ProcessSpan(audio.data(), 50);
+    publish_final();
+    worker.ProcessSpan(audio.data() + 50, 50);
+  }
+  worker.Finalize();
+
+  trace.reset_positions = asr.reset_positions;
+  trace.chunk_sizes = asr.chunk_sizes;
+  trace.fed_samples = asr.fed_samples;
+  return trace;
+}
 
 }  // namespace
 
@@ -114,35 +194,122 @@ int main() {
   }
 
   {
-    FakeAsr retract_asr;
-    orator::pipeline::ComprehensiveTimeline evidence;
-    params.asr_vad_gate = true;
-    std::vector<std::string> retract_events;
-    evidence.UpdateVadState(true, 0.1);
-    orator::pipeline::AsrWorker retract_worker(
-        &retract_asr, params,
-        [&retract_events](const std::string& event) {
-          retract_events.push_back(event);
-        },
-        orator::core::TimeBase(100), /*stream=*/0, &evidence);
-    retract_worker.set_text_sink(
-        [](long, double, double, const std::string&, bool) {});
-    retract_worker.ProcessSpan(audio.data(), static_cast<int>(audio.size()));
-    evidence.UpdateVadState(false, 0.2);
-    evidence.AdvanceVadHorizon(2.0);
-    retract_worker.Finalize();
+    const GateTrace early = RunPublicationSchedule(0);
+    const GateTrace late = RunPublicationSchedule(1);
+    const GateTrace active = RunPublicationSchedule(2);
 
-    CHECK(retract_events.size() == 2,
-          "VAD-rejected provisional transcript emits partial and retract");
-    if (retract_events.size() == 2) {
-      CHECK(retract_events[0].find("\"type\":\"asr_partial\"") !=
-                std::string::npos,
-            "provisional transcript emits a partial event");
-      CHECK(retract_events[1].find("\"type\":\"asr_retract\"") !=
-                    std::string::npos &&
-                retract_events[1].find("\"text_id\":0") != std::string::npos,
-            "retract event reuses the provisional text ID");
-    }
+    CHECK(late.events_before_evidence == 0,
+          "unclassified audio remains buffered without provisional text");
+    CHECK(early.reset_positions == late.reset_positions &&
+              early.reset_positions == active.reset_positions,
+          "VAD publication order preserves ASR reset positions");
+    CHECK(early.chunk_sizes == late.chunk_sizes &&
+              early.chunk_sizes == active.chunk_sizes,
+          "VAD publication order preserves fixed decoder chunks");
+    CHECK(early.fed_samples == late.fed_samples &&
+              early.fed_samples == active.fed_samples,
+          "VAD publication order preserves the exact decoder input samples");
+    CHECK(early.events == late.events && early.events == active.events,
+          "VAD publication order preserves live and final ASR events");
+    CHECK(early.finals == late.finals && early.finals == active.finals,
+          "VAD publication order preserves typed ASR finals");
+    CHECK(early.reset_positions == std::vector<long>{10},
+          "ASR reset starts at VAD onset minus TOML lead");
+    CHECK(early.chunk_sizes == std::vector<int>({10, 10, 10, 10}),
+          "decided speech uses the TOML fixed feed quantum");
+    CHECK(early.fed_samples.size() == 40 &&
+              early.fed_samples.front() == 10.0f &&
+              early.fed_samples.back() == 49.0f,
+          "only lead plus finalized VAD speech reaches the decoder");
+    CHECK(early.finals.size() == 1 && early.finals[0].start == 0.1 &&
+              early.finals[0].end == 0.5,
+          "typed final uses deterministic lead and endpoint time codes");
+  }
+
+  {
+    FakeAsr silence_asr;
+    orator::pipeline::ComprehensiveTimeline silence_evidence;
+    silence_evidence.UpdateVadState(false, 1.0);
+    silence_evidence.AdvanceVadHorizon(1.0);
+    params.sample_rate = 100;
+    params.asr_vad_gate = true;
+    params.asr_vad_lead_ms = 100;
+    params.asr_vad_gate_chunk_ms = 100;
+    std::vector<std::string> silence_events;
+    std::vector<FinalRecord> silence_finals;
+    orator::pipeline::AsrWorker silence_worker(
+        &silence_asr, params,
+        [&silence_events](const std::string& event) {
+          silence_events.push_back(event);
+        },
+        orator::core::TimeBase(100), /*stream=*/0, &silence_evidence);
+    silence_worker.set_text_sink(
+        [&silence_finals](long id, double start, double end,
+                          const std::string& text, bool final) {
+          if (final) silence_finals.push_back({id, start, end, text});
+        });
+    std::vector<float> silence(100, 0.0f);
+    silence_worker.ProcessSpan(silence.data(),
+                               static_cast<int>(silence.size()));
+    silence_worker.Finalize();
+    CHECK(silence_asr.reset_positions.empty() &&
+              silence_asr.fed_samples.empty() && silence_events.empty() &&
+              silence_finals.empty(),
+          "confirmed silence never reaches ASR or emits a transcript");
+  }
+
+  {
+    params.sample_rate = 100;
+    params.segment_sec = 0.0;
+    params.asr_vad_gate = true;
+    params.asr_vad_lead_ms = 100;
+    params.asr_vad_gate_chunk_ms = 100;
+    params.asr_vad_trail_sec = 0.1;
+    params.asr_vad_min_overlap_sec = 0.01;
+    std::vector<float> sequence(100);
+    std::iota(sequence.begin(), sequence.end(), 0.0f);
+
+    FakeAsr short_gap_asr;
+    orator::pipeline::ComprehensiveTimeline short_gap_evidence;
+    short_gap_evidence.DepositVad({0.2, 0.4});
+    short_gap_evidence.DepositVad({0.45, 0.6});
+    short_gap_evidence.AdvanceVadHorizon(1.0);
+    std::vector<FinalRecord> short_gap_finals;
+    orator::pipeline::AsrWorker short_gap_worker(
+        &short_gap_asr, params, [](const std::string&) {},
+        orator::core::TimeBase(100), /*stream=*/0, &short_gap_evidence);
+    short_gap_worker.set_text_sink(
+        [&short_gap_finals](long id, double start, double end,
+                            const std::string& text, bool final) {
+          if (final) short_gap_finals.push_back({id, start, end, text});
+        });
+    short_gap_worker.ProcessSpan(sequence.data(), 100);
+    short_gap_worker.Finalize();
+    CHECK(
+        short_gap_asr.reset_positions == std::vector<long>{10} &&
+            short_gap_finals.size() == 1,
+        "speech returning within the trailing interval keeps one ASR session");
+
+    FakeAsr long_gap_asr;
+    orator::pipeline::ComprehensiveTimeline long_gap_evidence;
+    long_gap_evidence.DepositVad({0.2, 0.4});
+    long_gap_evidence.DepositVad({0.55, 0.7});
+    long_gap_evidence.AdvanceVadHorizon(1.0);
+    std::vector<FinalRecord> long_gap_finals;
+    orator::pipeline::AsrWorker long_gap_worker(
+        &long_gap_asr, params, [](const std::string&) {},
+        orator::core::TimeBase(100), /*stream=*/0, &long_gap_evidence);
+    long_gap_worker.set_text_sink(
+        [&long_gap_finals](long id, double start, double end,
+                           const std::string& text, bool final) {
+          if (final) long_gap_finals.push_back({id, start, end, text});
+        });
+    long_gap_worker.ProcessSpan(sequence.data(), 100);
+    long_gap_worker.Finalize();
+    CHECK(
+        long_gap_asr.reset_positions == std::vector<long>({10, 45}) &&
+            long_gap_finals.size() == 2,
+        "speech after the trailing interval starts a new lead-backed session");
   }
 
   if (failures == 0) {

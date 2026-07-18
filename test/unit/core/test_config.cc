@@ -53,6 +53,8 @@ int main() {
     CHECK(defaults.diarizer_weights ==
               "models/sortformer_4spk_v2.1.safetensors",
           "compile-time diarizer default is v2.1");
+    CHECK(defaults.asr_vad_gate_chunk_ms > 0,
+          "compile-time ASR VAD gate chunk is positive");
     CHECK(defaults.diar_chunk_len == 340,
           "compile-time v2.1 chunk length is 340");
     CHECK(defaults.diar_chunk_right_context == 1,
@@ -78,6 +80,8 @@ int main() {
           "checked-in v2.1 FIFO length is 188");
     CHECK(checked_in.diar_spkcache_update_period == 188,
           "checked-in v2.1 cache update period is 188");
+    CHECK(checked_in.asr_vad_gate_chunk_ms == 100,
+          "checked-in ASR VAD gate chunk is frozen at 100 ms");
     const std::string removed_v2_path =
         std::string(ORATOR_TEST_SOURCE_DIR) +
         "/models/sortformer_4spk_v2.safetensors";
@@ -98,6 +102,7 @@ ui_root = "/custom/web"
 model_dir = "/models/my_asr"
 vad_gate = false
 vad_lead_ms = 150
+vad_gate_chunk_ms = 80
 vad_trail_sec = 2.5
 vad_min_overlap_sec = 0.25
 max_new_tokens = 64
@@ -228,6 +233,7 @@ ws_text_log_path = "/tmp/ws-frames.jsonl"
     CHECK(cfg.asr_model_dir == "/models/my_asr", "cfg.asr_model_dir");
     CHECK(cfg.asr_vad_gate == false, "cfg.asr_vad_gate == false");
     CHECK(cfg.asr_vad_lead_ms == 150, "cfg.asr_vad_lead_ms == 150");
+    CHECK(cfg.asr_vad_gate_chunk_ms == 80, "cfg.asr_vad_gate_chunk_ms == 80");
     CHECK(cfg.asr_vad_trail_sec == 2.5, "cfg.asr_vad_trail_sec == 2.5");
     CHECK(cfg.asr_vad_min_overlap_sec == 0.25,
           "cfg.asr_vad_min_overlap_sec == 0.25");
@@ -384,6 +390,8 @@ ws_text_log_path = "/tmp/ws-frames.jsonl"
     const std::string resolved = pipeline::SerializeResolvedConfig(cfg);
     CHECK(resolved.find("\"windowed_encoder\":true") != std::string::npos,
           "resolved config contains ASR execution mode");
+    CHECK(resolved.find("\"vad_gate_chunk_ms\":80") != std::string::npos,
+          "resolved config contains deterministic ASR gate chunk");
     CHECK(resolved.find("\"ws_text_log_path\":\"/tmp/ws-frames.jsonl\"") !=
               std::string::npos,
           "resolved config contains transport diagnostics");

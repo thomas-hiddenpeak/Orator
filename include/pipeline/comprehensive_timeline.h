@@ -90,6 +90,8 @@ class ComprehensiveTimeline {
     double horizon = -1e9;
     bool in_speech = false;
     double state_observed_at = -1e9;
+    double active_start = -1e9;
+    double active_horizon = -1e9;
   };
 
   struct AlignUnitSeg {
@@ -196,7 +198,9 @@ class ComprehensiveTimeline {
   DepositResult DepositAsrFinal(const RawTextSeg& segment);
   void DepositVad(const VadSeg& segment);
   void AdvanceVadHorizon(double horizon_sec);
-  void UpdateVadState(bool in_speech, double observed_at_sec);
+  void UpdateVadState(bool in_speech, double observed_at_sec,
+                      double active_start_sec = -1e9,
+                      double active_horizon_sec = -1e9);
   DepositResult DepositAlignment(const AlignGroup& group);
   DepositResult DepositDiarFrameBlock(const DiarFrameBlock& block);
   void DepositSpeakerVoiceprint(
@@ -256,6 +260,8 @@ class ComprehensiveTimeline {
   double vad_horizon_sec_ = -1e9;
   bool vad_in_speech_ = false;
   double vad_state_observed_at_sec_ = -1e9;
+  double vad_active_start_sec_ = -1e9;
+  double vad_active_horizon_sec_ = -1e9;
   std::map<long, AlignGroup> align_;
   std::vector<DiarFrameBlock> diar_frames_;
   std::vector<SpeakerVoiceprintEvidence> speaker_voiceprint_;

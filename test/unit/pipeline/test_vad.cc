@@ -125,6 +125,42 @@ int main() {
   }
   std::printf("GPU VAD speech padding gate PASSED (%zu segments)\n",
               padded_segments.size());
+
+  pipeline::GpuVad state_probe(padded_params);
+  bool saw_active_state = false;
+  std::vector<core::VadSegmentResult> state_segments;
+  constexpr int kProbeChunk = 1600;
+  for (size_t offset = 0; offset < audio.samples.size();
+       offset += kProbeChunk) {
+    const int take = static_cast<int>(std::min(static_cast<size_t>(kProbeChunk),
+                                               audio.samples.size() - offset));
+    state_probe.Push(audio.samples.data() + offset, take);
+    state_probe.DrainSegments(false, &state_segments);
+    const core::VadStateResult state = state_probe.state();
+    if (!state.in_speech) continue;
+    saw_active_state = true;
+    if (state.active_start_sample < 0 ||
+        state.active_stable_until_sample < state.active_start_sample ||
+        state.active_stable_until_sample > state.observed_until_sample) {
+      std::printf("FAIL: invalid typed active VAD frontier\n");
+      return 1;
+    }
+  }
+  if (!saw_active_state) {
+    std::printf("FAIL: real-audio probe exposed no active VAD state\n");
+    return 1;
+  }
+  state_probe.DrainSegments(true, &state_segments);
+  const core::VadStateResult terminal_state = state_probe.state();
+  if (terminal_state.in_speech || terminal_state.active_start_sample >= 0 ||
+      terminal_state.active_stable_until_sample >= 0 ||
+      terminal_state.silence_stable_until_sample < 0 ||
+      terminal_state.silence_stable_until_sample >
+          terminal_state.observed_until_sample) {
+    std::printf("FAIL: invalid typed terminal VAD state\n");
+    return 1;
+  }
+  std::printf("GPU VAD typed frontier gate PASSED\n");
   std::printf("GPU VAD numeric gate PASSED\n");
   return 0;
 }

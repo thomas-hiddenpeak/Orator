@@ -135,8 +135,9 @@ int main() {
 
   timeline.DepositVad({2.0, 2.5});
   timeline.AdvanceVadHorizon(3.0);
-  timeline.UpdateVadState(true, 2.75);
+  timeline.UpdateVadState(true, 2.75, 2.20, 2.50);
   const auto first_vad = timeline.SnapshotVadEvidence();
+  timeline.UpdateVadState(false, 2.50);
   timeline.DepositVad({3.0, 3.5});
   timeline.AdvanceVadHorizon(2.0);
   const auto second_vad = timeline.SnapshotVadEvidence();
@@ -146,8 +147,15 @@ int main() {
         "latest VAD snapshot contains both segments");
   CHECK(second_vad.horizon == 3.0,
         "VAD decision horizon advances monotonically");
-  CHECK(second_vad.in_speech && second_vad.state_observed_at == 2.75,
-        "VAD activity state is available as typed evidence");
+  CHECK(second_vad.in_speech && second_vad.state_observed_at == 2.75 &&
+            second_vad.active_start == 2.20 &&
+            second_vad.active_horizon == 2.50,
+        "VAD active onset and stable frontier are typed evidence");
+  timeline.UpdateVadState(false, 3.75);
+  const auto inactive_vad = timeline.SnapshotVadEvidence();
+  CHECK(!inactive_vad.in_speech && inactive_vad.active_start < -1e8 &&
+            inactive_vad.active_horizon < -1e8,
+        "inactive VAD state clears provisional active evidence");
 
   Timeline::DiarFrameBlock frame_block;
   frame_block.start = 0.0;

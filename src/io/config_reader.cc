@@ -62,6 +62,9 @@ bool ApplyTomlConfig(const std::string& path,
     if (auto v = sec->get("vad_lead_ms")) {
       if (auto n = v->value<int>()) cfg.asr_vad_lead_ms = *n;
     }
+    if (auto v = sec->get("vad_gate_chunk_ms")) {
+      if (auto n = v->value<int>()) cfg.asr_vad_gate_chunk_ms = *n;
+    }
     if (auto v = sec->get("vad_trail_sec")) {
       if (auto d = v->value<double>()) cfg.asr_vad_trail_sec = *d;
     }

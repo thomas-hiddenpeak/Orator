@@ -188,12 +188,23 @@ void ComprehensiveTimeline::AdvanceVadHorizon(double horizon_sec) {
 }
 
 void ComprehensiveTimeline::UpdateVadState(bool in_speech,
-                                           double observed_at_sec) {
+                                           double observed_at_sec,
+                                           double active_start_sec,
+                                           double active_horizon_sec) {
   if (!std::isfinite(observed_at_sec)) return;
   std::lock_guard<std::mutex> lock(mutex_);
   if (observed_at_sec + 1e-9 < vad_state_observed_at_sec_) return;
   vad_in_speech_ = in_speech;
   vad_state_observed_at_sec_ = observed_at_sec;
+  if (in_speech && std::isfinite(active_start_sec) &&
+      std::isfinite(active_horizon_sec) &&
+      active_horizon_sec + 1e-9 >= active_start_sec) {
+    vad_active_start_sec_ = active_start_sec;
+    vad_active_horizon_sec_ = active_horizon_sec;
+  } else {
+    vad_active_start_sec_ = -1e9;
+    vad_active_horizon_sec_ = -1e9;
+  }
 }
 
 ComprehensiveTimeline::DepositResult ComprehensiveTimeline::DepositAlignment(
@@ -416,8 +427,9 @@ std::vector<ComprehensiveTimeline::VadSeg> ComprehensiveTimeline::SnapshotVad()
 ComprehensiveTimeline::VadEvidence ComprehensiveTimeline::SnapshotVadEvidence()
     const {
   std::lock_guard<std::mutex> lock(mutex_);
-  return {vad_snapshot_, vad_horizon_sec_, vad_in_speech_,
-          vad_state_observed_at_sec_};
+  return {vad_snapshot_,         vad_horizon_sec_,
+          vad_in_speech_,        vad_state_observed_at_sec_,
+          vad_active_start_sec_, vad_active_horizon_sec_};
 }
 
 std::vector<ComprehensiveTimeline::AlignGroup>
@@ -495,6 +507,8 @@ void ComprehensiveTimeline::Clear() {
     vad_horizon_sec_ = -1e9;
     vad_in_speech_ = false;
     vad_state_observed_at_sec_ = -1e9;
+    vad_active_start_sec_ = -1e9;
+    vad_active_horizon_sec_ = -1e9;
     align_.clear();
     diar_frames_.clear();
     speaker_voiceprint_.clear();

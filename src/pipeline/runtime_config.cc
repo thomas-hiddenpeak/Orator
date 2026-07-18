@@ -81,6 +81,7 @@ std::string SerializeResolvedConfig(const AuditoryStream::Config& c) {
   asr.Add("model_dir", c.asr_model_dir);
   asr.Add("vad_gate", c.asr_vad_gate);
   asr.Add("vad_lead_ms", c.asr_vad_lead_ms);
+  asr.Add("vad_gate_chunk_ms", c.asr_vad_gate_chunk_ms);
   asr.Add("vad_trail_sec", c.asr_vad_trail_sec);
   asr.Add("vad_min_overlap_sec", c.asr_vad_min_overlap_sec);
   asr.Add("max_audio_tokens", c.asr_max_audio_tokens);
