@@ -21,8 +21,9 @@ at `507/556`; FR34 independently retains an exact `ref-0406` phrase repair on
 frozen evidence at `508/556`; FR35 retains the partition-invariant
 `ref-0420` isolated response on frozen evidence at `509/556`; FR36 retains the
 regular same-slot six-view `ref-0350` repair at `510/556` and passes the
-2400-3000 fixed block, with no new real-path claim; T102, T084, full canonical
-closure, release sign-off, and industrial readiness remain open
+2400-3000 fixed block; FR37 retains the bracketed-primary `ref-0478` response
+at `511/556`, with no new real-path claim; T102, T084, full canonical closure,
+release sign-off, and industrial readiness remain open
 **Created**: 2026-07-13
 **Scope**: Re-establish a truthful product baseline, recover full-session business
 accuracy, and define the evidence required before Orator may be declared closed.
@@ -2290,6 +2291,39 @@ subject to the complete acceptance gates in this spec.
   deterministically, and every changed complete conversation MUST receive
   chronological and reverse contextual semantic review against `test.txt`
   before retention or a new audio run.
+- **FR37**: A short embedding-backed `business_interval` MAY replace one
+  uniform unprotected primary identity A with the different initial identity B
+  of A's local activity slot only when a complete adjacent-boundary and
+  bracketed-primary topology corroborates B. The interval MUST remain within
+  the existing primary-consensus and short duration bounds, be robust-complete,
+  and contain the existing minimum aligned-unit count. Exactly one containing
+  primary run in A's local slot MUST cover it; that run MUST remain below the
+  existing short bound and be gaplessly bracketed by immediately preceding
+  and following primary runs which each meet the existing primary-consensus
+  minimum and name the same third identity C. Activity MUST expose exactly the
+  completely covering A and C local slots and no other overlap. A's slot MUST
+  have initial identity B, pairwise distinct from A and C, and B MUST NOT be a
+  current activity identity. Both interval galleries MUST rank A first and pass
+  the unchanged short score and margin gates, with C second in the session
+  view and B second in the robust view. Exactly one embedding-backed,
+  robust-complete same-text punctuation
+  phrase MUST end at the interval's source and common-clock start within the
+  existing alignment boundary tolerance. Both phrase galleries MUST rank B
+  first and pass the unchanged short score gate, with exactly one passing the
+  unchanged short margin. Exactly one embedding-backed, robust-complete VAD
+  MUST contain the interval, and both VAD galleries MUST rank B first and pass
+  their unchanged duration-class score and margin gates. Existing specialized
+  interval challenges MUST retain precedence, and the write MUST cover only
+  the exact interval source and forced-alignment range. Missing, duplicate,
+  non-gapless, differently ranked, differently gated, unaligned, protected,
+  additional-activity, or source/time-inconsistent evidence MUST preserve
+  existing behavior. FR37 MUST add no TOML value, score, margin, duration,
+  future lookahead, identity, transcript, speaker name, timestamp, reference
+  datum, or fitted constant and MUST alter no producer evidence or common-clock
+  coordinate. Frozen T111/T123 inputs MUST replay deterministically, and every
+  changed complete conversation MUST receive chronological and reverse
+  contextual semantic review against `test.txt` before retention or a new
+  audio run.
 
 The first FR31 implementation passed its focused engineering test and produced
 byte-stable repeated T111 and T123 replays. Complete forward and reverse review
@@ -2422,6 +2456,32 @@ frozen candidate is `510/556`; the 2400-3000 fixed block now passes at
 confident-wrong attribution, and speaker-time sign-off still fail. No new
 real-WebSocket result or closure claim is attributed to FR36. See
 `partition-invariant-regular-initial-slot-review-2026-07-19.md`.
+
+FR37 isolates the separate T111/T123 partition regression at `ref-0478`.
+T111 retains `我向国家交` as a short punctuation phrase and activates the
+existing initial-slot/VAD challenge. T123 preserves the same aligned words only
+as a `0.400 s` business interval, so ordinary direct evidence writes the
+current identity before any equivalent phrase challenge exists. The current A
+primary run is a short island gaplessly bracketed by the same C identity;
+activity A and C both cover the interval, A's slot has initial identity B, and
+both the source-adjacent preceding phrase and unique containing VAD select B in
+the specified unchanged-gate patterns. FR37 reconstructs only this exact typed
+topology. It changes no boundary, producer track, TOML value, transcript, or
+known time. See
+`bracketed-primary-adjacent-vad-reconstruction-diagnosis-2026-07-19.md`.
+
+Repeated FR37 T123 replays are byte-identical and change only the
+`3075.096-3075.496` `我向国家交。` interval from Tang Yunfeng to Zhu Jie.
+T111 remains byte-identical to FR36. Complete reading of the changed
+`50:35-52:28` conversation chronologically and in reverse confirms Zhu Jie's
+answer between Shi Yi's question and clarification and preserves the already
+accepted T111 handoff structure. The warning-clean build and all 69 CTest
+entries pass as engineering evidence. The manually reconciled frozen candidate
+is `511/556`; the 3000-3600 fixed block advances to `78/87` but still fails.
+Zhu Jie recall, critical attribution, confident-wrong attribution, and
+speaker-time sign-off also remain open. No new real-WebSocket result or closure
+claim is attributed to FR37. See
+`bracketed-primary-adjacent-vad-reconstruction-review-2026-07-19.md`.
 
 ## 5. Acceptance Gates
 

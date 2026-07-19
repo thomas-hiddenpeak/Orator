@@ -3396,6 +3396,41 @@ gates remain open, so FR36 is a transitional frozen repair and not a
 real-stream acceptance result. See
 `partition-invariant-regular-initial-slot-review-2026-07-19.md`.
 
+FR37 remains on the same frozen producer tracks and addresses a short answer
+whose punctuation-phrase challenge disappears under the T123 partition. The
+production projector first confirms one unprotected primary-owned interval in
+current identity A, one containing A primary run gaplessly bracketed by the
+same competitor C, exactly two completely covering activity slots A and C, and
+initial identity B for A's local slot. It then requires dual eligible interval
+views with exact A/C and A/B top-two order, a source/time-adjacent preceding
+phrase whose two views rank B in
+the specified one-margin-pass pattern, and one containing VAD whose two views
+independently select B under unchanged gates. A, B, and C remain pairwise
+distinct. No individual view or primary bracket may write the result; only the
+complete partition-reconstruction topology may challenge the exact interval.
+
+Focused positive and independent abstention tests cover every provenance,
+slot, identity, alignment, containment, adjacency, primary-bracket,
+gallery-rank, and existing-gate condition. The production C++ projector is
+then replayed twice over frozen T123 and T111. Automation verifies only hashes,
+immutable inputs, source reconstruction, time order, and displayed change
+scope. Every changed complete conversation is read chronologically and in
+reverse against `test.txt`; only that contextual semantic review may retain or
+reject FR37. No audio is rerun until the current frozen candidate passes this
+independent gate. See
+`bracketed-primary-adjacent-vad-reconstruction-diagnosis-2026-07-19.md`.
+
+The independent frozen gate retains FR37. T123 Run A and Run B have the same
+SHA-256 and differ from FR36 only at the complete `我向国家交。` interval;
+T111 is byte-identical to FR36. The reviewer reads the entire displayed
+`50:35-52:28` conversation forward and reverse and confirms Zhu Jie's answer
+between Shi Yi's question and clarification without changing either Shi
+contribution. The frozen ledger advances by one reviewed critical Zhu Jie
+contribution to `511/556`; the 3000-3600 fixed block reaches `78/87` and still
+fails. The other conjunctive closing gates remain open, so FR37 is a
+transitional frozen repair and not a real-stream acceptance result. See
+`bracketed-primary-adjacent-vad-reconstruction-review-2026-07-19.md`.
+
 ### 8.15 FR28 120-second outcome and promotion ladder
 
 T117-T121 are complete. The frozen T116 packages replay byte-stably; their

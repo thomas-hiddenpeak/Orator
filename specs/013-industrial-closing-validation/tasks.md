@@ -2195,3 +2195,33 @@ T102/T084 remain open 2026-07-19
   ledger is `510/556`; the 2400-3000 block passes at `117/129`, while the
   3000-3600 block and every other conjunctive failure keep closure open. See
   `partition-invariant-regular-initial-slot-review-2026-07-19.md`.
+- [x] T155 Diagnose the T111/T123 `ref-0478` partition regression using only
+  frozen typed evidence on the common time base. Specify FR37 as one strict
+  short-interval reconstruction requiring primary identity A gaplessly
+  bracketed by C, completely covering A/C activity, A-slot initial identity B,
+  dual interval support for A, source-adjacent phrase support for B, and dual
+  containing-VAD support for B under unchanged gates. Add no TOML value,
+  threshold, transcript, timestamp, reference lookup, or product verdict. See
+  `bracketed-primary-adjacent-vad-reconstruction-diagnosis-2026-07-19.md`.
+- [x] T156 Implement FR37 with focused positive and independent abstention
+  tests. Pass a warning-clean build and all CTest entries, then replay frozen
+  T123 and T111 producer packages at least twice. Automation may verify only
+  mechanical contracts and arrange raw changed contexts; it may not label
+  correctness, aggregate accuracy, select the candidate, or issue an
+  acceptance verdict.
+  The warning-clean build and all `69/69` CTest entries pass. Repeated T123
+  replays are byte-identical at SHA-256
+  `e4e0762d1d2324a555ad92ab268f423acb3c9ee468b2d691efd0f56e7c293e4b`
+  and repeated T111 replays are byte-identical to FR36 at SHA-256
+  `646ea91b357cafaf8af82c4f45e5cc771c622a501e71b12f2d1aa1555fb055f2`.
+  Mechanical display exposes only the complete `我向国家交。` interval.
+- [x] T157 Read every FR37 changed complete conversation chronologically and
+  in reverse against `test.txt`. Retain or remove FR37 only from that
+  contextual semantic review, synchronize spec/plan/tasks/project state, and
+  label any commit as a transitional frozen experiment. Do not attribute a new
+  real-WebSocket result or speaker-business closure to the replay.
+  Complete forward and reverse reading of `50:35-52:28` retains Zhu Jie's
+  answer between Shi Yi's question and clarification and finds no neighbouring
+  change. The manually reconciled frozen ledger is `511/556`; the 3000-3600
+  block advances to `78/87` but still fails. See
+  `bracketed-primary-adjacent-vad-reconstruction-review-2026-07-19.md`.

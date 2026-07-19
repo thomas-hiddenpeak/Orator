@@ -3809,6 +3809,279 @@ int main() {
           "insufficient alignment preserves the primary identity");
   }
 
+  // ---- 20g12b. FR37: a primary-owned short interval may recover one initial
+  // slot identity only under exact A/C and A/B interval ranks, a gaplessly
+  // bracketed primary island, and agreeing adjacent-phrase plus VAD evidence.
+  // ----
+  {
+    using Entry = ComprehensiveTimeline::Entry;
+    struct CaseOptions {
+      bool include_initial_identity = true;
+      bool include_competitor_activity = true;
+      bool include_extra_activity = false;
+      bool include_candidate_activity = false;
+      bool primary_current = true;
+      bool same_primary_brackets = true;
+      bool gapless_primary_brackets = true;
+      bool long_enough_primary_brackets = true;
+      bool current_primary_is_short = true;
+      bool enough_alignment = true;
+      bool interval_session_competitor_second = true;
+      bool interval_robust_initial_second = true;
+      bool interval_eligible = true;
+      int adjacent_phrase_count = 1;
+      bool adjacent_boundary_matches = true;
+      bool adjacent_initial_first = true;
+      bool adjacent_exactly_one_margin = true;
+      int containing_vad_count = 1;
+      bool vad_initial_first = true;
+      bool vad_eligible = true;
+    };
+    auto run_case = [](const CaseOptions& options) -> std::vector<Entry> {
+      BusinessSpeakerPipeline::Config config;
+      config.voiceprint_fusion_enabled = true;
+      config.speaker_overlap_tie_policy =
+          BusinessSpeakerPipeline::SpeakerOverlapTiePolicy::kPrimarySpeaker;
+      TestBusinessSpeakerPipeline tl(config);
+
+      std::vector<TestBusinessSpeakerPipeline::SpeakerInput> activity;
+      if (options.include_initial_identity) {
+        activity.push_back({-2.0, -1.0, "slot_a", 0.9f, "spk_b"});
+      }
+      activity.push_back({0.8, 1.8, "slot_a", 0.9f, "spk_a"});
+      if (options.include_competitor_activity) {
+        activity.push_back({0.8, 1.8, "slot_c", 0.8f, "spk_c"});
+      }
+      if (options.include_extra_activity) {
+        activity.push_back({1.0, 1.4, "slot_d", 0.7f, "spk_d"});
+      }
+      if (options.include_candidate_activity) {
+        activity.push_back({1.0, 1.4, "slot_b", 0.7f, "spk_b"});
+      }
+      tl.ReplaceSpeakers(activity);
+
+      const double current_end = options.current_primary_is_short ? 1.8 : 2.6;
+      const double previous_start =
+          options.long_enough_primary_brackets ? 0.4 : 0.8;
+      const double following_start =
+          current_end + (options.gapless_primary_brackets ? 0.0 : 0.2);
+      const double following_end =
+          following_start +
+          (options.long_enough_primary_brackets ? 0.6 : 0.2);
+      tl.ReplacePrimarySpeakers(
+          {{previous_start, 1.0, "slot_c", 0.9f, "spk_c"},
+           {1.0, current_end, "slot_a", 0.9f,
+            options.primary_current ? "spk_a" : "spk_c"},
+           {following_start, following_end,
+            options.same_primary_brackets ? "slot_c" : "slot_d", 0.9f,
+            options.same_primary_brackets ? "spk_c" : "spk_d"}});
+
+      tl.UpsertText(0, 0.2, 2.0, "甲乙，丙丁。");
+      tl.UpsertAlign(
+          0, 0.2, 2.0,
+          options.enough_alignment
+              ? std::vector<TestBusinessSpeakerPipeline::AlignUnitSeg>{
+                    {0.2, 0.5, "甲"}, {0.5, 0.8, "乙"},
+                    {1.0, 1.2, "丙"}, {1.2, 1.4, "丁"}}
+              : std::vector<TestBusinessSpeakerPipeline::AlignUnitSeg>{
+                    {0.2, 0.5, "甲"}, {0.5, 0.8, "乙"},
+                    {1.0, 1.4, "丙丁"}});
+
+      ComprehensiveTimeline::SpeakerVoiceprintEvidence interval;
+      interval.evidence_id = "business_interval:0:1";
+      interval.kind = "business_interval";
+      interval.text_id = 0;
+      interval.source_start = 3;
+      interval.source_end = 5;
+      interval.start = 1.0;
+      interval.end = 1.4;
+      interval.embedding_available = true;
+      interval.robust_gallery_complete = true;
+      const float interval_top = options.interval_eligible ? 0.70f : 0.52f;
+      const float interval_second = options.interval_eligible ? 0.50f : 0.50f;
+      interval.session_scores =
+          options.interval_session_competitor_second
+              ? std::vector<ComprehensiveTimeline::VoiceprintScore>{
+                    {"spk_a", interval_top}, {"spk_c", interval_second},
+                    {"spk_b", 0.30f}, {"spk_d", 0.20f}}
+              : std::vector<ComprehensiveTimeline::VoiceprintScore>{
+                    {"spk_a", interval_top}, {"spk_d", interval_second},
+                    {"spk_c", 0.30f}, {"spk_b", 0.20f}};
+      interval.robust_scores =
+          options.interval_robust_initial_second
+              ? std::vector<ComprehensiveTimeline::VoiceprintScore>{
+                    {"spk_a", interval_top}, {"spk_b", interval_second},
+                    {"spk_c", 0.30f}, {"spk_d", 0.20f}}
+              : std::vector<ComprehensiveTimeline::VoiceprintScore>{
+                    {"spk_a", interval_top}, {"spk_c", interval_second},
+                    {"spk_b", 0.30f}, {"spk_d", 0.20f}};
+
+      std::vector<ComprehensiveTimeline::SpeakerVoiceprintEvidence> evidence = {
+          interval};
+      for (int index = 0; index < options.adjacent_phrase_count; ++index) {
+        ComprehensiveTimeline::SpeakerVoiceprintEvidence phrase;
+        phrase.evidence_id =
+            "punctuation_phrase:0:" + std::to_string(index);
+        phrase.kind = "punctuation_phrase";
+        phrase.text_id = 0;
+        phrase.source_start = 0;
+        phrase.source_end = 3;
+        phrase.start = 0.2 - index * 0.01;
+        phrase.end = options.adjacent_boundary_matches ? 1.0 : 0.8;
+        phrase.embedding_available = true;
+        phrase.robust_gallery_complete = true;
+        const std::string first =
+            options.adjacent_initial_first ? "spk_b" : "spk_a";
+        const std::string second =
+            options.adjacent_initial_first ? "spk_a" : "spk_b";
+        phrase.session_scores = {
+            {first, 0.50f}, {second, 0.48f}, {"spk_c", 0.20f}};
+        phrase.robust_scores = options.adjacent_exactly_one_margin
+                                   ? std::vector<ComprehensiveTimeline::VoiceprintScore>{
+                                         {first, 0.62f},
+                                         {second, 0.50f},
+                                         {"spk_c", 0.20f}}
+                                   : std::vector<ComprehensiveTimeline::VoiceprintScore>{
+                                         {first, 0.51f},
+                                         {second, 0.49f},
+                                         {"spk_c", 0.20f}};
+        evidence.push_back(phrase);
+      }
+      for (int index = 0; index < options.containing_vad_count; ++index) {
+        ComprehensiveTimeline::SpeakerVoiceprintEvidence vad;
+        vad.evidence_id = "vad:" + std::to_string(index);
+        vad.kind = "vad";
+        vad.text_id = -1;
+        vad.start = 0.0 - index * 0.01;
+        vad.end = 1.6 + index * 0.01;
+        vad.embedding_available = true;
+        vad.robust_gallery_complete = true;
+        const std::string first = options.vad_initial_first ? "spk_b" : "spk_a";
+        const std::string second = options.vad_initial_first ? "spk_a" : "spk_b";
+        const float vad_top = options.vad_eligible ? 0.70f : 0.52f;
+        const float vad_second = options.vad_eligible ? 0.50f : 0.50f;
+        vad.session_scores = {
+            {first, vad_top}, {second, vad_second}, {"spk_c", 0.20f}};
+        vad.robust_scores = {
+            {first, vad_top - 0.01f}, {second, vad_second - 0.01f},
+            {"spk_c", 0.20f}};
+        evidence.push_back(vad);
+      }
+      tl.ReplaceVoiceprint(evidence);
+      return tl.Snapshot();
+    };
+
+    const std::string reason =
+        "voiceprint_interval_bracketed_primary_adjacent_vad_reconstruction";
+    auto selected = [&](const std::vector<Entry>& entries) {
+      return std::any_of(entries.begin(), entries.end(), [&](const auto& entry) {
+        return entry.text.find("丙") != std::string::npos &&
+               entry.speaker_id == "spk_b" &&
+               entry.speaker_decision.reason == reason &&
+               entry.speaker_decision.speaker_source ==
+                   "sortformer_initial_slot+activity+bracketed_primary+"
+                   "titanet_interval+titanet_adjacent_phrase+titanet_vad+"
+                   "robust_gallery+forced_alignment";
+      });
+    };
+    auto abstained = [&](const std::vector<Entry>& entries) {
+      return std::none_of(entries.begin(), entries.end(), [&](const auto& entry) {
+        return entry.speaker_decision.reason == reason;
+      });
+    };
+
+    CHECK(selected(run_case({})),
+          "bracketed primary plus adjacent phrase and VAD recovers initial id");
+    CaseOptions missing_initial;
+    missing_initial.include_initial_identity = false;
+    CHECK(abstained(run_case(missing_initial)),
+          "missing initial identity blocks interval reconstruction");
+    CaseOptions missing_competitor;
+    missing_competitor.include_competitor_activity = false;
+    CHECK(abstained(run_case(missing_competitor)),
+          "missing competitor activity blocks interval reconstruction");
+    CaseOptions extra_activity;
+    extra_activity.include_extra_activity = true;
+    CHECK(abstained(run_case(extra_activity)),
+          "additional activity blocks interval reconstruction");
+    CaseOptions candidate_activity;
+    candidate_activity.include_candidate_activity = true;
+    CHECK(abstained(run_case(candidate_activity)),
+          "current candidate activity blocks historical reconstruction");
+    CaseOptions primary_mismatch;
+    primary_mismatch.primary_current = false;
+    CHECK(abstained(run_case(primary_mismatch)),
+          "primary identity mismatch blocks interval reconstruction");
+    CaseOptions changed_bracket;
+    changed_bracket.same_primary_brackets = false;
+    CHECK(abstained(run_case(changed_bracket)),
+          "different primary brackets block interval reconstruction");
+    CaseOptions primary_gap;
+    primary_gap.gapless_primary_brackets = false;
+    CHECK(abstained(run_case(primary_gap)),
+          "a primary bracket gap blocks interval reconstruction");
+    CaseOptions short_bracket;
+    short_bracket.long_enough_primary_brackets = false;
+    CHECK(abstained(run_case(short_bracket)),
+          "subminimum primary brackets block interval reconstruction");
+    CaseOptions long_current;
+    long_current.current_primary_is_short = false;
+    CHECK(abstained(run_case(long_current)),
+          "a sustained current-primary run blocks historical reconstruction");
+    CaseOptions insufficient_alignment;
+    insufficient_alignment.enough_alignment = false;
+    CHECK(abstained(run_case(insufficient_alignment)),
+          "insufficient aligned units block interval reconstruction");
+    CaseOptions session_order;
+    session_order.interval_session_competitor_second = false;
+    CHECK(abstained(run_case(session_order)),
+          "a different interval session runner-up blocks reconstruction");
+    CaseOptions robust_order;
+    robust_order.interval_robust_initial_second = false;
+    CHECK(abstained(run_case(robust_order)),
+          "a different interval robust runner-up blocks reconstruction");
+    CaseOptions weak_interval;
+    weak_interval.interval_eligible = false;
+    CHECK(abstained(run_case(weak_interval)),
+          "an abstaining interval stays on the ordinary evidence path");
+    CaseOptions missing_phrase;
+    missing_phrase.adjacent_phrase_count = 0;
+    CHECK(abstained(run_case(missing_phrase)),
+          "missing adjacent phrase blocks interval reconstruction");
+    CaseOptions duplicate_phrase;
+    duplicate_phrase.adjacent_phrase_count = 2;
+    CHECK(abstained(run_case(duplicate_phrase)),
+          "duplicate adjacent phrases block interval reconstruction");
+    CaseOptions phrase_boundary;
+    phrase_boundary.adjacent_boundary_matches = false;
+    CHECK(abstained(run_case(phrase_boundary)),
+          "a nonadjacent phrase boundary blocks interval reconstruction");
+    CaseOptions phrase_rank;
+    phrase_rank.adjacent_initial_first = false;
+    CHECK(abstained(run_case(phrase_rank)),
+          "a current-first adjacent phrase blocks interval reconstruction");
+    CaseOptions phrase_gate;
+    phrase_gate.adjacent_exactly_one_margin = false;
+    CHECK(abstained(run_case(phrase_gate)),
+          "a different adjacent margin pattern blocks reconstruction");
+    CaseOptions missing_vad;
+    missing_vad.containing_vad_count = 0;
+    CHECK(abstained(run_case(missing_vad)),
+          "missing containing VAD blocks interval reconstruction");
+    CaseOptions duplicate_vad;
+    duplicate_vad.containing_vad_count = 2;
+    CHECK(abstained(run_case(duplicate_vad)),
+          "duplicate containing VAD blocks interval reconstruction");
+    CaseOptions vad_rank;
+    vad_rank.vad_initial_first = false;
+    CHECK(abstained(run_case(vad_rank)),
+          "a current-first VAD blocks interval reconstruction");
+    CaseOptions weak_vad;
+    weak_vad.vad_eligible = false;
+    CHECK(abstained(run_case(weak_vad)),
+          "an abstaining VAD blocks interval reconstruction");
+  }
+
   // ---- 20g13. FR16ABJ: a subminimum interval may restore uncontested native
   // evidence only under the exact phrase/VAD cross-scale abstention pattern.
   // ----
