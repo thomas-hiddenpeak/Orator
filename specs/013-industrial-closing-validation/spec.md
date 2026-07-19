@@ -2954,6 +2954,26 @@ open. See `fr47-real-path-promotion-review-2026-07-19.md`.
   syntax compilation. These are engineering checks only. See
   `fr49-source-leading-primary-prefix-diagnosis-2026-07-19.md`.
 
+- **FR49 real-path promotion gate**: The retained FR49 policy MUST be committed
+  and pushed before new audio is streamed. One exact clean revision and the
+  checked-in `orator.toml` MUST then run two independent 120-second production
+  WebSocket captures at `1.0x` with 100 ms frames, direct `end`, observers,
+  required runtime/device telemetry, and a genuinely empty isolated registry
+  for each run. Automation MAY verify transport, JSON, provenance, common-
+  clock, terminal, observer, telemetry, raw repeatability, and artifact-
+  identity contracts only. Each artifact MUST receive its own complete
+  chronological and reverse contextual semantic review of every in-scope
+  `test.txt` contribution before FR49 may advance. Any contextual speaker
+  regression stops promotion for diagnosis. Only if both 120-second reviews
+  retain FR49 MAY one 600-second run execute under the same contracts and
+  receive complete two-direction in-scope review. Only if that review retains
+  FR49 MAY full Run A start from an empty registry and full Run B restart from
+  Run A's frozen registry. Each full artifact MUST receive an independent
+  556-contribution chronological and reverse fixed-window contextual semantic
+  review. No executable result, hash, equality check, metric, or mechanical
+  contract may promote, reject, or score the candidate. The pre-existing
+  business storage MUST be preserved and restored after isolated validation.
+
 FR40 passes its frozen gate. Repeated T123 outputs are byte-identical and
 change only Xu Zijing's `184.240-184.320` response. Repeated T111 outputs are
 separately byte-identical and split only Zhu Jie's first reaction from the

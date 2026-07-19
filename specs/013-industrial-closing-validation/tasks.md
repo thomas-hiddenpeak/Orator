@@ -2874,3 +2874,39 @@ gates remain open 2026-07-19
   `53.22 s`. Post-build A1/A2/B1/B2 and disabled A/B replays reproduce the
   already reviewed hashes byte for byte. These are engineering checks only; no
   new audio run is claimed.
+- [x] T216 Commit and push the retained FR49 implementation as an explicitly
+  transitional experiment, then update and push the SDD authorization for its
+  real-path ladder before streaming new audio. Bind all later captures to that
+  exact clean revision and checked-in `orator.toml`; preserve the existing
+  business storage and use no behavioral environment or command-line override.
+  The implementation is pushed on `master` as `498d7ae`.
+- [ ] T217 From the T216 clean revision, execute two independent 120-second
+  production WebSocket runs at `1.0x` with 100 ms frames, direct `end`, early
+  and late observers, required telemetry, complete manifests, and a fresh empty
+  isolated registry/storage tree for each run. Archive each storage tree and
+  restore the pre-existing business storage after capture. Automation may
+  validate only transport, JSON, provenance, common-clock, terminal, observer,
+  telemetry, artifact-identity, and raw repeatability contracts.
+- [ ] T218 Read every in-scope `test.txt` contribution for each T217 artifact
+  completely in chronological order and again in reverse fixed windows.
+  Manually retain or reject FR49 separately for each run, explicitly checking
+  the `ref-0061` and `ref-0121` repairs plus all neighboring controls. Stop the
+  ladder on any contextual speaker regression. No code, script, query,
+  formula, metric, hash, or equality check may label, count, compare, rank, or
+  issue the product decision.
+- [ ] T219 Only if both T218 reviews retain FR49, execute one isolated clean
+  600-second production WebSocket run under the same exact revision, TOML,
+  direct-end, observer, telemetry, provenance, and common-clock contracts.
+  Read every in-scope contribution chronologically and in reverse before
+  manually deciding whether full A/B is authorized.
+- [ ] T220 Only if T219 passes, execute full Run A from an empty registry and
+  restarted full Run B using only Run A's frozen registry. Require exact
+  3615.120-second input, isolated storage, direct `end`, observers, telemetry,
+  and complete manifests. Independently read all 556 `test.txt` contributions
+  chronologically and in reverse fixed windows for each artifact before
+  deriving any speaker-business ledger or real-path status.
+- [ ] T221 Record the stopped or completed FR49 ladder in a dedicated review,
+  restore the preserved business storage, verify no validation process remains,
+  synchronize `PROJECT_STATE.md`, and commit/push the resulting evidence. Keep
+  critical-attribution, confident-wrong, speaker-time, holdout, report, release,
+  ASR, microphone, and Web UI gates explicitly separate.

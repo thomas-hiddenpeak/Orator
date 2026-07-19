@@ -4153,6 +4153,31 @@ source. The default in typed C++ configuration is `false`; the checked-in TOML
 is the sole production opt-in. See
 `fr49-source-leading-primary-prefix-diagnosis-2026-07-19.md`.
 
+FR49 now enters the same staged real-path discipline on the pushed
+transitional implementation. First, commit and push this promotion
+authorization so every capture identifies one clean source revision. Preserve
+the existing `/tmp/orator/storage` tree outside the validation workspace. For
+each 120-second run, create a fresh empty path at the exact checked-in TOML
+location, start a new production server process with no behavioral environment
+or command-line override, stream the first 120 seconds of `test.mp3` at `1.0x`
+in 100 ms frames through `ws_unified_test.py`, send direct `end`, and archive
+the resulting isolated storage beside the capture and manifest. Stop every
+server and device probe before starting the next run.
+
+Mechanical review checks only parseability, exact input/provenance identity,
+all seven terminal extents, common-clock reconciliation, producer/observer
+convergence, direct-end latency, telemetry coverage/cadence, and raw repeated
+scope. The reviewer then reads every in-scope `test.txt` contribution in full
+conversation order and again in reverse fixed windows for each artifact. A
+hash or normalized equality cannot authorize the next stage. If both 120-
+second contextual reviews retain FR49, repeat the process once for 600 seconds
+and review every in-scope contribution in both directions. Only that manual
+gate authorizes full Run A from an empty registry and restarted full Run B from
+Run A's frozen registry. Each full result receives its own two complete 556-
+contribution readings. Restore the preserved business storage when the ladder
+stops or completes, and record all evidence in an FR49 real-path promotion
+review without converting any mechanical observation into a product verdict.
+
 The first frozen candidate replay is an implementation gate, not an accepted
 result. Its mechanical changed-scope display exposes a third write at
 `2177.260-2177.500`. Complete context against `test.txt` shows that 唐云峰 owns
