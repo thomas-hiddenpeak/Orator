@@ -14,7 +14,7 @@ work is specified under [specs/](.).
 > pass is the consistency proof. Status lines advance to `Implemented` in the
 > same change that lands the code, with the commit reference.
 
-- **Last updated**: 2026-07-19 (FR33 frozen candidate retained; closure open)
+- **Last updated**: 2026-07-19 (FR34 frozen candidate retained; closure open)
 - **Branch**: `master`
 - **Constitution**: v1.7.0
 - **Speaker-business closure**: **BEST FROZEN FULL AVERAGE ABOVE FLOOR;
@@ -163,6 +163,24 @@ work is specified under [specs/](.).
   `013-industrial-closing-validation/partition-invariant-cross-scale-abstention-diagnosis-2026-07-19.md`
   and
   `013-industrial-closing-validation/partition-invariant-cross-scale-abstention-review-2026-07-19.md`.
+  T146-T148 then isolate a separate exact phrase/unique-VAD conflict at
+  `ref-0406`. FR34 requires one regular coarse interval to select current
+  identity A in both galleries, the exact phrase and its unique containing VAD
+  to select B in all four views, activity B to cover the phrase, and one
+  covering activity/primary identity C distinct from A and B. The rule writes
+  only the exact phrase and uses no new threshold or TOML value. Repeated T123
+  replays are byte-identical and split only `text_id=236`; repeated T111
+  replays remain byte-identical to FR33. Complete chronological and reverse
+  reading of `44:28-46:57` retains Tang Yunfeng's substantive ten-working-day
+  answer while recording the preceding `对，` as a `0.160 s` boundary
+  residual. The warning-clean build and all 69 CTest entries pass. The manually
+  reconciled frozen candidate is `508/556`; no real-WebSocket result is
+  attributed to FR34. The 2400-3000 and 3000-3600 fixed blocks, Zhu Jie recall,
+  speaker-time sign-off, critical attribution, and confident-wrong attribution
+  still fail; see
+  `013-industrial-closing-validation/exact-phrase-vad-direct-conflict-diagnosis-2026-07-19.md`
+  and
+  `013-industrial-closing-validation/exact-phrase-vad-direct-conflict-review-2026-07-19.md`.
 - **Result-evaluation rule**: product accuracy and candidate decisions may be
   produced only by complete item-by-item contextual semantic review. No code,
   test, script, notebook, formula, query, automated metric, or algorithm may

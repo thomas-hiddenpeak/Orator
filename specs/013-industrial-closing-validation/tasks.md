@@ -2101,8 +2101,37 @@ T102/T084 remain open 2026-07-19
   build emits no warning/error line and all `69/69` CTest entries pass; these
   are engineering checks only. The checkpoint explicitly leaves speaker
   closing open and attributes no new real-WebSocket result to FR33.
-- [ ] T146 Specify FR34 independently on frozen evidence for the exact phrase/
-  unique VAD versus coarse-direct topology exposed at `ref-0406`. Add no fitted
-  value or source-specific input, and do not start another real-audio promotion
-  ladder until the frozen upper-bound candidates have completed contextual
-  review.
+- [x] T146 Specify FR34 independently on frozen evidence for the exact phrase/
+  unique VAD versus coarse-direct topology exposed at `ref-0406`. The current
+  typed package contains one regular coarse interval whose two galleries write
+  Zhu Jie, one exact short phrase and one unique containing VAD whose four
+  gallery views select Tang Yunfeng, complete Tang activity coverage, and one
+  complete Xu Zijing activity/primary conflict. FR34 requires these three
+  identities to remain pairwise different, reuses only existing TOML gates,
+  writes only the exact phrase, and does not inherit the archived FR16AAG
+  verdict. See
+  `exact-phrase-vad-direct-conflict-diagnosis-2026-07-19.md`.
+- [x] T147 Implement FR34 in the final speaker-fusion policy with focused
+  positive and abstention tests for current-label provenance, business/VAD
+  uniqueness, every gallery gate and identity agreement, alignment, candidate
+  and primary activity coverage, primary uniqueness, and extra identities.
+  Pass a warning-clean build and all CTest entries. Replay frozen T111 and T123
+  at least twice, verify only mechanical contracts, and arrange all changed
+  complete contexts without assigning correctness or a product verdict. The
+  clean build emits no warning/error line and `69/69` CTest entries pass.
+  Repeated T123 outputs are byte-identical at SHA-256
+  `11d30935c940f155fb4b2089134b03b7ce08edb659cb1ae924122e46eea3919b`
+  and split only `text_id=236`; repeated T111 outputs remain byte-identical to
+  FR33 at SHA-256
+  `646ea91b357cafaf8af82c4f45e5cc771c622a501e71b12f2d1aa1555fb055f2`.
+- [x] T148 Read every FR34 changed complete conversation chronologically and in
+  reverse against `test.txt`, then retain or remove the implementation. Only
+  this contextual semantic review may update the manually reconciled ledger.
+  If retained, synchronize the spec, plan, tasks, and `PROJECT_STATE.md`, then
+  commit and push a clearly labeled transitional experiment. Do not attribute
+  a new real-WebSocket result or closing claim to the frozen replay. Complete
+  forward and reverse reading of `44:28-46:57` retains the exact Tang Yunfeng
+  answer at `ref-0406`, records the preceding `对，` as a `0.160 s` boundary
+  residual, and finds no neighboring change. The manually reconciled frozen
+  ledger is `508/556`; every remaining conjunctive failure keeps closure open.
+  See `exact-phrase-vad-direct-conflict-review-2026-07-19.md`.

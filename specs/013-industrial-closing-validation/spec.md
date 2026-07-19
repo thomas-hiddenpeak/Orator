@@ -17,7 +17,8 @@ real-WebSocket promotion ladder; independent full Run A and Run B contextual
 reviews each record `506/556`, but two fixed blocks, 朱杰 recall, critical
 turns, and confident-wrong attribution fail; FR33 deterministic T111/T123
 replay and complete changed-context review retain a frozen `ref-0517` repair
-at `507/556`, with no new real-path claim; T102, T084, full
+at `507/556`; FR34 independently retains an exact `ref-0406` phrase repair on
+frozen evidence at `508/556`, with no new real-path claim; T102, T084, full
 canonical closure, release sign-off, and industrial readiness remain open
 **Created**: 2026-07-13
 **Scope**: Re-establish a truthful product baseline, recover full-session business
@@ -2212,6 +2213,34 @@ subject to the complete acceptance gates in this spec.
   deterministically, and every changed context MUST receive complete forward
   and reverse contextual semantic review against `test.txt` before retention
   or a new audio run.
+- **FR34**: A short punctuation phrase MAY replace one uniform coarse direct
+  identity A with one different identity B only when the complete typed
+  evidence proves an exact phrase/unique-VAD conflict rather than a broad
+  interval repaint. Every phrase character MUST currently carry the same
+  voiceprint-direct identity A. Exactly one containing same-text regular
+  `business_interval` MUST be embedding-backed and robust-complete, and its
+  session and robust galleries MUST both select A under the unchanged regular
+  score and margin gates. The phrase MUST be embedding-backed,
+  robust-complete, meet the existing aligned-unit minimum, and have session
+  and robust galleries that both select B under the unchanged short gates.
+  Exactly one containing typed VAD interval MUST be embedding-backed and
+  robust-complete, and both of its galleries MUST independently select B under
+  its unchanged duration-class gates. Activity for B MUST cover the complete
+  phrase. Exactly one primary segment carrying a third identity C MUST overlap
+  and cover the phrase completely; activity for C MUST also cover the phrase,
+  and no activity identity other than B or C may overlap it. A, B, and C MUST
+  be non-empty and pairwise different. Existing specialized challenges MUST
+  retain precedence, and the write MUST cover only the exact phrase source and
+  forced-alignment range. Missing or duplicate containment, mixed or protected
+  current labels, gallery abstention or disagreement, insufficient alignment,
+  incomplete native coverage, primary ambiguity, an additional activity
+  identity, or any source/time mismatch MUST preserve existing behavior. FR34
+  MUST add no TOML value, score, margin, duration, identity, transcript,
+  speaker name, timestamp, reference datum, or fitted constant and MUST alter
+  no producer evidence or common-clock coordinate. Frozen T111/T123 inputs
+  MUST replay deterministically, and every changed complete conversation MUST
+  receive chronological and reverse contextual semantic review against
+  `test.txt` before retention or a new audio run.
 
 The first FR31 implementation passed its focused engineering test and produced
 byte-stable repeated T111 and T123 replays. Complete forward and reverse review
@@ -2266,6 +2295,32 @@ fail, and no new real-path result is attributed to FR33. See
 `partition-invariant-cross-scale-abstention-diagnosis-2026-07-19.md`.
 See also
 `partition-invariant-cross-scale-abstention-review-2026-07-19.md`.
+
+The next frozen diagnosis isolates a different `ref-0406` topology. A broad
+same-text business interval directly writes Zhu Jie across three adjacent
+contributions, while the exact short phrase and its unique containing VAD both
+select Tang Yunfeng in both galleries under existing gates. Tang activity
+covers the exact phrase; the overlapping activity/primary arbitration selects
+Xu Zijing, so no native top-one view alone supplies the answer. FR34 therefore
+tests only the pairwise-distinct coarse-direct, exact-acoustic, and primary-
+conflict topology. It does not restore the archived FR16AAG experiment or
+claim its incomplete historical review. See
+`exact-phrase-vad-direct-conflict-diagnosis-2026-07-19.md`.
+
+Repeated FR34 T123 replays are byte-identical and split only the
+`text_id=236` direct interval: `才十个工作日，` moves to Tang Yunfeng while
+the preceding `对，`, Zhu Jie's question, and Zhu Jie's following continuation
+remain unchanged. T111 remains byte-identical to FR33. Complete reading of the
+changed `44:28-46:57` conversation chronologically and in reverse retains the
+exact phrase repair. The remaining `2744.940-2745.100` `对，` attribution is
+recorded as a `0.160 s` source-time boundary residual; it does not erase the
+contextually complete ten-working-day answer, and it is not hidden from the
+still-open speaker-time gate. The warning-clean build and all 69 CTest entries
+pass as engineering evidence. The manually reconciled frozen candidate is
+`508/556`; both late fixed blocks, Zhu Jie recall, critical attribution,
+confident-wrong attribution, and speaker-time sign-off still fail. No new
+real-WebSocket result or closure claim is attributed to FR34. See
+`exact-phrase-vad-direct-conflict-review-2026-07-19.md`.
 
 ## 5. Acceptance Gates
 

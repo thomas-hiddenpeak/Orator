@@ -3302,6 +3302,42 @@ candidate remains frozen and separately specified; no audio rerun follows
 from this result. See
 `partition-invariant-cross-scale-abstention-review-2026-07-19.md`.
 
+FR34 remains on the same frozen producer tracks and addresses a different
+evidence-precedence topology. The production projector first confirms that one
+unique containing regular business interval selected the current direct
+identity A in both galleries. For the later exact short phrase, both phrase
+galleries and both galleries of one unique containing VAD must select a
+different identity B under the unchanged duration-class gates. Activity B must
+cover the complete phrase. One and only one overlapping primary segment must
+cover the same phrase with a third identity C, activity C must also cover it,
+and no fourth or current-identity activity may overlap. This makes primary a
+typed conflict boundary rather than speaker authority and prevents the broad
+interval, exact phrase, and native overlap views from being treated as votes.
+Only the exact phrase source/alignment range may change; all existing
+specialized challenges run first.
+
+Focused positive and abstention tests cover every identity, containment,
+gallery, alignment, activity, primary, and provenance condition. The
+production C++ projector is then replayed twice over frozen T123 and T111.
+Automation verifies only hashes, immutable inputs, source reconstruction, time
+order, and displayed change scope. Every changed complete conversation is read
+chronologically and in reverse against `test.txt`; only that review may retain
+or reject FR34. The historical FR16AAG files are diagnostic background only
+because their full two-pass review was never completed. No audio is rerun until
+the current frozen candidate passes this independent gate. See
+`exact-phrase-vad-direct-conflict-diagnosis-2026-07-19.md`.
+
+The independent frozen gate retains FR34. T123 Run A and Run B have the same
+SHA-256 and differ from FR33 only by the exact `text_id=236` split. T111 is
+byte-identical to FR33. The reviewer reads the entire displayed `44:28-46:57`
+conversation forward and reverse, confirms the Zhu question, Tang substantive
+answer, and Zhu continuation, and records the preceding `对，` as a bounded
+`0.160 s` residual rather than extending the rule beyond typed phrase evidence.
+The frozen ledger advances by one reviewed Tang contribution to `508/556`.
+Both late fixed blocks and the other conjunctive closing gates remain open, so
+FR34 is a transitional frozen repair and not a real-stream acceptance result.
+See `exact-phrase-vad-direct-conflict-review-2026-07-19.md`.
+
 ### 8.15 FR28 120-second outcome and promotion ladder
 
 T117-T121 are complete. The frozen T116 packages replay byte-stably; their

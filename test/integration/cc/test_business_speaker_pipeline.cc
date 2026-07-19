@@ -1355,6 +1355,318 @@ int main() {
           "insufficient alignment keeps ordinary session behavior");
   }
 
+  // ---- 18c3. FR34 lets an exact phrase and unique containing VAD supersede
+  // a coarse direct write only under the bounded three-identity topology. ----
+  {
+    using Entry = ComprehensiveTimeline::Entry;
+    struct Options {
+      bool include_interval = true;
+      bool duplicate_interval = false;
+      bool interval_contains = true;
+      bool interval_embedding = true;
+      bool interval_robust_complete = true;
+      bool interval_session_eligible = true;
+      bool interval_robust_current = true;
+      bool phrase_robust_complete = true;
+      bool phrase_margin_passes = true;
+      bool phrase_robust_candidate = true;
+      bool include_vad = true;
+      int containing_vad_count = 1;
+      bool vad_robust_complete = true;
+      bool vad_session_eligible = true;
+      bool vad_robust_candidate = true;
+      bool enough_aligned_units = true;
+      bool candidate_activity_covers = true;
+      bool primary_activity_covers = true;
+      bool extra_activity = false;
+      bool include_primary = true;
+      int overlapping_primary_count = 1;
+      std::string primary_identity = "spk_c";
+      bool protected_current_label = false;
+    };
+    auto run_case = [](const Options& options) -> std::vector<Entry> {
+      BusinessSpeakerPipeline::Config config;
+      config.voiceprint_fusion_enabled = true;
+      config.speaker_overlap_tie_policy =
+          BusinessSpeakerPipeline::SpeakerOverlapTiePolicy::kHigherConfidence;
+      TestBusinessSpeakerPipeline tl(config);
+      tl.UpsertText(0, 0.0, 2.4, "前甲乙。后");
+
+      std::vector<TestBusinessSpeakerPipeline::SpeakerInput> activity = {
+          {0.6, options.candidate_activity_covers ? 1.6 : 1.2, "slot_b",
+           0.95f, "spk_b"},
+          {0.6, options.primary_activity_covers ? 1.6 : 1.2, "slot_c",
+           0.80f, "spk_c"}};
+      if (options.extra_activity) {
+        activity.push_back({0.8, 1.3, "slot_d", 0.70f, "spk_d"});
+      }
+      tl.ReplaceSpeakers(activity);
+
+      std::vector<TestBusinessSpeakerPipeline::SpeakerInput> primary;
+      if (options.include_primary) {
+        for (int index = 0; index < options.overlapping_primary_count;
+             ++index) {
+          primary.push_back({0.6 + index * 0.02, 1.6 - index * 0.02,
+                             index == 0 ? "slot_c" : "slot_d", 0.90f,
+                             index == 0 ? options.primary_identity : "spk_d"});
+        }
+      }
+      tl.ReplacePrimarySpeakers(primary);
+
+      tl.UpsertAlign(
+          0, 0.0, 2.4,
+          options.enough_aligned_units
+              ? std::vector<TestBusinessSpeakerPipeline::AlignUnitSeg>{
+                    {0.2, 0.4, "前"}, {0.7, 0.9, "甲"},
+                    {0.9, 1.1, "乙"}, {1.1, 1.5, "。"},
+                    {1.8, 2.0, "后"}}
+              : std::vector<TestBusinessSpeakerPipeline::AlignUnitSeg>{
+                    {0.2, 0.4, "前"}, {0.7, 1.5, "甲乙。"},
+                    {1.8, 2.0, "后"}});
+
+      std::vector<ComprehensiveTimeline::SpeakerVoiceprintEvidence> evidence;
+      if (options.include_interval) {
+        ComprehensiveTimeline::SpeakerVoiceprintEvidence interval;
+        interval.evidence_id = "business_interval:0:0";
+        interval.kind = "business_interval";
+        interval.text_id = 0;
+        interval.source_start = 0;
+        interval.source_end = 5;
+        interval.start = 0.2;
+        interval.end = options.interval_contains ? 2.0 : 1.0;
+        interval.embedding_available = options.interval_embedding;
+        interval.robust_gallery_complete = options.interval_robust_complete;
+        interval.session_scores = options.interval_session_eligible
+                                      ? std::vector<ComprehensiveTimeline::VoiceprintScore>{
+                                            {"spk_a", 0.70f},
+                                            {"spk_b", 0.60f},
+                                            {"spk_c", 0.20f}}
+                                      : std::vector<ComprehensiveTimeline::VoiceprintScore>{
+                                            {"spk_a", 0.54f},
+                                            {"spk_b", 0.45f},
+                                            {"spk_c", 0.20f}};
+        interval.robust_scores = options.interval_robust_current
+                                     ? std::vector<ComprehensiveTimeline::VoiceprintScore>{
+                                           {"spk_a", 0.68f},
+                                           {"spk_b", 0.58f},
+                                           {"spk_c", 0.20f}}
+                                     : std::vector<ComprehensiveTimeline::VoiceprintScore>{
+                                           {"spk_b", 0.68f},
+                                           {"spk_a", 0.58f},
+                                           {"spk_c", 0.20f}};
+        evidence.push_back(interval);
+        if (options.duplicate_interval) {
+          interval.evidence_id = "business_interval:0:duplicate";
+          evidence.push_back(interval);
+        }
+      }
+
+      if (options.protected_current_label) {
+        ComprehensiveTimeline::SpeakerVoiceprintEvidence unit;
+        unit.evidence_id = "aligned_unit:0:protected";
+        unit.kind = "aligned_unit";
+        unit.text_id = 0;
+        unit.source_start = 2;
+        unit.source_end = 3;
+        unit.start = 0.9;
+        unit.end = 1.1;
+        unit.embedding_available = true;
+        unit.robust_gallery_complete = true;
+        unit.session_scores = {{"spk_d", 0.75f}, {"spk_a", 0.40f}};
+        unit.robust_scores = {{"spk_d", 0.72f}, {"spk_a", 0.39f}};
+        evidence.push_back(unit);
+      }
+
+      ComprehensiveTimeline::SpeakerVoiceprintEvidence phrase;
+      phrase.evidence_id = "punctuation_phrase:0:0";
+      phrase.kind = "punctuation_phrase";
+      phrase.text_id = 0;
+      phrase.source_start = 1;
+      phrase.source_end = 4;
+      phrase.start = 0.7;
+      phrase.end = 1.5;
+      phrase.embedding_available = true;
+      phrase.robust_gallery_complete = options.phrase_robust_complete;
+      phrase.session_scores = options.phrase_margin_passes
+                                  ? std::vector<ComprehensiveTimeline::VoiceprintScore>{
+                                        {"spk_b", 0.50f},
+                                        {"spk_a", 0.35f},
+                                        {"spk_c", 0.20f}}
+                                  : std::vector<ComprehensiveTimeline::VoiceprintScore>{
+                                        {"spk_b", 0.38f},
+                                        {"spk_a", 0.36f},
+                                        {"spk_c", 0.20f}};
+      phrase.robust_scores = options.phrase_robust_candidate
+                                 ? std::vector<ComprehensiveTimeline::VoiceprintScore>{
+                                       {"spk_b", 0.48f},
+                                       {"spk_a", 0.34f},
+                                       {"spk_c", 0.20f}}
+                                 : std::vector<ComprehensiveTimeline::VoiceprintScore>{
+                                       {"spk_c", 0.48f},
+                                       {"spk_b", 0.34f},
+                                       {"spk_a", 0.20f}};
+      evidence.push_back(phrase);
+
+      if (options.include_vad) {
+        for (int index = 0; index < options.containing_vad_count; ++index) {
+          ComprehensiveTimeline::SpeakerVoiceprintEvidence vad;
+          vad.evidence_id = "vad:" + std::to_string(index);
+          vad.kind = "vad";
+          vad.text_id = -1;
+          vad.start = 0.4 - index * 0.02;
+          vad.end = 1.9 + index * 0.02;
+          vad.embedding_available = true;
+          vad.robust_gallery_complete = options.vad_robust_complete;
+          vad.session_scores = options.vad_session_eligible
+                                   ? std::vector<ComprehensiveTimeline::VoiceprintScore>{
+                                         {"spk_b", 0.70f},
+                                         {"spk_c", 0.60f},
+                                         {"spk_a", 0.20f}}
+                                   : std::vector<ComprehensiveTimeline::VoiceprintScore>{
+                                         {"spk_b", 0.54f},
+                                         {"spk_c", 0.48f},
+                                         {"spk_a", 0.20f}};
+          vad.robust_scores = options.vad_robust_candidate
+                                  ? std::vector<ComprehensiveTimeline::VoiceprintScore>{
+                                        {"spk_b", 0.68f},
+                                        {"spk_c", 0.57f},
+                                        {"spk_a", 0.20f}}
+                                  : std::vector<ComprehensiveTimeline::VoiceprintScore>{
+                                        {"spk_c", 0.68f},
+                                        {"spk_b", 0.57f},
+                                        {"spk_a", 0.20f}};
+          evidence.push_back(vad);
+        }
+      }
+      tl.ReplaceVoiceprint(evidence);
+      return tl.Snapshot();
+    };
+    const std::string reason =
+        "voiceprint_phrase_vad_dual_gallery_direct_override";
+    auto has_exact_override = [&](const std::vector<Entry>& entries) {
+      std::string reconstructed;
+      int override_count = 0;
+      bool exact = false;
+      bool outside_preserved = true;
+      for (const auto& entry : entries) {
+        reconstructed += entry.text;
+        if (entry.speaker_decision.reason == reason) {
+          ++override_count;
+          exact = entry.text == "甲乙。" && entry.speaker_id == "spk_b" &&
+                  entry.speaker_decision.speaker_source ==
+                      "sortformer_activity+titanet_phrase+vad_session+"
+                      "robust_gallery+forced_alignment";
+        } else if (entry.text.find("前") != std::string::npos ||
+                   entry.text.find("后") != std::string::npos) {
+          outside_preserved = outside_preserved &&
+                              entry.speaker_id == "spk_a";
+        }
+      }
+      return reconstructed == "前甲乙。后" && override_count == 1 && exact &&
+             outside_preserved;
+    };
+    auto abstains = [&](const Options& options) {
+      const auto entries = run_case(options);
+      return std::none_of(entries.begin(), entries.end(), [&](const auto& entry) {
+        return entry.speaker_decision.reason == reason;
+      });
+    };
+
+    CHECK(has_exact_override(run_case({})),
+          "exact phrase and unique VAD override only the coarse direct range");
+
+    Options missing_interval;
+    missing_interval.include_interval = false;
+    CHECK(abstains(missing_interval), "missing coarse interval blocks FR34");
+    Options duplicate_interval;
+    duplicate_interval.duplicate_interval = true;
+    CHECK(abstains(duplicate_interval), "duplicate coarse intervals block FR34");
+    Options noncontaining_interval;
+    noncontaining_interval.interval_contains = false;
+    CHECK(abstains(noncontaining_interval),
+          "noncontaining coarse interval blocks FR34");
+    Options missing_interval_embedding;
+    missing_interval_embedding.interval_embedding = false;
+    CHECK(abstains(missing_interval_embedding),
+          "missing coarse embedding blocks FR34");
+    Options incomplete_interval_gallery;
+    incomplete_interval_gallery.interval_robust_complete = false;
+    CHECK(abstains(incomplete_interval_gallery),
+          "incomplete coarse robust gallery blocks FR34");
+    Options weak_interval;
+    weak_interval.interval_session_eligible = false;
+    CHECK(abstains(weak_interval), "coarse score abstention blocks FR34");
+    Options disagreeing_interval;
+    disagreeing_interval.interval_robust_current = false;
+    CHECK(abstains(disagreeing_interval),
+          "coarse gallery disagreement blocks FR34");
+
+    Options incomplete_phrase_gallery;
+    incomplete_phrase_gallery.phrase_robust_complete = false;
+    CHECK(abstains(incomplete_phrase_gallery),
+          "incomplete phrase robust gallery blocks FR34");
+    Options weak_phrase;
+    weak_phrase.phrase_margin_passes = false;
+    CHECK(abstains(weak_phrase), "phrase margin abstention blocks FR34");
+    Options disagreeing_phrase;
+    disagreeing_phrase.phrase_robust_candidate = false;
+    CHECK(abstains(disagreeing_phrase),
+          "phrase gallery disagreement blocks FR34");
+
+    Options missing_vad;
+    missing_vad.include_vad = false;
+    CHECK(abstains(missing_vad), "missing containing VAD blocks FR34");
+    Options duplicate_vad;
+    duplicate_vad.containing_vad_count = 2;
+    CHECK(abstains(duplicate_vad), "duplicate containing VAD blocks FR34");
+    Options incomplete_vad_gallery;
+    incomplete_vad_gallery.vad_robust_complete = false;
+    CHECK(abstains(incomplete_vad_gallery),
+          "incomplete VAD robust gallery blocks FR34");
+    Options weak_vad;
+    weak_vad.vad_session_eligible = false;
+    CHECK(abstains(weak_vad), "VAD score abstention blocks FR34");
+    Options disagreeing_vad;
+    disagreeing_vad.vad_robust_candidate = false;
+    CHECK(abstains(disagreeing_vad),
+          "VAD gallery disagreement blocks FR34");
+
+    Options insufficient_alignment;
+    insufficient_alignment.enough_aligned_units = false;
+    CHECK(abstains(insufficient_alignment),
+          "insufficient phrase alignment blocks FR34");
+    Options candidate_gap;
+    candidate_gap.candidate_activity_covers = false;
+    CHECK(abstains(candidate_gap),
+          "incomplete candidate activity coverage blocks FR34");
+    Options primary_activity_gap;
+    primary_activity_gap.primary_activity_covers = false;
+    CHECK(abstains(primary_activity_gap),
+          "incomplete primary-identity activity blocks FR34");
+    Options extra_activity;
+    extra_activity.extra_activity = true;
+    CHECK(abstains(extra_activity), "a fourth activity identity blocks FR34");
+    Options missing_primary;
+    missing_primary.include_primary = false;
+    CHECK(abstains(missing_primary), "missing primary conflict blocks FR34");
+    Options duplicate_primary;
+    duplicate_primary.overlapping_primary_count = 2;
+    CHECK(abstains(duplicate_primary),
+          "multiple overlapping primary segments block FR34");
+    Options candidate_primary;
+    candidate_primary.primary_identity = "spk_b";
+    CHECK(abstains(candidate_primary),
+          "candidate primary identity blocks the three-way conflict");
+    Options current_primary;
+    current_primary.primary_identity = "spk_a";
+    CHECK(abstains(current_primary),
+          "coarse current primary identity blocks the three-way conflict");
+    Options protected_current;
+    protected_current.protected_current_label = true;
+    CHECK(abstains(protected_current),
+          "a protected current subrange blocks the exact phrase override");
+  }
+
   // ---- 18d. FR16ABN recovers only a delayed subminimum clause group when
   // activity, primary, and a typed VAD gap expose one intervening identity.
   // ----
