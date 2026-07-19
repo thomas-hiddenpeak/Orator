@@ -14,10 +14,11 @@ work is specified under [specs/](.).
 > pass is the consistency proof. Status lines advance to `Implemented` in the
 > same change that lands the code, with the commit reference.
 
-- **Last updated**: 2026-07-19 (FR47 full real-path A/B promoted; closure open)
+- **Last updated**: 2026-07-19 (FR48 speaker-only reconciliation complete;
+  single-context guard stopped; closure open)
 - **Branch**: `master`
 - **Constitution**: v1.7.0
-- **Speaker-business closure**: **BEST REAL-PATH NATURAL-TURN LEDGER `521/556`;
+- **Speaker-business closure**: **BEST REAL-PATH NATURAL-TURN LEDGER `522/556`;
   CRITICAL GATES FAIL; FULL CANONICAL CLOSURE OPEN**.
   Transitional experimental commit `6b1cb79fa4f5` completed
   warning-clean build, `68/68` CTest, 120-second, 600-second, and full-length
@@ -391,19 +392,26 @@ work is specified under [specs/](.).
   cross-source candidate, and retains the source-bounded retry. The final build
   is warning-clean, all `70/70` CTest entries pass, and repeated frozen output
   is byte-identical. Complete chronological and reverse review of all 556
-  `test.txt` contributions retains only `ref-0507` and `ref-0509`, moving the
-  manually signed frozen ledger to `521/556`. Thirty-five residuals remain,
-  including 21 critical failures. Clean commit `70f1186` subsequently completes
+  `test.txt` contributions retains only `ref-0507` and `ref-0509`. Its ledger
+  was initially transcribed as `521/556`. Clean commit `70f1186` subsequently completes
   the restarted 120/600/full A/B real-WebSocket ladder. Both full artifacts
-  receive separate complete chronological and reverse contextual review and
-  retain the same manual `521/556` ledger without an accumulating identity
-  drift. Time-based evidence, holdout, report, and release gates remain open.
+  receive separate complete chronological and reverse contextual review.
+  FR48 repeats all four full readings under the speaker-only boundary and
+  corrects only `ref-0375`: its ASR wording is wrong, while `spk_2` already
+  identifies 徐子景. The current manual ledger is `522/556`, with 28 confident-
+  wrong, five missing, one uncertain, and 20 critical residuals. Review of all
+  24 direct-short/native conflicts finds only `ref-0099` with the complete
+  proposed hierarchical-consensus topology, so the single-context guard stops
+  without runtime or TOML implementation. Time-based evidence, holdout, report,
+  and release gates remain open.
   See
   `013-industrial-closing-validation/sortformer-v21-posterior-future-epoch-candidate-review-2026-07-19.md`
   and
   `013-industrial-closing-validation/post-fr47-residual-reconciliation-2026-07-19.md`
   and
   `013-industrial-closing-validation/fr47-real-path-promotion-review-2026-07-19.md`.
+  See also
+  `013-industrial-closing-validation/fr48-speaker-only-reconciliation-and-consensus-diagnosis-2026-07-19.md`.
 - **Result-evaluation rule**: product accuracy and candidate decisions may be
   produced only by complete item-by-item contextual semantic review. No code,
   test, script, notebook, formula, query, automated metric, or algorithm may
@@ -770,14 +778,14 @@ finds no FR28 natural-turn speaker regression. FR28 is retained for the
 | WebSocket server (libwebsockets v4.3.3) | ✅ Refactored | Replaced hand-rolled POSIX WS with libwebsockets (multi-client, RFC 6455/7692). One connection owns audio production while browser and diagnostic observers receive the same broadcast stream without resetting it; concurrent producer bytes are rejected. Eliminated file-scope static variables (`serve_server`, `serve_factory`, `pss_list_head`) → instance members via `lws_context_user`. Thread-safe `SendText` with wakeup/cancel-service. ServeOnce mode for unit tests. |
 | ASR + WS integration | FR28 120-second stability gate passed; full acceptance open | `AuditoryStream` owns one private `PipelineAudioCache` per active producer and uses separate worker threads. One session-owned `TimeBase` is injected into all active stores and workers. Final ASR live emission and its typed sink reuse one `text_id`; partial rejection emits a matching retract, and the terminal ASR track serializes the ID. ASR now buffers undecided audio, reads typed stable VAD frontiers from `ComprehensiveTimeline`, applies TOML lead/chunk settings, and drains only after final VAD is frozen; forced alignment consumes the resulting finalized ASR records. Focused publication-order tests and two independent 120-second real-WebSocket runs produce identical canonical product tracks. Full repeatability and contextual accuracy remain open. |
 | Incremental KV-cache ASR streaming (Spec 003) | ✅ Implemented, verified, committed (8cc31ab); params refined 2026-07-03 | Persistent KV cache + prefix caching + chunk-local windowed encoder; partial-emission every 1 s via WebSocket. Full 1hr CER 16.1% / 6.22x; beats production Silero-VAD at every scale. **Current params**: `kStreamWindowMel=100` (1 s), `max_new_tokens=32`, `unfixed_chunks=2`, `unfixed_tokens=15`, `segment_sec=24.0`, `vad_min_overlap_sec=0.12`. 2026-07-03 real WS `test.mp3` 600 s A/B after the VAD-overlap filter: `segment_sec=24` produced 49 ASR finals vs 67 at 12 s, with the same final comprehensive count (115) and better `To C` wording; default restored to 24 s for ASR semantic stability. |
-| Revisable comprehensive timeline (Spec 004) | FR47 is the current repeatable full real-path speaker candidate; closure open | `ComprehensiveTimeline` stores typed diarization, raw diar frame posterior, primary speaker, ASR, VAD, alignment, voiceprint, and business tracks and publishes immutable snapshots/typed updates. Its VAD snapshot includes observed, active, and confirmed-silence frontiers used by scheduling-invariant ASR gating. `BusinessSpeakerPipeline` consumes typed `SpeakerEvidenceStage` output and owns orchestration/publication; the internal `SpeakerFusionPolicy` owns rule execution. T135's uniform complete-context reconciliation records T111 at `514/556`, FR29/T123 at `505/556`, and FR30/T133 at `497/556`. FR31's broad primary-return guard is rejected. FR32 repairs `ref-0154`; FR33-FR45 add thirteen separately diagnosed frozen repairs, FR46 stops as evidence-only, and source-bounded FR47 adds `ref-0507` and `ref-0509`. Clean commit `70f1186` completes the restarted 120/600/full A/B real-WebSocket ladder. Separate complete forward/reverse contextual review of each full artifact manually retains `521/556`; all seven fixed-window and four per-speaker natural-turn floors pass without a whole-session permutation or late accumulating drift. Twenty-one critical failures and 29 confident-wrong contributions remain. Checked-in VAD threshold is `0.5`. Speaker-time, ASR, locked holdout, report, and release gates remain open. |
+| Revisable comprehensive timeline (Spec 004) | FR47 is the current repeatable full real-path speaker candidate; closure open | `ComprehensiveTimeline` stores typed diarization, raw diar frame posterior, primary speaker, ASR, VAD, alignment, voiceprint, and business tracks and publishes immutable snapshots/typed updates. Its VAD snapshot includes observed, active, and confirmed-silence frontiers used by scheduling-invariant ASR gating. `BusinessSpeakerPipeline` consumes typed `SpeakerEvidenceStage` output and owns orchestration/publication; the internal `SpeakerFusionPolicy` owns rule execution. T135's uniform complete-context reconciliation records T111 at `514/556`, FR29/T123 at `505/556`, and FR30/T133 at `497/556`. FR31's broad primary-return guard is rejected. FR32 repairs `ref-0154`; FR33-FR45 add thirteen separately diagnosed frozen repairs, FR46 stops as evidence-only, and source-bounded FR47 adds `ref-0507` and `ref-0509`. Clean commit `70f1186` completes the restarted 120/600/full A/B real-WebSocket ladder. FR48's fresh complete forward/reverse speaker-only review of each full artifact corrects only the ASR-only `ref-0375` row and manually records `522/556`; all seven fixed-window and four per-speaker natural-turn floors pass without a whole-session permutation or late accumulating drift. Twenty critical failures and 28 confident-wrong contributions remain. The proposed hierarchical-consensus guard stops as a single-context fit and changes no runtime or TOML behavior. Checked-in VAD threshold is `0.5`. Speaker-time, ASR, locked holdout, report, and release gates remain open. |
 | Reusable common time base (Spec 004) | Full-session A/B mechanical gate passed; product acceptance open | `AuditoryStream` owns one immutable `TimeBase` and injects it into every active private cache, worker, and retained audio store. Finalization reconciles exact sample extents for input, diarization, speaker identity, ASR, VAD, alignment, and business speaker. FR47 full Run A and restarted Run B both close all seven tracks at exactly 57,841,920 samples with zero declared extent gap and true reconciliation flags. This is a mechanical contract result; product closure remains open under Spec 013. |
 | Pipeline protocol layer (Spec 004) | ✅ Implemented | Phases 7–12 complete: data types (topic.h, schema.h), pipeline registry, topic router, storage layer (MEMORY + DISK), ProtocolTimeline integration, WS v2 envelope with describe command, --storage-disk-path flag. 25/25 tests pass. |
 | Streaming validation | Current FR47 full direct-end A/B path passed mechanically | `ws_unified_test.py` has one socket reader, captures source/config/binary pre/post hashes, continuous `tegrastats`, runtime telemetry, and independent terminal-command timing. Acceptance mode sends `end` directly after the final audio frame; explicit `--test-flush` runs record `flush -> end` but are marked ineligible for the 30-second gate. Clean commit `70f1186` passes the restarted 120/600/full A/B ladder. The two exact full streams close all seven tracks at 57,841,920 samples, converge producer/observer terminals, provide complete required telemetry, and finish direct-end at `17.559/17.392 s`. Structural checks never evaluate correctness or issue a product verdict; the separate complete contextual reviews are recorded under Spec 013. |
 | Logging system | ✅ Include-level `core/log.h` | Level-based macros (`LOG_DEBUG`/`INFO`/`WARN`/`ERROR`) with compile-time floor (`ORATOR_LOG_LEVEL`) and runtime env-var gate. All 14 `fprintf(stderr)` calls in src/ replaced. |
 | CUDA kernel unit tests | ✅ `test_kernels`: 13/13 passed | GPU kernel operations (Add, Multiply, NormalizeVector, CosineSimilarity, BatchCosineSimilarity) validated against CPU reference; includes edge cases (zero, single-element, large 1M vectors). |
 | CI pipeline | ✅ GitHub Actions | `.github/workflows/ci.yml`: CUDA 12.5, CMake build + ctest + warning check + Python syntax verification. Triggered on push/PR to master. |
-| Test suite | 70 configured CTest entries | The active Sortformer gates are bound to v2.1. Focused C++ tests cover typed speaker evidence, capture-ordered speaker-identity replay input, embedding-cache lifecycle, bounded precompute, final draining, accepted production fusion/abstention policy, and monotonic telemetry deadlines; active Python tests cover source/time/config invariants, immutable raw tracks, WebSocket manifests, telemetry, evidence integrity, replay inputs, and unjudged review packets. Thirty-three historical candidate tests are archived outside CTest. The current FR45 complete run passes 70/70. Browser and physical-microphone acceptance remain outside CTest. No automated result may assign correctness, aggregate accuracy, rank/select a candidate, or produce product acceptance. |
+| Test suite | 70 configured CTest entries | The active Sortformer gates are bound to v2.1. Focused C++ tests cover typed speaker evidence, capture-ordered speaker-identity replay input, embedding-cache lifecycle, bounded precompute, final draining, accepted production fusion/abstention policy, and monotonic telemetry deadlines; active Python tests cover source/time/config invariants, immutable raw tracks, WebSocket manifests, telemetry, evidence integrity, replay inputs, and unjudged review packets. Thirty-three historical candidate tests are archived outside CTest. The current FR48 exporter suite passes 3/3, the complete build emits no warning or error diagnostic, and all 70/70 CTest entries pass. Browser and physical-microphone acceptance remain outside CTest. No automated result may assign correctness, aggregate accuracy, rank/select a candidate, or produce product acceptance. |
 | Diar tail parameter experiments | ❌ No accepted fix | 2026-07-10 TOML experiments used `diar_evidence_probe` on full `test.mp3` for strict onset/offset, `min_dur_on=1.2`, `min_dur_on=2.0`, `chunk_left_context=2`, `chunk_right_context=0`, and `left2_right0`. Threshold/min-duration changes deleted evidence without recovering the correct speaker; context variants did not solve 3270-3304 s and some removed the small local-2 hint at 3299.76 s. NeMo full-length reference on the same audio produced the same hard-window spk3 bias (`3270-3304.5`: spk3 313/431 frames; `3240-3360`: spk3 1013/1500 frames). The historical v2 numerical gate passed at that time; its checkpoint and CTest have since been removed. See Spec 012 `diar-tail-toml-experiments-2026-07-10.md`. |
 | TitaNet tail voiceprint review | ❌ No accepted override | 2026-07-10 orthogonal speaker-embedding review used `speaker_embedding_probe` on full `test.mp3` with 600 s, 60 s, and 30 s buckets. The hard-window `L3@3270-3300` bucket remains closest to historical L3 (`L3@3300-3330=0.762`, historical L3 up to 0.724) while best non-L3 alternatives are lower (`L0=0.440`, `L1=0.424`, `L2=0.321`). This rejects direct TitaNet override for 3270-3304 s. See Spec 012 `titanet-tail-evidence-2026-07-10.md`. |
 | OnText protocol matching | ✅ Fixed | Substring `text.find("end")` → JSON key `text.find("\"end\"")` to prevent false positives on partial matches. Same for reset/flush. |
@@ -931,20 +939,21 @@ Findings:
 - [specs/011-observability/spec.md](011-observability/spec.md) — **Implemented** (2026-06-30): offline [rerun](https://rerun.io) visualization, kept entirely in `tools/` (no runtime third-party dep, Art. I). **Phase 1**: `tools/verify/py/ws_unified_test.py` captures the runtime's periodic `gpu_telemetry`/cursor WS samples into a `telemetry` array; `tools/observability/timeline_to_rerun.py` keys diarization/comprehensive lanes by the global `speaker_id` (`spk_N`) + per-pipeline RTF lanes. **Phase 2 (comprehensive dashboard)**: `TegraSampler` records a continuous `device_series`; the exporter renders six namespaced dimensions on one `audio_time` axis — `pipelines/*`, `comprehensive/<id>` swimlanes, `scheduler/<pipe>/{rtf,compute_sec,active,cuda_priority}`, `cursors/<pipe>/{position_sec,pending_sec}`, `device/{mem,cpu,gpu,temp,power}/*` (extended tegrastats parse; Orin `GR3D_FREQ` optional, omitted on Thor), and `session/summary` — laid out by a `rerun.blueprint` persisted in the `.rrd`. Methodology + best practices in `tools/observability/README.md`. **Config fix**: nested `[telemetry.cursor]` was never read (`config["telemetry.cursor"]` literal-key lookup) → now `config["telemetry"]["cursor"]`, with a `test_config` regression. Validated on a `rate=1` 120 s run: 125 gpu + 125 cursor + 126 device samples, six dimensions populated, stream_rt 0.964×, ctest 47/47, zero warnings. Follow-ups: live WS→rerun consumer, full-hour acceptance recording.
 - [specs/010-speaker-id/spec.md](010-speaker-id/spec.md) — **Implemented, with Phase H experiment not accepted as accuracy fix; local-diar operating profile restored**: speaker identity (TitaNet-Large voiceprint enrollment / re-identification as a post-diarization stage inside the diar pipeline, Art. III). **Phase A complete & committed**: A1 acquire+convert weights → `models/speaker/titanet_large.safetensors` (108 tensors); A2 NeMo oracle (`tools/reference/titanet_oracle.py`, isolated `tools/.venv-nemo`); A3 pure C++/CUDA `model::TitaNetEmbedder` (`include/model/titanet_embedder.h` + `src/model/titanet_embedder.cu`, time-major [T,C]: mel+per_feature → 5-block ContextNet encoder → attentive statistics pooling → 192-d, F32 weights); A4 `test_titanet` validated vs NeMo oracle (**span cosine 1.000000/0.999999/1.000000, cross-span matrix to 4 decimals; ctest 46/46, no warnings**). **Phase B complete & committed**: `pipeline::SpeakerIdentityStage` (clean-segment gate + per-local embed/match/enroll via `SpeakerDatabase` + revisable local→global map), wired into the diar pipeline behind a `DiarizationWorker` segment-processor hook + `[speaker]` config; diar message/track expose a backward-compatible `speaker_id` field. **2026-07-06 validation**: Phase H conservative cross-session candidate (`/tmp/orator_phaseh_full.json`) was rejected by context review [local-diar-review-2026-07-06.md](010-speaker-id/local-diar-review-2026-07-06.md): it reduced wrong late globals into local-only gaps but did not restore attribution. Follow-up restored Sortformer local-diar runtime tuning to the async/no-reset profile (`spkcache_update_period=188`, `chunk_right_context=1`, `spkcache_sil_frames=3`) in `orator.toml`; lower-level `SortformerConfig` defaults remain tied to the existing NeMo oracle fixture. Full-length real WS `/tmp/orator_full_async_default_20260706.json`: 3615 s audio, 3618.487 s wall, stream RT 0.999x, diar 773, ASR 288, VAD 972, 3611 tegrastats samples, stable 4 global ids and no local-only gaps; context review [local-diar-default-188-review-2026-07-06.md](010-speaker-id/local-diar-default-188-review-2026-07-06.md) accepts the stable operating profile but records residual rapid-turn fragmentation in 3000-3615 s and an ASR repeat burst at 1927-1944 s.
 - [specs/012-evidence-fusion-timeline/spec.md](012-evidence-fusion-timeline/spec.md) — **Runtime candidate validated (2026-07-08); tail evidence reviewed and support diagnostics added (2026-07-09)**: evidence-first comprehensive timeline fusion plus TOML-gated runtime adoption. `tools/verify/py/fusion_audit.py` and `speaker_business_review_packet.py` read frozen `ws_unified_test.py` JSON packages, audit ASR/diar/VAD/align consistency, and emit candidate/business-turn views without mutating captured tracks. After the 2026-07-07 context review showed forced alignment alone did not recover speaker-business accuracy, 2026-07-08 fixes added local-speaker drift/competing-identity split and backfill, per-entry comprehensive `speaker_id`, and `[timeline]` align-run split parameters. Full-length real WS run `/tmp/orator_timelinefusion_full_20260708.json`: 3615.0 s audio, 3618.74 s wall, stream RT 0.999x, diar 773, ASR 288, align 288/288. Fusion audit `/tmp/orator_timelinefusion_full_20260708_fusion_bt_timeline.json`: business_turns=728, unknown 171.860 s (4.75%), no mechanical audit issues. Complete contextual review [drift-epoch-review-2026-07-08.md](012-evidence-fusion-timeline/drift-epoch-review-2026-07-08.md) follows [speaker-business-method.md](012-evidence-fusion-timeline/speaker-business-method.md). Follow-up candidate decisions are historical context-review records. All code-derived percentages and evidence scores in Spec 012 are mechanical records only; they may not evaluate accuracy, rank/select a candidate, or issue a product verdict under Constitution 1.7.0.
-- [specs/013-industrial-closing-validation/spec.md](013-industrial-closing-validation/spec.md) - **FR47 completes the clean restarted 120/600/full A/B real-WebSocket ladder; speaker-business closure remains open; T102/T084 remain open**. Earlier FR16ABO, FR28, FR29, FR30, and FR31 promotions remain rejected; FR32-FR45 are retained historical steps and FR46 is evidence-only. Source-bounded FR47 adds the `ref-0507` and `ref-0509` repairs. Commit `70f1186` then completes independent full empty-registry A and restarted frozen-registry B. Separate complete chronological and reverse-window contextual review of all 556 contributions in each artifact manually retains `521/556`. All seven fixed-window and four per-speaker natural-turn floors pass, but 21 critical failures and 29 confident-wrong contributions remain. No code evaluates correctness or produces the product verdict. Checked-in `vad.threshold` is `0.5`. Speaker-time, per-speaker time, source-time-offset, ASR, browser/microphone, locked holdout, report-review, and release-tag gates remain open.
+- [specs/013-industrial-closing-validation/spec.md](013-industrial-closing-validation/spec.md) - **FR48 completes the fresh speaker-only reconciliation of FR47 full A/B; speaker-business closure remains open; T102/T084 remain open**. Earlier FR16ABO, FR28, FR29, FR30, and FR31 promotions remain rejected; FR32-FR45 are retained historical steps and FR46 is evidence-only. Source-bounded FR47 adds the `ref-0507` and `ref-0509` repairs. Commit `70f1186` then completes independent full empty-registry A and restarted frozen-registry B. FR48 independently rereads all 556 contributions chronologically and in reverse for each artifact, corrects only the ASR-only `ref-0375` row, and manually records `522/556`. All seven fixed-window and four per-speaker natural-turn floors pass, but 20 critical failures and 28 confident-wrong contributions remain. The proposed hierarchical-consensus guard stops before implementation because only one material context has the complete topology. No code evaluates correctness or produces the product verdict. Checked-in `vad.threshold` is `0.5`. Speaker-time, per-speaker time, source-time-offset, ASR, browser/microphone, locked holdout, report-review, and release-tag gates remain open.
 
 ## 7. Immediate next step
 
 Keep the streaming v2.1 `340/1/188/188` profile and clean FR47 commit
 `70f1186` fixed. Its restarted 120-second, 600-second, and full A/B real-
-WebSocket promotion ladder is complete. Independent complete contextual review
-of both full artifacts retains the manually signed `521/556` natural-turn
-ledger, but this is not an accepted closing result because 21 critical and 29
-confident-wrong contributions remain. Continue with residual evidence
-diagnosis across the common timeline; authorize a new bounded policy only when
-complete forward/reverse context and accepted controls establish a reusable,
-reference-free topology. Do not begin parameter search or a new full audio run
-before the frozen evidence gate passes.
+WebSocket promotion ladder is complete. FR48's independent complete speaker-
+only contextual review of both full artifacts corrects only `ref-0375` and
+records the manually signed `522/556` natural-turn ledger, but this is not an
+accepted closing result because 20 critical and 28 confident-wrong
+contributions remain. The first hierarchical-consensus proposal stops because
+only `ref-0099` has its complete topology. Continue frozen residual evidence
+diagnosis across the common timeline and seek a reusable multi-context family;
+do not implement a reference-specific rule, start parameter search, or run new
+full audio before that evidence gate passes.
 T110-T116 and T135 are complete. `test.txt` is the human-
 listened reference; T116 used it for complete 556-row chronological and tail-
 to-start review of both new full runs, not a script score or a request for new
@@ -1093,11 +1102,13 @@ forward/reverse context retains `ref-0507` and `ref-0509` while preserving the
 Shi-Tang handoff and accepted controls.
 
 A fresh complete read covers all 556 contributions chronologically and again
-in reverse fixed windows. The manually transcribed ledger is `521/556`; 29
-confident-wrong, five missing, and one uncertain contribution remain, including
-21 critical failures. The seven block ledgers are `88/93`, `79/84`, `76/80`,
-`75/80`, `118/129`, `82/87`, and `3/3`; all four per-speaker natural-turn floors
-remain passed. FR47 is retained as a frozen transitional candidate and may
+in reverse fixed windows. This review initially transcribes `521/556`. FR48's
+later speaker-only reread corrects only `ref-0375`, whose ASR wording is wrong
+but whose final canonical speaker is correct. The current manual ledger is
+`522/556`; 28 confident-wrong, five missing, and one uncertain contribution
+remain, including 20 critical failures. The seven block ledgers are `88/93`,
+`79/84`, `76/80`, `75/80`, `119/129`, `82/87`, and `3/3`; all four per-speaker
+natural-turn floors remain passed. FR47 is retained as a frozen transitional candidate and may
 enter the clean 120/600/full A/B real-WebSocket ladder after commit. It is not
 a closing or real-path result. See
 `013-industrial-closing-validation/post-fr47-residual-reconciliation-2026-07-19.md`.
@@ -1141,9 +1152,10 @@ provide complete required telemetry, and finish direct-end in `17.559 s` and
 
 Every one of the 556 `test.txt` contributions in each full artifact is read
 chronologically and again in reverse fixed windows. No executable mechanism
-assigns correctness or aggregates the result. Both manually signed reviews
-retain `521/556`, with 29 confident-wrong, five missing, one uncertain, and 21
-business-critical residuals. All seven fixed-window and four per-speaker
+assigns correctness or aggregates the result. FR48 independently repeats all
+four readings under the speaker-only boundary and corrects only `ref-0375`.
+Both manually signed reviews retain `522/556`, with 28 confident-wrong, five
+missing, one uncertain, and 20 business-critical residuals. All seven fixed-window and four per-speaker
 natural-turn floors pass, and no whole-session permutation or accumulating
 late identity drift appears. FR47 is therefore the current repeatable real-
 WebSocket speaker-business candidate rather than frozen-only evidence. Critical
@@ -1151,6 +1163,20 @@ attribution, confident-wrong attribution, speaker-time, per-speaker time,
 source-time offset, locked holdout, final report, and release gates remain
 open. See
 `013-industrial-closing-validation/fr47-real-path-promotion-review-2026-07-19.md`.
+
+T206-T210 complete FR48 on its stop branch. Reference-free direct-track export
+from both full timelines reveals that the replay TSV omitted the already typed
+`session_gallery_complete` field; the exporter and exact regression now
+preserve it. Both baseline replays restore all 1,716 business records and are
+byte-identical. Complete forward/reverse contextual review of all 24 ordinary
+direct-short/native conflicts finds many accepted direct repairs and only one
+material context, `ref-0099`, with the full proposed hierarchy. A single-
+context fit cannot authorize a product policy, so no guard, TOML field,
+candidate replay, or audio run is added. The focused exporter suite passes
+`3/3`, the full build has no warning or error diagnostic, and all `70/70`
+CTest entries pass in `53.12` seconds. These checks are mechanical engineering
+evidence only. See
+`013-industrial-closing-validation/fr48-speaker-only-reconciliation-and-consensus-diagnosis-2026-07-19.md`.
 T112 is complete and does not alter the speaker baseline. T084 closes only
 after both A and B independently pass every applicable gate.
 ASR, browser/microphone, locked holdout, final-report review, and release signing

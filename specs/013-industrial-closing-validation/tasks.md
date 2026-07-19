@@ -5,8 +5,10 @@ FR32 completed real-WebSocket promotion; FR33-FR45 are retained bounded frozen
 repairs; FR46 completed as an evidence-only stop with no shared multi-residual
 fusion topology; source-bounded FR47 completes the clean restarted 120/600/full
 A/B real-WebSocket ladder on commit `70f1186`; separate complete contextual
-review of each full artifact retains the manual `521/556` ledger, with every
-complete 600-second block and all four per-speaker natural-turn floors passed;
+review of each full artifact is reconciled again by FR48 under the speaker-only
+boundary, correcting the ASR-only `ref-0375` row to `522/556`; every complete
+600-second block and all four per-speaker natural-turn floors pass; the FR48
+hierarchical-consensus guard stops before implementation as a single-context fit;
 critical, confident-wrong, time-based, holdout, report, release, T102, and T084
 gates remain open 2026-07-19
 
@@ -2679,9 +2681,10 @@ gates remain open 2026-07-19
   output and reconcile the signed manual ledger without executable evaluation.
   Only then decide whether a clean 120/600/full real-WebSocket ladder is
   justified. Every contribution was read in chronological order and again in
-  reverse fixed windows. The manually transcribed ledger is `521/556`, with 29
-  confident-wrong, five missing, and one uncertain residual; 21 residuals are
-  critical. No new contextual regression is found. The frozen candidate is
+  reverse fixed windows. This review initially transcribes `521/556`. FR48's
+  speaker-only reread later corrects only `ref-0375`; the current ledger is
+  `522/556`, with 28 confident-wrong, five missing, one uncertain, and 20
+  critical residuals. No new contextual regression is found. The frozen candidate is
   retained and a gated real-WebSocket ladder is justified; closure remains
   open. See `post-fr47-residual-reconciliation-2026-07-19.md`.
 - [x] T201 Commit and push the exact FR47 transitional revision before any new
@@ -2722,8 +2725,9 @@ gates remain open 2026-07-19
   57,841,920 samples, pass direct-end, time-base, observer, provenance, and
   telemetry contracts, and leave the registry byte-identical. Every one of the
   556 contributions in each artifact is read chronologically and again in
-  reverse fixed windows against `test.txt`. Both manually signed reviews retain
-  `521/556`, with 29 confident-wrong, five missing, one uncertain, and 21
+  reverse fixed windows against `test.txt`. FR48's fresh speaker-only reread of
+  both artifacts corrects only `ref-0375`; both manually signed reviews retain
+  `522/556`, with 28 confident-wrong, five missing, one uncertain, and 20
   critical residuals. FR47 replaces frozen-only status as the current
   repeatable real-path candidate, but closure remains open. See
   `fr47-real-path-promotion-review-2026-07-19.md`.
@@ -2746,3 +2750,58 @@ gates remain open 2026-07-19
   provenance, and telemetry contracts, and have the same normalized product-
   entry bundle. Complete two-direction reading of `ref-0001` through
   `ref-0018` finds no new contextual speaker regression; T202 is authorized.
+- [x] T206 Reconcile the speaker-only evaluation boundary on both exact FR47
+  full artifacts. Read all 556 `test.txt` contributions chronologically and
+  again in reverse fixed windows for each artifact. Record ASR semantic defects
+  separately: wrong wording alone must not fail a recognizable contribution
+  already owned by the correct canonical speaker, while an absent contribution
+  or wrong material ownership remains a speaker-business failure. Manually
+  derive and cross-check every revised ledger and residual list; no executable
+  label, count, percentage, comparison, or verdict is permitted. All four
+  complete readings are finished. Only `ref-0375` changes because its final
+  `spk_2` owner is 徐子景 despite wrong decoded words. The manually transcribed
+  ledger is `522/556`, with 28 confident-wrong, five missing, one uncertain,
+  and 20 critical residuals.
+- [x] T207 Export reference-free typed replay inputs from FR47 full Run A and
+  Run B. Mechanically display every ordinary short direct voiceprint decision
+  that conflicts with a uniform native identity, including exact activity,
+  primary, containing VAD, complete-source, exact-interval, and session/robust
+  gallery evidence on the common clock. Include accepted neighboring controls.
+  Preserve every typed completeness field in the replay TSV; repair the
+  exporter and add an exact regression if an existing field is omitted. Do not
+  use `test.txt` in extraction or assign correctness from structure. The direct
+  exporter omitted `session_gallery_complete`; it now preserves both gallery
+  completeness fields and an exact regression covers asymmetric values. A/B
+  baseline replays each restore all 1,716 business records and are byte-
+  identical at SHA-256
+  `75fc0b39fdf4530ec98a54f8e6ac113e8eef1aee00839c3d9c6577adafb8302e`.
+  The focused exporter suite passes `3/3`, the complete build emits no warning
+  or error diagnostic, and all `70/70` CTest entries pass in `53.12` seconds.
+  These are mechanical engineering checks, not product-evaluation evidence.
+- [x] T208 Read every T207 complete conversation forward and reverse against
+  `test.txt`. Decide manually whether one reusable hierarchical-consensus
+  protection exists. It must cover more than a reference-named special case,
+  preserve independently accepted controls, add no numeric parameter, and
+  require exact abstention boundaries. Stop FR48 without implementation if the
+  complete context does not support that invariant. All 24 structural conflict
+  contexts and accepted controls were reviewed in both directions for A and B.
+  Many direct decisions are required repairs; only `ref-0099` has the complete
+  proposed hierarchy. T208 therefore takes the required single-context stop.
+- [x] T209 If T208 authorizes the guard, add one false-by-default
+  `[speaker_fusion].direct_short_native_consensus_guard_enable` TOML boolean,
+  typed configuration plumbing, a single-purpose policy helper, and focused
+  positive/abstention tests. Preserve the current identity only when activity,
+  primary, containing VAD, and complete-source dual galleries all agree and the
+  exact direct interval lacks eligible dual-gallery agreement. Add no numeric
+  field and change no producer track, text, time, or common-clock contract.
+  Not executed: T208 did not authorize implementation. No product code, TOML
+  field, or focused policy test was added.
+- [x] T210 Export candidate and disabled-control replays twice for both full A
+  and B typed inputs. Verify hashes and raw changed scope mechanically, then
+  read every changed complete conversation forward and reverse. If retained,
+  repeat the complete 556-contribution speaker-only review independently for A
+  and B before authorizing any real-WebSocket run. A regression, unstable
+  scope, or single-context fit stops the candidate. Not executed because the
+  T208 single-context stop precedes candidate generation; no audio run is
+  authorized. See
+  `fr48-speaker-only-reconciliation-and-consensus-diagnosis-2026-07-19.md`.

@@ -52,10 +52,14 @@ frozen replay and complete forward/reverse contextual review retain the bounded
 `ref-0192` repair at `519/556` without a new real-path claim; FR46 stops after
 complete orthogonal-evidence diagnosis; source-bounded FR47 deterministic
 replay and complete 556-contribution forward/reverse contextual review retain
-`ref-0507` and `ref-0509` at `521/556`; commit `70f1186` then completes the
+`ref-0507` and `ref-0509`; commit `70f1186` then completes the
 restarted 120/600/full A/B real-WebSocket ladder, and separate complete
-forward/reverse contextual review of each full artifact retains the same
-manual `521/556` ledger without long-term identity drift; critical attribution,
+forward/reverse contextual review of each full artifact initially transcribes
+`521/556` without long-term identity drift; FR48 repeats both complete reviews
+under the speaker-only boundary, corrects the ASR-only `ref-0375` row to
+speaker-correct, and records `522/556` with 20 critical residuals; its proposed
+hierarchical-consensus guard stops before implementation because only one
+material context has the complete topology; critical attribution,
 confident-wrong attribution, T102, T084, full canonical closure, release sign-
 off, and industrial readiness remain open
 **Created**: 2026-07-13
@@ -2721,12 +2725,14 @@ Yunfeng's `5.6个亿` expectation and first `对` while preserving Shi Yi's seco
 
 The reviewer then reads all 556 contributions chronologically and again in
 reverse fixed windows against `test.txt`. No executable mechanism labels,
-counts, compares, ranks, or decides the product result. The manually signed
-ledger advances only `ref-0507` and `ref-0509` to `521/556`; 29 confident-
-wrong, five missing, and one uncertain contribution remain, including 21
-business-critical failures. All complete 600-second and per-speaker natural-
-turn floors pass, but critical, confident-wrong, time-based, independent real-
-path, holdout, report, and release gates remain open.
+counts, compares, ranks, or decides the product result. That review initially
+transcribes `521/556`. FR48 later repeats the complete speaker-only review and
+corrects only `ref-0375`, whose ASR wording is wrong but whose final canonical
+speaker is already correct. The current speaker ledger is `522/556`: 28
+confident-wrong, five missing, and one uncertain contribution remain,
+including 20 business-critical failures. All complete 600-second and per-
+speaker natural-turn floors pass, but critical, confident-wrong, time-based,
+independent real-path, holdout, report, and release gates remain open.
 
 FR47 is retained only as a frozen transitional candidate. It MAY enter a clean
 real-WebSocket ladder on one committed revision: two independent 120-second
@@ -2774,14 +2780,79 @@ required telemetry, and deliver parseable terminal JSON in `17.559 s` and
 
 Each full artifact receives its own complete 556-contribution chronological
 review and independent reverse-fixed-window review against `test.txt`. No
-executable mechanism assigns correctness or aggregates the result. Both manual
-reviews retain the FR47 ledger at `521/556`: 29 confident-wrong, five missing,
-and one uncertain contribution remain, including 21 business-critical
+executable mechanism assigns correctness or aggregates the result. FR48's
+fresh speaker-only reread corrects only `ref-0375` in the initially transcribed
+FR47 ledger. Both artifacts retain `522/556`: 28 confident-wrong, five missing,
+and one uncertain contribution remain, including 20 business-critical
 failures. The seven fixed-window and four per-speaker natural-turn floors pass,
 and no whole-session permutation or accumulating late identity drift appears.
 Critical-attribution-zero, confident-wrong-zero, speaker-time, per-speaker-
 time, source-time-offset, locked holdout, report, and release gates remain
 open. See `fr47-real-path-promotion-review-2026-07-19.md`.
+
+- **FR48 speaker-only reconciliation and hierarchical-consensus guard gate**:
+  The current closing target evaluates the final business view's speaker
+  ownership independently from ASR lexical fidelity. A recognizable acoustic
+  contribution that is present under the listener-verified canonical speaker
+  MUST NOT fail the speaker ledger solely because its decoded words are wrong.
+  A contribution that is absent from the final business view, assigned to a
+  different speaker, or materially split across wrong speakers remains a
+  speaker-business failure. This separation changes no immutable `test.txt`
+  field and does not claim ASR accuracy. Because it changes the review rubric,
+  both FR47 full artifacts MUST receive a fresh complete 556-contribution
+  chronological and reverse-fixed-window reconciliation before any revised
+  speaker ledger is reported. No executable mechanism may label, count,
+  aggregate, or decide that reconciliation.
+
+  Before another rewrite policy is considered, the exact full Run A and Run B
+  typed tracks MUST be replayed to inspect every ordinary short business-
+  interval voiceprint decision whose selected identity conflicts with the
+  uniform native identity. Automation may list only reference-free structural
+  scope. Complete contextual review MUST establish whether one reusable
+  evidence-precedence invariant exists and MUST include accepted neighboring
+  controls in both directions.
+
+  A frozen guard MAY be implemented only for an ordinary short direct
+  voiceprint decision that lacks eligible dual-gallery agreement. The current
+  identity MUST be uniform over the source characters and MUST completely and
+  uncontestedly cover the exact aligned interval in both Sortformer activity
+  and primary views. Exactly one containing VAD query and exactly one complete-
+  source query for the same immutable ASR final MUST each have complete session
+  and robust galleries whose unique top identities agree with that current
+  identity under existing margin gates. The direct candidate MUST differ. Any
+  missing range, competing native identity, gallery tie/disagreement,
+  incomplete robust gallery, multiple containing query, source mismatch, or
+  already eligible exact dual-gallery decision MUST preserve current behavior.
+
+  The guard only prevents a lower-scope overwrite; it does not assign a new
+  identity, alter text or time, consume reference data, or mutate a producer
+  track. It MUST reuse the existing primary-consensus minimum, short-span
+  maximum, gallery margins, alignment tolerance, and typed evidence. It MAY
+  add one false-by-default TOML boolean and MUST add no numeric parameter. Both
+  full A and B frozen inputs require independent repeated candidate replay and
+  a contemporaneous disabled control. Every changed complete conversation MUST
+  be read forward and reverse against `test.txt`; if retained, each complete
+  556-contribution speaker-only review MUST be repeated before any real-
+  WebSocket run. A single-context fit, changed-context regression, or missing
+  independent control ends FR48 without an audio run.
+
+  FR48 completes on the stop branch. Both exact full artifacts receive fresh,
+  independent 556-contribution chronological and reverse-window speaker-only
+  review. Only `ref-0375` changes: its decoded wording is wrong, while its
+  final `spk_2` ownership is already 徐子景. The corrected manual ledger is
+  `522/556`, with 28 confident-wrong, five missing, one uncertain, and 20
+  critical residuals. Direct typed export also exposes and repairs a mechanical
+  omission of `session_gallery_complete`, restoring all 1,716 replay business
+  entries without changing runtime behavior. Complete forward/reverse review
+  of 24 ordinary direct-short/native conflicts finds that accepted direct
+  evidence is necessary in many controls; only `ref-0099` has the proposed
+  full hierarchy topology. Because that is a single material context, no
+  guard, TOML field, candidate replay, or audio run is authorized. See
+  `fr48-speaker-only-reconciliation-and-consensus-diagnosis-2026-07-19.md`.
+  The exporter-focused suite passes `3/3`, the complete build has no warning
+  or error diagnostic, and all `70/70` CTest entries pass in `53.12` seconds.
+  These checks validate engineering contracts only and do not produce the
+  contextual product verdict.
 
 FR40 passes its frozen gate. Repeated T123 outputs are byte-identical and
 change only Xu Zijing's `184.240-184.320` response. Repeated T111 outputs are

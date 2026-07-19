@@ -118,13 +118,15 @@ def write_voiceprint(path, entries):
         writer.writerow([
             "evidence_id", "kind", "text_id", "source_start",
             "source_end", "start", "end", "embedding_available",
-            "robust_gallery_complete", "session_scores", "robust_scores"])
+            "session_gallery_complete", "robust_gallery_complete",
+            "session_scores", "robust_scores"])
         for entry in entries:
             writer.writerow([
                 entry["evidence_id"], entry["evidence_kind"],
                 int(entry["text_id"]), int(entry["source_start"]),
                 int(entry["source_end"]), entry["start"], entry["end"],
                 int(bool(entry["embedding_available"])),
+                int(bool(entry.get("session_gallery_complete", False))),
                 int(bool(entry["robust_gallery_complete"])),
                 encode_scores(entry.get("session_scores", [])),
                 encode_scores(entry.get("robust_scores", []))])

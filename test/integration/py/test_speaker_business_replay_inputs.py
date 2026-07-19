@@ -68,6 +68,53 @@ class SpeakerBusinessReplayInputsTest(unittest.TestCase):
                     encoding="ascii").splitlines()[1].split("\t")
             self.assertEqual(bytes.fromhex(asr_row[3]).decode(), "你好")
 
+    def test_direct_export_preserves_gallery_completeness(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            timeline = root / "timeline.json"
+            timeline.write_text(json.dumps({"timeline": {
+                "audio_sec": 1.0,
+                "sample_rate": 16000,
+                "tracks": [
+                    {"kind": "diarization", "entries": [{
+                        "start": 0.0, "end": 1.0, "speaker": 0,
+                        "confidence": 0.9, "speaker_id": "spk_0"}]},
+                    {"kind": "primary_speaker", "entries": [{
+                        "start": 0.0, "end": 1.0, "speaker": 0,
+                        "confidence": 0.9, "speaker_id": "spk_0"}]},
+                    {"kind": "asr", "entries": [{
+                        "text_id": 0, "start": 0.0, "end": 1.0,
+                        "text": "测试"}]},
+                    {"kind": "align", "entries": [{
+                        "text_id": 0, "start": 0.0, "end": 1.0,
+                        "units": [{"start": 0.0, "end": 1.0,
+                                   "text": "测试"}]}]},
+                    {"kind": "speaker_voiceprint", "entries": [{
+                        "evidence_id": "complete_source:0",
+                        "evidence_kind": "complete_source",
+                        "text_id": 0, "source_start": 0, "source_end": 2,
+                        "start": 0.0, "end": 1.0,
+                        "embedding_available": True,
+                        "session_gallery_complete": True,
+                        "robust_gallery_complete": False,
+                        "session_scores": [{
+                            "speaker_id": "spk_0", "score": 0.8}],
+                        "robust_scores": []}]},
+                ],
+            }}, ensure_ascii=False), encoding="utf-8")
+
+            _, manifest = speaker_business_replay_inputs.export_inputs(
+                str(timeline), None, None, str(root / "replay"),
+                direct_timeline_tracks=True)
+            voiceprint_rows = pathlib.Path(
+                manifest["outputs"]["voiceprint"]["path"]).read_text(
+                    encoding="utf-8").splitlines()
+            self.assertEqual(
+                voiceprint_rows[0].split("\t")[8:10],
+                ["session_gallery_complete", "robust_gallery_complete"])
+            self.assertEqual(voiceprint_rows[1].split("\t")[8:10],
+                             ["1", "0"])
+
 
 if __name__ == "__main__":
     unittest.main()

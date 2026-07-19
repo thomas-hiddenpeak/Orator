@@ -3968,9 +3968,11 @@ accepted neighboring controls.
 
 T200 then completes a fresh two-direction read of the entire frozen candidate,
 not an extrapolation from changed rows. All 556 `test.txt` contributions are
-read chronologically and again in reverse fixed windows. The manually
-transcribed ledger is `521/556`, with 35 residuals: 29 confident-wrong, five
-missing, and one uncertain. Twenty-one remain business-critical. No new
+read chronologically and again in reverse fixed windows. This review initially
+transcribes `521/556`. FR48 later corrects the speaker-only boundary at
+`ref-0375`, whose ASR wording is wrong but whose canonical speaker is correct.
+The current ledger is `522/556`, with 34 residuals: 28 confident-wrong, five
+missing, and one uncertain. Twenty remain business-critical. No new
 contextual failure is found, so the frozen candidate is retained; this does not
 convert it into real-path or closing evidence. See
 `post-fr47-residual-reconciliation-2026-07-19.md`.
@@ -4019,9 +4021,10 @@ converge all observer terminals, retain the frozen registry, and satisfy the
 direct-end and telemetry contracts.
 
 Each full artifact is reviewed independently across all 556 human-listened
-`test.txt` contributions in chronological and reverse fixed-window order. The
-manually signed result in each path is the FR47 `521/556` ledger, including 21
-critical residuals; no executable evaluation contributes a label, total, or
+`test.txt` contributions in chronological and reverse fixed-window order.
+FR48's fresh speaker-only reread corrects only `ref-0375` in the initial FR47
+transcription. The manually signed result in each path is `522/556`, including
+20 critical residuals; no executable evaluation contributes a label, total, or
 decision. FR47 is therefore promoted from frozen-only evidence to the current
 repeatable real-path candidate. The next phase is residual evidence work, not
 parameter search: diagnose the remaining critical contexts by common source
@@ -4029,6 +4032,64 @@ topology and independently accepted controls, and specify a bounded policy only
 where the complete context establishes reusable, reference-free evidence.
 Speaker-time, holdout, report, and release work remain separate later gates.
 See `fr47-real-path-promotion-review-2026-07-19.md`.
+
+### 8.35 FR48 speaker-only reconciliation and evidence precedence
+
+FR48 first corrects the evaluation boundary without changing the product. The
+reviewer will reread each full A and B artifact across all 556 `test.txt`
+contributions chronologically and in reverse fixed windows. Speaker ownership
+and ASR semantics are recorded separately. Wrong wording under the correct
+speaker remains an ASR defect but is not by itself a speaker-attribution
+failure; an absent business contribution or wrong material ownership remains a
+speaker-business failure. The reviewer manually reconciles and cross-checks
+every row and total. Automation continues to provide only immutable display.
+
+In parallel, extract direct typed replay inputs from both exact FR47 artifacts.
+The source-free inventory begins at ordinary `voiceprint_direct_short`
+business intervals where the selected identity differs from a uniform current
+identity. It then displays activity, primary, containing VAD, complete-source,
+exact interval, and robust/session gallery evidence for every structural match.
+Reference labels are introduced only when the reviewer reads every resulting
+complete conversation and its accepted controls forward and reverse.
+
+The candidate is a precedence guard, not another identity rewrite. Before an
+ordinary short business-interval session-gallery result is applied, preserve
+the current label when all of the following hold:
+
+1. exact direct session and robust galleries do not already form an eligible
+   dual-gallery decision for the same different identity;
+2. the current source label is uniform and its identity covers the exact range
+   completely and uncontestedly in both activity and primary tracks;
+3. exactly one containing VAD query has complete session and robust galleries,
+   both uniquely rank the current identity first under existing margin gates;
+4. exactly one complete-source query for the same text has complete session and
+   robust galleries, both uniquely rank that same current identity first under
+   the existing gates;
+5. every range and text ID is exact on the common clock.
+
+No score, duration, or tolerance is fitted. The candidate reuses the existing
+TOML numerical fields and adds only a false-by-default
+`direct_short_native_consensus_guard_enable` switch. Focused tests cover the
+positive topology and each abstention boundary. Candidate and disabled-control
+replays run twice against both full typed inputs. Raw diffs define review scope
+but never correctness. Complete changed-context review decides retention; a
+retained result still requires fresh complete 556-contribution A and B reviews
+under the speaker-only rubric before an audio ladder can be authorized.
+
+Execution takes the stop branch. Both full A and B artifacts are read across
+all 556 contributions forward and reverse under the speaker-only rubric. The
+only ledger correction is `ref-0375`, producing the manually transcribed
+`522/556` result with 20 critical residuals. Direct replay input export is
+repaired to preserve `session_gallery_complete`; both baseline replays then
+contain all 1,716 business entries and are byte-identical. Complete contextual
+review of all 24 displayed direct-short/native conflicts finds many accepted
+direct repairs and only one material context (`ref-0099`) satisfying the full
+proposed hierarchy. A single-context fit cannot authorize product policy, so
+the boolean, helper, candidate replay, TOML change, and audio run are not
+implemented. The focused exporter suite passes `3/3`, the full build emits no
+warning or error diagnostic, and all `70/70` CTest entries pass in `53.12`
+seconds; these checks establish engineering consistency only. See
+`fr48-speaker-only-reconciliation-and-consensus-diagnosis-2026-07-19.md`.
 
 ### 8.15 FR28 120-second outcome and promotion ladder
 

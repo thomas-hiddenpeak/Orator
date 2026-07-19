@@ -21,6 +21,13 @@ contextual reading in chronological order and again in reversed fixed windows.
 This report promotes FR47 from frozen replay evidence to repeatable real-path
 evidence. It does not close Spec 013 or establish industrial readiness.
 
+FR48 subsequently repeated the complete A/B forward and reverse review with
+speaker ownership separated explicitly from ASR wording. That review corrects
+only `ref-0375`: the final view already uses `spk_2` (徐子景), although its
+decoded words are wrong. The corrected speaker-only ledger below supersedes
+the original `521/556` transcription; the captured artifacts and all
+mechanical promotion evidence are unchanged.
+
 ## Frozen revision and inputs
 
 | Item | Frozen value |
@@ -127,19 +134,20 @@ as speaker errors when the complete natural turn and its owner remain clear;
 wrong ownership, absent material contribution, and genuinely indeterminate
 ownership retain their separate manual classes.
 
-Both complete A and B reviews reproduce the frozen FR47 signed ledger:
+Both complete A and B reviews, after the FR48 speaker-only reconciliation,
+produce the same corrected signed ledger:
 
-- natural-turn ledger: `521/556`, approximately `93.7%` as a presentation of
+- natural-turn ledger: `522/556`, approximately `93.9%` as a presentation of
   the manually signed judgments;
-- fixed-window ledgers: `88/93`, `79/84`, `76/80`, `75/80`, `118/129`,
+- fixed-window ledgers: `88/93`, `79/84`, `76/80`, `75/80`, `119/129`,
   `82/87`, and `3/3`;
-- per-speaker ledgers: 朱杰 `77/83`, 唐云峰 `176/189`, 徐子景 `69/73`, 石一
+- per-speaker ledgers: 朱杰 `77/83`, 唐云峰 `176/189`, 徐子景 `70/73`, 石一
   `199/211`;
-- residual classes: 29 confident-wrong, five missing, and one uncertain;
-- business-critical residuals: 21.
+- residual classes: 28 confident-wrong, five missing, and one uncertain;
+- business-critical residuals: 20.
 
-The 21 critical residuals are `0049`, `0058`, `0066`, `0099`, `0102`, `0118`,
-`0252`, `0313`, `0327`, `0331`, `0333`, `0354`, `0375`, `0390`, `0426`,
+The 20 critical residuals are `0049`, `0058`, `0066`, `0099`, `0102`, `0118`,
+`0252`, `0313`, `0327`, `0331`, `0333`, `0354`, `0390`, `0426`,
 `0442` (missing), `0444`, `0461`, `0499`, `0503`, and `0505`. The nine
 additional confident-wrong residuals are `0061`, `0135`, `0171`, `0221`,
 `0239`, `0241`, `0298`, `0457`, and `0537`. The remaining missing residuals
@@ -155,6 +163,10 @@ Residuals remain distributed across every complete 600-second block and are
 concentrated at overlap, zero-duration or very short interjections, source-
 boundary fragments, and cases where the upstream evidence itself is absent or
 wrong. The remaining defect is therefore not tail-only.
+
+The complete correction and the stopped hierarchical-consensus diagnosis are
+recorded in
+`fr48-speaker-only-reconciliation-and-consensus-diagnosis-2026-07-19.md`.
 
 ## Decision and remaining gates
 
