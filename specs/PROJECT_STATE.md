@@ -14,7 +14,7 @@ work is specified under [specs/](.).
 > pass is the consistency proof. Status lines advance to `Implemented` in the
 > same change that lands the code, with the commit reference.
 
-- **Last updated**: 2026-07-19 (FR34 frozen candidate retained; closure open)
+- **Last updated**: 2026-07-19 (FR35 frozen candidate retained; closure open)
 - **Branch**: `master`
 - **Constitution**: v1.7.0
 - **Speaker-business closure**: **BEST FROZEN FULL AVERAGE ABOVE FLOOR;
@@ -181,6 +181,24 @@ work is specified under [specs/](.).
   `013-industrial-closing-validation/exact-phrase-vad-direct-conflict-diagnosis-2026-07-19.md`
   and
   `013-industrial-closing-validation/exact-phrase-vad-direct-conflict-review-2026-07-19.md`.
+  T149-T151 then isolate the T111/T123 partition-sensitive `ref-0420`
+  acknowledgement. FR35 reuses the existing alignment boundary tolerance only
+  in the two neighbouring-gap checks of the already-conjunctive isolated
+  no-embedding aligned-unit rule. It changes no TOML value or producer track;
+  every identity, activity, primary, VAD uniqueness, gallery, duration, and
+  provenance condition remains required. Repeated T123 replays are
+  byte-identical and change only `text_id=242`; repeated T111 replays remain
+  byte-identical to FR34. Complete chronological and reverse reading of
+  `46:19-47:53` retains Zhu Jie's isolated acknowledgement between Tang
+  Yunfeng's instruction and Shi Yi's confirmation question and finds no
+  neighbouring substantive change. The warning-clean build and all 69 CTest
+  entries pass. The manually reconciled frozen candidate is `509/556`; no
+  real-WebSocket result is attributed to FR35. The 2400-3000 and 3000-3600
+  fixed blocks, Zhu Jie recall, speaker-time sign-off, critical attribution,
+  and confident-wrong attribution still fail; see
+  `013-industrial-closing-validation/aligned-unit-isolation-tolerance-diagnosis-2026-07-19.md`
+  and
+  `013-industrial-closing-validation/aligned-unit-isolation-tolerance-review-2026-07-19.md`.
 - **Result-evaluation rule**: product accuracy and candidate decisions may be
   produced only by complete item-by-item contextual semantic review. No code,
   test, script, notebook, formula, query, automated metric, or algorithm may
@@ -747,7 +765,7 @@ treated as a repair for `ref-0503`, which is already wrong in T111.
 Speaker-time, per-speaker time, and source-time offsets remain to be manually
 signed at `test.txt`'s recorded precision; no duplicate listening or invented
 sub-second boundary is required.
-T136-T144 are complete. FR31 is rejected after deterministic frozen replay and
+T136-T151 are complete. FR31 is rejected after deterministic frozen replay and
 complete review of every changed T111/T123 context. FR32 is retained after
 changing only T123 `text_id=84`, repairing `ref-0154`, leaving T111 unchanged,
 and completing the full real-WebSocket ladder. Independent full empty/frozen-
@@ -758,8 +776,12 @@ T143 specifies a source-free partition-invariant abstention candidate on
 frozen evidence; T144 retains FR33 after deterministic T111/T123 replay and
 complete forward/reverse review of every changed context. The frozen candidate
 is `507/556`, but no new full real-path result follows. T145 records FR33 as a
-warning-clean, `69/69` transitional checkpoint. T146 next specifies FR34 on
-frozen evidence before any audio run.
+warning-clean, `69/69` transitional checkpoint. T146-T148 retain FR34 after a
+separate deterministic T111/T123 replay and complete forward/reverse review,
+advancing the frozen candidate to `508/556`. T149-T151 retain FR35 after the
+same bounded frozen gate, advancing it to `509/556`. Neither result is a new
+real-WebSocket run, and both late fixed blocks remain below their conjunctive
+acceptance gates.
 T112 is complete and does not alter the speaker baseline. T084 closes only
 after both A and B independently pass every applicable gate.
 ASR, browser/microphone, locked holdout, final-report review, and release signing

@@ -1905,10 +1905,13 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
         break;
       }
     }
+    const double boundary_tolerance =
+        pipeline.config_.align_boundary_split_tolerance_sec;
     if (previous_unit == nullptr || next_unit == nullptr ||
-        item.start - previous_unit->end + 1e-9 <
+        item.start - previous_unit->end + boundary_tolerance + 1e-9 <
             pipeline.config_.align_snap_pause_sec ||
-        next_unit->start - item.end + 1e-9 < pipeline.config_.align_snap_pause_sec) {
+        next_unit->start - item.end + boundary_tolerance + 1e-9 <
+            pipeline.config_.align_snap_pause_sec) {
       return std::nullopt;
     }
 

@@ -2462,16 +2462,21 @@ int main() {
           "insufficient exact alignment preserves coarse direct attribution");
   }
 
-  // ---- 20g5. FR16ABB: an isolated subminimum aligned unit without its own
-  // embedding may recover one initial slot identity only from uncontested
-  // native tracks and a passing dual-gallery containing VAD. ----
+  // ---- 20g5. FR16ABB/FR35: an isolated subminimum aligned unit without its
+  // own embedding may recover one initial slot identity only from uncontested
+  // native tracks and a passing dual-gallery containing VAD. Alignment
+  // boundary jitter may consume only the configured split tolerance. ----
   {
     using Entry = ComprehensiveTimeline::Entry;
     auto run_case = [](bool include_epoch, bool isolated, bool strong_vad,
                        bool gallery_agreement, bool primary_current,
-                       bool unit_embedding_available) -> std::vector<Entry> {
+                       bool unit_embedding_available,
+                       double following_unit_start = 1.5,
+                       double boundary_tolerance = 0.08)
+        -> std::vector<Entry> {
       BusinessSpeakerPipeline::Config config;
       config.voiceprint_fusion_enabled = true;
+      config.align_boundary_split_tolerance_sec = boundary_tolerance;
       config.speaker_overlap_tie_policy =
           BusinessSpeakerPipeline::SpeakerOverlapTiePolicy::kPrimarySpeaker;
       TestBusinessSpeakerPipeline tl(config);
@@ -2488,7 +2493,7 @@ int main() {
       tl.UpsertAlign(0, 0.0, 2.0,
                      {{0.0, isolated ? 0.5 : 0.9, "前"},
                       {1.0, 1.1, "嗯"},
-                      {1.5, 2.0, "后"}});
+                      {following_unit_start, 2.0, "后"}});
 
       ComprehensiveTimeline::SpeakerVoiceprintEvidence unit;
       unit.evidence_id = "aligned_unit:0:1";
@@ -2535,6 +2540,17 @@ int main() {
                    "voiceprint_aligned_unit_isolated_initial_slot_vad_"
                    "override"),
           "isolated no-embedding unit recovers the initial slot identity");
+    CHECK(has_unit(run_case(true, true, true, true, true, false, 1.34, 0.08),
+                   "spk_b",
+                   "voiceprint_aligned_unit_isolated_initial_slot_vad_"
+                   "override"),
+          "configured boundary tolerance preserves aligned isolation");
+    CHECK(has_unit(run_case(true, true, true, true, true, false, 1.25, 0.08),
+                   "spk_a"),
+          "gap outside boundary tolerance preserves the native identity");
+    CHECK(has_unit(run_case(true, true, true, true, true, false, 1.34, 0.0),
+                   "spk_a"),
+          "zero boundary tolerance preserves the exact pause contract");
     CHECK(has_unit(run_case(false, true, true, true, true, false), "spk_a"),
           "missing initial epoch preserves the native identity");
     CHECK(has_unit(run_case(true, false, true, true, true, false), "spk_a"),

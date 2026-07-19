@@ -18,8 +18,10 @@ reviews each record `506/556`, but two fixed blocks, 朱杰 recall, critical
 turns, and confident-wrong attribution fail; FR33 deterministic T111/T123
 replay and complete changed-context review retain a frozen `ref-0517` repair
 at `507/556`; FR34 independently retains an exact `ref-0406` phrase repair on
-frozen evidence at `508/556`, with no new real-path claim; T102, T084, full
-canonical closure, release sign-off, and industrial readiness remain open
+frozen evidence at `508/556`; FR35 retains the partition-invariant
+`ref-0420` isolated response on frozen evidence at `509/556`, with no new
+real-path claim; T102, T084, full canonical closure, release sign-off, and
+industrial readiness remain open
 **Created**: 2026-07-13
 **Scope**: Re-establish a truthful product baseline, recover full-session business
 accuracy, and define the evidence required before Orator may be declared closed.
@@ -2241,6 +2243,25 @@ subject to the complete acceptance gates in this spec.
   MUST replay deterministically, and every changed complete conversation MUST
   receive chronological and reverse contextual semantic review against
   `test.txt` before retention or a new audio run.
+- **FR35**: The existing isolated no-embedding aligned-unit challenge MAY
+  treat a neighbouring aligned-unit gap as satisfying the configured
+  isolation pause only when adding at most the existing
+  `timeline.align_boundary_split_tolerance_sec` reaches
+  `timeline.align_snap_pause_sec`. The tolerance MUST apply only to the
+  preceding and following gap comparisons. The existing positive-duration,
+  subminimum duration, no-embedding, uniform native-label, unprotected
+  provenance, unique activity local-slot, distinct initial-identity, exact
+  current-primary coverage, unique containing complete-gallery VAD, and dual
+  VAD gallery selection conditions MUST remain conjunctive and unchanged.
+  An out-of-tolerance gap, zero configured tolerance, missing or competing
+  evidence, gallery abstention or disagreement, independently embedded unit,
+  protected label, or source/time mismatch MUST preserve existing behavior.
+  FR35 MUST add no TOML value, score, margin, duration, identity, transcript,
+  speaker name, timestamp, reference datum, or fitted constant and MUST alter
+  no producer evidence or common-clock coordinate. Frozen T111/T123 inputs
+  MUST replay deterministically, and every changed complete conversation MUST
+  receive chronological and reverse contextual semantic review against
+  `test.txt` before retention or a new audio run.
 
 The first FR31 implementation passed its focused engineering test and produced
 byte-stable repeated T111 and T123 replays. Complete forward and reverse review
@@ -2321,6 +2342,31 @@ pass as engineering evidence. The manually reconciled frozen candidate is
 confident-wrong attribution, and speaker-time sign-off still fail. No new
 real-WebSocket result or closure claim is attributed to FR34. See
 `exact-phrase-vad-direct-conflict-review-2026-07-19.md`.
+
+FR35 returns to the frozen T111/T123 partition regression at `ref-0420`. The
+activity, primary, VAD, initial identity, and TOML evidence are unchanged, but
+T123 extends the no-embedding aligned `嗯` through punctuation and leaves a
+`0.240 s` following gap, `0.010 s` below the configured `0.25 s` isolation
+pause. The same boundary moves by less than the existing configured `0.08 s`
+alignment tolerance. FR35 therefore applies that tolerance only to the two
+neighbour-gap checks in the already-conjunctive isolated-unit/initial-slot/VAD
+rule. Every identity, activity, primary, embedding, uniqueness, and dual-gallery
+gate remains unchanged. No TOML value or acoustic threshold changes. See
+`aligned-unit-isolation-tolerance-diagnosis-2026-07-19.md`.
+
+Repeated FR35 T123 replays are byte-identical and change only the isolated
+`text_id=242` response: `2809.436-2809.676` `嗯` moves from Tang Yunfeng to
+Zhu Jie while the punctuation-only residual and every neighbouring
+substantive contribution remain unchanged. T111 remains byte-identical to
+FR34. Complete reading of the changed `46:19-47:53` conversation
+chronologically and in reverse confirms the Tang instruction, Zhu
+acknowledgement, Shi confirmation question, and Zhu explanation. The
+warning-clean build and all 69 CTest entries pass as engineering evidence. The
+manually reconciled frozen candidate is `509/556`; the 2400-3000 and
+3000-3600 fixed blocks, Zhu Jie recall, critical attribution,
+confident-wrong attribution, and speaker-time sign-off still fail. No new
+real-WebSocket result or closure claim is attributed to FR35. See
+`aligned-unit-isolation-tolerance-review-2026-07-19.md`.
 
 ## 5. Acceptance Gates
 

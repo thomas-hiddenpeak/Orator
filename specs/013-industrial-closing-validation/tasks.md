@@ -2135,3 +2135,32 @@ T102/T084 remain open 2026-07-19
   residual, and finds no neighboring change. The manually reconciled frozen
   ledger is `508/556`; every remaining conjunctive failure keeps closure open.
   See `exact-phrase-vad-direct-conflict-review-2026-07-19.md`.
+- [x] T149 Diagnose the T111/T123 `ref-0420` partition regression using only
+  frozen typed evidence on the common time base. Specify FR35 as a reuse of the
+  existing alignment boundary tolerance in the isolated no-embedding aligned
+  unit's two neighbour-gap checks. Preserve every existing identity, activity,
+  primary, VAD uniqueness, gallery, duration, and provenance condition; add no
+  TOML value, threshold, reference lookup, or product verdict. See
+  `aligned-unit-isolation-tolerance-diagnosis-2026-07-19.md`.
+- [x] T150 Implement FR35 with focused positive and abstention tests. Pass a
+  warning-clean build and all CTest entries, then replay frozen T123 and T111
+  producer packages at least twice. Automation may verify only mechanical
+  contracts and arrange raw changed contexts; it may not label correctness,
+  aggregate accuracy, select the candidate, or issue an acceptance verdict.
+  The warning-clean build and all `69/69` CTest entries pass. Repeated T123
+  replays are byte-identical at SHA-256
+  `e068418430423db26970d674e841455133dd69bdd3c1c83d09dd23413985ad4f`
+  and repeated T111 replays are byte-identical to FR34 at SHA-256
+  `646ea91b357cafaf8af82c4f45e5cc771c622a501e71b12f2d1aa1555fb055f2`.
+  Mechanical display exposes only the isolated `text_id=242` source split.
+- [x] T151 Read every FR35 changed complete conversation chronologically and in
+  reverse against `test.txt`. Retain or remove FR35 only from that contextual
+  semantic review, synchronize spec/plan/tasks/project state, and label any
+  commit as a transitional frozen experiment. Do not attribute a new
+  real-WebSocket result or speaker-business closure to the replay.
+  Complete forward and reverse reading of `46:19-47:53` retains Zhu Jie's
+  isolated acknowledgement between Tang Yunfeng's instruction and Shi Yi's
+  confirmation question and finds no neighbouring substantive change. The
+  manually reconciled frozen ledger is `509/556`; both late fixed blocks and
+  every other conjunctive failure keep closure open. See
+  `aligned-unit-isolation-tolerance-review-2026-07-19.md`.

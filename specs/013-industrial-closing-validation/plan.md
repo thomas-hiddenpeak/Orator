@@ -3338,6 +3338,30 @@ Both late fixed blocks and the other conjunctive closing gates remain open, so
 FR34 is a transitional frozen repair and not a real-stream acceptance result.
 See `exact-phrase-vad-direct-conflict-review-2026-07-19.md`.
 
+FR35 is a boundary-invariance correction inside the existing isolated aligned
+unit challenge. The implementation reuses
+`align_boundary_split_tolerance_sec` when comparing each neighbouring aligned
+gap with `align_snap_pause_sec`; no new configuration field is introduced. The
+current rule's no-embedding duration bound, uniform native labels, unique local
+slot and initial identity, exact primary coverage, unique containing VAD, and
+dual-gallery selection remain required. Focused tests prove that a gap within
+the configured tolerance is admitted while an out-of-tolerance gap, zero
+tolerance, or any missing evidence still abstains. Repeated frozen T123 and
+T111 projector replays then expose only raw change scope. Complete forward and
+reverse context review remains the sole retention gate. See
+`aligned-unit-isolation-tolerance-diagnosis-2026-07-19.md`.
+
+The independent frozen gate retains FR35. T123 Run A and Run B have the same
+SHA-256 and differ from FR34 only by the isolated `text_id=242` source split;
+T111 is byte-identical to FR34. The reviewer reads the entire displayed
+`46:19-47:53` conversation forward and reverse and confirms the Tang
+instruction, Zhu acknowledgement, Shi confirmation question, and Zhu
+explanation without a neighbouring change. The frozen ledger advances by one
+reviewed Zhu Jie contribution to `509/556`. The 2400-3000 and 3000-3600 fixed
+blocks and the other conjunctive closing gates remain open, so FR35 is a
+transitional frozen repair and not a real-stream acceptance result. See
+`aligned-unit-isolation-tolerance-review-2026-07-19.md`.
+
 ### 8.15 FR28 120-second outcome and promotion ladder
 
 T117-T121 are complete. The frozen T116 packages replay byte-stably; their
