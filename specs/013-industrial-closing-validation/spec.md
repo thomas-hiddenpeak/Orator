@@ -52,9 +52,12 @@ frozen replay and complete forward/reverse contextual review retain the bounded
 `ref-0192` repair at `519/556` without a new real-path claim; FR46 stops after
 complete orthogonal-evidence diagnosis; source-bounded FR47 deterministic
 replay and complete 556-contribution forward/reverse contextual review retain
-`ref-0507` and `ref-0509` at `521/556`, still without a new real-path claim;
-critical attribution, confident-wrong attribution, T102, T084, full canonical
-closure, release sign-off, and industrial readiness remain open
+`ref-0507` and `ref-0509` at `521/556`; commit `70f1186` then completes the
+restarted 120/600/full A/B real-WebSocket ladder, and separate complete
+forward/reverse contextual review of each full artifact retains the same
+manual `521/556` ledger without long-term identity drift; critical attribution,
+confident-wrong attribution, T102, T084, full canonical closure, release sign-
+off, and industrial readiness remain open
 **Created**: 2026-07-13
 **Scope**: Re-establish a truthful product baseline, recover full-session business
 accuracy, and define the evidence required before Orator may be declared closed.
@@ -2751,6 +2754,34 @@ fix changes no model, fusion policy, time code, speaker assignment, or TOML
 parameter. Because it changes the runtime binary, promotion MUST restart from
 two independent 120-second runs on one new clean committed revision before a
 new 600-second attempt.
+
+Commit `70f1186d2b9e0b1b12808ebc644a164d1e21983c` completes that restarted
+promotion. Two independent empty-registry 120-second streams close every
+product track at 1,920,000 samples, pass direct-end, common-clock, observer,
+provenance, and telemetry contracts, and have the same normalized seven-track
+entry bundle. Complete forward and reverse reading of `ref-0001` through
+`ref-0018` finds no new contextual speaker regression. A clean 600-second run
+then closes all tracks at 9,600,000 samples and passes the same contracts;
+complete two-direction reading of `ref-0001` through `ref-0093` preserves the
+FR47 contextual ledger and authorizes full A/B.
+
+Full Run A starts from an isolated empty registry. Full Run B restarts the same
+binary with only Run A's frozen registry. Both consume exactly 57,841,920 PCM
+samples in `3615.120 s` at `0.995x`, close all seven tracks on the common time
+base, converge producer and observer terminal documents, provide complete
+required telemetry, and deliver parseable terminal JSON in `17.559 s` and
+`17.392 s`. The registry remains byte-identical after Run B.
+
+Each full artifact receives its own complete 556-contribution chronological
+review and independent reverse-fixed-window review against `test.txt`. No
+executable mechanism assigns correctness or aggregates the result. Both manual
+reviews retain the FR47 ledger at `521/556`: 29 confident-wrong, five missing,
+and one uncertain contribution remain, including 21 business-critical
+failures. The seven fixed-window and four per-speaker natural-turn floors pass,
+and no whole-session permutation or accumulating late identity drift appears.
+Critical-attribution-zero, confident-wrong-zero, speaker-time, per-speaker-
+time, source-time-offset, locked holdout, report, and release gates remain
+open. See `fr47-real-path-promotion-review-2026-07-19.md`.
 
 FR40 passes its frozen gate. Repeated T123 outputs are byte-identical and
 change only Xu Zijing's `184.240-184.320` response. Repeated T111 outputs are

@@ -3,10 +3,12 @@
 **Status**: In progress - T135 reconciled T111/T123/T133; FR31 is rejected;
 FR32 completed real-WebSocket promotion; FR33-FR45 are retained bounded frozen
 repairs; FR46 completed as an evidence-only stop with no shared multi-residual
-fusion topology; the source-bounded FR47 frozen candidate is retained at
-`521/556`, with every complete 600-second block and all four per-speaker
-natural-turn floors passed; critical, confident-wrong, time-based, real-path
-repeatability, holdout, T102, and T084 gates remain open 2026-07-19
+fusion topology; source-bounded FR47 completes the clean restarted 120/600/full
+A/B real-WebSocket ladder on commit `70f1186`; separate complete contextual
+review of each full artifact retains the manual `521/556` ledger, with every
+complete 600-second block and all four per-speaker natural-turn floors passed;
+critical, confident-wrong, time-based, holdout, report, release, T102, and T084
+gates remain open 2026-07-19
 
 ## Phase 0: Governance
 
@@ -2695,7 +2697,7 @@ repeatability, holdout, T102, and T084 gates remain open 2026-07-19
   speaker regression; the known cold-start and rapid-short-turn defects remain
   visible. This result is historical evidence for `68016fd` and cannot qualify
   a later changed binary.
-- [ ] T202 If both T201 runs pass, execute one clean 600-second real-WebSocket
+- [x] T202 If both T201 runs pass, execute one clean 600-second real-WebSocket
   stream from the same revision and apply the same mechanical contracts plus
   complete forward/reverse review of every in-scope contribution. Do not infer
   a product result from equality or hashes. The first attempt consumes all 600
@@ -2703,13 +2705,28 @@ repeatability, holdout, T102, and T084 gates remain open 2026-07-19
   formatter truncates long records and no parseable terminal timeline reaches
   the client. No contextual review or product result is attributed to that
   failed attempt. Repeat this task only after T204-T205 pass on one new clean
-  commit.
-- [ ] T203 If T202 passes, execute full Run A from an empty registry and full
+  commit. The restarted attempt on clean commit `70f1186` closes every track at
+  9,600,000 samples, passes direct-end, common-clock, observer, provenance,
+  telemetry, and parseable-terminal contracts, and receives complete forward
+  and reverse reading of `ref-0001` through `ref-0093`. The manual review
+  preserves the FR47 contextual decisions and finds no new long-running
+  identity drift; full A/B is authorized.
+- [x] T203 If T202 passes, execute full Run A from an empty registry and full
   Run B from Run A's frozen registry on the same revision. Each run must pass
   all mechanical gates and receive its own complete 556-contribution
   chronological and reverse contextual semantic review before FR47 can replace
   the frozen comparison baseline. Time-based, holdout, report, and release
-  gates remain separately required.
+  gates remain separately required. Commit `70f1186` completes both exact
+  3615.120-second paths at `0.995x`; A starts from an empty isolated registry
+  and B restarts with A's frozen registry. Both close all seven tracks at
+  57,841,920 samples, pass direct-end, time-base, observer, provenance, and
+  telemetry contracts, and leave the registry byte-identical. Every one of the
+  556 contributions in each artifact is read chronologically and again in
+  reverse fixed windows against `test.txt`. Both manually signed reviews retain
+  `521/556`, with 29 confident-wrong, five missing, one uncertain, and 21
+  critical residuals. FR47 replaces frozen-only status as the current
+  repeatable real-path candidate, but closure remains open. See
+  `fr47-real-path-promotion-review-2026-07-19.md`.
 - [x] T204 Replace fixed-buffer speaker-voiceprint terminal formatting with a
   dynamically sized, shared JSON record serializer. Add an exact regression
   using escaped evidence and speaker identifiers longer than 256 bytes. Pass
@@ -2720,7 +2737,12 @@ repeatability, holdout, T102, and T084 gates remain open 2026-07-19
   `6b4b48b771809a29bf2276a2659fc39900677e7a058f5b41c301180f3c4f8258`.
   The exact long-record regression passes, the full build emits no warning,
   and all `70/70` CTest entries pass in 52.99 seconds.
-- [ ] T205 Commit and push T204, then restart promotion on that exact clean
+- [x] T205 Commit and push T204, then restart promotion on that exact clean
   revision with two independent empty-registry 120-second real-WebSocket runs.
   Require parseable terminal JSON, all mechanical contracts, and complete
-  chronological and reverse contextual review before T202 is retried.
+  chronological and reverse contextual review before T202 is retried. Commit
+  `70f1186` is pushed. Both runs close all seven tracks at 1,920,000 samples,
+  produce parseable terminal JSON, pass direct-end, common-clock, observer,
+  provenance, and telemetry contracts, and have the same normalized product-
+  entry bundle. Complete two-direction reading of `ref-0001` through
+  `ref-0018` finds no new contextual speaker regression; T202 is authorized.

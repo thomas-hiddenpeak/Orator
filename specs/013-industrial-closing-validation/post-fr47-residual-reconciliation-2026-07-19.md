@@ -80,9 +80,12 @@ manual block ledgers are `88/93`, `79/84`, `76/80`, `75/80`, `118/129`,
 
 ## Promotion boundary
 
-FR47 is retained as a frozen transitional experiment. It has not yet produced
-a real-WebSocket result. A committed revision may enter the clean 120-second,
-600-second, then full A/B promotion ladder, with complete contextual semantic
-review at every stage. Critical attribution, confident-wrong attribution,
-speaker-time, per-speaker time, source-time offset, locked holdout, final report
-review, and release signing remain open; no industrial-closing claim follows.
+At this checkpoint FR47 was retained as a frozen transitional experiment and
+had not yet produced a real-WebSocket result. Clean commit `70f1186`
+subsequently completes the 120-second, 600-second, then full A/B promotion
+ladder, with complete contextual semantic review at every stage. The two full
+reviews retain this same `521/556` ledger. See
+`fr47-real-path-promotion-review-2026-07-19.md`. Critical attribution,
+confident-wrong attribution, speaker-time, per-speaker time, source-time
+offset, locked holdout, final report review, and release signing remain open;
+no industrial-closing claim follows.

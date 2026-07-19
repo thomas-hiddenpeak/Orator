@@ -4009,6 +4009,27 @@ and 120 B, complete forward/reverse review, then 600 seconds, then full A/B only
 after the preceding gate passes. Mechanical JSON parsing and terminal equality
 remain protocol checks, never product evaluation.
 
+That restarted ladder is complete on clean pushed commit `70f1186`. Both
+120-second paths pass their mechanical contracts and complete in-scope
+two-direction context review before the 600-second path begins. The 600-second
+path then passes the same gates and authorizes full A/B. Full Run A uses an
+isolated empty registry; Run B restarts the same binary with Run A's frozen
+registry. Both exact 3615.120-second streams close every product track,
+converge all observer terminals, retain the frozen registry, and satisfy the
+direct-end and telemetry contracts.
+
+Each full artifact is reviewed independently across all 556 human-listened
+`test.txt` contributions in chronological and reverse fixed-window order. The
+manually signed result in each path is the FR47 `521/556` ledger, including 21
+critical residuals; no executable evaluation contributes a label, total, or
+decision. FR47 is therefore promoted from frozen-only evidence to the current
+repeatable real-path candidate. The next phase is residual evidence work, not
+parameter search: diagnose the remaining critical contexts by common source
+topology and independently accepted controls, and specify a bounded policy only
+where the complete context establishes reusable, reference-free evidence.
+Speaker-time, holdout, report, and release work remain separate later gates.
+See `fr47-real-path-promotion-review-2026-07-19.md`.
+
 ### 8.15 FR28 120-second outcome and promotion ladder
 
 T117-T121 are complete. The frozen T116 packages replay byte-stably; their
