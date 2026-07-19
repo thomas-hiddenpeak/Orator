@@ -41,7 +41,11 @@ retain the bounded repair at `516/556` without a new real-path claim; FR43
 diagnosis bounds the critical `ref-0194` T111/T123 regression to one
 zero-duration aligned character plus a nonlocal phrase top identity;
 deterministic replay and complete forward/reverse contextual review retain the
-complete-source repair at `517/556` without a new real-path claim; critical
+complete-source repair at `517/556` without a new real-path claim; FR44 bounds
+the critical `ref-0071` overwrite to one regular session-only phrase whose
+base source is Shi-Tang-Shi across two VAD records; deterministic replay and
+complete forward/reverse contextual review retain the phrase abstention at
+`518/556` without a new real-path claim; critical
 attribution, confident-wrong attribution, T102, T084, full canonical closure,
 release sign-off, and industrial readiness remain open
 **Created**: 2026-07-13
@@ -2502,6 +2506,37 @@ subject to the complete acceptance gates in this spec.
   chronological and reverse contextual semantic review against `test.txt`
   before retention or a new audio run. See
   `complete-source-local-pair-tie-diagnosis-2026-07-19.md`.
+- **FR44**: A generic regular-duration punctuation-phrase write MAY abstain on
+  one three-run middle-slot representation. The source MUST contain exactly
+  three contiguous known base-identity runs `A-B-A`; both outer runs MUST have
+  the same identity, the phrase-selected identity MUST be the middle run, and
+  that run MUST contain exactly one visible source character, and the
+  configured punctuation set MUST be present. The character
+  immediately before, inside, and after the middle run MUST have positive
+  alignment and typed primary tie-break/refinement provenance. Unique primary
+  segments at their alignment midpoints MUST form the same ordered `A-B-A`
+  sequence, and the middle primary segment MUST meet the existing configured
+  primary-consensus duration. Each outer run MUST expose at least that duration
+  through positive aligned time and through matching activity and primary
+  coverage on those intervals. The session phrase view MUST pass the existing
+  regular score and margin gates. The complete robust gallery MUST have the
+  same unique raw top identity and pass the existing regular margin gate, but
+  MUST abstain only on the existing regular score gate. Exactly two positive,
+  ordered, non-overlapping VAD records MUST overlap the phrase; neither may
+  contain it, the phrase MUST begin inside the first and end inside the second,
+  and both VAD galleries MUST rank the outer identity first on the first VAD
+  and the selected middle identity first on the second VAD under the existing
+  margin gate. Missing, duplicate, tied, differently ranked, unknown,
+  multi-character, unaligned, zero-duration, source-inconsistent,
+  under-covered, overlapping, reversed, containing-VAD, short-duration, or
+  differently gated evidence MUST preserve existing behavior. FR44 MUST only
+  prevent the generic phrase write; it MUST assign no identity, move no source
+  or common-clock boundary, and add no TOML value, threshold, transcript,
+  speaker name, timestamp, reference datum, or fitted constant. Frozen T111
+  and T123 inputs MUST replay deterministically, and every changed complete
+  conversation MUST receive chronological and reverse contextual semantic
+  review against `test.txt` before retention or a new audio run. See
+  `three-run-middle-slot-phrase-abstention-diagnosis-2026-07-19.md`.
 
 FR40 passes its frozen gate. Repeated T123 outputs are byte-identical and
 change only Xu Zijing's `184.240-184.320` response. Repeated T111 outputs are
@@ -2552,6 +2587,19 @@ and Xu Zijing advances to `69/73`. Critical attribution, confident-wrong
 attribution, time-based evidence, real-path repeatability, and holdout gates
 remain open. See
 `complete-source-local-pair-tie-review-2026-07-19.md`.
+
+FR44 passes its frozen gate. Final clean-binary T123 replays are byte-identical
+and change only `text_id=43`: the existing Shi-Tang-Shi base sequence is no
+longer replaced by the generic Tang session-only phrase. T111 is separately
+byte-identical and unchanged from FR43. Complete forward and reverse reading
+of `07:42-08:33` retains Shi Yi's calculation, Tang Yunfeng's short
+interjection, Shi Yi's `44/45` answer, and Tang Yunfeng's veto statement. Only
+current T123 `ref-0071` advances the manually reconciled frozen ledger to
+`518/556`; neighboring source partition changes are not additional natural-
+turn repairs. The 0-600 block advances to `88/93`, and Shi Yi advances to
+`199/211`. Critical attribution, confident-wrong attribution, time-based
+evidence, real-path repeatability, and holdout gates remain open. See
+`three-run-middle-slot-phrase-abstention-review-2026-07-19.md`.
 
 The first FR31 implementation passed its focused engineering test and produced
 byte-stable repeated T111 and T123 replays. Complete forward and reverse review

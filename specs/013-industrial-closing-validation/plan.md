@@ -3684,6 +3684,54 @@ ledger to `517/556`, the 1200-1800 block to `75/80`, and Xu Zijing to `69/73`.
 No new real-WebSocket result or closing claim follows. See
 `complete-source-local-pair-tie-review-2026-07-19.md`.
 
+FR44 diagnoses the remaining critical `ref-0071` T111/T123 regression as a
+generic punctuation-phrase precedence error. T111 exposes a two-run Tang-Shi
+phrase already protected by the retained native-handoff guard. T123 represents
+the same exchange as three base runs Shi-Tang-Shi; its one-character Tang
+middle run is surrounded by positive aligned Shi primary evidence. The phrase
+crosses two ordered non-containing VAD records. Its session view is eligible;
+the robust view has the same raw top identity and an eligible margin but falls
+below the existing regular score gate. The generic session-only write therefore
+replaces all three native runs with Tang.
+
+The implementation will add one read-only predicate beside the retained
+native-handoff guard. It will reconstruct exactly three base runs, validate the
+single-character middle slot and adjacent aligned primary provenance, resolve
+unique primary segments at the three character midpoints, and measure each
+outer run only on its positive aligned intervals. It will require matching
+activity/primary coverage using the existing primary-consensus duration. It
+will independently rank the complete robust phrase scores and the two
+overlapping VAD records using the existing gates. Only a session-eligible,
+robust-score-abstaining phrase with ordered outer-to-middle VAD rankings may
+return `true`. The existing phrase loop will then abstain before applying the
+generic phrase write. No label, evidence record, boundary, producer, thread,
+configuration value, or later specialized rule changes.
+
+Focused coverage will preserve the two-run handoff case and the existing
+outer-selected subminimum A-B-A case. A synthetic FR44 positive will be paired
+with independent failures for duration, gallery completeness and ranking,
+three-run identity/cardinality, adjacent alignment, primary topology and
+duration, outer aligned/activity/primary coverage, and VAD count/order/
+containment/ranking. Build and CTest results remain engineering evidence only.
+The clean projector will replay frozen T123 and T111 twice, expose the complete
+raw change scope, and stop before product judgment. Complete chronological and
+reverse contextual reading of every changed conversation against `test.txt`
+alone will retain or remove FR44. See
+`three-run-middle-slot-phrase-abstention-diagnosis-2026-07-19.md`.
+
+The independent frozen gate retains FR44. The warning-clean build and all 69
+CTest entries pass. Final T123 replays are byte-identical at
+`174319361040f648b4f930e312986e626f6b5cba9e3d8eaad9aeaa4a0bc7e7f1`;
+T111 replays are byte-identical and unchanged from FR43 at
+`ad2abee782ab30ff67be1a86fa46f4ec0c16b5422ae18954107c398131157aa4`.
+Mechanical display exposes only T123 `text_id=43`. Complete chronological and
+reverse reading of `07:42-08:33` retains the Shi-to-Tang-to-Shi-to-Tang
+calculation sequence and finds no neighboring contribution change. Only
+current T123 `ref-0071` advances the manual ledger to `518/556`, the 0-600
+block to `88/93`, and Shi Yi to `199/211`. No new real-WebSocket result or
+closing claim follows. See
+`three-run-middle-slot-phrase-abstention-review-2026-07-19.md`.
+
 ### 8.15 FR28 120-second outcome and promotion ladder
 
 T117-T121 are complete. The frozen T116 packages replay byte-stably; their

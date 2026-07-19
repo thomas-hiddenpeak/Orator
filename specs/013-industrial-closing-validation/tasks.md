@@ -1,8 +1,8 @@
 # Tasks: Industrial Closing Validation
 
 **Status**: In progress - T135 reconciled T111/T123/T133; FR31 is rejected;
-FR32 completed real-WebSocket promotion; FR33-FR43 are retained bounded frozen
-repairs; the current candidate is `517/556`, with every complete 600-second
+FR32 completed real-WebSocket promotion; FR33-FR44 are retained bounded frozen
+repairs; the current candidate is `518/556`, with every complete 600-second
 block and all four per-speaker natural-turn floors passed; critical,
 confident-wrong, time-based, repeatability, holdout, T102, and T084 gates remain
 open 2026-07-19
@@ -2426,3 +2426,46 @@ open 2026-07-19
   confident-wrong attribution, time-based, real-path repeatability, and holdout
   gates remain open. See
   `complete-source-local-pair-tie-review-2026-07-19.md`.
+- [x] T176 Read `ref-0065` through `ref-0077` chronologically and in reverse
+  against `test.txt`, then diagnose the T111/T123 `ref-0071` regression on the
+  frozen common clock. Record the T111 two-run protection, T123 Shi-Tang-Shi
+  base runs, one-character middle slot, phrase gallery eligibility split, two
+  non-containing VAD records, and unchanged diarization/primary hashes. Use no
+  automated correctness label, result aggregation, candidate ranking, or
+  verdict. See
+  `three-run-middle-slot-phrase-abstention-diagnosis-2026-07-19.md`.
+- [x] T177 Specify FR44 as a generic three-run middle-slot punctuation-phrase
+  abstention. Require all existing regular phrase gates, exact `A-B-A` source
+  identity structure, one visible middle character, positive adjacent
+  alignment, matching unique primary topology, configured-duration outer
+  aligned/activity/primary coverage, session eligibility, same-top robust
+  score-only abstention, and exactly two ordered non-containing VAD records
+  with matching raw rankings. Add no TOML value, threshold, transcript,
+  timestamp, speaker lookup, reference datum, common-clock change, or
+  automated product judgment.
+- [x] T178 Implement FR44 as a read-only generic-phrase abstention predicate.
+  Preserve the retained two-run guard, the outer-selected subminimum A-B-A
+  behavior, all specialized-rule precedence, source reconstruction, and time
+  order. Add one positive and independent negative tests for every new source,
+  character-class configuration, gallery, alignment, primary, activity, and
+  VAD condition. Pass a warning-clean build and all CTest entries, then replay
+  frozen T123 and T111 at least
+  twice. Automation may verify only engineering and mechanical contracts. The
+  final build has no warning/error diagnostic, all `69/69` CTest entries pass,
+  repeated T123 output is byte-identical at
+  `174319361040f648b4f930e312986e626f6b5cba9e3d8eaad9aeaa4a0bc7e7f1`,
+  and repeated T111 output is byte-identical and unchanged from FR43 at
+  `ad2abee782ab30ff67be1a86fa46f4ec0c16b5422ae18954107c398131157aa4`.
+- [x] T179 Display the complete FR44 mechanical change scope, then read every
+  changed conversation chronologically and in reverse against `test.txt`.
+  Retain or remove FR44 only from that complete contextual semantic review.
+  If retained, synchronize spec/plan/tasks/project state and label the commit
+  as a transitional frozen experiment. Do not claim a new real-WebSocket
+  result or speaker-business closure. Complete forward and reverse reading of
+  `07:42-08:33` retains the Shi-to-Tang-to-Shi-to-Tang calculation sequence and
+  finds no neighboring contribution change. Only current T123 `ref-0071`
+  advances the manual ledger to `518/556`, the 0-600 block to `88/93`, and Shi
+  Yi to `199/211`; T111 is unchanged and is not double-counted. Critical,
+  confident-wrong, time-based, real-path repeatability, and holdout gates remain
+  open. See
+  `three-run-middle-slot-phrase-abstention-review-2026-07-19.md`.

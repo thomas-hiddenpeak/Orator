@@ -924,6 +924,319 @@ int main() {
           "subminimum primary fluctuation keeps generic phrase behavior");
   }
 
+  // ---- 18bb. FR44: a regular session-only phrase cannot erase a
+  // VAD-separated A-B-A base view when its selected B run is one character.
+  // ----
+  {
+    using Pipeline = orator::pipeline::BusinessSpeakerPipeline;
+    struct Options {
+      bool short_gate = false;
+      bool robust_score_passes = false;
+      bool robust_disagrees = false;
+      bool robust_margin_fails = false;
+      bool incomplete_phrase_gallery = false;
+      bool duplicate_session_identity = false;
+      bool duplicate_robust_identity = false;
+      bool two_character_middle = false;
+      bool punctuation_middle = false;
+      bool whitespace_middle = false;
+      bool punctuation_config_missing = false;
+      bool zero_previous_alignment = false;
+      bool zero_following_alignment = false;
+      bool different_following_outer = false;
+      bool short_middle_primary = false;
+      bool partial_middle_activity = false;
+      bool uncontested_activity = false;
+      bool insufficient_following_alignment = false;
+      bool omit_second_vad = false;
+      bool containing_first_vad = false;
+      bool overlapping_vads = false;
+      bool add_third_vad = false;
+      bool wrong_first_vad = false;
+      bool wrong_second_vad = false;
+      bool incomplete_first_vad_gallery = false;
+      bool duplicate_first_vad_identity = false;
+      bool first_vad_margin_fails = false;
+    };
+    auto run_case = [](const Options& options) {
+      Pipeline::Config config;
+      config.voiceprint_fusion_enabled = true;
+      config.speaker_overlap_tie_policy =
+          Pipeline::SpeakerOverlapTiePolicy::kPrimarySpeaker;
+      if (options.short_gate) config.voiceprint_short_max_sec = 2.0;
+      if (options.punctuation_config_missing) {
+        config.voiceprint_punctuation.clear();
+      }
+      TestBusinessSpeakerPipeline tl(config);
+
+      const std::string middle_codepoint =
+          options.punctuation_middle ? "，"
+                                     : (options.whitespace_middle ? " " : "丙");
+      const std::string source = "甲乙" + middle_codepoint + "丁戊。";
+      tl.UpsertText(0, 0.0, 2.2, source);
+      std::vector<TestBusinessSpeakerPipeline::SpeakerInput> activity;
+      if (options.uncontested_activity) {
+        activity = {{0.0, 0.8, "slot_a", 0.9f, "spk_a"},
+                    {0.8, 1.2, "slot_b", 0.9f, "spk_b"},
+                    {1.2, 2.2, "slot_a", 0.9f, "spk_a"}};
+      } else {
+        activity = {{0.0, 2.2, "slot_a", 0.9f, "spk_a"},
+                    {options.partial_middle_activity ? 0.9 : 0.0,
+                     options.partial_middle_activity ? 1.1 : 2.2, "slot_b",
+                     0.9f, "spk_b"}};
+      }
+      if (options.different_following_outer) {
+        activity.push_back({1.2, 2.2, "slot_c", 0.9f, "spk_c"});
+      }
+      tl.ReplaceSpeakers(activity);
+
+      double middle_start = 0.8;
+      double middle_end = options.two_character_middle ? 1.5 : 1.2;
+      if (options.short_middle_primary) {
+        middle_start = 0.9;
+        middle_end = 1.1;
+      }
+      tl.ReplacePrimarySpeakers(
+          {{0.0, middle_start, "slot_a", 0.9f, "spk_a"},
+           {middle_start, middle_end, "slot_b", 0.9f, "spk_b"},
+           {middle_end, 2.2, "slot_a", 0.9f,
+            options.different_following_outer ? "spk_c" : "spk_a"}});
+
+      const double following_first_end =
+          options.insufficient_following_alignment ? 1.35 : 1.65;
+      const double following_second_start = following_first_end;
+      const double following_second_end =
+          options.insufficient_following_alignment ? 1.50 : 1.95;
+      tl.UpsertAlign(
+          0, 0.0, 2.2,
+          {{0.1, 0.4, "甲"},
+           {options.zero_previous_alignment ? 0.75 : 0.45, 0.75, "乙"},
+           {0.95, 1.05, middle_codepoint},
+           {1.25, options.zero_following_alignment ? 1.25 : following_first_end,
+            "丁"},
+           {following_second_start, following_second_end, "戊"}});
+
+      std::vector<ComprehensiveTimeline::SpeakerVoiceprintEvidence> evidence;
+      ComprehensiveTimeline::SpeakerVoiceprintEvidence phrase;
+      phrase.evidence_id = "punctuation_phrase:0:0";
+      phrase.kind = "punctuation_phrase";
+      phrase.text_id = 0;
+      phrase.source_start = 0;
+      phrase.source_end = 6;
+      phrase.start = 0.1;
+      phrase.end = 1.95;
+      phrase.embedding_available = true;
+      phrase.robust_gallery_complete = !options.incomplete_phrase_gallery;
+      phrase.session_scores = {{"spk_a", 0.460f},
+                               {"spk_b", 0.575f},
+                               {"spk_c", 0.405f},
+                               {"spk_d", 0.340f}};
+      if (options.duplicate_session_identity) {
+        phrase.session_scores.push_back({"spk_c", 0.300f});
+      }
+      if (options.robust_disagrees) {
+        phrase.robust_scores = {{"spk_a", 0.544f},
+                                {"spk_b", 0.446f},
+                                {"spk_c", 0.416f},
+                                {"spk_d", 0.350f}};
+      } else if (options.robust_margin_fails) {
+        phrase.robust_scores = {{"spk_a", 0.525f},
+                                {"spk_b", 0.544f},
+                                {"spk_c", 0.416f},
+                                {"spk_d", 0.350f}};
+      } else {
+        phrase.robust_scores = {
+            {"spk_a", 0.446f},
+            {"spk_b", options.robust_score_passes ? 0.600f : 0.544f},
+            {"spk_c", 0.416f},
+            {"spk_d", 0.350f}};
+      }
+      if (options.duplicate_robust_identity) {
+        phrase.robust_scores.push_back({"spk_b", 0.543f});
+      }
+      evidence.push_back(std::move(phrase));
+
+      auto add_vad =
+          [&](const std::string& id, double start, double end,
+              const std::string& top, bool robust_gallery_complete = true,
+              bool duplicate_identity = false, bool margin_fails = false) {
+            ComprehensiveTimeline::SpeakerVoiceprintEvidence vad;
+            vad.evidence_id = id;
+            vad.kind = "vad";
+            vad.text_id = -1;
+            vad.start = start;
+            vad.end = end;
+            vad.embedding_available = true;
+            vad.robust_gallery_complete = robust_gallery_complete;
+            const std::string other = top == "spk_a" ? "spk_b" : "spk_a";
+            vad.session_scores = {{top, 0.550f},
+                                  {other, margin_fails ? 0.530f : 0.330f},
+                                  {"spk_c", 0.250f},
+                                  {"spk_d", 0.120f}};
+            vad.robust_scores = {{top, 0.520f},
+                                 {other, margin_fails ? 0.500f : 0.330f},
+                                 {"spk_c", 0.250f},
+                                 {"spk_d", 0.120f}};
+            if (duplicate_identity) {
+              vad.robust_scores.push_back({"spk_c", 0.200f});
+            }
+            evidence.push_back(std::move(vad));
+          };
+      add_vad("vad:0", 0.0,
+              options.containing_first_vad
+                  ? 2.1
+                  : (options.overlapping_vads ? 1.2 : 0.85),
+              options.wrong_first_vad ? "spk_b" : "spk_a",
+              !options.incomplete_first_vad_gallery,
+              options.duplicate_first_vad_identity,
+              options.first_vad_margin_fails);
+      if (!options.omit_second_vad) {
+        add_vad("vad:1", options.overlapping_vads ? 1.1 : 0.90, 2.1,
+                options.wrong_second_vad ? "spk_a" : "spk_b");
+      }
+      if (options.add_third_vad) {
+        add_vad("vad:2", 0.86, 0.89, "spk_a");
+      }
+      tl.ReplaceVoiceprint(evidence);
+      return tl.Snapshot();
+    };
+    auto identity_sequence = [](const auto& entries) {
+      std::vector<std::string> sequence;
+      for (const auto& entry : entries) {
+        if (sequence.empty() || sequence.back() != entry.speaker_id) {
+          sequence.push_back(entry.speaker_id);
+        }
+      }
+      return sequence;
+    };
+    auto preserves_three_runs = [&](const auto& entries) {
+      std::string rebuilt;
+      for (const auto& entry : entries) rebuilt += entry.text;
+      return rebuilt == "甲乙丙丁戊。" &&
+             identity_sequence(entries) ==
+                 std::vector<std::string>({"spk_a", "spk_b", "spk_a"});
+    };
+    auto applies_phrase = [&](const auto& entries) {
+      return !entries.empty() &&
+             std::all_of(entries.begin(), entries.end(), [](const auto& entry) {
+               return entry.speaker_id == "spk_b";
+             });
+    };
+
+    CHECK(preserves_three_runs(run_case({})),
+          "score-abstaining robust phrase preserves a VAD-separated A-B-A "
+          "base view");
+
+    Options short_gate;
+    short_gate.short_gate = true;
+    CHECK(applies_phrase(run_case(short_gate)),
+          "short-gated phrases preserve existing fusion behavior");
+    Options robust_score_passes;
+    robust_score_passes.robust_score_passes = true;
+    CHECK(applies_phrase(run_case(robust_score_passes)),
+          "eligible robust phrases preserve dual-gallery fusion");
+    Options robust_disagrees;
+    robust_disagrees.robust_disagrees = true;
+    CHECK(applies_phrase(run_case(robust_disagrees)),
+          "robust top disagreement blocks three-run abstention");
+    Options robust_margin_fails;
+    robust_margin_fails.robust_margin_fails = true;
+    CHECK(applies_phrase(run_case(robust_margin_fails)),
+          "robust margin failure blocks three-run abstention");
+    Options duplicate_robust;
+    duplicate_robust.duplicate_robust_identity = true;
+    CHECK(applies_phrase(run_case(duplicate_robust)),
+          "duplicate robust identities block three-run abstention");
+    Options incomplete_phrase_gallery;
+    incomplete_phrase_gallery.incomplete_phrase_gallery = true;
+    CHECK(applies_phrase(run_case(incomplete_phrase_gallery)),
+          "an incomplete phrase gallery blocks three-run abstention");
+    Options duplicate_session;
+    duplicate_session.duplicate_session_identity = true;
+    CHECK(applies_phrase(run_case(duplicate_session)),
+          "duplicate session identities block three-run abstention");
+    Options two_character_middle;
+    two_character_middle.two_character_middle = true;
+    CHECK(applies_phrase(run_case(two_character_middle)),
+          "multi-character middle runs preserve existing phrase fusion");
+    Options punctuation_middle;
+    punctuation_middle.punctuation_middle = true;
+    CHECK(applies_phrase(run_case(punctuation_middle)),
+          "punctuation middle slots block three-run abstention");
+    Options whitespace_middle;
+    whitespace_middle.whitespace_middle = true;
+    CHECK(applies_phrase(run_case(whitespace_middle)),
+          "whitespace middle slots block three-run abstention");
+    Options punctuation_config_missing;
+    punctuation_config_missing.punctuation_config_missing = true;
+    CHECK(applies_phrase(run_case(punctuation_config_missing)),
+          "missing punctuation configuration blocks three-run abstention");
+    Options zero_previous;
+    zero_previous.zero_previous_alignment = true;
+    CHECK(applies_phrase(run_case(zero_previous)),
+          "zero-duration preceding alignment blocks three-run abstention");
+    Options zero_following;
+    zero_following.zero_following_alignment = true;
+    CHECK(applies_phrase(run_case(zero_following)),
+          "zero-duration following alignment blocks three-run abstention");
+    Options different_outer;
+    different_outer.different_following_outer = true;
+    CHECK(applies_phrase(run_case(different_outer)),
+          "different outer identities block three-run abstention");
+    Options short_middle;
+    short_middle.short_middle_primary = true;
+    CHECK(applies_phrase(run_case(short_middle)),
+          "subminimum middle primary runs preserve phrase fusion");
+    Options partial_middle_activity;
+    partial_middle_activity.partial_middle_activity = true;
+    CHECK(applies_phrase(run_case(partial_middle_activity)),
+          "partial middle activity blocks three-run abstention");
+    Options uncontested_activity;
+    uncontested_activity.uncontested_activity = true;
+    CHECK(applies_phrase(run_case(uncontested_activity)),
+          "non-primary adjacent provenance blocks three-run abstention");
+    Options short_outer_alignment;
+    short_outer_alignment.insufficient_following_alignment = true;
+    CHECK(applies_phrase(run_case(short_outer_alignment)),
+          "insufficient outer alignment blocks three-run abstention");
+    Options one_vad;
+    one_vad.omit_second_vad = true;
+    CHECK(applies_phrase(run_case(one_vad)),
+          "one VAD cannot establish the three-run representation");
+    Options containing_vad;
+    containing_vad.containing_first_vad = true;
+    CHECK(applies_phrase(run_case(containing_vad)),
+          "a containing VAD blocks three-run abstention");
+    Options overlapping_vads;
+    overlapping_vads.overlapping_vads = true;
+    CHECK(applies_phrase(run_case(overlapping_vads)),
+          "overlapping VADs block three-run abstention");
+    Options third_vad;
+    third_vad.add_third_vad = true;
+    CHECK(applies_phrase(run_case(third_vad)),
+          "a third overlapping VAD blocks three-run abstention");
+    Options wrong_first_vad;
+    wrong_first_vad.wrong_first_vad = true;
+    CHECK(applies_phrase(run_case(wrong_first_vad)),
+          "a different first VAD rank blocks three-run abstention");
+    Options wrong_second_vad;
+    wrong_second_vad.wrong_second_vad = true;
+    CHECK(applies_phrase(run_case(wrong_second_vad)),
+          "a different second VAD rank blocks three-run abstention");
+    Options incomplete_vad;
+    incomplete_vad.incomplete_first_vad_gallery = true;
+    CHECK(applies_phrase(run_case(incomplete_vad)),
+          "an incomplete VAD gallery blocks three-run abstention");
+    Options duplicate_vad;
+    duplicate_vad.duplicate_first_vad_identity = true;
+    CHECK(applies_phrase(run_case(duplicate_vad)),
+          "duplicate VAD identities block three-run abstention");
+    Options vad_margin;
+    vad_margin.first_vad_margin_fails = true;
+    CHECK(applies_phrase(run_case(vad_margin)),
+          "a VAD margin failure blocks three-run abstention");
+  }
+
   // ---- 18c. FR32 preserves only an exact business-interval/TitaNet-backed
   // short primary A-B-A return from an ordinary phrase repaint. ----
   {
