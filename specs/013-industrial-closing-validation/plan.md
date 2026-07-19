@@ -3601,6 +3601,40 @@ real-path repeatability, and holdout gates remain open. FR41 remains a
 transitional frozen repair, not a real-stream acceptance result. See
 `primary-onset-single-unit-partition-review-2026-07-19.md`.
 
+FR42 addresses the remaining T111/T123 partition regression at critical
+`ref-0432` by extending only the retained isolated-VAD aligned-island rule.
+Both packages have identical coarse Tang activity and primary tracks, the same
+isolated `2851.172-2851.868` VAD, and independent session/robust VAD views that
+select Zhu. T111 exposes three source-contiguous positive units and already
+uses the retained rule. T123 exposes two positive units around one visible
+zero-duration source character; their temporal gap remains below the existing
+alignment-pause value.
+
+The implementation preserves the current contiguous path and adds one
+strict alignment-dropout path. It requires the existing configured minimum
+unit count, one-character units, exactly one one-character source gap, a
+visible non-whitespace/non-punctuation missing character, and a sub-pause
+temporal gap. It reuses every existing VAD, dual-gallery, isolation, label,
+activity, and primary guard and writes only from the first positive unit
+through the last. No TOML value, threshold, transcript, identity, or producer
+track changes.
+
+Focused tests preserve the existing positive and abstention matrix and add
+independent dropout checks for source/unit cardinality, source validity,
+missing-character type, gap count and width, temporal order and pause, and
+write scope. The warning-clean build and all 69 CTest entries pass. Final T123
+and T111 projector replays are separately byte-identical; T111 is unchanged,
+and T123 splits only the bounded `ref-0432` source.
+
+Complete chronological and reverse contextual semantic review of
+`45:47-49:42` retains FR42. The bounded response island belongs to Zhu Jie;
+the remaining `思？` is a non-independent ASR suffix whose zero-duration
+alignment falls after the target VAD, so it remains visible under Tang rather
+than being repainted. Only current T123 `ref-0432` advances the manual ledger,
+to `516/556`; no new real-WebSocket result or closing claim follows. See
+`isolated-vad-single-character-alignment-gap-diagnosis-2026-07-19.md` and
+`isolated-vad-single-character-alignment-gap-review-2026-07-19.md`.
+
 ### 8.15 FR28 120-second outcome and promotion ladder
 
 T117-T121 are complete. The frozen T116 packages replay byte-stably; their

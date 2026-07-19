@@ -3009,6 +3009,226 @@ int main() {
           "discontinuous aligned source preserves the direct identity");
   }
 
+  // ---- 20g7b. FR42: one visible source character dropped to zero alignment
+  // duration may remain inside the same isolated dual-gallery VAD island.
+  // ----
+  {
+    using Entry = ComprehensiveTimeline::Entry;
+    struct DropoutCase {
+      bool punctuation_gap = false;
+      bool whitespace_gap = false;
+      bool wide_gap = false;
+      bool long_time_gap = false;
+      bool overlapping_time = false;
+      bool multi_character_unit = false;
+      bool extra_unit = false;
+      bool multiple_gaps = false;
+      bool valid_source_range = true;
+      bool punctuation_configured = true;
+      int minimum_units = 2;
+    };
+    auto run_case = [](const DropoutCase& options) -> std::vector<Entry> {
+      BusinessSpeakerPipeline::Config config;
+      config.voiceprint_fusion_enabled = true;
+      config.align_snap_pause_sec = 0.25;
+      config.voiceprint_four_view_min_aligned_units = options.minimum_units;
+      if (!options.punctuation_configured) {
+        config.voiceprint_punctuation.clear();
+      }
+      TestBusinessSpeakerPipeline tl(config);
+      tl.ReplaceSpeakers({{0.8, 1.8, "slot_0", 0.9f, "spk_a"}});
+      tl.ReplacePrimarySpeakers(
+          {{0.8, 1.8, "slot_0", 0.9f, "spk_a"}});
+
+      std::string source = "甲中乙，尾";
+      int character_count = 5;
+      int first_start = 0;
+      int first_end = 1;
+      int second_start = 2;
+      int second_end = 3;
+      int third_start = 0;
+      int third_end = 0;
+      if (options.punctuation_gap) {
+        source = "甲，乙，尾";
+      } else if (options.whitespace_gap) {
+        source = "甲 乙，尾";
+      } else if (options.wide_gap) {
+        source = "甲中间乙，尾";
+        character_count = 6;
+        second_start = 3;
+        second_end = 4;
+      } else if (options.multi_character_unit) {
+        source = "甲乙中丙，尾";
+        character_count = 6;
+        first_end = 2;
+        second_start = 3;
+        second_end = 4;
+      } else if (options.multiple_gaps) {
+        source = "甲中乙间丙，尾";
+        character_count = 7;
+        second_start = 2;
+        second_end = 3;
+        third_start = 4;
+        third_end = 5;
+      } else if (options.extra_unit) {
+        source = "甲中乙丙，尾";
+        character_count = 6;
+        third_start = 3;
+        third_end = 4;
+      }
+      if (!options.valid_source_range) first_start = -1;
+
+      const double first_unit_start = 1.0;
+      const double first_unit_end = 1.2;
+      double second_unit_start = 1.3;
+      if (options.long_time_gap) second_unit_start = 1.45;
+      if (options.overlapping_time) second_unit_start = 1.1;
+      const double second_unit_end = second_unit_start + 0.1;
+      const double third_unit_start = second_unit_end + 0.1;
+      const double third_unit_end = third_unit_start + 0.1;
+
+      tl.UpsertText(0, 0.8, 1.8, source);
+      std::vector<TestBusinessSpeakerPipeline::AlignUnitSeg> alignment = {
+          {first_unit_start, first_unit_end, "甲"},
+          {second_unit_start, second_unit_end, "乙"}};
+      if (options.extra_unit || options.multiple_gaps) {
+        alignment.push_back({third_unit_start, third_unit_end, "丙"});
+      }
+      tl.UpsertAlign(0, 0.8, 1.8, alignment);
+
+      std::vector<ComprehensiveTimeline::SpeakerVoiceprintEvidence> evidence;
+      ComprehensiveTimeline::SpeakerVoiceprintEvidence direct;
+      direct.evidence_id = "business_interval:0:0";
+      direct.kind = "business_interval";
+      direct.text_id = 0;
+      direct.source_start = 0;
+      direct.source_end = character_count;
+      direct.start = first_unit_start;
+      direct.end = third_end > 0.0 ? third_unit_end : second_unit_end;
+      direct.embedding_available = true;
+      direct.session_scores = {{"spk_a", 0.70f}, {"spk_b", 0.20f}};
+      evidence.push_back(direct);
+
+      auto add_unit = [&](const std::string& evidence_id, int source_start,
+                          int source_end, double start, double end) {
+        ComprehensiveTimeline::SpeakerVoiceprintEvidence unit;
+        unit.evidence_id = evidence_id;
+        unit.kind = "aligned_unit";
+        unit.text_id = 0;
+        unit.source_start = source_start;
+        unit.source_end = source_end;
+        unit.start = start;
+        unit.end = end;
+        evidence.push_back(unit);
+      };
+      add_unit("aligned_unit:0:0", first_start, first_end, first_unit_start,
+               first_unit_end);
+      add_unit("aligned_unit:0:1", second_start, second_end, second_unit_start,
+               second_unit_end);
+      if (options.extra_unit || options.multiple_gaps) {
+        add_unit("aligned_unit:0:2", third_start, third_end, third_unit_start,
+                 third_unit_end);
+      }
+
+      ComprehensiveTimeline::SpeakerVoiceprintEvidence previous_vad;
+      previous_vad.evidence_id = "vad:0";
+      previous_vad.kind = "vad";
+      previous_vad.text_id = -1;
+      previous_vad.start = 0.0;
+      previous_vad.end = 0.5;
+      ComprehensiveTimeline::SpeakerVoiceprintEvidence target_vad;
+      target_vad.evidence_id = "vad:1";
+      target_vad.kind = "vad";
+      target_vad.text_id = -1;
+      target_vad.start = 0.9;
+      target_vad.end = 1.8;
+      target_vad.embedding_available = true;
+      target_vad.robust_gallery_complete = true;
+      target_vad.session_scores = {{"spk_a", 0.30f}, {"spk_b", 0.65f}};
+      target_vad.robust_scores = {{"spk_a", 0.31f}, {"spk_b", 0.64f}};
+      ComprehensiveTimeline::SpeakerVoiceprintEvidence next_vad;
+      next_vad.evidence_id = "vad:2";
+      next_vad.kind = "vad";
+      next_vad.text_id = -1;
+      next_vad.start = 2.2;
+      next_vad.end = 2.6;
+      evidence.push_back(previous_vad);
+      evidence.push_back(target_vad);
+      evidence.push_back(next_vad);
+      tl.ReplaceVoiceprint(evidence);
+      return tl.Snapshot();
+    };
+
+    auto has_override = [](const std::vector<Entry>& entries) {
+      return std::any_of(entries.begin(), entries.end(), [](const auto& entry) {
+        return entry.speaker_decision.reason ==
+               "voiceprint_vad_isolated_aligned_island_override";
+      });
+    };
+    auto has_fragment = [](const std::vector<Entry>& entries,
+                           const std::string& fragment,
+                           const std::string& speaker_id) {
+      return std::any_of(entries.begin(), entries.end(), [&](const auto& entry) {
+        return entry.text.find(fragment) != std::string::npos &&
+               entry.speaker_id == speaker_id;
+      });
+    };
+
+    const auto positive = run_case({});
+    CHECK(has_override(positive),
+          "isolated VAD retains a one-character alignment dropout");
+    CHECK(has_fragment(positive, "甲中乙", "spk_b"),
+          "dropout write includes only the bounded internal character");
+    CHECK(has_fragment(positive, "尾", "spk_a"),
+          "dropout write preserves the trailing direct source text");
+
+    DropoutCase punctuation_gap;
+    punctuation_gap.punctuation_gap = true;
+    CHECK(!has_override(run_case(punctuation_gap)),
+          "punctuation dropout preserves the direct identity");
+    DropoutCase whitespace_gap;
+    whitespace_gap.whitespace_gap = true;
+    CHECK(!has_override(run_case(whitespace_gap)),
+          "whitespace dropout preserves the direct identity");
+    DropoutCase wide_gap;
+    wide_gap.wide_gap = true;
+    CHECK(!has_override(run_case(wide_gap)),
+          "multi-character source gap preserves the direct identity");
+    DropoutCase long_gap;
+    long_gap.long_time_gap = true;
+    CHECK(!has_override(run_case(long_gap)),
+          "alignment-pause-sized time gap preserves the direct identity");
+    DropoutCase overlapping_time;
+    overlapping_time.overlapping_time = true;
+    CHECK(!has_override(run_case(overlapping_time)),
+          "overlapping aligned units preserve the direct identity");
+    DropoutCase multi_character_unit;
+    multi_character_unit.multi_character_unit = true;
+    CHECK(!has_override(run_case(multi_character_unit)),
+          "multi-character aligned unit preserves the direct identity");
+    DropoutCase extra_unit;
+    extra_unit.extra_unit = true;
+    CHECK(!has_override(run_case(extra_unit)),
+          "extra positive aligned unit preserves the direct identity");
+    DropoutCase multiple_gaps;
+    multiple_gaps.multiple_gaps = true;
+    multiple_gaps.minimum_units = 3;
+    CHECK(!has_override(run_case(multiple_gaps)),
+          "multiple one-character gaps preserve the direct identity");
+    DropoutCase invalid_source;
+    invalid_source.valid_source_range = false;
+    CHECK(!has_override(run_case(invalid_source)),
+          "invalid aligned source range preserves the direct identity");
+    DropoutCase insufficient_units;
+    insufficient_units.minimum_units = 3;
+    CHECK(!has_override(run_case(insufficient_units)),
+          "configured aligned-unit minimum remains authoritative");
+    DropoutCase missing_punctuation_config;
+    missing_punctuation_config.punctuation_configured = false;
+    CHECK(!has_override(run_case(missing_punctuation_config)),
+          "missing punctuation configuration preserves the direct identity");
+  }
+
   // ---- 20g8. FR16ABE: a short primary/activity island at a separately
   // bounded VAD onset may own only its complete aligned source before the
   // current identity resumes gaplessly. ----

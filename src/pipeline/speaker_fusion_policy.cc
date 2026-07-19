@@ -3017,9 +3017,50 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
         units.back()->source_end > character_count) {
       return std::nullopt;
     }
+    std::optional<int> missing_source_index;
     for (std::size_t index = 1; index < units.size(); ++index) {
-      if (units[index - 1]->source_end != units[index]->source_start ||
+      if (units[index - 1]->source_end > units[index]->source_start ||
           units[index]->start + 1e-9 < units[index - 1]->end) {
+        return std::nullopt;
+      }
+      if (units[index - 1]->source_end == units[index]->source_start) {
+        continue;
+      }
+      if (missing_source_index ||
+          units[index]->source_start != units[index - 1]->source_end + 1 ||
+          units[index]->start - units[index - 1]->end + 1e-9 >=
+              pipeline.config_.align_snap_pause_sec) {
+        return std::nullopt;
+      }
+      missing_source_index = units[index - 1]->source_end;
+    }
+    if (missing_source_index) {
+      if (static_cast<int>(units.size()) !=
+              pipeline.config_.voiceprint_four_view_min_aligned_units ||
+          pipeline.config_.voiceprint_punctuation.empty()) {
+        return std::nullopt;
+      }
+      for (const auto* unit : units) {
+        if (unit->source_start < 0 || unit->source_end > character_count ||
+            unit->source_end != unit->source_start + 1) {
+          return std::nullopt;
+        }
+      }
+      std::set<std::string> punctuation;
+      const auto punctuation_offsets =
+          Utf8Offsets(pipeline.config_.voiceprint_punctuation);
+      for (std::size_t index = 0; index + 1 < punctuation_offsets.size();
+           ++index) {
+        punctuation.insert(pipeline.config_.voiceprint_punctuation.substr(
+            punctuation_offsets[index],
+            punctuation_offsets[index + 1] - punctuation_offsets[index]));
+      }
+      const auto missing_codepoint = text.text.substr(
+          offsets[*missing_source_index],
+          offsets[*missing_source_index + 1] - offsets[*missing_source_index]);
+      if (missing_codepoint == " " || missing_codepoint == "\t" ||
+          missing_codepoint == "\n" || missing_codepoint == "\r" ||
+          punctuation.count(missing_codepoint) != 0) {
         return std::nullopt;
       }
     }

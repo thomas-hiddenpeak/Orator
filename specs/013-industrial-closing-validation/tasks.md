@@ -1,8 +1,8 @@
 # Tasks: Industrial Closing Validation
 
 **Status**: In progress - T135 reconciled T111/T123/T133; FR31 is rejected;
-FR32 completed real-WebSocket promotion; FR33-FR41 are retained bounded frozen
-repairs; the current candidate is `515/556`, with every complete 600-second
+FR32 completed real-WebSocket promotion; FR33-FR42 are retained bounded frozen
+repairs; the current candidate is `516/556`, with every complete 600-second
 block and all four per-speaker natural-turn floors passed; critical,
 confident-wrong, time-based, repeatability, holdout, T102, and T084 gates remain
 open 2026-07-19
@@ -2358,3 +2358,36 @@ open 2026-07-19
   confident-wrong attribution, time-based, real-path repeatability, and
   holdout gates remain open. See
   `primary-onset-single-unit-partition-review-2026-07-19.md`.
+- [x] T170 Diagnose the frozen T111/T123 critical `ref-0432` partition
+  regression on the common clock. Specify FR42 as a single-character
+  alignment-dropout representation of the retained isolated-VAD aligned-
+  island rule, preserving every existing VAD, gallery, isolation, label,
+  activity, primary, duration, and ranking guard. Add no TOML value,
+  threshold, transcript, timestamp, identity lookup, reference datum, or
+  product verdict. See
+  `isolated-vad-single-character-alignment-gap-diagnosis-2026-07-19.md`.
+- [x] T171 Implement FR42 with the existing contiguous positive shape, the new
+  one-character alignment-dropout positive shape, and independent abstention
+  tests for every added source, unit, gap, character-type, timing, cardinality,
+  and write-scope condition. Pass a warning-clean build and all CTest entries,
+  then replay frozen T123 and T111 producer packages at least twice.
+  Automation may verify only engineering and mechanical contracts; it may not
+  label correctness, aggregate accuracy, select the candidate, or issue an
+  acceptance verdict. The final build has no warning/error diagnostic, all
+  `69/69` CTest entries pass, repeated T123 output is byte-identical at
+  `00499131119515f91a5a6592a49b37190c1462a7804f45c76190f2c011efe6c7`,
+  and repeated T111 output is byte-identical and unchanged from FR41 at
+  `ad2abee782ab30ff67be1a86fa46f4ec0c16b5422ae18954107c398131157aa4`.
+- [x] T172 Read every FR42 changed complete conversation chronologically and
+  in reverse against `test.txt`. Retain or remove FR42 only from that complete
+  contextual semantic review, synchronize spec/plan/tasks/project state, and
+  label any retained commit as a transitional frozen experiment. Do not
+  attribute a new real-WebSocket result or speaker-business closure to the
+  replay. Complete forward and reverse reading of `45:47-49:42` retains the
+  Tang-to-Zhu-to-Tang valuation handoff. The unsupported `思？` suffix remains
+  explicit for speaker-time review and is not a separate substantive turn.
+  Only current T123 `ref-0432` advances the manual ledger to `516/556`, Zhu Jie
+  to `76/83`, and the 2400-3000 block to `118/129`; T111 is not double-counted.
+  Critical attribution, confident-wrong attribution, time-based, real-path
+  repeatability, and holdout gates remain open. See
+  `isolated-vad-single-character-alignment-gap-review-2026-07-19.md`.

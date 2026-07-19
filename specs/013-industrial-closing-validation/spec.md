@@ -34,8 +34,12 @@ the current frozen candidate to `514/556` without a new real-path claim; FR41
 retains the single-unit source partition of the same primary-onset aligned-
 island rule at `ref-0268`, moving the current frozen candidate to `515/556`
 and passing all four per-speaker natural-turn floors without a new real-path
-claim; critical attribution, confident-wrong attribution, T102, T084, full
-canonical closure, release sign-off, and industrial readiness remain open
+claim; FR42 diagnosis isolates the critical `ref-0432` T111/T123 regression to
+one zero-duration character inside an otherwise retained isolated-VAD aligned
+island; deterministic replay and complete forward/reverse contextual review
+retain the bounded repair at `516/556` without a new real-path claim; critical
+attribution, confident-wrong attribution, T102, T084, full canonical closure,
+release sign-off, and industrial readiness remain open
 **Created**: 2026-07-13
 **Scope**: Re-establish a truthful product baseline, recover full-session business
 accuracy, and define the evidence required before Orator may be declared closed.
@@ -2437,6 +2441,31 @@ subject to the complete acceptance gates in this spec.
   conversation MUST receive chronological and reverse contextual semantic
   review against `test.txt` before retention or a new audio run. See
   `primary-onset-single-unit-partition-diagnosis-2026-07-19.md`.
+- **FR42**: The retained isolated-VAD aligned-island rule MAY recognize one
+  alignment-dropout representation when the positive aligned units equal the
+  existing configured minimum count and exactly one visible source character
+  lies between one neighboring unit pair. Every unit MUST map exactly one
+  valid source character, remain temporally ordered, and belong to the current
+  ASR source wholly inside the VAD. The missing character MUST be visible,
+  non-whitespace, and non-configured-punctuation; all other unit pairs MUST be
+  source-contiguous. The temporal gap around the missing character MUST be
+  strictly below the existing alignment-pause value. Every existing VAD
+  duration, embedding, robust completeness, isolation, preceding/following
+  pause, dual-gallery identity/rank/gate, uniform direct-label, single-slot
+  activity, competing-activity, covering-primary, and current-identity
+  condition MUST remain required. Only the bounded source span from the first
+  positive unit through the last positive unit, including the one internal
+  missing character, may change. Missing, duplicate, extra-unit,
+  multi-character-unit, invalid-source, punctuation-gap, whitespace-gap,
+  multi-character-gap, long-time-gap, mixed-label, activity, primary, VAD, or
+  gallery evidence MUST preserve existing behavior. FR42 MUST add no TOML
+  value, threshold, duration, score, margin, transcript lookup, speaker name,
+  known timestamp, reference datum, or fitted constant and MUST alter no
+  producer evidence or common-clock coordinate. Frozen T111/T123 inputs MUST
+  replay deterministically, and every changed complete conversation MUST
+  receive chronological and reverse contextual semantic review against
+  `test.txt` before retention or a new audio run. See
+  `isolated-vad-single-character-alignment-gap-diagnosis-2026-07-19.md`.
 
 FR40 passes its frozen gate. Repeated T123 outputs are byte-identical and
 change only Xu Zijing's `184.240-184.320` response. Repeated T111 outputs are
@@ -2461,6 +2490,20 @@ natural-turn ledger advances to `75/83`, so all four per-speaker natural-turn
 floors now pass. Critical attribution, confident-wrong attribution, time-based
 evidence, real-path repeatability, and holdout gates remain open. See
 `primary-onset-single-unit-partition-review-2026-07-19.md`.
+
+FR42 passes its frozen gate. Final clean-binary T123 replays are byte-identical
+and split only the `ref-0432` response source: the bounded `什么意` fragment
+moves to Zhu Jie, while the unsupported zero-duration `思？` suffix remains
+with Tang Yunfeng as an explicit source-time residual. T111 is separately
+byte-identical and unchanged from FR41. Complete forward and reverse reading
+of `45:47-49:42` retains the Tang-to-Zhu-to-Tang valuation handoff and finds no
+neighboring contribution change. Only current T123 `ref-0432` advances the
+manually reconciled frozen ledger to `516/556`; T111 is partition evidence and
+is not double-counted. Zhu Jie advances to `76/83`, and the 2400-3000 block
+advances to `118/129`. Critical attribution, confident-wrong attribution,
+time-based evidence, real-path repeatability, and holdout gates remain open.
+See
+`isolated-vad-single-character-alignment-gap-review-2026-07-19.md`.
 
 The first FR31 implementation passed its focused engineering test and produced
 byte-stable repeated T111 and T123 replays. Complete forward and reverse review
