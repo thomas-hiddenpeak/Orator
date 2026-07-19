@@ -3139,6 +3139,264 @@ int main() {
           "VAD ranking disagreement preserves the voiceprint identity");
   }
 
+  // ---- 20g8b. FR41: the same pause-onset primary/activity island remains
+  // available when punctuation leaves only one aligned unit inside the run.
+  // ----
+  {
+    using Entry = ComprehensiveTimeline::Entry;
+    struct BoundaryCase {
+      bool include_previous = true;
+      bool previous_same_source = true;
+      bool valid_previous_source_range = true;
+      bool duplicate_previous = false;
+      bool punctuation_gap = true;
+      bool empty_gap = false;
+      bool temporal_pause = true;
+      bool include_next = true;
+      bool valid_next_source_range = true;
+      bool duplicate_next = false;
+      bool next_adjacent = true;
+      bool next_after_run = true;
+      bool visible_candidate = true;
+      bool whitespace_candidate = false;
+      bool positive_candidate = true;
+      bool single_character_candidate = true;
+      bool extra_candidate_unit = false;
+      int minimum_units = 2;
+    };
+    auto run_case = [](const BoundaryCase& options) -> std::vector<Entry> {
+      BusinessSpeakerPipeline::Config config;
+      config.voiceprint_fusion_enabled = true;
+      config.align_snap_pause_sec = 0.25;
+      config.voiceprint_four_view_min_aligned_units = options.minimum_units;
+      TestBusinessSpeakerPipeline tl(config);
+
+      constexpr double candidate_start = 0.8;
+      constexpr double candidate_end = 1.4;
+      constexpr double candidate_unit_start = 0.9;
+      const double candidate_unit_end =
+          options.positive_candidate ? 1.05 : candidate_unit_start;
+      const double previous_unit_end = options.temporal_pause ? 0.4 : 0.7;
+      const double next_unit_start = options.next_after_run ? 1.5 : 1.3;
+      const double next_unit_end = next_unit_start + 0.15;
+
+      std::string source = "甲，乙丙";
+      std::string candidate_text = "乙";
+      int source_count = 4;
+      int candidate_source_start = 2;
+      int next_source_start = 3;
+      if (options.empty_gap) {
+        source = "甲乙丙";
+        source_count = 3;
+        candidate_source_start = 1;
+        next_source_start = 2;
+      } else if (!options.punctuation_gap) {
+        source = "甲丁乙丙";
+      } else if (!options.next_adjacent || options.extra_candidate_unit) {
+        source = "甲，乙丁丙";
+        source_count = 5;
+        next_source_start = 4;
+      } else if (options.whitespace_candidate) {
+        source = "甲， 丙";
+        candidate_text = " ";
+      } else if (!options.visible_candidate) {
+        source = "甲，，丙";
+        candidate_text = "，";
+      }
+
+      tl.ReplaceSpeakers({{0.0, 2.2, "slot_0", 0.9f, "spk_a"},
+                          {candidate_start, candidate_end, "slot_1", 0.9f,
+                           "spk_b"}});
+      tl.ReplacePrimarySpeakers(
+          {{0.0, 0.5, "slot_0", 0.9f, "spk_a"},
+           {candidate_start, candidate_end, "slot_1", 0.9f, "spk_b"},
+           {candidate_end, 2.2, "slot_0", 0.9f, "spk_a"}});
+      tl.UpsertText(0, 0.0, 2.2, source);
+      std::vector<TestBusinessSpeakerPipeline::AlignUnitSeg> alignment = {
+          {0.2, previous_unit_end, "甲"},
+          {candidate_unit_start, candidate_unit_end, candidate_text}};
+      if (options.extra_candidate_unit) {
+        alignment.push_back({1.1, 1.25, "丁"});
+      }
+      alignment.push_back({next_unit_start, next_unit_end, "丙"});
+      tl.UpsertAlign(0, 0.0, 2.2, alignment);
+
+      std::vector<ComprehensiveTimeline::SpeakerVoiceprintEvidence> evidence;
+      ComprehensiveTimeline::SpeakerVoiceprintEvidence phrase;
+      phrase.evidence_id = "punctuation_phrase:0:0";
+      phrase.kind = "punctuation_phrase";
+      phrase.text_id = 0;
+      phrase.source_start = 0;
+      phrase.source_end = source_count;
+      phrase.start = 0.2;
+      phrase.end = next_unit_end;
+      phrase.embedding_available = true;
+      phrase.robust_gallery_complete = true;
+      phrase.session_scores = {{"spk_a", 0.70f}, {"spk_b", 0.20f}};
+      phrase.robust_scores = {{"spk_a", 0.69f}, {"spk_b", 0.21f}};
+      evidence.push_back(phrase);
+
+      auto add_unit = [&](const std::string& evidence_id, long text_id,
+                          int source_start, int source_end, double start,
+                          double end) {
+        ComprehensiveTimeline::SpeakerVoiceprintEvidence unit;
+        unit.evidence_id = evidence_id;
+        unit.kind = "aligned_unit";
+        unit.text_id = text_id;
+        unit.source_start = source_start;
+        unit.source_end = source_end;
+        unit.start = start;
+        unit.end = end;
+        evidence.push_back(unit);
+      };
+      if (options.include_previous) {
+        add_unit("aligned_unit:previous",
+                 options.previous_same_source ? 0 : 1,
+                 options.valid_previous_source_range ? 0 : -1, 1, 0.2,
+                 previous_unit_end);
+      }
+      if (options.duplicate_previous) {
+        add_unit("aligned_unit:previous-duplicate", 0, 0, 1, 0.2,
+                 previous_unit_end);
+      }
+      add_unit("aligned_unit:candidate", 0, candidate_source_start,
+               candidate_source_start +
+                   (options.single_character_candidate ? 1 : 2),
+               candidate_unit_start, candidate_unit_end);
+      if (options.extra_candidate_unit) {
+        add_unit("aligned_unit:extra", 0, 3, 4, 1.1, 1.25);
+      }
+      if (options.include_next) {
+        add_unit("aligned_unit:next", 0, next_source_start,
+                 next_source_start +
+                     (options.valid_next_source_range ? 1 : 0),
+                 next_unit_start, next_unit_end);
+      }
+      if (options.duplicate_next) {
+        add_unit("aligned_unit:next-duplicate", 0, next_source_start,
+                 next_source_start + 1, next_unit_start, next_unit_end);
+      }
+
+      ComprehensiveTimeline::SpeakerVoiceprintEvidence previous_vad;
+      previous_vad.evidence_id = "vad:0";
+      previous_vad.kind = "vad";
+      previous_vad.text_id = -1;
+      previous_vad.start = 0.0;
+      previous_vad.end = 0.4;
+      ComprehensiveTimeline::SpeakerVoiceprintEvidence target_vad;
+      target_vad.evidence_id = "vad:1";
+      target_vad.kind = "vad";
+      target_vad.text_id = -1;
+      target_vad.start = candidate_start + 0.02;
+      target_vad.end = 2.0;
+      target_vad.embedding_available = true;
+      target_vad.robust_gallery_complete = true;
+      target_vad.session_scores = {{"spk_a", 0.50f}, {"spk_b", 0.40f}};
+      target_vad.robust_scores = target_vad.session_scores;
+      evidence.push_back(previous_vad);
+      evidence.push_back(target_vad);
+      tl.ReplaceVoiceprint(evidence);
+      return tl.Snapshot();
+    };
+
+    auto has_override = [](const std::vector<Entry>& entries) {
+      return std::any_of(entries.begin(), entries.end(), [](const auto& entry) {
+        return entry.speaker_decision.reason ==
+               "primary_speaker_pause_onset_aligned_island_override";
+      });
+    };
+    auto has_fragment = [](const std::vector<Entry>& entries,
+                           const std::string& fragment,
+                           const std::string& speaker_id) {
+      return std::any_of(entries.begin(), entries.end(), [&](const auto& entry) {
+        return entry.text.find(fragment) != std::string::npos &&
+               entry.speaker_id == speaker_id;
+      });
+    };
+
+    const auto positive = run_case({});
+    CHECK(has_override(positive),
+          "single-unit source partition retains the pause-onset override");
+    CHECK(has_fragment(positive, "乙", "spk_b"),
+          "single-unit source partition writes the candidate identity");
+    CHECK(has_fragment(positive, "甲", "spk_a") &&
+              has_fragment(positive, "丙", "spk_a"),
+          "single-unit write preserves previous and following source text");
+
+    BoundaryCase missing_previous;
+    missing_previous.include_previous = false;
+    CHECK(!has_override(run_case(missing_previous)),
+          "missing previous aligned unit preserves the voiceprint identity");
+    BoundaryCase different_source;
+    different_source.previous_same_source = false;
+    CHECK(!has_override(run_case(different_source)),
+          "different previous ASR source preserves the voiceprint identity");
+    BoundaryCase duplicate_previous;
+    duplicate_previous.duplicate_previous = true;
+    CHECK(!has_override(run_case(duplicate_previous)),
+          "duplicate previous aligned unit preserves the voiceprint identity");
+    BoundaryCase invalid_previous_source;
+    invalid_previous_source.valid_previous_source_range = false;
+    CHECK(!has_override(run_case(invalid_previous_source)),
+          "invalid previous source range preserves the voiceprint identity");
+    BoundaryCase empty_gap;
+    empty_gap.empty_gap = true;
+    CHECK(!has_override(run_case(empty_gap)),
+          "empty source gap preserves the voiceprint identity");
+    BoundaryCase visible_gap;
+    visible_gap.punctuation_gap = false;
+    CHECK(!has_override(run_case(visible_gap)),
+          "nonpunctuation source gap preserves the voiceprint identity");
+    BoundaryCase short_pause;
+    short_pause.temporal_pause = false;
+    CHECK(!has_override(run_case(short_pause)),
+          "short aligned pause preserves the voiceprint identity");
+    BoundaryCase missing_next;
+    missing_next.include_next = false;
+    CHECK(!has_override(run_case(missing_next)),
+          "missing following aligned unit preserves the voiceprint identity");
+    BoundaryCase duplicate_next;
+    duplicate_next.duplicate_next = true;
+    CHECK(!has_override(run_case(duplicate_next)),
+          "duplicate following aligned unit preserves current identity");
+    BoundaryCase invalid_next_source;
+    invalid_next_source.valid_next_source_range = false;
+    CHECK(!has_override(run_case(invalid_next_source)),
+          "invalid following source range preserves the voiceprint identity");
+    BoundaryCase nonadjacent_next;
+    nonadjacent_next.next_adjacent = false;
+    CHECK(!has_override(run_case(nonadjacent_next)),
+          "nonadjacent following source preserves the voiceprint identity");
+    BoundaryCase next_inside_run;
+    next_inside_run.next_after_run = false;
+    CHECK(!has_override(run_case(next_inside_run)),
+          "following unit inside the primary run preserves current identity");
+    BoundaryCase punctuation_candidate;
+    punctuation_candidate.visible_candidate = false;
+    CHECK(!has_override(run_case(punctuation_candidate)),
+          "punctuation candidate preserves the voiceprint identity");
+    BoundaryCase whitespace_candidate;
+    whitespace_candidate.whitespace_candidate = true;
+    CHECK(!has_override(run_case(whitespace_candidate)),
+          "whitespace candidate preserves the voiceprint identity");
+    BoundaryCase zero_duration_candidate;
+    zero_duration_candidate.positive_candidate = false;
+    CHECK(!has_override(run_case(zero_duration_candidate)),
+          "nonpositive candidate unit preserves the voiceprint identity");
+    BoundaryCase wide_candidate;
+    wide_candidate.single_character_candidate = false;
+    CHECK(!has_override(run_case(wide_candidate)),
+          "multi-character candidate preserves the voiceprint identity");
+    BoundaryCase extra_candidate;
+    extra_candidate.extra_candidate_unit = true;
+    CHECK(!has_override(run_case(extra_candidate)),
+          "multiple in-run units stay outside the single-unit partition");
+    BoundaryCase insufficient_units;
+    insufficient_units.minimum_units = 3;
+    CHECK(!has_override(run_case(insufficient_units)),
+          "configured aligned-unit minimum remains authoritative");
+  }
+
   // ---- 20g9. FR16ABF: a no-embedding subminimum business interval may
   // recover its local slot's initial identity only under independent VAD and
   // aligned-unit isolation. ----

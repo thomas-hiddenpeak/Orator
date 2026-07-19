@@ -1,9 +1,11 @@
 # Tasks: Industrial Closing Validation
 
-**Status**: In progress - T135 reconciled T111/T123/T133; FR31 rejected by
-complete changed-context review; FR32 retained by frozen review and awaiting
-real-WebSocket promotion; no full candidate passes all natural-turn gates;
-T102/T084 remain open 2026-07-19
+**Status**: In progress - T135 reconciled T111/T123/T133; FR31 is rejected;
+FR32 completed real-WebSocket promotion; FR33-FR41 are retained bounded frozen
+repairs; the current candidate is `515/556`, with every complete 600-second
+block and all four per-speaker natural-turn floors passed; critical,
+confident-wrong, time-based, repeatability, holdout, T102, and T084 gates remain
+open 2026-07-19
 
 ## Phase 0: Governance
 
@@ -2319,3 +2321,40 @@ T102/T084 remain open 2026-07-19
   neighboring change. Only current T123 `ref-0025` advances the manually
   reconciled frozen ledger to `514/556`; T111 `ref-0024` is not double-counted.
   See `two-unit-primary-handoff-review-2026-07-19.md`.
+- [x] T167 Diagnose the frozen T111/T123 `ref-0268` partition regression on
+  the common clock. Specify FR41 as a single-unit representation of the
+  retained primary-onset aligned-island rule, preserving every existing
+  primary, activity, VAD, label, duration, and ranking guard. Add no TOML
+  value, threshold, transcript, timestamp, identity lookup, reference datum,
+  or product verdict. See
+  `primary-onset-single-unit-partition-diagnosis-2026-07-19.md`.
+- [x] T168 Implement FR41 with the existing in-run positive shape, the new
+  boundary-partition positive shape, and independent abstention tests for
+  every added source, timing, cardinality, punctuation, adjacency, unit-type,
+  and write-scope condition. Pass a warning-clean build and all CTest entries,
+  then replay frozen T123 and T111 producer packages at least twice.
+  Automation may verify only engineering and mechanical contracts; it may not
+  label correctness, aggregate accuracy, select the candidate, or issue an
+  acceptance verdict.
+  The final clean build has no warning/error lines beyond compiler ABI notes,
+  and all `69/69` CTest entries pass. Final clean-binary T123 replays are
+  byte-identical at
+  `cbc67b85afce75bc2e40a19a5cb567309981cd433d1ccf4733fc3000415c65d2`;
+  T111 replays are byte-identical at
+  `ad2abee782ab30ff67be1a86fa46f4ec0c16b5422ae18954107c398131157aa4`
+  and unchanged from FR40. Mechanical display exposes only the bounded T123
+  source split.
+- [x] T169 Read every FR41 changed complete conversation chronologically and
+  in reverse against `test.txt`. Retain or remove FR41 only from that complete
+  contextual semantic review, synchronize spec/plan/tasks/project state, and
+  label any retained commit as a transitional frozen experiment. Do not
+  attribute a new real-WebSocket result or speaker-business closure to the
+  replay.
+  Complete forward and reverse reading of `31:17-33:23` retains the
+  Xu-to-Zhu-to-Xu handoff and finds no neighboring change. Only current T123
+  `ref-0268` advances the manually reconciled frozen ledger to `515/556`;
+  T111 is not double-counted. Zhu Jie advances to `75/83`, so all four
+  per-speaker natural-turn floors pass. Critical attribution,
+  confident-wrong attribution, time-based, real-path repeatability, and
+  holdout gates remain open. See
+  `primary-onset-single-unit-partition-review-2026-07-19.md`.

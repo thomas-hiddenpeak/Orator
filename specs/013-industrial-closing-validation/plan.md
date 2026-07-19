@@ -3561,6 +3561,46 @@ manual ledger, to `514/556`; the T111 `ref-0024` repair is not double-counted.
 FR40 remains a transitional frozen repair, not a real-stream acceptance result.
 See `two-unit-primary-handoff-review-2026-07-19.md`.
 
+FR41 addresses the remaining T111/T123 partition regression at `ref-0268` by
+extending only the retained primary-onset aligned-island rule. Both packages
+have the same paused A-before/B/gapless-A-after primary sequence, overlapping
+A/B activity, isolated VAD onset, dual-gallery A continuation, and common
+clock. T111 places a punctuation-separated previous source unit inside B, so
+the existing rule selects Zhu Jie's first `啊`. T123 places that previous unit
+before B and leaves exactly one candidate unit inside B; the source and
+acoustic boundaries otherwise agree.
+
+The implementation will preserve the current in-run path and add one strict
+single-unit boundary path. It locates the nearest previous and following
+positive aligned units in the same source, requires a configured-punctuation-
+only source gap and configured temporal pause before the candidate, requires
+the following source-adjacent unit to begin after B ends, and reuses every
+existing primary, activity, label, VAD, duration, and rank guard. It writes
+only the candidate character. No TOML value, threshold, transcript, identity,
+or producer track changes.
+
+Focused tests will keep the existing positive and abstention matrix and add
+independent single-unit checks for previous/following presence, source
+identity, punctuation gap, temporal pause, candidate cardinality/type,
+adjacency, post-run boundary, configured minimum units, and write scope. The
+clean projector will replay frozen T123 and T111 twice. Automation may expose
+only mechanical changes; complete chronological and reverse contextual
+semantic review against `test.txt` alone decides retention. See
+`primary-onset-single-unit-partition-diagnosis-2026-07-19.md`.
+
+The independent frozen gate retains FR41. Final clean-binary T123 replays are
+byte-identical and split only `ref-0268` into Zhu Jie's first `啊` followed by
+Xu Zijing's second `啊` and technical continuation. Repeated T111 output is
+separately byte-identical and unchanged from FR40. Complete chronological and
+reverse reading of `31:17-33:23` confirms the Xu-to-Zhu-to-Xu handoff and no
+neighboring contribution change. The current manual ledger advances only for
+T123 `ref-0268`, to `515/556`; T111 is not double-counted. Zhu Jie's
+natural-turn ledger becomes `75/83`, so all four per-speaker natural-turn
+floors pass. Critical attribution, confident-wrong attribution, time-based,
+real-path repeatability, and holdout gates remain open. FR41 remains a
+transitional frozen repair, not a real-stream acceptance result. See
+`primary-onset-single-unit-partition-review-2026-07-19.md`.
+
 ### 8.15 FR28 120-second outcome and promotion ladder
 
 T117-T121 are complete. The frozen T116 packages replay byte-stably; their

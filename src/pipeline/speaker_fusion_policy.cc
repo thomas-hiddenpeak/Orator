@@ -3155,10 +3155,6 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
       }
       units.push_back(&item);
     }
-    if (static_cast<int>(units.size()) <
-        pipeline.config_.voiceprint_four_view_min_aligned_units) {
-      return std::nullopt;
-    }
     std::sort(units.begin(), units.end(), [](const auto* left,
                                              const auto* right) {
       if (left->source_start != right->source_start) {
@@ -3166,7 +3162,7 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
       }
       return left->source_end < right->source_end;
     });
-    if (units.front()->source_start < 0 ||
+    if (units.empty() || units.front()->source_start < 0 ||
         units.back()->source_end > character_count) {
       return std::nullopt;
     }
@@ -3181,13 +3177,98 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
         source_split = index;
       }
     }
-    if (!source_split) return std::nullopt;
 
-    const int full_source_start = units.front()->source_start;
+    int full_source_start = units.front()->source_start;
     const int source_end = units.back()->source_end;
-    const int source_start = units[*source_split]->source_start;
-    const double island_start = units[*source_split]->start;
+    int source_start = 0;
+    double island_start = 0.0;
     const double island_end = units.back()->end;
+    if (source_split) {
+      if (static_cast<int>(units.size()) <
+          pipeline.config_.voiceprint_four_view_min_aligned_units) {
+        return std::nullopt;
+      }
+      source_start = units[*source_split]->source_start;
+      island_start = units[*source_split]->start;
+    } else {
+      if (units.size() != 1 ||
+          units.front()->source_end != units.front()->source_start + 1 ||
+          pipeline.config_.voiceprint_punctuation.empty()) {
+        return std::nullopt;
+      }
+
+      const SpeakerVoiceprintEvidence* previous_unit = nullptr;
+      const SpeakerVoiceprintEvidence* next_unit = nullptr;
+      bool previous_unit_ambiguous = false;
+      bool next_unit_ambiguous = false;
+      for (const auto& item : pipeline.voiceprint_aligned_units_) {
+        if (item.kind != "aligned_unit" || item.text_id != text.id ||
+            item.end <= item.start || &item == units.front()) {
+          continue;
+        }
+        if (item.end <= candidate_run.start + 1e-9) {
+          if (previous_unit == nullptr ||
+              item.end > previous_unit->end + 1e-9) {
+            previous_unit = &item;
+            previous_unit_ambiguous = false;
+          } else if (NearEqual(item.end, previous_unit->end)) {
+            previous_unit_ambiguous = true;
+          }
+        }
+        if (item.start + 1e-9 >= candidate_run.end) {
+          if (next_unit == nullptr ||
+              item.start + 1e-9 < next_unit->start) {
+            next_unit = &item;
+            next_unit_ambiguous = false;
+          } else if (NearEqual(item.start, next_unit->start)) {
+            next_unit_ambiguous = true;
+          }
+        }
+      }
+      if (previous_unit == nullptr || next_unit == nullptr ||
+          previous_unit_ambiguous || next_unit_ambiguous ||
+          previous_unit->source_start < 0 ||
+          previous_unit->source_end <= previous_unit->source_start ||
+          previous_unit->source_end >= units.front()->source_start ||
+          units.front()->source_end != next_unit->source_start ||
+          next_unit->source_end <= next_unit->source_start ||
+          next_unit->source_end > character_count ||
+          units.front()->start - previous_unit->end + 1e-9 <
+              pipeline.config_.align_snap_pause_sec ||
+          static_cast<int>(units.size()) + 1 <
+              pipeline.config_.voiceprint_four_view_min_aligned_units) {
+        return std::nullopt;
+      }
+
+      std::set<std::string> punctuation;
+      const auto punctuation_offsets =
+          Utf8Offsets(pipeline.config_.voiceprint_punctuation);
+      for (std::size_t index = 0; index + 1 < punctuation_offsets.size();
+           ++index) {
+        punctuation.insert(pipeline.config_.voiceprint_punctuation.substr(
+            punctuation_offsets[index],
+            punctuation_offsets[index + 1] - punctuation_offsets[index]));
+      }
+      for (int index = previous_unit->source_end;
+           index < units.front()->source_start; ++index) {
+        const auto codepoint = text.text.substr(
+            offsets[index], offsets[index + 1] - offsets[index]);
+        if (punctuation.count(codepoint) == 0) return std::nullopt;
+      }
+      const auto candidate_codepoint = text.text.substr(
+          offsets[units.front()->source_start],
+          offsets[units.front()->source_end] -
+              offsets[units.front()->source_start]);
+      if (candidate_codepoint == " " || candidate_codepoint == "\t" ||
+          candidate_codepoint == "\n" || candidate_codepoint == "\r" ||
+          punctuation.count(candidate_codepoint) != 0) {
+        return std::nullopt;
+      }
+
+      full_source_start = previous_unit->source_start;
+      source_start = units.front()->source_start;
+      island_start = units.front()->start;
+    }
     std::string current_identity;
     for (int index = full_source_start; index < source_end; ++index) {
       if (labels[index].speaker_id.empty() ||

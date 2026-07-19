@@ -30,9 +30,12 @@ separate aligned tail reverses wider evidence; frozen replay and complete
 context review retain the exact phrase repair at `513/556` and raise the
 3000-3600 block to `80/87`, with no new real-path claim; FR40 retains the
 partition-invariant two-unit primary handoff for `ref-0024`/`ref-0025`, moving
-the current frozen candidate to `514/556` without a new real-path claim; T102,
-T084, full canonical closure, release sign-off, and industrial readiness
-remain open
+the current frozen candidate to `514/556` without a new real-path claim; FR41
+retains the single-unit source partition of the same primary-onset aligned-
+island rule at `ref-0268`, moving the current frozen candidate to `515/556`
+and passing all four per-speaker natural-turn floors without a new real-path
+claim; critical attribution, confident-wrong attribution, T102, T084, full
+canonical closure, release sign-off, and industrial readiness remain open
 **Created**: 2026-07-13
 **Scope**: Re-establish a truthful product baseline, recover full-session business
 accuracy, and define the evidence required before Orator may be declared closed.
@@ -2409,6 +2412,31 @@ subject to the complete acceptance gates in this spec.
   T111/T123 inputs MUST replay deterministically, and every changed complete
   conversation MUST receive chronological and reverse contextual semantic
   review against `test.txt` before retention or a new audio run.
+- **FR41**: The retained primary-onset aligned-island rule MAY recognize its
+  existing paused A-before/B/gapless-A-after topology when alignment exposes
+  exactly one visible candidate unit inside B and places the punctuation-
+  separated previous unit before B. The nearest previous and following
+  positive aligned units MUST belong to the same ASR source. The previous unit
+  MUST end before B, meet the existing alignment-pause value, and reach the
+  candidate through a nonempty configured-punctuation-only source gap. The
+  following unit MUST be source-adjacent to the candidate and begin only after
+  B ends. Previous plus candidate units MUST satisfy the existing configured
+  minimum aligned-unit count. The candidate MUST be one visible,
+  non-whitespace, non-punctuation character; existing labels through it MUST
+  be uniform voiceprint-backed A. Every existing duration, primary recovery,
+  candidate-activity, competing-identity, previous-VAD pause, containing-VAD
+  continuation/completeness, and dual-gallery A-ranking condition MUST remain
+  required. Only the exact candidate character may change to B. Missing,
+  duplicate, multi-unit, nonpunctuation-gap, short-gap, nonadjacent-following,
+  in-run-following, punctuation-target, insufficient-unit, mixed-label,
+  primary, activity, or VAD evidence MUST preserve existing behavior. FR41
+  MUST add no TOML value, threshold, duration, score, margin, transcript
+  lookup, speaker name, known timestamp, reference datum, or fitted constant
+  and MUST alter no producer evidence or common-clock coordinate. Frozen
+  T111/T123 inputs MUST replay deterministically, and every changed complete
+  conversation MUST receive chronological and reverse contextual semantic
+  review against `test.txt` before retention or a new audio run. See
+  `primary-onset-single-unit-partition-diagnosis-2026-07-19.md`.
 
 FR40 passes its frozen gate. Repeated T123 outputs are byte-identical and
 change only Xu Zijing's `184.240-184.320` response. Repeated T111 outputs are
@@ -2420,6 +2448,19 @@ advances by only `ref-0025` to `514/556`; T111's complementary `ref-0024`
 repair is partition evidence and is not counted again. Zhu Jie recall and all
 other conjunctive closing failures remain open. See
 `two-unit-primary-handoff-review-2026-07-19.md`.
+
+FR41 passes its frozen gate. Final clean-binary T123 replays are byte-identical
+and split only the two-reaction `ref-0268` source span: the first `啊` moves to
+Zhu Jie while the second `啊` and Xu Zijing's continuation remain with Xu.
+Repeated T111 output is separately byte-identical and unchanged from FR40.
+Complete forward and reverse reading of `31:17-33:23` retains the
+Xu-to-Zhu-to-Xu handoff and finds no neighboring contribution change. Only
+current T123 `ref-0268` advances the manually reconciled frozen ledger to
+`515/556`; T111 is partition evidence and is not double-counted. The Zhu Jie
+natural-turn ledger advances to `75/83`, so all four per-speaker natural-turn
+floors now pass. Critical attribution, confident-wrong attribution, time-based
+evidence, real-path repeatability, and holdout gates remain open. See
+`primary-onset-single-unit-partition-review-2026-07-19.md`.
 
 The first FR31 implementation passed its focused engineering test and produced
 byte-stable repeated T111 and T123 replays. Complete forward and reverse review
