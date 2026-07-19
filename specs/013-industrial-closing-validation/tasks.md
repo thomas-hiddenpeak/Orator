@@ -1,8 +1,8 @@
 # Tasks: Industrial Closing Validation
 
 **Status**: In progress - T135 reconciled T111/T123/T133; FR31 is rejected;
-FR32 completed real-WebSocket promotion; FR33-FR42 are retained bounded frozen
-repairs; the current candidate is `516/556`, with every complete 600-second
+FR32 completed real-WebSocket promotion; FR33-FR43 are retained bounded frozen
+repairs; the current candidate is `517/556`, with every complete 600-second
 block and all four per-speaker natural-turn floors passed; critical,
 confident-wrong, time-based, repeatability, holdout, T102, and T084 gates remain
 open 2026-07-19
@@ -2391,3 +2391,38 @@ open 2026-07-19
   Critical attribution, confident-wrong attribution, time-based, real-path
   repeatability, and holdout gates remain open. See
   `isolated-vad-single-character-alignment-gap-review-2026-07-19.md`.
+- [x] T173 Diagnose the frozen T111/T123 critical `ref-0194` partition
+  regression on the common clock. Specify FR43 as one zero-duration aligned-
+  character and nonlocal phrase-top representation of the retained complete-
+  source aligned-VAD closure. Preserve every existing complete-source,
+  duration, gallery, label, activity, primary, phrase, VAD, source-partition,
+  and ranking gate. Add no TOML value, threshold, transcript, timestamp,
+  identity lookup, reference datum, automated product judgment, or verdict.
+  See `complete-source-local-pair-tie-diagnosis-2026-07-19.md`.
+- [x] T174 Implement FR43 while preserving the existing fully anchored path.
+  Add the strict one-character unanchored representation and local-pair phrase
+  tie path, plus independent positive and abstention tests for every new
+  source, unit, character, timing, bridge, score-list, local-identity, phrase,
+  raw-zero-duration, activity, and primary condition. Pass a warning-clean
+  build and all CTest entries, then replay frozen T123 and T111 producer
+  packages at least twice.
+  Automation may verify only engineering and mechanical contracts; it may not
+  label correctness, aggregate accuracy, select FR43, or issue a verdict. The
+  final build has no warning/error diagnostic, all `69/69` CTest entries pass,
+  repeated T123 output is byte-identical at
+  `ed9744a6d8a4b9bfb0bfdffd56abe62f91c4ee14b38cb8a0de1c2952e6a02bcc`,
+  and repeated T111 output is byte-identical and unchanged from FR42 at
+  `ad2abee782ab30ff67be1a86fa46f4ec0c16b5422ae18954107c398131157aa4`.
+- [x] T175 Read every FR43 changed complete conversation chronologically and in
+  reverse against `test.txt`. Retain or remove FR43 only from that complete
+  contextual semantic review, synchronize spec/plan/tasks/project state, and
+  label any retained commit as a transitional frozen experiment. Do not
+  attribute a new real-WebSocket result or speaker-business closure to the
+  replay. Complete forward and reverse reading of `20:07-22:56` retains Xu
+  Zijing's response between Shi Yi's prompt and Tang Yunfeng's explanation and
+  finds no neighboring contribution change. Only current T123 `ref-0194`
+  advances the manual ledger to `517/556`, the 1200-1800 block to `75/80`, and
+  Xu Zijing to `69/73`; T111 is not double-counted. Critical attribution,
+  confident-wrong attribution, time-based, real-path repeatability, and holdout
+  gates remain open. See
+  `complete-source-local-pair-tie-review-2026-07-19.md`.

@@ -5942,6 +5942,32 @@ int main() {
       bool additional_primary = false;
       bool candidate_primary_edge = true;
       bool aligned_span_is_short = true;
+      bool alignment_dropout = false;
+      bool dropout_punctuation = false;
+      bool dropout_whitespace = false;
+      bool dropout_zero_unit_missing = false;
+      bool dropout_missing_previous = false;
+      bool dropout_missing_following = false;
+      bool dropout_duplicate_previous = false;
+      bool dropout_duplicate_following = false;
+      bool dropout_multi_character_unit = false;
+      bool dropout_invalid_unit_source = false;
+      bool dropout_invalid_interval_source = false;
+      bool dropout_unit_on_missing = false;
+      bool dropout_additional_unanchored = false;
+      bool dropout_pause_sized = false;
+      bool dropout_overlapping_units = false;
+      bool dropout_bridge_not_contained = false;
+      bool dropout_pause_disabled = false;
+      bool dropout_punctuation_config_missing = false;
+      bool phrase_local_pair_tie = false;
+      bool phrase_nonlocal_top_disagrees = false;
+      bool phrase_local_top = false;
+      bool phrase_session_local_pair_decisive = false;
+      bool phrase_robust_local_pair_decisive = false;
+      bool phrase_missing_candidate = false;
+      bool phrase_missing_incumbent = false;
+      bool phrase_duplicate_identity = false;
     };
     auto run_case = [](const CaseOptions& options) -> std::vector<Entry> {
       BusinessSpeakerPipeline::Config config;
@@ -5951,40 +5977,65 @@ int main() {
       if (!options.aligned_span_is_short) {
         config.voiceprint_short_max_sec = 0.75;
       }
+      if (options.dropout_pause_disabled) {
+        config.align_snap_pause_sec = 0.0;
+      }
+      if (options.dropout_punctuation_config_missing) {
+        config.voiceprint_punctuation.clear();
+      }
       TestBusinessSpeakerPipeline tl(config);
 
       std::vector<TestBusinessSpeakerPipeline::SpeakerInput> activity = {
           {0.0, 1.0, "slot_0", 0.9f, "spk_a"},
-          {options.candidate_activity_covers ? 0.0 : 0.6, 1.0, "slot_1",
-           0.9f, "spk_b"}};
+          {options.candidate_activity_covers ? 0.0 : 0.6, 1.0, "slot_1", 0.9f,
+           "spk_b"}};
       if (options.additional_activity) {
-        activity.push_back({0.4, 0.5, "slot_2", 0.9f, "spk_d"});
+        activity.push_back({0.4, 0.5, "slot_2", 0.9f,
+                            options.phrase_local_pair_tie ? "spk_c" : "spk_d"});
       }
       tl.ReplaceSpeakers(activity);
 
       std::vector<TestBusinessSpeakerPipeline::SpeakerInput> primary = {
-          {0.0, options.primary_gap ? 0.7 : 0.8, "slot_0", 0.9f,
-           "spk_a"}};
+          {0.0, options.primary_gap ? 0.7 : 0.8, "slot_0", 0.9f, "spk_a"}};
       if (options.candidate_primary_edge) {
         primary.push_back({0.8, 1.0, "slot_1", 0.9f, "spk_b"});
       }
       if (options.additional_primary) {
-        primary.push_back({0.4, 0.5, "slot_2", 0.9f, "spk_d"});
+        primary.push_back({0.4, 0.5, "slot_2", 0.9f,
+                           options.phrase_local_pair_tie ? "spk_c" : "spk_d"});
       }
       tl.ReplacePrimarySpeakers(primary);
-      tl.UpsertText(0, 0.0, 2.0, "甲乙，丙丁。");
-      tl.UpsertAlign(0, 0.0, 2.0,
-                     {{0.1, 0.2, "甲"},
-                      {0.2, 0.3, "乙"},
-                      {0.6, 0.7, "丙"},
-                      {0.82, 0.9, "丁"}});
+      const std::string dropout_character =
+          options.dropout_punctuation
+              ? "，"
+              : (options.dropout_whitespace ? " " : "丙");
+      const std::string source_text =
+          options.alignment_dropout ? "甲乙，" + dropout_character + "丁。"
+                                    : "甲乙，丙丁。";
+      tl.UpsertText(0, 0.0, 2.0, source_text);
+      if (options.alignment_dropout) {
+        std::vector<TestBusinessSpeakerPipeline::AlignUnitSeg> units = {
+            {0.1, 0.2, "甲"},
+            {0.2, 0.3, "乙"},
+            {0.6, 0.7, "，"}};
+        if (!options.dropout_zero_unit_missing) {
+          units.push_back({0.7, 0.7, dropout_character});
+        }
+        units.push_back({0.82, 0.9, "丁"});
+        tl.UpsertAlign(0, 0.0, 2.0, units);
+      } else {
+        tl.UpsertAlign(0, 0.0, 2.0,
+                       {{0.1, 0.2, "甲"},
+                        {0.2, 0.3, "乙"},
+                        {0.6, 0.7, "丙"},
+                        {0.82, 0.9, "丁"}});
+      }
 
       std::vector<ComprehensiveTimeline::SpeakerVoiceprintEvidence> evidence;
       auto add_interval = [&](int ordinal, int source_start, int source_end,
                               double start, double end) {
         ComprehensiveTimeline::SpeakerVoiceprintEvidence interval;
-        interval.evidence_id =
-            "business_interval:0:" + std::to_string(ordinal);
+        interval.evidence_id = "business_interval:0:" + std::to_string(ordinal);
         interval.kind = "business_interval";
         interval.text_id = 0;
         interval.source_start = source_start;
@@ -5993,18 +6044,32 @@ int main() {
         interval.end = end;
         evidence.push_back(std::move(interval));
       };
-      add_interval(0, 0, 3, 0.1, 0.3);
-      add_interval(1, 3, 4, 0.6, 0.7);
-      add_interval(2, options.partition_gap ? 5 : 4, 6,
-                   options.unanchored_interval ? 0.91 : 0.82,
-                   options.unanchored_interval ? 0.99 : 0.9);
+      if (options.alignment_dropout) {
+        add_interval(0, 0, 3,
+                     options.dropout_additional_unanchored ? 0.31 : 0.1,
+                     options.dropout_additional_unanchored
+                         ? 0.59
+                         : (options.dropout_overlapping_units ? 0.85 : 0.7));
+        add_interval(1, 3, 4,
+                     options.dropout_bridge_not_contained ? 0.71 : 0.65,
+                     options.dropout_bridge_not_contained ? 0.81 : 0.83);
+        add_interval(2, 4, 6, 0.82, 0.9);
+      } else {
+        add_interval(0, 0, 3, 0.1, 0.3);
+        add_interval(1, 3, 4, 0.6, 0.7);
+        add_interval(2, options.partition_gap ? 5 : 4, 6,
+                     options.unanchored_interval ? 0.91 : 0.82,
+                     options.unanchored_interval ? 0.99 : 0.9);
+      }
+      if (options.dropout_invalid_interval_source) {
+        add_interval(3, -1, 0, 0.4, 0.5);
+      }
 
       int unit_ordinal = 0;
       auto add_unit = [&](int source_start, int source_end, double start,
                           double end) {
         ComprehensiveTimeline::SpeakerVoiceprintEvidence unit;
-        unit.evidence_id =
-            "aligned_unit:0:" + std::to_string(unit_ordinal++);
+        unit.evidence_id = "aligned_unit:0:" + std::to_string(unit_ordinal++);
         unit.kind = "aligned_unit";
         unit.text_id = 0;
         unit.source_start = source_start;
@@ -6013,35 +6078,121 @@ int main() {
         unit.end = end;
         evidence.push_back(std::move(unit));
       };
-      add_unit(0, 1, 0.1, 0.2);
+      add_unit(0, options.dropout_multi_character_unit ? 2 : 1, 0.1, 0.2);
       add_unit(1, 2, 0.2, 0.3);
-      add_unit(3, 4, 0.6, 0.7);
-      add_unit(4, 5, 0.82, 0.9);
+      if (options.alignment_dropout) {
+        const double previous_start =
+            options.dropout_overlapping_units
+                ? 0.75
+                : (options.dropout_pause_sized ? 0.50 : 0.60);
+        const double previous_end =
+            options.dropout_overlapping_units
+                ? 0.83
+                : (options.dropout_pause_sized ? 0.57 : 0.70);
+        if (!options.dropout_missing_previous) {
+          add_unit(2, 3, previous_start, previous_end);
+          if (options.dropout_duplicate_previous) {
+            add_unit(2, 3, previous_start, previous_end);
+          }
+        }
+        if (options.dropout_unit_on_missing) {
+          add_unit(3, 4, 0.72, 0.78);
+        }
+        if (!options.dropout_missing_following) {
+          add_unit(4, 5, 0.82, 0.9);
+          if (options.dropout_duplicate_following) {
+            add_unit(4, 5, 0.82, 0.9);
+          }
+        } else {
+          add_unit(5, 6, 0.84, 0.9);
+        }
+      } else {
+        add_unit(3, 4, 0.6, 0.7);
+        add_unit(4, 5, 0.82, 0.9);
+      }
+      if (options.dropout_invalid_unit_source) {
+        add_unit(-1, 0, 0.4, 0.5);
+      }
 
       for (int index = 0; index < options.phrase_count; ++index) {
         ComprehensiveTimeline::SpeakerVoiceprintEvidence phrase;
-        phrase.evidence_id =
-            "punctuation_phrase:0:" + std::to_string(index);
+        phrase.evidence_id = "punctuation_phrase:0:" + std::to_string(index);
         phrase.kind = "punctuation_phrase";
         phrase.text_id = 0;
         phrase.source_start = index == 0 ? 0 : 3;
         phrase.source_end = index == 0 ? 3 : 6;
         phrase.start = index == 0 ? 0.1 : 0.6;
-        phrase.end = index == 0 ? 0.3 : 0.9;
+        phrase.end = index == 0 ? (options.alignment_dropout ? 0.7 : 0.3) : 0.9;
         phrase.embedding_available = true;
         phrase.robust_gallery_complete = true;
-        const float phrase_top =
-            options.phrase_margin_abstains ? 0.36f : 0.42f;
-        phrase.session_scores = options.phrase_candidate_top_two
-                                    ? std::vector<ComprehensiveTimeline::VoiceprintScore>{
-                                          {"spk_c", phrase_top},
-                                          {"spk_b", 0.35f},
-                                          {"spk_a", 0.10f}}
-                                    : std::vector<ComprehensiveTimeline::VoiceprintScore>{
-                                          {"spk_c", phrase_top},
-                                          {"spk_d", 0.35f},
-                                          {"spk_b", 0.10f}};
-        phrase.robust_scores = phrase.session_scores;
+        const float phrase_top = options.phrase_margin_abstains ? 0.36f : 0.42f;
+        if (options.phrase_local_pair_tie) {
+          const std::string session_top =
+              options.phrase_local_top ? "spk_a" : "spk_c";
+          const std::string robust_top =
+              options.phrase_nonlocal_top_disagrees ? "spk_d" : session_top;
+          const std::string robust_runner_up =
+              robust_top == "spk_c" ? "spk_d" : "spk_c";
+          if (options.phrase_local_top) {
+            phrase.session_scores = {{"spk_a", phrase_top},
+                                     {"spk_d", 0.35f},
+                                     {"spk_c", 0.34f},
+                                     {"spk_b", 0.33f}};
+            phrase.robust_scores = {{"spk_a", phrase_top},
+                                    {"spk_c", 0.35f},
+                                    {"spk_d", 0.34f},
+                                    {"spk_b", 0.33f}};
+          } else {
+            phrase.session_scores = {
+                {session_top, phrase_top},
+                {"spk_d", 0.35f},
+                {"spk_a", 0.34f},
+                {"spk_b",
+                 options.phrase_session_local_pair_decisive ? 0.29f : 0.31f}};
+            phrase.robust_scores = {
+                {robust_top, phrase_top},
+                {robust_runner_up, 0.35f},
+                {"spk_a", 0.34f},
+                {"spk_b",
+                 options.phrase_robust_local_pair_decisive ? 0.29f : 0.32f}};
+          }
+          if (options.phrase_missing_candidate) {
+            phrase.session_scores.erase(
+                std::remove_if(phrase.session_scores.begin(),
+                               phrase.session_scores.end(),
+                               [](const auto& score) {
+                                 return score.speaker_id == "spk_b";
+                               }),
+                phrase.session_scores.end());
+          }
+          if (options.phrase_missing_incumbent) {
+            phrase.robust_scores.erase(
+                std::remove_if(phrase.robust_scores.begin(),
+                               phrase.robust_scores.end(),
+                               [](const auto& score) {
+                                 return score.speaker_id == "spk_a";
+                               }),
+                phrase.robust_scores.end());
+          }
+          if (options.phrase_duplicate_identity) {
+            phrase.robust_scores.push_back({"spk_b", 0.32f});
+          }
+        } else {
+          phrase.session_scores =
+              options.phrase_candidate_top_two
+                  ? std::vector<
+                        ComprehensiveTimeline::VoiceprintScore>{{"spk_c",
+                                                                 phrase_top},
+                                                                {"spk_b",
+                                                                 0.35f},
+                                                                {"spk_a",
+                                                                 0.10f}}
+                  : std::vector<ComprehensiveTimeline::VoiceprintScore>{
+                        {"spk_c", phrase_top},
+                        {"spk_d", 0.35f},
+                        {"spk_b", 0.10f}};
+          phrase.robust_scores = phrase.session_scores;
+        }
         evidence.push_back(std::move(phrase));
       }
 
@@ -6055,16 +6206,16 @@ int main() {
       complete.end = 2.0;
       complete.embedding_available = true;
       complete.robust_gallery_complete = true;
-      const float complete_top =
-          options.complete_regular_pass ? 0.60f : 0.40f;
+      const float complete_top = options.complete_regular_pass ? 0.60f : 0.40f;
       complete.session_scores = {
           {"spk_b", complete_top}, {"spk_c", 0.20f}, {"spk_a", 0.10f}};
-      complete.robust_scores = options.complete_robust_candidate
-                                   ? complete.session_scores
-                                   : std::vector<ComprehensiveTimeline::VoiceprintScore>{
-                                         {"spk_c", complete_top},
-                                         {"spk_b", 0.20f},
-                                         {"spk_a", 0.10f}};
+      complete.robust_scores =
+          options.complete_robust_candidate
+              ? complete.session_scores
+              : std::vector<ComprehensiveTimeline::VoiceprintScore>{
+                    {"spk_c", complete_top},
+                    {"spk_b", 0.20f},
+                    {"spk_a", 0.10f}};
       evidence.push_back(std::move(complete));
 
       for (int index = 0; index < options.containing_vad_count; ++index) {
@@ -6077,8 +6228,7 @@ int main() {
         vad.embedding_available = true;
         vad.robust_gallery_complete = options.vad_robust_complete;
         const std::string top = options.vad_candidate ? "spk_b" : "spk_c";
-        vad.session_scores = {
-            {top, 0.45f}, {"spk_a", 0.20f}, {"spk_d", 0.10f}};
+        vad.session_scores = {{top, 0.45f}, {"spk_a", 0.20f}, {"spk_d", 0.10f}};
         vad.robust_scores = vad.session_scores;
         evidence.push_back(std::move(vad));
       }
@@ -6086,8 +6236,7 @@ int main() {
       return tl.Snapshot();
     };
 
-    const std::string reason =
-        "voiceprint_complete_source_aligned_vad_closure";
+    const std::string reason = "voiceprint_complete_source_aligned_vad_closure";
     auto has_reason = [&](const std::vector<Entry>& entries) {
       return entries.size() == 1 && entries[0].speaker_id == "spk_b" &&
              entries[0].text == "甲乙，丙丁。" &&
@@ -6100,6 +6249,17 @@ int main() {
     const auto positive_entries = run_case({});
     CHECK(has_reason(positive_entries),
           "aligned complete-source evidence closes one padded short source");
+    CaseOptions dropout_top_two;
+    dropout_top_two.alignment_dropout = true;
+    CHECK(
+        has_reason(run_case(dropout_top_two)),
+        "one visible zero-duration character preserves phrase-top-two closure");
+    CaseOptions dropout_local_pair_tie;
+    dropout_local_pair_tie.alignment_dropout = true;
+    dropout_local_pair_tie.phrase_local_pair_tie = true;
+    CHECK(
+        has_reason(run_case(dropout_local_pair_tie)),
+        "a nonlocal phrase top may abstain between the only local identities");
     CaseOptions partition_gap;
     partition_gap.partition_gap = true;
     CHECK(!has_reason(run_case(partition_gap)),
@@ -6164,6 +6324,111 @@ int main() {
     missing_candidate_edge.candidate_primary_edge = false;
     CHECK(!has_reason(run_case(missing_candidate_edge)),
           "missing candidate edge provenance blocks complete-source closure");
+    CaseOptions punctuation_dropout = dropout_local_pair_tie;
+    punctuation_dropout.dropout_punctuation = true;
+    CHECK(!has_reason(run_case(punctuation_dropout)),
+          "a punctuation alignment dropout blocks complete-source closure");
+    CaseOptions whitespace_dropout = dropout_local_pair_tie;
+    whitespace_dropout.dropout_whitespace = true;
+    CHECK(!has_reason(run_case(whitespace_dropout)),
+          "a whitespace alignment dropout blocks complete-source closure");
+    CaseOptions missing_zero_unit = dropout_local_pair_tie;
+    missing_zero_unit.dropout_zero_unit_missing = true;
+    CHECK(!has_reason(run_case(missing_zero_unit)),
+          "a missing raw zero-duration unit blocks dropout closure");
+    CaseOptions missing_previous = dropout_local_pair_tie;
+    missing_previous.dropout_missing_previous = true;
+    CHECK(!has_reason(run_case(missing_previous)),
+          "a dropout without a source-adjacent previous unit abstains");
+    CaseOptions missing_following = dropout_local_pair_tie;
+    missing_following.dropout_missing_following = true;
+    CHECK(!has_reason(run_case(missing_following)),
+          "a dropout without a source-adjacent following unit abstains");
+    CaseOptions duplicate_previous = dropout_local_pair_tie;
+    duplicate_previous.dropout_duplicate_previous = true;
+    CHECK(!has_reason(run_case(duplicate_previous)),
+          "duplicate source-adjacent previous units abstain");
+    CaseOptions duplicate_following = dropout_local_pair_tie;
+    duplicate_following.dropout_duplicate_following = true;
+    CHECK(!has_reason(run_case(duplicate_following)),
+          "duplicate source-adjacent following units abstain");
+    CaseOptions multi_character_unit = dropout_local_pair_tie;
+    multi_character_unit.dropout_multi_character_unit = true;
+    CHECK(!has_reason(run_case(multi_character_unit)),
+          "a multi-character positive unit blocks dropout closure");
+    CaseOptions invalid_unit_source = dropout_local_pair_tie;
+    invalid_unit_source.dropout_invalid_unit_source = true;
+    CHECK(!has_reason(run_case(invalid_unit_source)),
+          "an invalid positive-unit source range blocks dropout closure");
+    CaseOptions invalid_interval_source = dropout_local_pair_tie;
+    invalid_interval_source.dropout_invalid_interval_source = true;
+    CHECK(!has_reason(run_case(invalid_interval_source)),
+          "an invalid business-interval source range blocks dropout closure");
+    CaseOptions unit_on_missing = dropout_local_pair_tie;
+    unit_on_missing.dropout_unit_on_missing = true;
+    CHECK(!has_reason(run_case(unit_on_missing)),
+          "positive alignment on the claimed missing character abstains");
+    CaseOptions additional_unanchored = dropout_local_pair_tie;
+    additional_unanchored.dropout_additional_unanchored = true;
+    CHECK(!has_reason(run_case(additional_unanchored)),
+          "multiple unanchored intervals block dropout closure");
+    CaseOptions pause_sized = dropout_local_pair_tie;
+    pause_sized.dropout_pause_sized = true;
+    CHECK(!has_reason(run_case(pause_sized)),
+          "a pause-sized alignment gap blocks dropout closure");
+    CaseOptions overlapping_units = dropout_local_pair_tie;
+    overlapping_units.dropout_overlapping_units = true;
+    CHECK(!has_reason(run_case(overlapping_units)),
+          "overlapping adjacent units block dropout closure");
+    CaseOptions bridge_not_contained = dropout_local_pair_tie;
+    bridge_not_contained.dropout_bridge_not_contained = true;
+    CHECK(!has_reason(run_case(bridge_not_contained)),
+          "an interval outside the adjacent-unit bridge abstains");
+    CaseOptions pause_disabled = dropout_local_pair_tie;
+    pause_disabled.dropout_pause_disabled = true;
+    CHECK(!has_reason(run_case(pause_disabled)),
+          "a disabled alignment pause blocks dropout closure");
+    CaseOptions punctuation_config_missing = dropout_local_pair_tie;
+    punctuation_config_missing.dropout_punctuation_config_missing = true;
+    CHECK(!has_reason(run_case(punctuation_config_missing)),
+          "missing configured punctuation blocks dropout closure");
+    CaseOptions nonlocal_disagreement = dropout_local_pair_tie;
+    nonlocal_disagreement.phrase_nonlocal_top_disagrees = true;
+    CHECK(!has_reason(run_case(nonlocal_disagreement)),
+          "nonlocal phrase-top disagreement blocks dropout closure");
+    CaseOptions local_phrase_top = dropout_local_pair_tie;
+    local_phrase_top.phrase_local_top = true;
+    CHECK(!has_reason(run_case(local_phrase_top)),
+          "a locally supported phrase top blocks the nonlocal fallback");
+    CaseOptions decisive_session_pair = dropout_local_pair_tie;
+    decisive_session_pair.phrase_session_local_pair_decisive = true;
+    CHECK(!has_reason(run_case(decisive_session_pair)),
+          "a session-local pair at the configured margin abstains");
+    CaseOptions decisive_robust_pair = dropout_local_pair_tie;
+    decisive_robust_pair.phrase_robust_local_pair_decisive = true;
+    CHECK(!has_reason(run_case(decisive_robust_pair)),
+          "a robust-local pair at the configured margin abstains");
+    CaseOptions missing_phrase_candidate = dropout_local_pair_tie;
+    missing_phrase_candidate.phrase_missing_candidate = true;
+    CHECK(!has_reason(run_case(missing_phrase_candidate)),
+          "a missing candidate phrase score blocks dropout closure");
+    CaseOptions missing_phrase_incumbent = dropout_local_pair_tie;
+    missing_phrase_incumbent.phrase_missing_incumbent = true;
+    CHECK(!has_reason(run_case(missing_phrase_incumbent)),
+          "a missing incumbent phrase score blocks dropout closure");
+    CaseOptions duplicate_phrase_identity = dropout_local_pair_tie;
+    duplicate_phrase_identity.phrase_duplicate_identity = true;
+    CHECK(!has_reason(run_case(duplicate_phrase_identity)),
+          "a duplicate phrase identity blocks dropout closure");
+    CaseOptions nonlocal_activity = dropout_local_pair_tie;
+    nonlocal_activity.additional_activity = true;
+    CHECK(!has_reason(run_case(nonlocal_activity)),
+          "activity from the nonlocal phrase top blocks dropout closure");
+    CaseOptions nonlocal_primary = dropout_local_pair_tie;
+    nonlocal_primary.additional_primary = true;
+    CHECK(
+        !has_reason(run_case(nonlocal_primary)),
+        "primary coverage from the nonlocal phrase top blocks dropout closure");
   }
 
   // ---- 20g3. FR16AAZ: a strong exact phrase may extend into one immediately

@@ -37,7 +37,11 @@ and passing all four per-speaker natural-turn floors without a new real-path
 claim; FR42 diagnosis isolates the critical `ref-0432` T111/T123 regression to
 one zero-duration character inside an otherwise retained isolated-VAD aligned
 island; deterministic replay and complete forward/reverse contextual review
-retain the bounded repair at `516/556` without a new real-path claim; critical
+retain the bounded repair at `516/556` without a new real-path claim; FR43
+diagnosis bounds the critical `ref-0194` T111/T123 regression to one
+zero-duration aligned character plus a nonlocal phrase top identity;
+deterministic replay and complete forward/reverse contextual review retain the
+complete-source repair at `517/556` without a new real-path claim; critical
 attribution, confident-wrong attribution, T102, T084, full canonical closure,
 release sign-off, and industrial readiness remain open
 **Created**: 2026-07-13
@@ -2466,6 +2470,38 @@ subject to the complete acceptance gates in this spec.
   receive chronological and reverse contextual semantic review against
   `test.txt` before retention or a new audio run. See
   `isolated-vad-single-character-alignment-gap-diagnosis-2026-07-19.md`.
+- **FR43**: The retained complete-source aligned-VAD closure MAY recognize one
+  zero-duration local-pair-tie representation. Exactly one positive business
+  interval MUST lack a positive aligned-unit anchor and MUST map exactly one
+  visible, non-whitespace, non-configured-punctuation source character. Every
+  such character MUST have exactly one zero-duration unit in the raw alignment
+  track. Every other positive business interval MUST be anchored, and all
+  intervals MUST partition the complete source exactly once. Every positive
+  aligned unit MUST map exactly one valid source character. Unique source-
+  adjacent units MUST
+  surround the missing character, remain temporally ordered with a gap below
+  the existing alignment-pause value, and have their temporal bridge contained
+  by the unanchored interval. Every existing complete-source, aligned-duration,
+  outer-duration, dual-gallery, short-gate, regular-abstention, label, edge,
+  activity, primary, coverage, phrase-cardinality, containing-VAD, and VAD-
+  ranking condition MUST remain required. The candidate and incumbent MUST be
+  the only locally active and primary identities. Both phrase galleries MUST
+  remain score-eligible and margin-abstaining, agree on the same top identity
+  outside that local pair, and expose candidate and incumbent scores whose
+  absolute difference is below the existing configured short margin. The
+  nonlocal top identity MUST have no activity or primary coverage inside the
+  aligned envelope. Missing, duplicate, multi-character, punctuation,
+  whitespace, multiply unanchored, source-inconsistent, overlapping, reversed,
+  pause-sized, locally decisive, differently ranked, incomplete, competing,
+  or differently gated evidence MUST preserve existing behavior. Only the
+  complete source may change. FR43 MUST add no TOML value, threshold, score,
+  margin, duration, transcript lookup, speaker name, known timestamp,
+  reference datum, or fitted constant and MUST alter no producer evidence or
+  common-clock coordinate. Frozen T111/T123 inputs MUST replay
+  deterministically, and every changed complete conversation MUST receive
+  chronological and reverse contextual semantic review against `test.txt`
+  before retention or a new audio run. See
+  `complete-source-local-pair-tie-diagnosis-2026-07-19.md`.
 
 FR40 passes its frozen gate. Repeated T123 outputs are byte-identical and
 change only Xu Zijing's `184.240-184.320` response. Repeated T111 outputs are
@@ -2504,6 +2540,18 @@ advances to `118/129`. Critical attribution, confident-wrong attribution,
 time-based evidence, real-path repeatability, and holdout gates remain open.
 See
 `isolated-vad-single-character-alignment-gap-review-2026-07-19.md`.
+
+FR43 passes its frozen gate. Final clean-binary T123 replays are byte-identical
+and merge only the `ref-0194` response source under Xu Zijing. T111 is
+separately byte-identical and unchanged from FR42. Complete forward and reverse
+reading of `20:07-22:56` retains the Shi-to-Xu-to-Tang response sequence and
+finds no neighboring contribution change. Only current T123 `ref-0194`
+advances the manually reconciled frozen ledger to `517/556`; T111 is partition
+evidence and is not double-counted. The 1200-1800 block advances to `75/80`,
+and Xu Zijing advances to `69/73`. Critical attribution, confident-wrong
+attribution, time-based evidence, real-path repeatability, and holdout gates
+remain open. See
+`complete-source-local-pair-tie-review-2026-07-19.md`.
 
 The first FR31 implementation passed its focused engineering test and produced
 byte-stable repeated T111 and T123 replays. Complete forward and reverse review

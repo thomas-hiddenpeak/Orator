@@ -3635,6 +3635,55 @@ to `516/556`; no new real-WebSocket result or closing claim follows. See
 `isolated-vad-single-character-alignment-gap-diagnosis-2026-07-19.md` and
 `isolated-vad-single-character-alignment-gap-review-2026-07-19.md`.
 
+FR43 addresses the remaining critical T111/T123 partition regression at
+`ref-0194` by extending only the retained complete-source aligned-VAD closure.
+Both packages have identical activity and primary tracks. Complete-source and
+containing-VAD session/robust views independently select Xu, while Tang covers
+the aligned envelope and Xu enters at its terminal handoff. T111 already uses
+the retained closure. T123 differs in two coupled producer representations:
+one visible source character has a zero-duration aligned unit, and the short
+phrase's agreed top identity is a third speaker with no local activity or
+primary coverage. Within the only locally supported Tang/Xu pair, both raw
+phrase score differences remain below the existing configured short margin.
+
+The implementation will preserve the fully anchored and phrase-top-two path.
+Its new path requires exactly one one-visible-character unanchored business
+interval, one-character positive units, unique source-adjacent units around the
+dropout, exactly one raw zero-duration unit on the missing character, a
+temporally ordered sub-pause bridge contained by that interval, and an
+otherwise exact source partition. The phrase fallback is available only
+for this representation and requires session/robust agreement on the same
+nonlocal top identity, unique candidate/incumbent scores tied under the
+existing short margin, and absence of that top identity from local activity
+and primary coverage. Every existing complete-source, outer/aligned duration,
+dual-gallery, label, edge, activity, primary, coverage, phrase-abstention, and
+containing-VAD gate remains unchanged. No TOML value, threshold, transcript,
+identity, producer track, or common-clock coordinate changes.
+
+Focused tests will preserve the existing positive and abstention matrix and
+add independent checks for unanchored cardinality, source-character type,
+unit cardinality and bounds, adjacent-unit uniqueness, temporal order, bridge
+containment, configured pause, score-list completeness, local-pair margin,
+nonlocal top agreement, and local activity/primary exclusion. A warning-clean
+build and complete CTest pass establish engineering behavior only. The clean
+projector will replay frozen T123 and T111 twice; automation may expose only
+mechanical changes. Complete chronological and reverse contextual semantic
+review against `test.txt` alone decides retention. See
+`complete-source-local-pair-tie-diagnosis-2026-07-19.md`.
+
+The independent frozen gate retains FR43. The warning-clean build and all 69
+CTest entries pass. Final T123 replays are byte-identical at
+`ed9744a6d8a4b9bfb0bfdffd56abe62f91c4ee14b38cb8a0de1c2952e6a02bcc`;
+T111 replays are byte-identical and unchanged from FR42 at
+`ad2abee782ab30ff67be1a86fa46f4ec0c16b5422ae18954107c398131157aa4`.
+Mechanical display exposes only the complete T123 `text_id=113` merge.
+Complete chronological and reverse reading of `20:07-22:56` retains Xu
+Zijing's response between Shi Yi's prompt and Tang Yunfeng's explanation and
+finds no neighboring change. Only current T123 `ref-0194` advances the manual
+ledger to `517/556`, the 1200-1800 block to `75/80`, and Xu Zijing to `69/73`.
+No new real-WebSocket result or closing claim follows. See
+`complete-source-local-pair-tie-review-2026-07-19.md`.
+
 ### 8.15 FR28 120-second outcome and promotion ladder
 
 T117-T121 are complete. The frozen T116 packages replay byte-stably; their
