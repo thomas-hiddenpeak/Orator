@@ -1004,6 +1004,20 @@ WebSocket run; the business coordinate remains the existing forced-alignment
 time rather than the acoustic query island. Critical and confident-wrong
 attribution, time-based sign-off, real-path repeatability, and holdout gates
 remain open.
+T187-T190 complete FR46 as an evidence-only stop. Two exact-PCM empty-registry
+replays reproduce all 1,254,049 captured identity strings with zero differences
+and display byte-identical dual-gallery evidence for all 1,348 frozen primary
+runs, including unavailable spans. Manual reconciliation leaves 37 residuals,
+23 of them critical, across every complete 600-second block. Complete forward
+and reverse contextual review of all 23 finds only `ref-0099` with mutually
+corroborating correct source, alignment, activity, primary, VAD, and both
+identity galleries that final fusion overwrites. Every other critical context
+has a distinct missing/displaced-source, subminimum-span, evidence-disagreement,
+partial-support, or producer-wrong boundary. No shared multi-residual topology
+is established, so FR46 changes no production code, TOML, model, audio result,
+ledger, or acceptance status. The next speaker-closing phase must investigate
+whether the two orthogonal speaker models expose complementary raw evidence
+before another fusion policy is specified.
 T112 is complete and does not alter the speaker baseline. T084 closes only
 after both A and B independently pass every applicable gate.
 ASR, browser/microphone, locked holdout, final-report review, and release signing

@@ -2,7 +2,8 @@
 
 **Status**: In progress - T135 reconciled T111/T123/T133; FR31 is rejected;
 FR32 completed real-WebSocket promotion; FR33-FR45 are retained bounded frozen
-repairs; the current candidate is `519/556`, with every complete 600-second
+repairs; FR46 completed as an evidence-only stop with no shared multi-residual
+fusion topology; the current candidate is `519/556`, with every complete 600-second
 block and all four per-speaker natural-turn floors passed; critical,
 confident-wrong, time-based, repeatability, holdout, T102, and T084 gates remain
 open 2026-07-19
@@ -2551,3 +2552,45 @@ open 2026-07-19
   to `519/556`, the 1200-1800 block to `76/80`, and Zhu Jie to `77/83`.
   No new real-WebSocket result or closure claim follows. See
   `primary-island-alignment-gap-echo-review-2026-07-19.md`.
+- [x] T187 Manually reconcile the signed T123 51-error table with every
+  retained FR32-FR45 contextual decision. Record the complete current residual
+  list and critical subset from the existing human judgments only. Do not use
+  code, a query, a formula, or a metric to subtract, count, classify, rank, or
+  issue a product conclusion. Manual reconciliation records 37 residuals: 23
+  critical and 14 noncritical, distributed across every complete 600-second
+  block. See `post-fr45-residual-reconciliation-2026-07-19.md`.
+- [x] T188 Derive a temporary diagnostic query for every one of the 1,348
+  frozen T123 primary runs using only its ordinal and exact common-clock bounds.
+  Replay the exact streamed PCM and all 3,575 captured diar snapshots from an
+  empty registry, preserve the existing 1,254,049-row producer-equality
+  contract, and display explicit session/robust evidence for every query.
+  Include unavailable and subminimum spans. Automation may validate ordering,
+  completeness, hashes, replay equality, and raw row cardinality only. Both
+  exact-PCM empty-registry replays reproduce all 1,254,049 captured identity
+  values with zero differences. Their final identity and 1,348-row evidence
+  files are separately byte-identical at `b1f42d0085adcafaf6564479bbc88895518adfa80d84891cd8be3dde843467fa`
+  and `6c7b4c9b1e17a08895a3c4a88eab855acf8e42fb530fef90c093ce7f6b88d366`.
+  See `session-wide-primary-evidence-capture-2026-07-19.md`.
+- [x] T189 Read every remaining critical contribution completely in
+  chronological and reverse order against `test.txt`. For each one, display
+  current business, ASR, alignment, activity, primary, VAD, and primary-run
+  dual-gallery evidence on the common clock. Manually distinguish source-
+  absent content, source-present alignment displacement, corroborated native
+  islands, gallery disagreement, and producer-wrong evidence. Add accepted
+  neighboring controls. No executable mechanism may label or group a product
+  result. All 23 critical conversations were read in full chronological and
+  reverse context. Only `ref-0099` has complete mutually corroborating native
+  speaker evidence that final fusion overwrites. Every other critical context
+  has missing/displaced source, an unavailable short-span embedding,
+  disagreeing evidence, partial support, or producer-wrong identity evidence.
+  See `session-wide-primary-residual-review-2026-07-19.md`.
+- [x] T190 Decide from the complete manual FR46 review whether one shared
+  source-free topology can repair multiple residuals with independently
+  specified abstention controls. If yes, update spec/plan/tasks before
+  implementation. If not, record the evidence boundary and stop without a new
+  fusion rule, TOML change, audio run, ledger change, or closure claim. The
+  complete review finds no shared source-free topology across multiple
+  residuals with independent abstention controls. FR46 therefore stops without
+  any of those changes; the next phase must investigate complementary upstream
+  evidence from the two orthogonal speaker models. See
+  `session-wide-primary-residual-review-2026-07-19.md`.

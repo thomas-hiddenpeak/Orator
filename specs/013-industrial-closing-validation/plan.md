@@ -3812,6 +3812,48 @@ business output keeps existing forced-alignment times, so time-based gates
 remain open. No new real-WebSocket result or closing claim follows. See
 `primary-island-alignment-gap-echo-review-2026-07-19.md`.
 
+FR46 stops the sequence of single-residual fusion patches and first establishes
+a session-wide source-independent identity view. A temporary query list will be
+derived mechanically from all 1,348 frozen T123 primary runs. Every row keeps
+the primary run's exact clock interval and uses only an ordinal diagnostic ID;
+no reference row, expected identity, correctness field, or selection score is
+added. The existing capture-faithful replay will start from an empty registry,
+consume the original 3,575 chronological diar snapshots over the exact streamed
+PCM, and display explicit session/robust evidence for every primary query. The
+previous 1,254,049-row producer-equality contract must still hold. Short and
+unavailable spans remain visible because their absence can be as important as
+an eligible score list.
+
+In parallel, the already signed T123 error table will be manually reconciled
+with each retained FR32-FR45 contextual decision. The resulting residual list
+will be read against `test.txt`, first chronologically and then in reverse. For
+every remaining critical contribution, raw displays will place the current
+business output, ASR source, alignment units, activity, primary, VAD, and the
+new primary-run dual-gallery evidence on the common clock. The reviewer will
+manually record whether content is absent, alignment is displaced from an
+independently corroborated island, galleries disagree, or the acoustic models
+themselves support the wrong identity.
+
+Only after that complete review may one shared source-free alignment policy be
+specified. It must explain multiple residuals through the same topology, reuse
+existing TOML boundaries unless a separately justified parameter is required,
+and name independent accepted-context controls that force abstention. If the
+evidence instead remains case-specific or producer-wrong, FR46 ends as a
+diagnosis and no production fusion code or new real-WebSocket run follows.
+Code may capture and arrange evidence but cannot perform any of the contextual
+classification, candidate selection, or product judgment.
+
+FR46 completes as an evidence-only stop. Complete forward and reverse review
+of all 23 critical residuals finds only `ref-0099` with source, alignment,
+activity, primary, VAD, and both identity galleries independently agreeing on
+the correct speaker while final fusion overwrites it. Every other critical
+context has a different upstream or evidence-completeness boundary. One
+single-residual veto would not satisfy the FR46 shared-topology gate, so no
+production fusion rule, TOML change, model change, audio run, or ledger change
+is made. The next plan revision must examine complementary raw evidence from
+the two orthogonal speaker models before authorizing another implementation.
+See `session-wide-primary-residual-review-2026-07-19.md`.
+
 ### 8.15 FR28 120-second outcome and promotion ladder
 
 T117-T121 are complete. The frozen T116 packages replay byte-stably; their

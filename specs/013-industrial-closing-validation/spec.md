@@ -2601,6 +2601,42 @@ subject to the complete acceptance gates in this spec.
   review against `test.txt` before retention or a new audio run. See
   `primary-island-alignment-gap-evidence-diagnosis-2026-07-19.md` and
   `primary-island-alignment-gap-echo-review-2026-07-19.md`.
+- **FR46 evidence gate**: No further speaker-fusion rule MAY be specified from
+  one residual, one known timestamp, or one manually preferred output label.
+  The capture-faithful empty-registry identity replay MUST first display
+  explicit session and robust gallery evidence for every positive-duration
+  frozen T123 primary-speaker run. The query set MUST be derived only from the
+  immutable primary track, preserve its exact common-clock bounds, carry no
+  reference speaker or correctness field, and include short or unavailable
+  spans rather than filtering them by a desired outcome. Replay MUST use the
+  exact streamed PCM and original chronological diar snapshots already proven
+  equal to the capture. Automation MAY validate input order, completeness,
+  hashes, replay equality, and raw evidence cardinality; it MUST NOT assign a
+  speaker-product label, aggregate accuracy, rank a topology, select a rule,
+  or issue a verdict.
+
+  Every manually retained FR32-FR45 repair MUST then be reconciled against the
+  complete T123 error ledger to establish the current residual set without
+  code. Every remaining critical context MUST be read completely in forward
+  and reverse order against `test.txt` and inspected across final business,
+  ASR, forced alignment, activity, primary, VAD, and both complete identity
+  galleries on the common clock. Manual diagnosis MUST distinguish at least
+  source-absent content, source-present alignment displacement, independently
+  corroborated native speaker islands, gallery disagreement, and producer-
+  wrong evidence. A shared implementation MAY be specified only if this full
+  review establishes a source-free topology across multiple residuals and
+  identifies independent abstention controls. Otherwise the evidence phase
+  MUST stop without production code or a new audio run.
+
+FR46 completes under the stop branch. Complete chronological and reverse
+contextual review finds only `ref-0099` with mutually corroborating correct
+source, primary, activity, VAD, and dual-gallery evidence that final fusion
+overwrites. The other critical residuals cross distinct source-absence,
+alignment-displacement, short-span, disagreement, partial-support, or
+producer-wrong boundaries. No shared source-free multi-residual policy is
+therefore specified, and FR46 makes no code, TOML, model, audio, ledger, or
+acceptance change. See
+`session-wide-primary-residual-review-2026-07-19.md`.
 
 FR40 passes its frozen gate. Repeated T123 outputs are byte-identical and
 change only Xu Zijing's `184.240-184.320` response. Repeated T111 outputs are
