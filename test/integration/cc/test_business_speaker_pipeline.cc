@@ -4863,6 +4863,393 @@ int main() {
           "an eligible complete-source view blocks the abstention topology");
   }
 
+  // ---- 20g12e. FR40: reconstruct a two-unit primary handoff identically
+  // across merged and adjacent ASR source partitions.
+  // ----
+  {
+    using Entry = ComprehensiveTimeline::Entry;
+    using Evidence = ComprehensiveTimeline::SpeakerVoiceprintEvidence;
+    using VoiceprintScore = ComprehensiveTimeline::VoiceprintScore;
+    struct CaseOptions {
+      bool split_sources = false;
+      bool direct_label = true;
+      bool candidate_embedded = false;
+      bool valid_unit_width = true;
+      bool left_punctuation = true;
+      bool right_punctuation = true;
+      int containing_vad_count = 1;
+      bool vad_contains_pair = true;
+      bool vad_robust_complete = true;
+      bool short_vad = true;
+      bool extra_unit_inside_vad = false;
+      double unit_gap = 0.32;
+      double boundary_tolerance = 0.08;
+      bool left_primary = true;
+      bool right_primary = true;
+      bool duplicate_right_primary = false;
+      bool distinct_primary = true;
+      bool overlapping_primary = false;
+      bool activity_covers_pair = true;
+      bool competing_activity = false;
+      bool vad_right_first = true;
+      bool vad_expected_pair = true;
+      bool vad_score_passes = true;
+      bool vad_margin_passes = true;
+      bool adjacent_texts = true;
+      bool current_identity_in_pair = true;
+    };
+    auto run_case = [](const CaseOptions& options) -> std::vector<Entry> {
+      BusinessSpeakerPipeline::Config config;
+      config.voiceprint_fusion_enabled = true;
+      config.align_boundary_split_tolerance_sec =
+          options.boundary_tolerance;
+      config.speaker_overlap_tie_policy =
+          BusinessSpeakerPipeline::SpeakerOverlapTiePolicy::kPrimarySpeaker;
+      TestBusinessSpeakerPipeline tl(config);
+
+      constexpr double kLeftStart = 0.20;
+      constexpr double kLeftEnd = 0.28;
+      const double right_start = kLeftEnd + options.unit_gap;
+      const double right_end = right_start + 0.08;
+      const double later_start = right_end + 0.52;
+      const double interval_end = options.split_sources
+                                      ? right_start + 1.60
+                                      : right_end;
+
+      std::vector<TestBusinessSpeakerPipeline::SpeakerInput> activity = {
+          {0.0,
+           options.activity_covers_pair ? interval_end + 0.2
+                                        : kLeftEnd + 0.01,
+           "slot_a", 0.9f, "spk_a"}};
+      if (options.competing_activity) {
+        activity.push_back(
+            {kLeftStart, right_end, "slot_c", 0.8f, "spk_c"});
+      }
+      tl.ReplaceSpeakers(activity);
+
+      std::vector<TestBusinessSpeakerPipeline::SpeakerInput> primary;
+      if (options.left_primary) {
+        primary.push_back(
+            {0.12,
+             options.overlapping_primary ? right_start + 0.04 : 0.40,
+             "slot_a", 0.9f, "spk_a"});
+      }
+      if (options.right_primary) {
+        primary.push_back(
+            {right_start - 0.02, right_end + 0.16, "slot_b", 0.9f,
+             options.distinct_primary ? "spk_b" : "spk_a"});
+      }
+      if (options.duplicate_right_primary) {
+        primary.push_back({right_start, right_end + 0.10, "slot_c", 0.8f,
+                           "spk_b"});
+      }
+      if (options.split_sources) {
+        primary.push_back({later_start - 0.02, interval_end, "slot_a", 0.9f,
+                           "spk_a"});
+      }
+      tl.ReplacePrimarySpeakers(primary);
+
+      const std::string left_text =
+          options.left_punctuation ? "甲？" : "甲";
+      const std::string right_clause = options.right_punctuation
+                                           ? (options.split_sources ? "乙，"
+                                                                    : "乙。")
+                                           : "乙";
+      const int left_character_count = options.left_punctuation ? 2 : 1;
+      const int right_source_start = options.split_sources
+                                         ? 0
+                                         : left_character_count;
+      const int right_source_end = right_source_start + 1;
+      const int right_clause_end =
+          right_source_end + (options.right_punctuation ? 1 : 0);
+
+      if (options.split_sources) {
+        const double right_text_start = options.adjacent_texts ? 0.50 : 0.51;
+        tl.UpsertText(0, 0.0, 0.50, left_text);
+        tl.UpsertText(1, right_text_start, interval_end + 0.1,
+                      right_clause + "丙？");
+        tl.UpsertAlign(0, 0.0, 0.50,
+                       {{kLeftStart, kLeftEnd, "甲"}});
+        tl.UpsertAlign(1, right_text_start, interval_end + 0.1,
+                       {{right_start, right_end, "乙"},
+                        {later_start, later_start + 0.08, "丙"}});
+      } else {
+        const std::string source = left_text + right_clause;
+        tl.UpsertText(0, 0.0, 1.0, source);
+        tl.UpsertAlign(0, 0.0, 1.0,
+                       {{kLeftStart, kLeftEnd, "甲"},
+                        {right_start, right_end, "乙"}});
+      }
+
+      Evidence left_unit;
+      left_unit.evidence_id = "aligned_unit:left";
+      left_unit.kind = "aligned_unit";
+      left_unit.text_id = 0;
+      left_unit.source_start = 0;
+      left_unit.source_end =
+          options.valid_unit_width ? 1 : left_character_count;
+      left_unit.start = kLeftStart;
+      left_unit.end = kLeftEnd;
+      left_unit.embedding_available = options.candidate_embedded;
+
+      Evidence right_unit;
+      right_unit.evidence_id = "aligned_unit:right";
+      right_unit.kind = "aligned_unit";
+      right_unit.text_id = options.split_sources ? 1 : 0;
+      right_unit.source_start = right_source_start;
+      right_unit.source_end =
+          options.valid_unit_width ? right_source_end : right_clause_end;
+      right_unit.start = right_start;
+      right_unit.end = right_end;
+      right_unit.embedding_available = options.candidate_embedded;
+
+      Evidence interval;
+      interval.evidence_id = "business_interval:coarse";
+      interval.kind = "business_interval";
+      interval.text_id = options.split_sources ? 1 : 0;
+      interval.source_start = 0;
+      interval.source_end = options.split_sources
+                                ? right_clause_end + 2
+                                : right_clause_end;
+      interval.start = options.split_sources ? right_start : kLeftStart;
+      interval.end = interval_end;
+      interval.embedding_available = options.direct_label;
+      interval.robust_gallery_complete = true;
+      const std::string direct_identity =
+          options.current_identity_in_pair
+              ? (options.split_sources ? "spk_a" : "spk_b")
+              : "spk_c";
+      if (direct_identity == "spk_a") {
+        interval.session_scores = {
+            {"spk_a", 0.70f}, {"spk_b", 0.30f}, {"spk_c", 0.10f}};
+      } else if (direct_identity == "spk_b") {
+        interval.session_scores = {
+            {"spk_b", 0.70f}, {"spk_a", 0.30f}, {"spk_c", 0.10f}};
+      } else {
+        interval.session_scores = {
+            {"spk_c", 0.70f}, {"spk_a", 0.30f}, {"spk_b", 0.20f}};
+      }
+      interval.robust_scores = interval.session_scores;
+
+      std::vector<Evidence> evidence = {interval, left_unit, right_unit};
+      if (options.extra_unit_inside_vad) {
+        Evidence extra = right_unit;
+        extra.evidence_id = "aligned_unit:extra";
+        extra.start = right_end + 0.02;
+        extra.end = right_end + 0.06;
+        evidence.push_back(extra);
+      }
+      if (options.split_sources) {
+        Evidence later_unit;
+        later_unit.evidence_id = "aligned_unit:later";
+        later_unit.kind = "aligned_unit";
+        later_unit.text_id = 1;
+        later_unit.source_start = right_clause_end;
+        later_unit.source_end = right_clause_end + 1;
+        later_unit.start = later_start;
+        later_unit.end = later_start + 0.08;
+        evidence.push_back(later_unit);
+      }
+
+      for (int index = 0; index < options.containing_vad_count; ++index) {
+        Evidence vad;
+        vad.evidence_id = "vad:two-unit:" + std::to_string(index);
+        vad.kind = "vad";
+        vad.text_id = -1;
+        vad.start = options.vad_contains_pair
+                        ? (options.short_vad ? 0.10 - index * 0.01 : -1.0)
+                        : 0.40;
+        vad.end = right_end + 0.10 + index * 0.01;
+        vad.embedding_available = true;
+        vad.robust_gallery_complete = options.vad_robust_complete;
+        const float top_score = options.vad_score_passes
+                                    ? (options.vad_margin_passes ? 0.50f
+                                                               : 0.42f)
+                                    : -0.05f;
+        const float second_score = options.vad_score_passes
+                                       ? 0.40f
+                                       : -0.15f;
+        if (options.vad_expected_pair) {
+          vad.session_scores = options.vad_right_first
+                                   ? std::vector<VoiceprintScore>{
+                                         {"spk_b", top_score},
+                                         {"spk_a", second_score},
+                                         {"spk_c", 0.10f}}
+                                   : std::vector<VoiceprintScore>{
+                                         {"spk_a", top_score},
+                                         {"spk_b", second_score},
+                                         {"spk_c", 0.10f}};
+        } else {
+          vad.session_scores = {{"spk_b", top_score},
+                                {"spk_c", second_score},
+                                {"spk_a", 0.10f}};
+        }
+        vad.robust_scores = vad.session_scores;
+        evidence.push_back(vad);
+      }
+      tl.ReplaceVoiceprint(evidence);
+      return tl.Snapshot();
+    };
+
+    const std::string reason =
+        "voiceprint_aligned_unit_two_unit_primary_handoff_override";
+    auto merged_selected = [&](const std::vector<Entry>& entries) {
+      bool left_restored = false;
+      bool right_preserved = false;
+      for (const auto& entry : entries) {
+        if (entry.text == "甲？" && entry.speaker_id == "spk_a" &&
+            entry.speaker_decision.reason == reason &&
+            entry.speaker_decision.speaker_source ==
+                "sortformer_activity+primary_top1+titanet_vad+"
+                "robust_gallery+forced_alignment") {
+          left_restored = true;
+        }
+        if (entry.text == "乙。" && entry.speaker_id == "spk_b" &&
+            entry.speaker_decision.reason != reason) {
+          right_preserved = true;
+        }
+      }
+      return left_restored && right_preserved;
+    };
+    auto split_selected = [&](const std::vector<Entry>& entries) {
+      bool right_restored = false;
+      bool later_preserved = false;
+      for (const auto& entry : entries) {
+        if (entry.text == "乙，" && entry.speaker_id == "spk_b" &&
+            entry.speaker_decision.reason == reason) {
+          right_restored = true;
+        }
+        if (entry.text == "丙？" && entry.speaker_id == "spk_a" &&
+            entry.speaker_decision.reason != reason) {
+          later_preserved = true;
+        }
+      }
+      return right_restored && later_preserved;
+    };
+    auto abstained = [&](const std::vector<Entry>& entries) {
+      return std::none_of(entries.begin(), entries.end(), [&](const auto& entry) {
+        return entry.speaker_decision.reason == reason;
+      });
+    };
+
+    CHECK(merged_selected(run_case({})),
+          "merged source reconstructs the exact two-unit primary handoff");
+    CaseOptions split;
+    split.split_sources = true;
+    split.unit_gap = 0.404;
+    CHECK(split_selected(run_case(split)),
+          "adjacent sources reconstruct the same two-unit primary handoff");
+    CaseOptions split_without_tolerance = split;
+    split_without_tolerance.boundary_tolerance = 0.0;
+    CHECK(abstained(run_case(split_without_tolerance)),
+          "the split-source boundary requires configured alignment tolerance");
+    CaseOptions native_label;
+    native_label.direct_label = false;
+    CHECK(abstained(run_case(native_label)),
+          "native provenance blocks the final direct-write challenge");
+    CaseOptions embedded_unit;
+    embedded_unit.candidate_embedded = true;
+    CHECK(abstained(run_case(embedded_unit)),
+          "an independently embedded aligned unit blocks reconstruction");
+    CaseOptions wide_unit;
+    wide_unit.valid_unit_width = false;
+    CHECK(abstained(run_case(wide_unit)),
+          "a multi-character aligned unit blocks reconstruction");
+    CaseOptions missing_left_punctuation;
+    missing_left_punctuation.left_punctuation = false;
+    CHECK(abstained(run_case(missing_left_punctuation)),
+          "missing left punctuation blocks the two-clause handoff");
+    CaseOptions missing_right_punctuation;
+    missing_right_punctuation.right_punctuation = false;
+    CHECK(abstained(run_case(missing_right_punctuation)),
+          "missing right punctuation blocks the two-clause handoff");
+    CaseOptions missing_vad;
+    missing_vad.containing_vad_count = 0;
+    CHECK(abstained(run_case(missing_vad)),
+          "missing containing VAD blocks reconstruction");
+    CaseOptions duplicate_vad;
+    duplicate_vad.containing_vad_count = 2;
+    CHECK(abstained(run_case(duplicate_vad)),
+          "duplicate containing VAD blocks reconstruction");
+    CaseOptions partial_vad;
+    partial_vad.vad_contains_pair = false;
+    CHECK(abstained(run_case(partial_vad)),
+          "a VAD that does not contain both units blocks reconstruction");
+    CaseOptions incomplete_vad;
+    incomplete_vad.vad_robust_complete = false;
+    CHECK(abstained(run_case(incomplete_vad)),
+          "an incomplete VAD gallery blocks reconstruction");
+    CaseOptions long_vad;
+    long_vad.short_vad = false;
+    CHECK(abstained(run_case(long_vad)),
+          "a regular-duration VAD blocks the short handoff contract");
+    CaseOptions third_unit;
+    third_unit.extra_unit_inside_vad = true;
+    CHECK(abstained(run_case(third_unit)),
+          "a third aligned unit inside the VAD blocks reconstruction");
+    CaseOptions short_gap;
+    short_gap.unit_gap = 0.20;
+    CHECK(abstained(run_case(short_gap)),
+          "a sub-pause unit gap blocks reconstruction");
+    CaseOptions long_gap;
+    long_gap.unit_gap = 0.50;
+    CHECK(abstained(run_case(long_gap)),
+          "a regular-duration unit gap blocks reconstruction");
+    CaseOptions missing_left_primary;
+    missing_left_primary.left_primary = false;
+    CHECK(abstained(run_case(missing_left_primary)),
+          "missing left primary evidence blocks reconstruction");
+    CaseOptions missing_right_primary;
+    missing_right_primary.right_primary = false;
+    CHECK(abstained(run_case(missing_right_primary)),
+          "missing right primary evidence blocks reconstruction");
+    CaseOptions duplicate_right_primary;
+    duplicate_right_primary.duplicate_right_primary = true;
+    CHECK(abstained(run_case(duplicate_right_primary)),
+          "competing right primary evidence blocks reconstruction");
+    CaseOptions same_primary;
+    same_primary.distinct_primary = false;
+    CHECK(abstained(run_case(same_primary)),
+          "one primary identity across both units blocks reconstruction");
+    CaseOptions overlapping_primary;
+    overlapping_primary.overlapping_primary = true;
+    CHECK(abstained(run_case(overlapping_primary)),
+          "overlapping primary runs block reconstruction");
+    CaseOptions short_activity;
+    short_activity.activity_covers_pair = false;
+    CHECK(abstained(run_case(short_activity)),
+          "activity that does not cover both units blocks reconstruction");
+    CaseOptions competing_activity;
+    competing_activity.competing_activity = true;
+    CHECK(abstained(run_case(competing_activity)),
+          "competing activity blocks reconstruction");
+    CaseOptions changed_vad_order;
+    changed_vad_order.vad_right_first = false;
+    CHECK(abstained(run_case(changed_vad_order)),
+          "a changed VAD order blocks reconstruction");
+    CaseOptions changed_vad_pair;
+    changed_vad_pair.vad_expected_pair = false;
+    CHECK(abstained(run_case(changed_vad_pair)),
+          "a third VAD top-two identity blocks reconstruction");
+    CaseOptions weak_vad;
+    weak_vad.vad_score_passes = false;
+    CHECK(abstained(run_case(weak_vad)),
+          "a VAD failing the short score gate blocks reconstruction");
+    CaseOptions tied_vad;
+    tied_vad.vad_margin_passes = false;
+    CHECK(abstained(run_case(tied_vad)),
+          "a VAD failing the short margin gate blocks reconstruction");
+    CaseOptions nonadjacent_sources;
+    nonadjacent_sources.split_sources = true;
+    nonadjacent_sources.adjacent_texts = false;
+    CHECK(abstained(run_case(nonadjacent_sources)),
+          "nonadjacent ASR source clocks block reconstruction");
+    CaseOptions outsider;
+    outsider.current_identity_in_pair = false;
+    CHECK(abstained(run_case(outsider)),
+          "a coarse identity outside the corroborated pair is preserved");
+  }
+
   // ---- 20g13. FR16ABJ: a subminimum interval may restore uncontested native
   // evidence only under the exact phrase/VAD cross-scale abstention pattern.
   // ----

@@ -2289,3 +2289,33 @@ T102/T084 remain open 2026-07-19
   `513/556`; the 3000-3600 block reaches `80/87`, while Zhu Jie recall and the
   remaining conjunctive closing gates stay open. See
   `source-leading-phrase-tail-isolation-review-2026-07-19.md`.
+- [x] T164 Diagnose the partition-sensitive `ref-0024`/`ref-0025` handoff from
+  frozen T111/T123 typed evidence on the common clock. Specify FR40 as a strict
+  two-unit reconstruction requiring one coarse activity identity A, exact
+  primary A-to-B units, dual eligible VAD B/A evidence, configured punctuation
+  clauses, and only a conflicting coarse `voiceprint_direct_*` target. Add no
+  TOML value, threshold, transcript, timestamp, reference lookup, or product
+  verdict. See `two-unit-primary-handoff-diagnosis-2026-07-19.md`.
+- [x] T165 Implement FR40 with merged-source and split-source positive tests
+  plus independent abstention for every contract condition. Pass a warning-
+  clean build and all CTest entries, then replay frozen T123 and T111 producer
+  packages at least twice. Automation may verify only mechanical contracts and
+  arrange raw changed contexts; it may not label correctness, aggregate
+  accuracy, select the candidate, or issue an acceptance verdict. The clean
+  build contains no warning/error diagnostic and all `69/69` CTest entries
+  pass. Repeated T123 outputs are byte-identical at SHA-256
+  `47b43e59afbc2e10776b7e7891712bd79437b97d8b19660de6738d5488509cc4`;
+  repeated T111 outputs are byte-identical at SHA-256
+  `ad2abee782ab30ff67be1a86fa46f4ec0c16b5422ae18954107c398131157aa4`.
+  Mechanical display exposes only the complementary two-unit handoff changes.
+- [x] T166 Read every FR40 changed complete conversation chronologically and
+  in reverse against `test.txt`. Retain or remove FR40 only from that
+  contextual semantic review, synchronize spec/plan/tasks/project state, and
+  label any retained commit as a transitional frozen experiment. Do not
+  attribute a new real-WebSocket result or speaker-business closure to the
+  replay.
+  Complete forward and reverse reading of `02:07-03:45` retains the
+  Zhu-to-Xu-to-Zhu reaction sequence in both partitions and finds no
+  neighboring change. Only current T123 `ref-0025` advances the manually
+  reconciled frozen ledger to `514/556`; T111 `ref-0024` is not double-counted.
+  See `two-unit-primary-handoff-review-2026-07-19.md`.

@@ -3518,6 +3518,49 @@ open. FR39 is therefore a transitional frozen repair, not a real-stream
 acceptance result. See
 `source-leading-phrase-tail-isolation-review-2026-07-19.md`.
 
+FR40 addresses the partition-sensitive `ref-0024`/`ref-0025` handoff. T111
+places Zhu Jie's `啊？` and Xu Zijing's `嗯？` in one source-tail interval and
+the coarse short voiceprint write assigns both to Xu. T123 separates the same
+two aligned reactions across adjacent ASR sources; its wider following
+interval assigns the source-leading Xu response to Zhu. The immutable common-
+clock producer evidence is otherwise identical: one Zhu activity slot covers
+both units, primary changes exactly from Zhu to Xu between them, and one VAD
+containing exactly the two units ranks Xu then Zhu in both galleries under the
+unchanged eligible short gates.
+
+The projector will add one final exact-unit challenge after existing coarse
+source reconstructions. It finds the unique containing VAD, requires exactly
+two one-character punctuation clauses across either one or two ASR sources,
+validates their raw gap with only the configured pause and boundary-tolerance
+values, proves unique A-to-B primary runs,
+proves one uncontested A activity slot over both units, and requires eligible
+B/A VAD session and robust views. It rewrites only a currently conflicting
+`voiceprint_direct_*` unit to its primary identity and carries that identity
+only through immediately following configured punctuation. No source text,
+speaker name, known time, reference row, new threshold, or TOML value enters
+the rule.
+
+Focused tests cover the merged-source and split-source positive shapes plus
+independent abstention for every source, punctuation, provenance, alignment,
+containment, unit-count, timing, primary, activity, VAD rank, gate, and write-
+scope condition. The production projector is then replayed twice over frozen
+T123 and T111. Automation verifies only immutable hashes, determinism,
+reconstruction, time order, and displayed change scope. Every changed complete
+conversation is read chronologically and in reverse against `test.txt`; only
+that contextual semantic review may retain or reject FR40. No audio is rerun
+before the frozen gate completes. See
+`two-unit-primary-handoff-diagnosis-2026-07-19.md`.
+
+The independent frozen gate retains FR40. Final clean-build T123 replays are
+byte-identical and change only `184.240-184.320` `嗯，` from Zhu to Xu. T111
+replays are separately byte-identical and split only the merged `啊？嗯。`
+tail into Zhu then Xu. Complete forward and reverse reading of the full
+`02:07-03:45` context confirms the same Zhu-to-Xu-to-Zhu sequence in both
+partitions and no neighboring change. Only T123 `ref-0025` advances the current
+manual ledger, to `514/556`; the T111 `ref-0024` repair is not double-counted.
+FR40 remains a transitional frozen repair, not a real-stream acceptance result.
+See `two-unit-primary-handoff-review-2026-07-19.md`.
+
 ### 8.15 FR28 120-second outcome and promotion ladder
 
 T117-T121 are complete. The frozen T116 packages replay byte-stably; their

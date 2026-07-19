@@ -28,8 +28,11 @@ to `79/87`, with no new real-path claim; FR39 diagnosis isolates the
 partition-stable `ref-0518` defect to a source-leading exact phrase whose
 separate aligned tail reverses wider evidence; frozen replay and complete
 context review retain the exact phrase repair at `513/556` and raise the
-3000-3600 block to `80/87`, with no new real-path claim; T102, T084, full
-canonical closure, release sign-off, and industrial readiness remain open
+3000-3600 block to `80/87`, with no new real-path claim; FR40 retains the
+partition-invariant two-unit primary handoff for `ref-0024`/`ref-0025`, moving
+the current frozen candidate to `514/556` without a new real-path claim; T102,
+T084, full canonical closure, release sign-off, and industrial readiness
+remain open
 **Created**: 2026-07-13
 **Scope**: Re-establish a truthful product baseline, recover full-session business
 accuracy, and define the evidence required before Orator may be declared closed.
@@ -2365,6 +2368,58 @@ subject to the complete acceptance gates in this spec.
   MUST replay deterministically, and every changed complete conversation MUST
   receive chronological and reverse contextual semantic review against
   `test.txt` before retention or a new audio run.
+- **FR39**: A source-leading exact punctuation phrase MAY return from one
+  uniform unprotected native identity B to the different initial identity A
+  of its sole covering activity slot only when a separately aligned terminal
+  tail explains the cross-scale reversal. The exact phrase, containing short
+  interval, containing VAD, and complete-source views MUST expose only A/B in
+  the strict rank and unchanged-gate topology recorded by the frozen
+  diagnosis. One third-identity primary segment MUST cover exactly the one-
+  visible-character tail after the existing configured pause. Activity and
+  primary MUST uniquely cover their required ranges, and only the exact
+  source-leading phrase may change. Missing, duplicate, differently ranked,
+  differently gated, mixed, protected, unaligned, competing, or source/time-
+  inconsistent evidence MUST preserve existing behavior. FR39 MUST add no
+  TOML value, threshold, fitted constant, transcript lookup, speaker name,
+  timestamp, or reference datum and MUST alter no producer evidence or common-
+  clock coordinate. Frozen T111/T123 inputs MUST replay deterministically,
+  and every changed complete conversation MUST receive chronological and
+  reverse contextual semantic review against `test.txt` before retention or a
+  new audio run.
+- **FR40**: One no-embedding, one-visible-character aligned unit MAY replace a
+  conflicting uniform `voiceprint_direct_*` label with its exact primary
+  identity only inside a fully corroborated two-unit handoff. Exactly one
+  robust-complete VAD MUST contain exactly two positive aligned units across
+  any ASR partition. Each unit MUST be followed by configured punctuation;
+  their raw gap MUST be at least the existing alignment-pause value and, after
+  subtracting at most the existing alignment-boundary tolerance, remain below
+  the existing primary-consensus minimum. Unique non-overlapping primary runs
+  MUST name A then B over the two units. Exactly one activity local slot
+  carrying A MUST cover both units without competing activity. Both VAD
+  galleries MUST rank B first and A second and pass the unchanged short score
+  and margin gates. Only a candidate whose current direct label differs from
+  its exact primary identity may change, and the write MUST stop after its
+  immediately following configured punctuation. Missing, duplicate,
+  differently ranked,
+  differently gated, embedded, mixed, protected, additional-unit, competing,
+  or source/time-inconsistent evidence MUST preserve existing behavior. FR40
+  MUST add no TOML value, threshold, score, margin, duration, transcript
+  lookup, speaker name, known timestamp, reference datum, or fitted constant
+  and MUST alter no producer evidence or common-clock coordinate. Frozen
+  T111/T123 inputs MUST replay deterministically, and every changed complete
+  conversation MUST receive chronological and reverse contextual semantic
+  review against `test.txt` before retention or a new audio run.
+
+FR40 passes its frozen gate. Repeated T123 outputs are byte-identical and
+change only Xu Zijing's `184.240-184.320` response. Repeated T111 outputs are
+separately byte-identical and split only Zhu Jie's first reaction from the
+merged two-reaction source tail. Complete forward and reverse reading of
+`02:07-03:45` retains the common Zhu-to-Xu-to-Zhu sequence and finds no
+neighboring contribution change. The current T123-derived manual ledger
+advances by only `ref-0025` to `514/556`; T111's complementary `ref-0024`
+repair is partition evidence and is not counted again. Zhu Jie recall and all
+other conjunctive closing failures remain open. See
+`two-unit-primary-handoff-review-2026-07-19.md`.
 
 The first FR31 implementation passed its focused engineering test and produced
 byte-stable repeated T111 and T123 replays. Complete forward and reverse review
