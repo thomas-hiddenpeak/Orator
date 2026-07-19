@@ -202,6 +202,10 @@ BusinessSpeakerPipeline::BusinessSpeakerPipeline(
       std::max(1, config_.voiceprint_four_view_min_aligned_units);
   config_.voiceprint_future_epoch_lookahead_sec =
       std::max(0.0, config_.voiceprint_future_epoch_lookahead_sec);
+  config_.posterior_frame_activity_threshold =
+      std::clamp(config_.posterior_frame_activity_threshold, 0.0f, 1.0f);
+  config_.posterior_identity_backfill_sec =
+      std::max(0.0, config_.posterior_identity_backfill_sec);
 }
 
 BusinessSpeakerPipeline::~BusinessSpeakerPipeline() { Stop(); }
@@ -278,6 +282,7 @@ void BusinessSpeakerPipeline::ResetState() {
   primary_speakers_.clear();
   texts_.clear();
   align_.clear();
+  diar_frames_.clear();
   voiceprint_.clear();
   voiceprint_vad_.clear();
   voiceprint_aligned_units_.clear();
@@ -311,6 +316,7 @@ void BusinessSpeakerPipeline::SynchronizeAll() {
   for (const auto& group : snapshot.align) {
     align_[group.text_id] = group;
   }
+  diar_frames_ = snapshot.diar_frames;
   voiceprint_ = snapshot.speaker_voiceprint;
   ReindexSpeakerVoiceprint();
   for (const auto& text : texts_) ReprojectText(text, &revisions);
@@ -325,6 +331,7 @@ void BusinessSpeakerPipeline::OnEvidence(
 
   switch (update.track) {
     case ComprehensiveTimeline::EvidenceTrack::kDiarization:
+      diar_frames_ = timeline_->SnapshotDiarFrames();
       ApplyDiarization(timeline_->SnapshotDiarization(), &revisions);
       break;
     case ComprehensiveTimeline::EvidenceTrack::kPrimarySpeaker:

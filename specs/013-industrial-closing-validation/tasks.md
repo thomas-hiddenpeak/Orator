@@ -3,10 +3,10 @@
 **Status**: In progress - T135 reconciled T111/T123/T133; FR31 is rejected;
 FR32 completed real-WebSocket promotion; FR33-FR45 are retained bounded frozen
 repairs; FR46 completed as an evidence-only stop with no shared multi-residual
-fusion topology; the current candidate is `519/556`, with every complete 600-second
-block and all four per-speaker natural-turn floors passed; critical,
-confident-wrong, time-based, repeatability, holdout, T102, and T084 gates remain
-open 2026-07-19
+fusion topology; the source-bounded FR47 frozen candidate is retained at
+`521/556`, with every complete 600-second block and all four per-speaker
+natural-turn floors passed; critical, confident-wrong, time-based, real-path
+repeatability, holdout, T102, and T084 gates remain open 2026-07-19
 
 ## Phase 0: Governance
 
@@ -2594,3 +2594,107 @@ open 2026-07-19
   any of those changes; the next phase must investigate complementary upstream
   evidence from the two orthogonal speaker models. See
   `session-wide-primary-residual-review-2026-07-19.md`.
+- [x] T191 Run `diar_evidence_probe` at least twice on T123's exact streamed
+  PCM WAV with the frozen T123 TOML and Sortformer v2.1. Record immutable input
+  and output hashes and validate only frame shape, common-clock
+  origin/period/extent, repeatability, and mechanical equality with the frozen
+  T123 primary top-1 producer. Do not use `test.txt`, a reference identity, a
+  correctness field, or a product metric in this capture. Both runs emit
+  byte-identical 45,189-row four-channel frame tables at SHA-256
+  `79fd2c416ac76a0af477f98bf8d848f6e604b2d94c5c4445e653978afd6c7e41`.
+  Mechanical top-1 compression yields the same 1,348 ordered local-slot runs as
+  frozen T123, with zero slot differences and at most `0.000001` decimal
+  serialization difference in bounds or mean probability. See
+  `sortformer-v21-exact-pcm-posterior-capture-2026-07-19.md`.
+- [x] T192 Build raw evidence worksheets for all 23 FR46 critical residuals and
+  their named accepted neighboring controls. Display the four Sortformer
+  posterior channels, frozen time-varying local-to-global identity mapping,
+  activity, primary, VAD, exact-span TitaNet session/robust score lists, ASR,
+  alignment, and business output on the common clock. Automation may copy,
+  order, hash, and validate raw rows only; it must not summarize or label a
+  product result. All 23 six-file directories are present with no empty file;
+  the 141-file content manifest has SHA-256
+  `f839d1efd360b812ef771585e62081ec9a4a1b7efe70e66f79e31c1e02810359`.
+  See `sortformer-v21-orthogonal-evidence-capture-2026-07-19.md`.
+- [x] T193 Read every T192 worksheet completely in chronological and reverse
+  order against `test.txt`. Manually record whether the listener-verified
+  speaker is absent, inactive secondary evidence, sustained overlapping
+  evidence, temporally displaced evidence, or contradicted by TitaNet. Recheck
+  the accepted controls in both directions. No executable mechanism may label,
+  count, rank, select, or decide any speaker-product result. The complete
+  review and manual classifications are recorded in
+  `sortformer-v21-orthogonal-context-review-2026-07-19.md`.
+- [x] T194 Decide from the complete manual FR47 review whether one
+  reference-free, no-new-threshold topology explains multiple critical
+  residuals and has independent abstention controls. Update spec/plan/tasks
+  before any implementation. Otherwise stop without production code, TOML
+  change, model change, new audio run, ledger change, or closure claim. A
+  bounded future-epoch posterior topology is shared by `ref-0507` and
+  `ref-0509` and is separated from accepted `ref-0508`, `ref-0510`, and
+  `ref-0511` controls by the existing frame gate and exact aligned ranges.
+  This authorizes a frozen candidate only; it does not retain a policy or
+  change a product result.
+- [x] T195 Implement the FR47 frozen candidate with one TOML boolean and no new
+  numeric parameter. Snapshot existing typed diar frame blocks in the business
+  pipeline, apply the unique top-1/top-2 plus threshold-crossing and future-
+  epoch/primary contracts to exact phrases and positive aligned units, and
+  preserve every producer, source, and common-clock value. Extend the
+  production replay probe to accept frozen frame CSV input. Add focused
+  positive and independent abstention tests.
+- [x] T196 Pass a warning-clean build and all registered CTest entries, then
+  replay frozen T123 at least twice with the exact T191 posterior. Verify only
+  parsing, typed deposit, determinism, source reconstruction, unchanged
+  producer tracks, and raw changed scope. No executable mechanism may assign
+  correctness, aggregate a result, rank/select the candidate, or issue a
+  verdict. The revised build is warning-clean and `70/70` CTest entries pass.
+  Its two 1,715-entry outputs are byte-identical at SHA-256
+  `27f90ce43f4b226750cadaf5b11b949986536478e84524c0715c2c477b0c85e6`;
+  both frame inputs retain SHA-256
+  `79fd2c416ac76a0af477f98bf8d848f6e604b2d94c5c4445e653978afd6c7e41`.
+- [x] T197 Read every mechanically changed complete conversation
+  chronologically and in reverse against `test.txt`, including independently
+  accepted controls. Manually retain or reject the frozen candidate. The
+  first implementation is rejected: cross-source rewrites in records
+  `175-181`, `253-257`, and `264-271` contradict the listener transcript;
+  only record `283` is retained as evidence for a revised frozen candidate.
+- [x] T198 Revise the FR47 candidate so the future epoch begins inside the same
+  immutable ASR final and both its minimum duration and matching primary
+  support are satisfied before that source ends. Add a cross-text regression
+  test, preserve every earlier abstention contract, add no parameter, and run
+  no audio. The implementation clips both contracts to the immutable source
+  end and the focused cross-text test passes.
+- [x] T199 Complete T196 for the revised candidate, inspect the raw changed
+  scope, and read every changed complete conversation chronologically and in
+  reverse against `test.txt`. Remove the policy and disable the root candidate
+  if any cross-source or contextual regression remains. A boolean-disabled
+  control is deterministic at SHA-256
+  `174319361040f648b4f930e312986e626f6b5cba9e3d8eaad9aeaa4a0bc7e7f1`.
+  The revised override appears only twice in source `283`; complete forward and
+  reverse review retains both `ref-0507` and `ref-0509` corrections and finds
+  no neighboring regression.
+- [x] T200 If T199 retains the candidate, complete a full 556-contribution
+  chronological and reverse contextual semantic review of the frozen T123
+  output and reconcile the signed manual ledger without executable evaluation.
+  Only then decide whether a clean 120/600/full real-WebSocket ladder is
+  justified. Every contribution was read in chronological order and again in
+  reverse fixed windows. The manually transcribed ledger is `521/556`, with 29
+  confident-wrong, five missing, and one uncertain residual; 21 residuals are
+  critical. No new contextual regression is found. The frozen candidate is
+  retained and a gated real-WebSocket ladder is justified; closure remains
+  open. See `post-fr47-residual-reconciliation-2026-07-19.md`.
+- [ ] T201 Commit and push the exact FR47 transitional revision before any new
+  audio run. From that clean revision, execute two independent 120-second real-
+  WebSocket streams using only checked-in `orator.toml`. Verify direct-end,
+  common-clock, producer, observer, telemetry, and deterministic raw contracts,
+  then read every in-scope `test.txt` conversation forward and reverse. Stop
+  and diagnose on any contextual regression.
+- [ ] T202 If both T201 runs pass, execute one clean 600-second real-WebSocket
+  stream from the same revision and apply the same mechanical contracts plus
+  complete forward/reverse review of every in-scope contribution. Do not infer
+  a product result from equality or hashes.
+- [ ] T203 If T202 passes, execute full Run A from an empty registry and full
+  Run B from Run A's frozen registry on the same revision. Each run must pass
+  all mechanical gates and receive its own complete 556-contribution
+  chronological and reverse contextual semantic review before FR47 can replace
+  the frozen comparison baseline. Time-based, holdout, report, and release
+  gates remain separately required.

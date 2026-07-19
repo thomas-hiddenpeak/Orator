@@ -49,9 +49,12 @@ complete forward/reverse contextual review retain the phrase abstention at
 replay separates the source-absent `ref-0066` from the source-present
 `ref-0192` and reproduces every captured T123 identity value; strict FR45
 frozen replay and complete forward/reverse contextual review retain the bounded
-`ref-0192` repair at `519/556` without a new real-path claim; critical
-attribution, confident-wrong attribution, T102, T084, full canonical closure,
-release sign-off, and industrial readiness remain open
+`ref-0192` repair at `519/556` without a new real-path claim; FR46 stops after
+complete orthogonal-evidence diagnosis; source-bounded FR47 deterministic
+replay and complete 556-contribution forward/reverse contextual review retain
+`ref-0507` and `ref-0509` at `521/556`, still without a new real-path claim;
+critical attribution, confident-wrong attribution, T102, T084, full canonical
+closure, release sign-off, and industrial readiness remain open
 **Created**: 2026-07-13
 **Scope**: Re-establish a truthful product baseline, recover full-session business
 accuracy, and define the evidence required before Orator may be declared closed.
@@ -2637,6 +2640,99 @@ producer-wrong boundaries. No shared source-free multi-residual policy is
 therefore specified, and FR46 makes no code, TOML, model, audio, ledger, or
 acceptance change. See
 `session-wide-primary-residual-review-2026-07-19.md`.
+
+- **FR47 orthogonal-evidence gate**: Before another speaker policy is
+  specified, the complete four-channel Sortformer v2.1 posterior MUST be
+  reconstructed from the exact T123 streamed PCM with the frozen T123 TOML.
+  The existing diagnostic probe MUST be run independently at least twice.
+  Frame count, channel count, common-clock origin/period/extent, output hash,
+  and the mechanical top-1 compression contract MUST be repeatable and MUST
+  reproduce the frozen T123 primary-speaker producer before the posterior is
+  treated as capture-faithful evidence. The v2.1 weights and exact PCM hashes
+  MUST remain those already frozen by T123. No alternate diar model, decoder,
+  audio input, CLI tuning value, or reference-derived parameter is permitted.
+
+  For every FR46 critical residual, all four raw Sortformer channels MUST then
+  be displayed over the complete conversational context beside the frozen
+  local-slot identity history, activity, primary, VAD, exact-span TitaNet
+  evidence, ASR, alignment, and final business output. The same display MUST
+  include independently accepted neighboring turns as abstention controls.
+  The reviewer MUST read all contexts chronologically and in reverse against
+  `test.txt` and manually record whether the listener-verified identity is
+  absent from Sortformer, present only as an inactive secondary channel,
+  present as sustained overlapping activity, displaced in time, or contradicted
+  by TitaNet. Automation MAY reproduce, hash, validate, and display these raw
+  values only; it MUST NOT label a speaker result, aggregate coverage or
+  accuracy, rank a channel or candidate, select a threshold, or issue a
+  verdict.
+
+  A production change MAY be specified only if the complete manual review
+  establishes one reference-free topology shared by multiple critical
+  residuals, identifies independent accepted controls that force abstention,
+  and adds no fitted numerical parameter. Existing TOML thresholds MUST be
+  reused unless a separately approved component-oracle experiment establishes
+  a new value without consulting product outcomes. If the correct identity is
+  absent or non-complementary in the raw posterior, or only one residual fits,
+  FR47 MUST stop without production code, TOML change, new audio run, ledger
+  change, or closure claim.
+
+FR47 completes the manual evidence gate and authorizes only a frozen candidate.
+The complete forward and reverse review rejects general secondary-channel,
+primary-preference, source-continuity, and wider identity-backfill policies.
+It finds one shared bounded topology at `ref-0507` and `ref-0509`: the same
+local slot is top-1 or top-2 throughout an exact aligned range, crosses the
+existing frame-activity gate, and then receives a different stable global
+identity within the existing identity backfill horizon. A candidate MUST reuse
+the existing frame gate, horizon, minimum future-epoch duration, phrase bounds,
+and forced-alignment ranges. It MUST require matching future primary support,
+one uniform conflicting current identity, one unique eligible local slot, and
+abstention on any missing frame, rank tie, threshold dropout, identity
+ambiguity, or competing slot. It MAY add a TOML boolean but MUST add no numeric
+parameter. The raw frame track, producer tracks, identity epochs, source text,
+and common-clock coordinates remain immutable. Frozen replay and complete
+changed-context forward/reverse review are required before any retention or
+audio run. See
+`sortformer-v21-orthogonal-context-review-2026-07-19.md`.
+
+The first FR47 frozen implementation is not retainable. Its two deterministic
+replays expose posterior overrides in sixteen finalized source records. The
+complete chronological and reverse semantic review against `test.txt` finds
+that records `175-181`, `253-257`, and `264-271` cross independent speaker
+turns before a later identity epoch and introduce wrong attributions. Only the
+two changes inside source record `283` match the listener transcript. A retry
+MUST therefore keep every future-epoch correction inside one immutable ASR
+final: the future epoch MUST begin before that source ends, and both its
+existing minimum duration and matching primary support MUST be satisfied
+inside the same source bounds. This is a categorical source-ownership and
+common-clock invariant, not a fitted duration. It adds no parameter and MUST
+still satisfy every earlier FR47 abstention condition. See
+`sortformer-v21-posterior-future-epoch-candidate-review-2026-07-19.md`.
+
+The source-bounded FR47 retry passes its frozen gate. The warning-clean build
+and all `70/70` CTest entries pass. Two candidate replays are byte-identical,
+and a contemporaneous boolean-disabled control is separately byte-identical.
+The only revised reason appears on two exact ranges inside source `283`.
+Complete forward and reverse reading of that conversation retains Tang
+Yunfeng's `5.6个亿` expectation and first `对` while preserving Shi Yi's second
+`对，一点影响都没有` and all neighboring turns.
+
+The reviewer then reads all 556 contributions chronologically and again in
+reverse fixed windows against `test.txt`. No executable mechanism labels,
+counts, compares, ranks, or decides the product result. The manually signed
+ledger advances only `ref-0507` and `ref-0509` to `521/556`; 29 confident-
+wrong, five missing, and one uncertain contribution remain, including 21
+business-critical failures. All complete 600-second and per-speaker natural-
+turn floors pass, but critical, confident-wrong, time-based, independent real-
+path, holdout, report, and release gates remain open.
+
+FR47 is retained only as a frozen transitional candidate. It MAY enter a clean
+real-WebSocket ladder on one committed revision: two independent 120-second
+runs, then one 600-second run, then full empty-registry and restarted frozen-
+registry runs. Every stage MUST pass its mechanical contracts and complete in-
+scope chronological and reverse contextual semantic review before the next
+stage. Each full run MUST receive a separate complete 556-contribution review;
+frozen replay evidence MUST NOT be reported as a real-path result. See
+`post-fr47-residual-reconciliation-2026-07-19.md`.
 
 FR40 passes its frozen gate. Repeated T123 outputs are byte-identical and
 change only Xu Zijing's `184.240-184.320` response. Repeated T111 outputs are

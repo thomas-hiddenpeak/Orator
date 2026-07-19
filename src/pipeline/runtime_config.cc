@@ -227,6 +227,8 @@ std::string SerializeResolvedConfig(const AuditoryStream::Config& c) {
                      c.speaker_fusion_four_view_min_aligned_units);
   speaker_fusion.Add("future_epoch_lookahead_sec",
                      c.speaker_fusion_future_epoch_lookahead_sec);
+  speaker_fusion.Add("posterior_future_epoch_enable",
+                     c.speaker_fusion_posterior_future_epoch_enable);
   speaker_fusion.Add("precompute_interval_sec",
                      c.speaker_fusion_precompute_interval_sec);
   speaker_fusion.Add("precompute_max_spans_per_cycle",

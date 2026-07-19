@@ -236,6 +236,9 @@ regular_min_margin = 0.04
 four_view_min_aligned_units = 2
 # T116 full A/B review rejected this experiment as a production baseline.
 future_epoch_lookahead_sec = 0.0
+# FR47 frozen candidate: permit a strictly bounded final-view correction when
+# exact Sortformer posterior evidence and a later identity epoch corroborate.
+posterior_future_epoch_enable = true
 # Spread acoustic-only TitaNet embedding extraction across idle points in the
 # live session. Work starts only after the gallery is mature and all real-time
 # producer pipelines have reached the common-clock head. Final gallery scoring

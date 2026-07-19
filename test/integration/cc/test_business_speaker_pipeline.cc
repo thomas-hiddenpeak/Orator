@@ -7329,6 +7329,179 @@ int main() {
           "overlapping local activity blocks future-epoch corroboration");
   }
 
+  // ---- 20e. FR47 consumes the immutable Sortformer posterior only when one
+  // reset-aware local slot has complete top-two support and a corroborated
+  // future identity epoch. Every incomplete or ambiguous contract abstains. ----
+  {
+    struct CaseOptions {
+      bool enabled = true;
+      bool threshold_crossing = true;
+      bool complete_frame_coverage = true;
+      bool rank_tie = false;
+      bool future_primary = true;
+      bool competing_slot = false;
+      bool aligned_unit_only = false;
+      bool unchanged_future_identity = false;
+      bool foreign_text_id = false;
+      bool future_outside_source = false;
+      bool future_epoch_short_inside_source = false;
+      bool future_primary_short = false;
+    };
+    auto run_case = [](const CaseOptions& options) {
+      BusinessSpeakerPipeline::Config config;
+      config.voiceprint_fusion_enabled = true;
+      config.posterior_future_epoch_enabled = options.enabled;
+      config.posterior_frame_activity_threshold = 0.5f;
+      config.posterior_identity_backfill_sec = 4.0;
+      TestBusinessSpeakerPipeline tl(config);
+
+      ComprehensiveTimeline::DiarFrameBlock frames;
+      frames.start = options.complete_frame_coverage ? 0.0 : 0.08;
+      frames.frame_period_sec = 0.08;
+      frames.num_frames = options.complete_frame_coverage ? 10 : 9;
+      frames.num_speakers = 4;
+      for (int frame = 0; frame < frames.num_frames; ++frame) {
+        const float slot_one =
+            options.threshold_crossing && frame == 2 ? 0.60f : 0.45f;
+        const float slot_three =
+            options.rank_tie && frame == 2
+                ? slot_one
+                : options.competing_slot && frame == 3 ? 0.55f : 0.35f;
+        frames.probabilities.insert(frames.probabilities.end(),
+                                    {0.20f, slot_one, 0.10f, slot_three});
+      }
+      CHECK(tl.timeline().DepositDiarFrameBlock(frames) ==
+                ComprehensiveTimeline::DepositResult::kInserted,
+            "posterior future-epoch fixture deposits typed frame evidence");
+
+      const std::string future_identity =
+          options.unchanged_future_identity ? "spk_old" : "spk_new";
+      std::vector<TestBusinessSpeakerPipeline::SpeakerInput> activity = {
+          {0.0, 0.8, "speaker_1", 0.9f, "spk_old"},
+          {2.0, 3.0, "speaker_1", 0.9f, future_identity}};
+      if (options.competing_slot) {
+        activity.push_back(
+            {0.0, 0.8, "speaker_3", 0.9f, "spk_other"});
+        activity.push_back(
+            {2.0, 3.0, "speaker_3", 0.9f, "spk_third"});
+      }
+      tl.ReplaceSpeakers(activity);
+
+      std::vector<TestBusinessSpeakerPipeline::SpeakerInput> primary;
+      if (options.future_primary) {
+        primary.push_back({2.0, options.future_primary_short ? 2.2 : 3.0,
+                           "speaker_1", 0.9f, future_identity});
+      }
+      if (options.competing_slot) {
+        primary.push_back(
+            {2.0, 3.0, "speaker_3", 0.9f, "spk_third"});
+      }
+      tl.ReplacePrimarySpeakers(primary);
+      const double source_end =
+          options.future_outside_source
+              ? 0.8
+              : options.future_epoch_short_inside_source ? 2.2 : 3.0;
+      const std::string source =
+          options.future_outside_source ? "甲乙。" : "甲乙。丙丁";
+      tl.UpsertText(0, 0.0, source_end, source);
+      std::vector<TestBusinessSpeakerPipeline::AlignUnitSeg> units = {
+          {0.0, 0.3, "甲"}, {0.3, 0.7, "乙"}};
+      if (!options.future_outside_source) {
+        const double middle =
+            options.future_epoch_short_inside_source ? 2.1 : 2.3;
+        const double end =
+            options.future_epoch_short_inside_source ? 2.2 : 2.7;
+        units.push_back({2.0, middle, "丙"});
+        units.push_back({middle, end, "丁"});
+      }
+      tl.UpsertAlign(0, 0.0, source_end, units);
+
+      ComprehensiveTimeline::SpeakerVoiceprintEvidence evidence;
+      evidence.evidence_id = options.aligned_unit_only
+                                 ? "aligned_unit:0:0"
+                                 : "punctuation_phrase:0:0";
+      evidence.kind =
+          options.aligned_unit_only ? "aligned_unit" : "punctuation_phrase";
+      evidence.text_id = options.foreign_text_id ? 1 : 0;
+      evidence.source_start = 0;
+      evidence.source_end = options.aligned_unit_only ? 1 : 3;
+      evidence.start = 0.0;
+      evidence.end = options.aligned_unit_only ? 0.3 : 0.7;
+      tl.ReplaceVoiceprint({evidence});
+      return tl.Snapshot();
+    };
+    const std::string reason =
+        "sortformer_posterior_future_epoch_override";
+    auto has_override = [&](const auto& entries) {
+      return std::any_of(entries.begin(), entries.end(), [&](const auto& entry) {
+        return entry.speaker_id == "spk_new" &&
+               entry.speaker_decision.reason == reason &&
+               entry.speaker_decision.speaker_source ==
+                   "sortformer_frame_posterior+future_identity_epoch+"
+                   "primary_top1+forced_alignment";
+      });
+    };
+    auto abstains = [&](const CaseOptions& options) {
+      const auto entries = run_case(options);
+      return std::none_of(entries.begin(), entries.end(),
+                          [&](const auto& entry) {
+                            return entry.speaker_decision.reason == reason;
+                          });
+    };
+
+    CHECK(has_override(run_case({})),
+          "complete posterior and future-epoch evidence selects the phrase");
+    CaseOptions aligned_unit;
+    aligned_unit.aligned_unit_only = true;
+    const auto aligned_entries = run_case(aligned_unit);
+    CHECK(has_override(aligned_entries) &&
+              std::any_of(aligned_entries.begin(), aligned_entries.end(),
+                          [&](const auto& entry) {
+                            return entry.text == "甲" &&
+                                   entry.speaker_decision.reason == reason;
+                          }),
+          "positive-duration aligned evidence limits the posterior override");
+    CaseOptions disabled;
+    disabled.enabled = false;
+    CHECK(abstains(disabled), "the false typed switch disables the policy");
+    CaseOptions below_gate;
+    below_gate.threshold_crossing = false;
+    CHECK(abstains(below_gate),
+          "a top-two slot that never crosses the existing frame gate abstains");
+    CaseOptions missing_frames;
+    missing_frames.complete_frame_coverage = false;
+    CHECK(abstains(missing_frames), "missing frame coverage abstains");
+    CaseOptions tied_rank;
+    tied_rank.rank_tie = true;
+    CHECK(abstains(tied_rank), "a top-two rank tie abstains");
+    CaseOptions no_primary;
+    no_primary.future_primary = false;
+    CHECK(abstains(no_primary), "a future epoch without primary support abstains");
+    CaseOptions competing;
+    competing.competing_slot = true;
+    CHECK(abstains(competing), "multiple eligible local slots abstain");
+    CaseOptions unchanged;
+    unchanged.unchanged_future_identity = true;
+    CHECK(abstains(unchanged), "an unchanged local identity epoch abstains");
+    CaseOptions foreign_text;
+    foreign_text.aligned_unit_only = true;
+    foreign_text.foreign_text_id = true;
+    CHECK(abstains(foreign_text),
+          "an aligned unit cannot revise a different source text");
+    CaseOptions cross_source;
+    cross_source.future_outside_source = true;
+    CHECK(abstains(cross_source),
+          "a future epoch in a later finalized source cannot backfill text");
+    CaseOptions short_in_source;
+    short_in_source.future_epoch_short_inside_source = true;
+    CHECK(abstains(short_in_source),
+          "future identity duration must complete inside the source text");
+    CaseOptions short_primary;
+    short_primary.future_primary_short = true;
+    CHECK(abstains(short_primary),
+          "future primary support must complete inside the source text");
+  }
+
   // ---- 21. An identity change surrounded by unaligned punctuation remains
   // source ordered after terminal serialization sorts entries by time. ----
   {

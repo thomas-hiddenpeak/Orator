@@ -3854,6 +3854,137 @@ is made. The next plan revision must examine complementary raw evidence from
 the two orthogonal speaker models before authorizing another implementation.
 See `session-wide-primary-residual-review-2026-07-19.md`.
 
+FR47 moves one level upstream without changing either model. The diagnostic
+input is the lossless WAV wrapper around T123's exact streamed PCM, not a new
+MP3 decode. `diar_evidence_probe` will load the frozen T123 TOML and current
+Sortformer v2.1 weights, run the model twice, and serialize every frame's four
+sigmoid values with its absolute common-clock start and `0.08 s` period. A
+mechanical replay will coalesce only threshold-eligible frame-wise top-1 runs
+using the same existing `speaker_fusion.frame_activity_threshold` contract and
+compare their local slot, bounds, and mean probability with the frozen T123
+primary track. This validates evidence provenance only.
+
+The frozen T123 diarization/identity history supplies the time-varying mapping
+from each local Sortformer slot to its TitaNet global identity. Diagnostic
+worksheets will copy raw frame rows intersecting each of the 23 FR46 critical
+contexts and the accepted controls named by the FR46 review. They will display,
+without derived correctness fields, ASR source, forced-alignment units,
+activity segments, primary runs, VAD spans, all four raw posterior channels,
+session and robust TitaNet score lists, and final business entries. No weighted
+combination, automated channel summary, result-dependent threshold search, or
+candidate output belongs in this capture phase.
+
+The reviewer will then traverse every worksheet forward and backward against
+`test.txt`. Manual notes will distinguish true overlap evidence from low-level
+inactive probability, temporal displacement, identity-map ambiguity, and
+shared-model TitaNet agreement. Prior FR16ZU and FR16AAL artifacts are controls:
+FR16ZU's session-wide strict secondary-channel rule was a no-op, while FR16AAL
+retained one bounded edge closure. FR47 may not broaden either historical rule
+without new multi-residual evidence and explicit accepted-context abstention
+controls. Only after the complete review may spec/plan/tasks be revised for a
+production implementation; otherwise FR47 ends as an upstream evidence
+diagnosis.
+
+T191 completes the capture prerequisite. Two exact-PCM runs emit byte-identical
+45,189-row four-channel frame tables. Applying only the frozen `0.5` top-1
+compression reproduces all 1,348 frozen T123 primary runs in the same order and
+local slots; serialized bounds and means differ by no more than one unit in the
+sixth decimal place. This is producer provenance, not speaker accuracy. T192
+may now arrange this raw posterior beside the frozen typed tracks. See
+`sortformer-v21-exact-pcm-posterior-capture-2026-07-19.md`.
+
+T192 is complete. Twenty-three immutable context directories now display every
+raw posterior frame beside all six frozen upstream track kinds, the current
+business view, intersecting identity epochs, and the complete selected
+reference entries. Every FR46 accepted neighboring control is included. The
+content manifest covers 141 files and no file is empty. This is evidence
+availability only; T193 is the first phase permitted to relate it to product
+correctness. See
+`sortformer-v21-orthogonal-evidence-capture-2026-07-19.md`.
+
+T193 completes the manual two-direction review. Most raw secondary evidence is
+either contradicted by TitaNet, attached to missing/displaced source, or also
+present in accepted controls. A broad primary preference similarly cannot
+combine the fully corroborated `ref-0099` overwrite with the subminimum,
+otherwise contradicted `ref-0327` island. Those paths stop.
+
+T194 authorizes one narrower frozen experiment for `ref-0507` and
+`ref-0509`. `ComprehensiveTimeline` already owns each immutable Sortformer
+frame block, so the business pipeline will snapshot that existing track rather
+than add a producer callback or duplicate model execution. For each exact
+punctuation phrase and then each exact positive-duration aligned unit, a pure
+policy helper will consider each reset-aware local slot. One slot is eligible
+only when it is uniquely top-1 or top-2 on every intersecting frame, has no
+rank tie, and crosses the existing `speaker_fusion.frame_activity_threshold`
+on at least one frame. Its first later different identity epoch must start
+within `[speaker].local_drift_competing_backfill_sec`, satisfy the existing
+`speaker_fusion.min_embed_sec`, and have matching primary support for at least
+that duration. The current exact source range must have one uniform different
+known identity. Missing frames, multiple slots, current/future identity
+ambiguity, absent primary support, mixed/protected source labels, or an
+already-matching identity preserves the current view.
+
+The experiment adds one false-by-default typed boolean under
+`[speaker_fusion]`; the checked-in candidate profile may enable it. It adds no
+numeric TOML field and reuses the existing frame gate, identity horizon,
+duration, phrase, punctuation, and alignment contracts. The rejected generic
+`future_epoch_lookahead_sec` path remains disabled and is not widened.
+`business_speaker_replay_probe` will accept an optional frozen frame CSV and
+deposit it through the production typed timeline API. Two replays must be
+byte-identical. Automation may list raw changed entries and build review
+packets only. Every changed complete conversation is then read forward and in
+reverse against `test.txt`; only a manually retained candidate may receive a
+complete 556-contribution review or a later real-WebSocket ladder. See
+`sortformer-v21-orthogonal-context-review-2026-07-19.md`.
+
+The first implementation omitted a source-ownership boundary. Its repeated
+frozen output is byte-identical, but the raw changed scope reaches sixteen ASR
+finals in four pre-epoch windows. Complete forward and reverse semantic review
+rejects every cross-source window: the delayed epoch is later evidence from a
+different finalized source and flattens real intervening Zhu, Tang, Xu, and
+Shi turns. Source `283` is structurally different because the `3330.640`
+identity epoch and its matching primary support occur before that same ASR
+final ends at `3338.244`.
+
+The revised candidate will therefore clip future-epoch duration and primary
+coverage to `[future_epoch.start, text.end]` and abstain unless both still meet
+the existing `speaker_fusion.min_embed_sec`. It will also require the epoch to
+start before `text.end`. All posterior, local-slot, alignment, identity, and
+uniform-incumbent contracts remain unchanged. This prevents a final view from
+using one source record's future evidence to rewrite another source record,
+adds no numerical field, and follows the origin-process-result ownership rule.
+The revised candidate must repeat the complete build, deterministic replay,
+raw-scope inspection, and changed-context forward/reverse review before it can
+advance. See
+`sortformer-v21-posterior-future-epoch-candidate-review-2026-07-19.md`.
+
+The source-bounded retry completes those gates. The warning-clean build and all
+`70/70` CTest entries pass. Repeated candidate output is byte-identical, the
+boolean-disabled control is independently byte-identical, and the revised
+reason occurs only on two ranges inside source `283`. Complete changed-context
+review retains Tang Yunfeng's `ref-0507` expectation and first `ref-0509`
+confirmation without changing Shi Yi's intervening strategy explanation or
+accepted neighboring controls.
+
+T200 then completes a fresh two-direction read of the entire frozen candidate,
+not an extrapolation from changed rows. All 556 `test.txt` contributions are
+read chronologically and again in reverse fixed windows. The manually
+transcribed ledger is `521/556`, with 35 residuals: 29 confident-wrong, five
+missing, and one uncertain. Twenty-one remain business-critical. No new
+contextual failure is found, so the frozen candidate is retained; this does not
+convert it into real-path or closing evidence. See
+`post-fr47-residual-reconciliation-2026-07-19.md`.
+
+The next promotion uses one committed revision and the checked-in TOML only.
+First run two independent 120-second real-WebSocket streams and complete all
+mechanical checks plus the full in-scope forward/reverse context review. Only
+if both pass, run one 600-second stream and repeat those gates. Only if that
+passes, run a full empty-registry session followed by a full session using the
+first run's frozen registry. Each full result receives its own complete 556-
+contribution chronological and reverse contextual review. A failure stops the
+ladder for diagnosis; hashes and output equality cannot make the product
+decision.
+
 ### 8.15 FR28 120-second outcome and promotion ladder
 
 T117-T121 are complete. The frozen T116 packages replay byte-stably; their

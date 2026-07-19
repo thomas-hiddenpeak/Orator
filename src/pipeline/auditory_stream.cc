@@ -130,6 +130,12 @@ void AuditoryStream::Start() {
       config_.speaker_fusion_four_view_min_aligned_units;
   business_config.voiceprint_future_epoch_lookahead_sec =
       config_.speaker_fusion_future_epoch_lookahead_sec;
+  business_config.posterior_future_epoch_enabled =
+      config_.speaker_fusion_posterior_future_epoch_enable;
+  business_config.posterior_frame_activity_threshold =
+      config_.speaker_fusion_frame_activity_threshold;
+  business_config.posterior_identity_backfill_sec =
+      config_.speaker_local_drift_competing_backfill_sec;
   business_config.voiceprint_punctuation = config_.speaker_fusion_punctuation;
   if (config_.timeline_speaker_overlap_tie_policy == "higher_confidence") {
     business_config.speaker_overlap_tie_policy =

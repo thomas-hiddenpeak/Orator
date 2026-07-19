@@ -5669,6 +5669,271 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
     }
   }
 
+  struct PosteriorFrameView {
+    double start = 0.0;
+    double end = 0.0;
+    std::vector<std::pair<std::string, float>> ranked;
+  };
+  auto posterior_future_epoch_challenge = [&](const auto& item)
+      -> std::optional<std::string> {
+    if (!pipeline.config_.voiceprint_fusion_enabled ||
+        !pipeline.config_.posterior_future_epoch_enabled ||
+        pipeline.config_.posterior_identity_backfill_sec <= 0.0 ||
+        pipeline.diar_frames_.empty() || item.text_id != text.id ||
+        item.end <= item.start ||
+        item.source_start < 0 || item.source_end > character_count ||
+        item.source_end <= item.source_start) {
+      return std::nullopt;
+    }
+    if (item.kind == "punctuation_phrase") {
+      if (item.end - item.start >
+          pipeline.config_.voiceprint_phrase_max_sec + 1e-9) {
+        return std::nullopt;
+      }
+    } else if (item.kind != "aligned_unit") {
+      return std::nullopt;
+    }
+
+    auto allowed_incumbent_reason = [](const std::string& reason) {
+      return reason == "sole_diar_support" ||
+             reason == "competing_diar_interval_policy" ||
+             reason == "primary_speaker_tie_break" ||
+             reason == "primary_speaker_overlap_refinement" ||
+             reason == "voiceprint_direct_short" ||
+             reason == "voiceprint_direct_regular";
+    };
+    std::string incumbent_identity;
+    for (int index = item.source_start; index < item.source_end; ++index) {
+      if (labels[index].speaker_id.empty() ||
+          !allowed_incumbent_reason(labels[index].reason)) {
+        return std::nullopt;
+      }
+      if (incumbent_identity.empty()) {
+        incumbent_identity = labels[index].speaker_id;
+      } else if (labels[index].speaker_id != incumbent_identity) {
+        return std::nullopt;
+      }
+    }
+
+    std::vector<PosteriorFrameView> frames;
+    const auto first_block = std::lower_bound(
+        pipeline.diar_frames_.begin(), pipeline.diar_frames_.end(), item.start,
+        [](const auto& block, double start) {
+          const double block_end =
+              block.start + block.num_frames * block.frame_period_sec;
+          return block_end <= start + 1e-9;
+        });
+    for (auto block_it = first_block;
+         block_it != pipeline.diar_frames_.end() &&
+         block_it->start < item.end - 1e-9;
+         ++block_it) {
+      const auto& block = *block_it;
+      const std::size_t expected =
+          static_cast<std::size_t>(block.num_frames) * block.num_speakers;
+      if (block.num_frames <= 0 || block.num_speakers < 2 ||
+          block.frame_period_sec <= 0.0 ||
+          block.probabilities.size() != expected) {
+        return std::nullopt;
+      }
+      const int first_frame = std::clamp(
+          static_cast<int>(
+              std::floor((item.start - block.start) /
+                         block.frame_period_sec)) -
+              1,
+          0, block.num_frames);
+      const int last_frame = std::clamp(
+          static_cast<int>(
+              std::ceil((item.end - block.start) /
+                        block.frame_period_sec)) +
+              1,
+          0, block.num_frames);
+      for (int frame = first_frame; frame < last_frame; ++frame) {
+        const double frame_start =
+            block.start + frame * block.frame_period_sec;
+        const double frame_end = frame_start + block.frame_period_sec;
+        if (Overlap(item.start, item.end, frame_start, frame_end) <= 1e-9) {
+          continue;
+        }
+        PosteriorFrameView view;
+        view.start = frame_start;
+        view.end = frame_end;
+        view.ranked.reserve(block.num_speakers);
+        for (int channel = 0; channel < block.num_speakers; ++channel) {
+          const float probability =
+              block.probabilities[static_cast<std::size_t>(frame) *
+                                      block.num_speakers +
+                                  channel];
+          if (!std::isfinite(probability)) return std::nullopt;
+          view.ranked.push_back(
+              {"speaker_" +
+                   std::to_string(block.local_speaker_offset + channel),
+               probability});
+        }
+        std::sort(view.ranked.begin(), view.ranked.end(),
+                  [](const auto& left, const auto& right) {
+                    if (!NearEqual(left.second, right.second)) {
+                      return left.second > right.second;
+                    }
+                    return left.first < right.first;
+                  });
+        if (NearEqual(view.ranked[0].second, view.ranked[1].second) ||
+            (view.ranked.size() > 2 &&
+             NearEqual(view.ranked[1].second, view.ranked[2].second))) {
+          return std::nullopt;
+        }
+        frames.push_back(std::move(view));
+      }
+    }
+    if (frames.empty()) return std::nullopt;
+    std::sort(frames.begin(), frames.end(), [](const auto& left,
+                                               const auto& right) {
+      if (!NearEqual(left.start, right.start)) return left.start < right.start;
+      return left.end < right.end;
+    });
+
+    double covered_until = item.start;
+    std::set<std::string> candidate_slots;
+    std::map<std::string, bool> threshold_crossed;
+    bool first_frame = true;
+    for (const auto& frame : frames) {
+      const double clipped_start = std::max(item.start, frame.start);
+      const double clipped_end = std::min(item.end, frame.end);
+      if (clipped_start > covered_until + 1e-6) return std::nullopt;
+      covered_until = std::max(covered_until, clipped_end);
+
+      const std::set<std::string> frame_slots = {
+          frame.ranked[0].first, frame.ranked[1].first};
+      if (first_frame) {
+        candidate_slots = frame_slots;
+        first_frame = false;
+      } else {
+        for (auto slot = candidate_slots.begin();
+             slot != candidate_slots.end();) {
+          if (frame_slots.count(*slot) == 0) {
+            slot = candidate_slots.erase(slot);
+          } else {
+            ++slot;
+          }
+        }
+      }
+      for (const auto& ranked : frame.ranked) {
+        if (ranked.second + 1e-9f >=
+            pipeline.config_.posterior_frame_activity_threshold) {
+          threshold_crossed[ranked.first] = true;
+        }
+      }
+    }
+    if (covered_until + 1e-6 < item.end || candidate_slots.empty()) {
+      return std::nullopt;
+    }
+
+    struct EpochCandidate {
+      std::string local_speaker;
+      std::string speaker_id;
+    };
+    std::vector<EpochCandidate> eligible;
+    for (const auto& local_speaker : candidate_slots) {
+      if (!threshold_crossed[local_speaker]) continue;
+
+      const SpeakerSeg* current_epoch = nullptr;
+      bool current_ambiguous = false;
+      for (const auto& segment : pipeline.speakers_) {
+        if (segment.speaker != local_speaker || segment.speaker_id.empty() ||
+            segment.start > item.start + 1e-9) {
+          continue;
+        }
+        if (current_epoch == nullptr ||
+            segment.start > current_epoch->start + 1e-9) {
+          current_epoch = &segment;
+          current_ambiguous = false;
+        } else if (NearEqual(segment.start, current_epoch->start) &&
+                   segment.speaker_id != current_epoch->speaker_id) {
+          current_ambiguous = true;
+        }
+      }
+      if (current_epoch == nullptr || current_ambiguous) continue;
+
+      bool changes_inside_item = false;
+      for (const auto& segment : pipeline.speakers_) {
+        if (segment.speaker == local_speaker &&
+            segment.speaker_id != current_epoch->speaker_id &&
+            segment.start > item.start + 1e-9 &&
+            segment.start < item.end - 1e-9) {
+          changes_inside_item = true;
+          break;
+        }
+      }
+      if (changes_inside_item) continue;
+
+      const SpeakerSeg* future_epoch = nullptr;
+      bool future_ambiguous = false;
+      for (const auto& segment : pipeline.speakers_) {
+        if (segment.speaker != local_speaker || segment.speaker_id.empty() ||
+            segment.speaker_id == current_epoch->speaker_id ||
+            segment.start < item.end - 1e-9) {
+          continue;
+        }
+        if (future_epoch == nullptr ||
+            segment.start < future_epoch->start - 1e-9) {
+          future_epoch = &segment;
+          future_ambiguous = false;
+        } else if (NearEqual(segment.start, future_epoch->start) &&
+                   segment.speaker_id != future_epoch->speaker_id) {
+          future_ambiguous = true;
+        }
+      }
+      if (future_epoch == nullptr || future_ambiguous ||
+          future_epoch->start >= text.end - 1e-9 ||
+          future_epoch->start - item.end >
+              pipeline.config_.posterior_identity_backfill_sec + 1e-9 ||
+          std::min(future_epoch->end, text.end) - future_epoch->start + 1e-9 <
+              pipeline.config_.voiceprint_primary_consensus_min_sec ||
+          future_epoch->speaker_id == incumbent_identity) {
+        continue;
+      }
+
+      std::vector<std::pair<double, double>> primary_intervals;
+      const double future_end = std::min(future_epoch->end, text.end);
+      for (const auto& primary : pipeline.primary_speakers_) {
+        if (primary.speaker != local_speaker ||
+            primary.speaker_id != future_epoch->speaker_id) {
+          continue;
+        }
+        const double start = std::max(future_epoch->start, primary.start);
+        const double end = std::min(future_end, primary.end);
+        if (end > start) primary_intervals.push_back({start, end});
+      }
+      if (CoveredDuration(MergeIntervals(std::move(primary_intervals))) +
+              1e-9 <
+          pipeline.config_.voiceprint_primary_consensus_min_sec) {
+        continue;
+      }
+      eligible.push_back({local_speaker, future_epoch->speaker_id});
+    }
+    if (eligible.size() != 1) return std::nullopt;
+    return eligible.front().speaker_id;
+  };
+  auto apply_posterior_future_epoch = [&](const auto& item,
+                                          const std::string& selected) {
+    const std::string label = speaker_label(selected);
+    for (int index = item.source_start; index < item.source_end; ++index) {
+      labels[index].speaker = label;
+      labels[index].speaker_id = selected;
+      labels[index].reason =
+          "sortformer_posterior_future_epoch_override";
+      labels[index].voiceprint = false;
+    }
+  };
+  for (const auto* item : source_evidence) {
+    if (item->kind != "punctuation_phrase") continue;
+    const auto selected = posterior_future_epoch_challenge(*item);
+    if (selected) apply_posterior_future_epoch(*item, *selected);
+  }
+  for (const auto& item : pipeline.voiceprint_aligned_units_) {
+    const auto selected = posterior_future_epoch_challenge(item);
+    if (selected) apply_posterior_future_epoch(item, *selected);
+  }
+
   std::vector<int> bounds{0};
   for (int index = 1; index < character_count; ++index) {
     if (labels[index - 1].speaker_id != labels[index].speaker_id ||
@@ -5797,6 +6062,14 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
       entry.speaker_uncertain = false;
       entry.speaker_decision.speaker_source =
           "sortformer_activity+primary_top1+vad_boundary+forced_alignment";
+      entry.speaker_decision.reason = label.reason;
+    } else if (label.reason ==
+               "sortformer_posterior_future_epoch_override") {
+      entry.speaker_support = "strong";
+      entry.speaker_uncertain = false;
+      entry.speaker_decision.speaker_source =
+          "sortformer_frame_posterior+future_identity_epoch+primary_top1+"
+          "forced_alignment";
       entry.speaker_decision.reason = label.reason;
     } else if (label.voiceprint) {
       entry.speaker_support = "strong";

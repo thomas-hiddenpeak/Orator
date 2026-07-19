@@ -44,6 +44,9 @@ class BusinessSpeakerPipeline {
     double voiceprint_phrase_max_sec = 3.0;
     int voiceprint_four_view_min_aligned_units = 2;
     double voiceprint_future_epoch_lookahead_sec = 0.0;
+    bool posterior_future_epoch_enabled = false;
+    float posterior_frame_activity_threshold = 0.5f;
+    double posterior_identity_backfill_sec = 0.0;
     std::string voiceprint_punctuation = "，。？！；：、,.?!;:";
     SpeakerOverlapTiePolicy speaker_overlap_tie_policy =
         SpeakerOverlapTiePolicy::kShorterSpan;
@@ -78,6 +81,7 @@ class BusinessSpeakerPipeline {
 
   using AlignGroup = ComprehensiveTimeline::AlignGroup;
   using Entry = ComprehensiveTimeline::Entry;
+  using DiarFrameBlock = ComprehensiveTimeline::DiarFrameBlock;
   using RawTextSeg = ComprehensiveTimeline::RawTextSeg;
   using SpeakerDecisionAudit = ComprehensiveTimeline::SpeakerDecisionAudit;
   using SpeakerInput = ComprehensiveTimeline::SpeakerInput;
@@ -172,6 +176,7 @@ class BusinessSpeakerPipeline {
   std::vector<SpeakerSeg> primary_speakers_;
   std::vector<TextSeg> texts_;
   std::map<long, AlignGroup> align_;
+  std::vector<DiarFrameBlock> diar_frames_;
   std::vector<SpeakerVoiceprintEvidence> voiceprint_;
   std::vector<SpeakerVoiceprintEvidence> voiceprint_vad_;
   std::vector<SpeakerVoiceprintEvidence> voiceprint_aligned_units_;

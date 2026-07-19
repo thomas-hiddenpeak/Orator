@@ -172,6 +172,7 @@ regular_min_score = 0.55
 regular_min_margin = 0.04
 four_view_min_aligned_units = 3
 future_epoch_lookahead_sec = 90.0
+posterior_future_epoch_enable = true
 precompute_interval_sec = 7.5
 precompute_max_spans_per_cycle = 4
 
@@ -323,6 +324,8 @@ ws_text_log_path = "/tmp/ws-frames.jsonl"
           "cfg.speaker_fusion_four_view_min_aligned_units == 3");
     CHECK(cfg.speaker_fusion_future_epoch_lookahead_sec == 90.0,
           "cfg.speaker_fusion_future_epoch_lookahead_sec == 90.0");
+    CHECK(cfg.speaker_fusion_posterior_future_epoch_enable,
+          "cfg.speaker_fusion_posterior_future_epoch_enable == true");
     CHECK(cfg.speaker_fusion_precompute_interval_sec == 7.5,
           "cfg.speaker_fusion_precompute_interval_sec == 7.5");
     CHECK(cfg.speaker_fusion_precompute_max_spans_per_cycle == 4,

@@ -1,10 +1,12 @@
 // Replay frozen producer tracks through the production business-speaker view.
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <fstream>
 #include <iomanip>
 #include <map>
+#include <optional>
 #include <set>
 #include <sstream>
 #include <stdexcept>
@@ -32,6 +34,18 @@ std::vector<std::string> SplitTab(const std::string& line) {
     out.push_back(line.substr(start, tab - start));
     if (tab == std::string::npos) break;
     start = tab + 1;
+  }
+  return out;
+}
+
+std::vector<std::string> SplitComma(const std::string& line) {
+  std::vector<std::string> out;
+  std::size_t start = 0;
+  while (true) {
+    const std::size_t comma = line.find(',', start);
+    out.push_back(line.substr(start, comma - start));
+    if (comma == std::string::npos) break;
+    start = comma + 1;
   }
   return out;
 }
@@ -179,6 +193,139 @@ std::vector<ComprehensiveTimeline::SpeakerVoiceprintEvidence> ReadVoiceprint(
   return out;
 }
 
+std::vector<ComprehensiveTimeline::DiarFrameBlock> ReadDiarFrames(
+    const std::string& path) {
+  constexpr double kCsvTimeToleranceSec = 2e-6;
+  std::ifstream input(path);
+  if (!input) throw std::runtime_error("cannot open diar frame CSV: " + path);
+
+  std::string line;
+  if (!std::getline(input, line)) {
+    throw std::runtime_error("empty diar frame CSV");
+  }
+  const auto header = SplitComma(line);
+  const std::vector<std::string> prefix = {
+      "frame",       "time_sec",  "session",     "top1", "top1_prob",
+      "top2",        "top2_prob", "margin",      "active_count"};
+  if (header.size() <= prefix.size() ||
+      !std::equal(prefix.begin(), prefix.end(), header.begin())) {
+    throw std::runtime_error("invalid diar frame CSV header");
+  }
+  const int num_speakers =
+      static_cast<int>(header.size() - prefix.size());
+  for (int speaker = 0; speaker < num_speakers; ++speaker) {
+    if (header[prefix.size() + speaker] !=
+        "spk" + std::to_string(speaker)) {
+      throw std::runtime_error("invalid diar frame probability columns");
+    }
+  }
+
+  struct FrameRow {
+    long frame = -1;
+    double time = 0.0;
+    int session = -1;
+    std::vector<float> probabilities;
+  };
+  std::vector<FrameRow> rows;
+  while (std::getline(input, line)) {
+    if (line.empty()) continue;
+    const auto columns = SplitComma(line);
+    if (columns.size() != header.size()) {
+      throw std::runtime_error("invalid diar frame CSV row width");
+    }
+    FrameRow row;
+    row.frame = std::stol(columns[0]);
+    row.time = std::stod(columns[1]);
+    row.session = std::stoi(columns[2]);
+    if (row.frame < 0 || !std::isfinite(row.time) || row.time < 0.0 ||
+        row.session < 0) {
+      throw std::runtime_error("invalid diar frame coordinates");
+    }
+    row.probabilities.reserve(num_speakers);
+    for (int speaker = 0; speaker < num_speakers; ++speaker) {
+      const float probability =
+          std::stof(columns[prefix.size() + speaker]);
+      if (!std::isfinite(probability) || probability < 0.0f ||
+          probability > 1.0f) {
+        throw std::runtime_error("invalid diar frame probability");
+      }
+      row.probabilities.push_back(probability);
+    }
+    if (!rows.empty()) {
+      const auto& previous = rows.back();
+      if (row.frame != previous.frame + 1 || row.session < previous.session ||
+          row.time <= previous.time) {
+        throw std::runtime_error("non-monotonic diar frame CSV");
+      }
+    }
+    rows.push_back(std::move(row));
+  }
+  if (rows.empty()) throw std::runtime_error("insufficient diar frame rows");
+
+  std::vector<ComprehensiveTimeline::DiarFrameBlock> blocks;
+  std::optional<double> fallback_period_sec;
+  for (std::size_t begin = 0; begin < rows.size();) {
+    std::size_t end = begin + 1;
+    while (end < rows.size() &&
+           rows[end].session == rows[begin].session) {
+      ++end;
+    }
+    if (end - begin > 1) {
+      fallback_period_sec =
+          (rows[end - 1].time - rows[begin].time) /
+          static_cast<double>(end - begin - 1);
+      break;
+    }
+    begin = end;
+  }
+  if (!fallback_period_sec || *fallback_period_sec <= 0.0) {
+    throw std::runtime_error("insufficient diar frame period evidence");
+  }
+
+  for (std::size_t begin = 0; begin < rows.size();) {
+    std::size_t end = begin + 1;
+    while (end < rows.size() &&
+           rows[end].session == rows[begin].session) {
+      ++end;
+    }
+    const double frame_period_sec =
+        end - begin > 1
+            ? (rows[end - 1].time - rows[begin].time) /
+                  static_cast<double>(end - begin - 1)
+            : *fallback_period_sec;
+    if (frame_period_sec <= 0.0) {
+      throw std::runtime_error("invalid diar frame period");
+    }
+    ComprehensiveTimeline::DiarFrameBlock block;
+    block.start = rows[begin].time;
+    block.frame_period_sec = frame_period_sec;
+    block.num_frames = static_cast<int>(end - begin);
+    block.num_speakers = num_speakers;
+    block.local_speaker_offset = rows[begin].session * num_speakers;
+    block.probabilities.reserve(
+        static_cast<std::size_t>(block.num_frames) * num_speakers);
+    for (std::size_t index = begin; index < end; ++index) {
+      const double expected_time =
+          block.start + (index - begin) * block.frame_period_sec;
+      if (std::abs(rows[index].time - expected_time) >
+          kCsvTimeToleranceSec) {
+        throw std::runtime_error("non-contiguous diar frame session");
+      }
+      if (index > begin &&
+          std::abs((rows[index].time - rows[index - 1].time) -
+                   block.frame_period_sec) > kCsvTimeToleranceSec) {
+        throw std::runtime_error("inconsistent diar frame period");
+      }
+      block.probabilities.insert(block.probabilities.end(),
+                                 rows[index].probabilities.begin(),
+                                 rows[index].probabilities.end());
+    }
+    blocks.push_back(std::move(block));
+    begin = end;
+  }
+  return blocks;
+}
+
 int SpeakerIndex(const std::string& speaker) {
   if (speaker.rfind("speaker_", 0) != 0) return -1;
   return std::stoi(speaker.substr(8));
@@ -239,7 +386,7 @@ int main(int argc, char** argv) {
     std::fprintf(stderr,
                  "usage: %s <diar.tsv> <asr.tsv> <align.tsv> <out.json> "
                  "<audio_sec> [config=orator.toml] [primary.tsv] "
-                 "[voiceprint.tsv]\n",
+                 "[voiceprint.tsv] [diar_frames.csv]\n",
                  argv[0]);
     return 2;
   }
@@ -286,6 +433,12 @@ int main(int argc, char** argv) {
         config.speaker_fusion_four_view_min_aligned_units;
     business_config.voiceprint_future_epoch_lookahead_sec =
         config.speaker_fusion_future_epoch_lookahead_sec;
+    business_config.posterior_future_epoch_enabled =
+        config.speaker_fusion_posterior_future_epoch_enable;
+    business_config.posterior_frame_activity_threshold =
+        config.speaker_fusion_frame_activity_threshold;
+    business_config.posterior_identity_backfill_sec =
+        config.speaker_local_drift_competing_backfill_sec;
     business_config.voiceprint_punctuation = config.speaker_fusion_punctuation;
     if (config.timeline_speaker_overlap_tie_policy == "higher_confidence") {
       business_config.speaker_overlap_tie_policy =
@@ -318,6 +471,16 @@ int main(int argc, char** argv) {
             ? ReadVoiceprint(argv[8])
             : std::vector<
                   ComprehensiveTimeline::SpeakerVoiceprintEvidence>{};
+    const auto diar_frames =
+        argc > 9
+            ? ReadDiarFrames(argv[9])
+            : std::vector<ComprehensiveTimeline::DiarFrameBlock>{};
+    for (const auto& block : diar_frames) {
+      if (timeline.DepositDiarFrameBlock(block) !=
+          ComprehensiveTimeline::DepositResult::kInserted) {
+        throw std::runtime_error("rejected diar frame block");
+      }
+    }
     timeline.DepositDiarization(diar);
     if (!primary.empty()) timeline.DepositPrimarySpeaker(primary);
     for (const auto& item : asr) timeline.DepositAsrFinal(item);
@@ -332,10 +495,11 @@ int main(int argc, char** argv) {
     const auto entries = timeline.Snapshot();
     WriteCandidate(output_path, entries, audio_sec, config.sample_rate);
     std::printf(
-        "diar=%zu primary=%zu asr=%zu align=%zu voiceprint=%zu business=%zu "
-        "out=%s\n",
+        "diar=%zu primary=%zu asr=%zu align=%zu voiceprint=%zu "
+        "frame_blocks=%zu business=%zu out=%s\n",
         diar.size(), primary.size(), asr.size(), align.size(),
-        voiceprint.size(), entries.size(), output_path.c_str());
+        voiceprint.size(), diar_frames.size(), entries.size(),
+        output_path.c_str());
     return 0;
   } catch (const std::exception& error) {
     std::fprintf(stderr, "business speaker replay probe: %s\n", error.what());
