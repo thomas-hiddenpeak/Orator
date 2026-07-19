@@ -145,6 +145,7 @@ int main() {
     orator::pipeline::SpeakerEvidenceStage::Config evidence_config;
     evidence_config.enabled = true;
     evidence_config.min_embed_sec = 0.4;
+    evidence_config.boundary_tolerance_sec = 0.08;
     evidence_config.minimum_gallery_size = 2;
     orator::pipeline::SpeakerEvidenceStage stage(&identity, evidence_config);
 
@@ -195,6 +196,158 @@ int main() {
         TestSpeakerEvidenceStage::BuildVoiceprintQueries(stage, query_snapshot);
     CHECK(business_ranges(joined_queries) == std::vector<Range>({{0, 4}}),
           "joined business projection emits one derived query");
+
+    auto alignment_gap_snapshot = [] {
+      orator::pipeline::ComprehensiveTimeline::SpeakerEvidenceSnapshot value;
+      value.asr.push_back({9, 0.0, 2.2, "甲乙丙。乙丙，丁。"});
+      value.align.push_back(
+          {9,
+           0.0,
+           2.2,
+           {{0.0, 0.2, "甲"},
+            {0.2, 0.4, "乙"},
+            {1.2, 1.4, "丙"},
+            {1.4, 1.5, "。"},
+            {1.5, 1.7, "乙"},
+            {1.7, 1.9, "丙"},
+            {1.9, 2.0, "，"},
+            {2.0, 2.1, "丁"},
+            {2.1, 2.2, "。"}}});
+      value.primary_speaker = {
+          {.start = 0.0,
+           .end = 0.52,
+           .speaker = "speaker_0",
+           .speaker_id = "spk_a"},
+          {.start = 0.6,
+           .end = 1.0,
+           .speaker = "speaker_1",
+           .speaker_id = "spk_b"},
+          {.start = 1.0,
+           .end = 1.6,
+           .speaker = "speaker_0",
+           .speaker_id = "spk_a"}};
+      return value;
+    };
+    auto alignment_gap_queries = [&](const auto& value) {
+      std::vector<VoiceprintEvidence> result;
+      for (const auto& query :
+           TestSpeakerEvidenceStage::BuildVoiceprintQueries(stage, value)) {
+        if (query.kind == "primary_alignment_gap_echo") {
+          result.push_back(query);
+        }
+      }
+      return result;
+    };
+    auto gap_snapshot = alignment_gap_snapshot();
+    const auto gap_queries = alignment_gap_queries(gap_snapshot);
+    CHECK(gap_queries.size() == 1 && gap_queries[0].text_id == 9 &&
+              gap_queries[0].source_start == 4 &&
+              gap_queries[0].source_end == 7 &&
+              gap_queries[0].start == 0.6 && gap_queries[0].end == 1.0,
+          "a unique bracketed primary island emits one typed echo query");
+
+    auto no_suffix = alignment_gap_snapshot();
+    no_suffix.asr[0].text = "甲乙丙。甲丙，丁。";
+    no_suffix.align[0].units[4].text = "甲";
+    CHECK(alignment_gap_queries(no_suffix).empty(),
+          "a non-suffix following phrase emits no gap query");
+
+    auto changed_outer = alignment_gap_snapshot();
+    changed_outer.primary_speaker[2].speaker_id = "spk_c";
+    CHECK(alignment_gap_queries(changed_outer).empty(),
+          "different outer primary identities emit no gap query");
+
+    auto wide_primary_gap = alignment_gap_snapshot();
+    wide_primary_gap.primary_speaker[0].end = 0.50;
+    CHECK(alignment_gap_queries(wide_primary_gap).empty(),
+          "a primary boundary beyond configured tolerance emits no gap query");
+
+    auto short_middle = alignment_gap_snapshot();
+    short_middle.primary_speaker[0].end = 0.7;
+    short_middle.primary_speaker[1].start = 0.7;
+    short_middle.primary_speaker[1].end = 1.0;
+    CHECK(alignment_gap_queries(short_middle).empty(),
+          "a subminimum middle primary run emits no gap query");
+
+    auto outside_gap = alignment_gap_snapshot();
+    outside_gap.primary_speaker[0].end = 0.3;
+    outside_gap.primary_speaker[1].start = 0.3;
+    outside_gap.primary_speaker[1].end = 0.7;
+    outside_gap.primary_speaker[2].start = 0.7;
+    CHECK(alignment_gap_queries(outside_gap).empty(),
+          "a primary run crossing positive alignment emits no gap query");
+
+    auto missing_following_alignment = alignment_gap_snapshot();
+    missing_following_alignment.align[0].units.erase(
+        missing_following_alignment.align[0].units.begin() + 4,
+        missing_following_alignment.align[0].units.begin() + 7);
+    CHECK(alignment_gap_queries(missing_following_alignment).empty(),
+          "a following source phrase without positive alignment emits no query");
+
+    auto ambiguous_islands = alignment_gap_snapshot();
+    ambiguous_islands.align[0].units[2].start = 2.4;
+    ambiguous_islands.align[0].units[2].end = 2.6;
+    ambiguous_islands.primary_speaker = {
+        {.start = 0.0,
+         .end = 0.52,
+         .speaker = "speaker_0",
+         .speaker_id = "spk_a"},
+        {.start = 0.6,
+         .end = 1.0,
+         .speaker = "speaker_1",
+         .speaker_id = "spk_b"},
+        {.start = 1.0,
+         .end = 1.4,
+         .speaker = "speaker_0",
+         .speaker_id = "spk_a"},
+        {.start = 1.4,
+         .end = 1.8,
+         .speaker = "speaker_1",
+         .speaker_id = "spk_b"},
+        {.start = 1.8,
+         .end = 2.4,
+         .speaker = "speaker_0",
+         .speaker_id = "spk_a"}};
+    CHECK(alignment_gap_queries(ambiguous_islands).empty(),
+          "multiple primary islands inside one alignment gap emit no query");
+
+    auto multiple_phrase_pairs = alignment_gap_snapshot();
+    multiple_phrase_pairs.asr[0] =
+        {10, 0.0, 5.0, "甲乙丙。乙丙，甲乙丙。乙丙，"};
+    multiple_phrase_pairs.align[0] =
+        {10,
+         0.0,
+         5.0,
+         {{0.0, 0.2, "甲"},
+          {0.2, 0.4, "乙"},
+          {1.2, 1.4, "丙"},
+          {1.4, 1.5, "。"},
+          {1.5, 1.7, "乙"},
+          {1.7, 1.9, "丙"},
+          {1.9, 2.0, "，"},
+          {3.0, 3.2, "甲"},
+          {3.2, 3.4, "乙"},
+          {4.2, 4.4, "丙"},
+          {4.4, 4.5, "。"},
+          {4.5, 4.7, "乙"},
+          {4.7, 4.9, "丙"},
+          {4.9, 5.0, "，"}}};
+    multiple_phrase_pairs.primary_speaker.insert(
+        multiple_phrase_pairs.primary_speaker.end(),
+        {{.start = 3.0,
+          .end = 3.52,
+          .speaker = "speaker_2",
+          .speaker_id = "spk_c"},
+         {.start = 3.6,
+          .end = 4.0,
+          .speaker = "speaker_3",
+          .speaker_id = "spk_d"},
+         {.start = 4.0,
+          .end = 4.6,
+          .speaker = "speaker_2",
+          .speaker_id = "spk_c"}});
+    CHECK(alignment_gap_queries(multiple_phrase_pairs).empty(),
+          "multiple matching phrase mappings emit no gap query");
 
     orator::pipeline::ComprehensiveTimeline::SpeakerEvidenceSnapshot snapshot;
     snapshot.diarization.push_back(

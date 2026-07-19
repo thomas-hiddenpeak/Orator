@@ -135,6 +135,7 @@ class ComprehensiveTimeline {
     double start = 0.0;
     double end = 0.0;
     bool embedding_available = false;
+    bool session_gallery_complete = false;
     bool robust_gallery_complete = false;
     std::vector<VoiceprintScore> session_scores;
     std::vector<VoiceprintScore> robust_scores;
@@ -185,6 +186,7 @@ class ComprehensiveTimeline {
   // does not repeatedly copy unrelated data or feed evidence into itself.
   struct SpeakerEvidenceSnapshot {
     std::vector<SpeakerInput> diarization;
+    std::vector<SpeakerInput> primary_speaker;
     std::vector<RawTextSeg> asr;
     std::vector<VadSeg> vad;
     std::vector<AlignGroup> align;

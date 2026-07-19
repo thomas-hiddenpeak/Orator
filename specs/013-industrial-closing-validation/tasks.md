@@ -1,8 +1,8 @@
 # Tasks: Industrial Closing Validation
 
 **Status**: In progress - T135 reconciled T111/T123/T133; FR31 is rejected;
-FR32 completed real-WebSocket promotion; FR33-FR44 are retained bounded frozen
-repairs; the current candidate is `518/556`, with every complete 600-second
+FR32 completed real-WebSocket promotion; FR33-FR45 are retained bounded frozen
+repairs; the current candidate is `519/556`, with every complete 600-second
 block and all four per-speaker natural-turn floors passed; critical,
 confident-wrong, time-based, repeatability, holdout, T102, and T084 gates remain
 open 2026-07-19
@@ -2469,3 +2469,85 @@ open 2026-07-19
   confident-wrong, time-based, real-path repeatability, and holdout gates remain
   open. See
   `three-run-middle-slot-phrase-abstention-review-2026-07-19.md`.
+- [x] T180 Read the complete `ref-0066` and `ref-0192` conversations
+  chronologically and in reverse, then display their T111/T123 ASR, alignment,
+  activity, primary, VAD, voiceprint, and final business tracks. Record that
+  T123 has no source contribution for `ref-0066`, while `ref-0192` retains
+  repeated source content but places Zhu Jie's exact activity/primary island
+  wholly inside a forced-alignment time gap. Treat the existing exact-span
+  centroid scores as incomplete diagnostics, not a candidate decision. See
+  `primary-island-alignment-gap-evidence-diagnosis-2026-07-19.md`.
+- [x] T181 Extend `speaker_identity_replay_probe` with a backward-compatible
+  chronological snapshot mode and a genuine empty-registry input. Require
+  ordered grouped snapshots, optional captured identity display, full-retain
+  enforcement for preloaded audio, unchanged final-segment behavior, and
+  requested session/robust `EvaluateSpan` output. Add focused parser/replay
+  coverage, build warning-clean, and pass all CTest entries. This tool may
+  verify producer reproduction only; it may not evaluate speaker correctness,
+  rank a product candidate, aggregate accuracy, or issue a verdict.
+  Snapshot/final-segment input compatibility, strict grouped parsing, empty
+  snapshots, identity stripping, exactly-once callbacks, malformed ordering,
+  and comparison display have focused coverage. The complete warning-clean
+  build and all `70/70` CTest entries pass.
+- [x] T182 Export all captured T123 diar snapshots mechanically, replay them
+  from an empty registry, and compare replayed versus captured identity only as
+  a raw producer contract. If parity holds, display dual-gallery evidence for
+  the exact `ref-0192` primary island and controls. Manually determine whether
+  the evidence is sufficient for a separately specified FR45 typed producer
+  change; otherwise record the failed gate and stop. Do not alter production
+  fusion, TOML, the manual ledger, or closure status in this evidence phase.
+  Exact production PCM replays reproduce all 1,254,049 captured identity
+  values with zero differences; repeated final identity and dual-gallery
+  outputs are byte-identical. Manual inspection finds that only the complete
+  exact primary island has complete agreeing session/robust views under the
+  existing short gates. The VAD intersection fails the robust margin, and the
+  mixed VAD/neighbor controls retain the outer identity. See
+  `primary-island-alignment-gap-evidence-diagnosis-2026-07-19.md`.
+- [x] T183 Specify FR45 as a generic typed
+  `primary_alignment_gap_echo` producer and conservative final fusion rule.
+  Require one strict-suffix phrase mapping, one positive-character alignment
+  gap, one same-outer primary bracket within the existing boundary tolerance,
+  complete equal session/robust
+  identity sets, independent existing-gate passage, exact middle
+  primary/activity agreement, full outer activity support, uniform ordinary
+  incumbent provenance, and independent policy reconstruction. Add no TOML
+  value, threshold, fitted constant, transcript lookup, speaker name, known
+  timestamp, reference datum, model change, clock change, or automated product
+  judgment.
+- [x] T184 Implement the typed snapshot/completeness fields and FR45 evidence
+  producer. Add focused positive tests plus independent ambiguity, phrase,
+  alignment, primary, duration, source, and query-scope abstention tests. The
+  producer emits acoustic evidence only and never chooses a speaker. The final
+  producer copies immutable primary evidence and explicit session completeness,
+  emits only one exact island/following-suffix mapping per text, and globally
+  abstains on multiple islands or phrase mappings. Focused tests cover the
+  positive source/acoustic bounds and each specified abstention family.
+- [x] T185 Implement the final FR45 fusion predicate and speaker-only write.
+  Add one positive and independent negative tests for gallery completeness,
+  identity-set uniqueness/equality, score and margin gates, selected identity,
+  source suffix, alignment gap, primary bracket/coverage, activity
+  coverage/local slot, incumbent provenance, evidence cardinality, and write
+  scope. Preserve all existing specialized behavior when any gate fails. The
+  final pass independently reconstructs every topology and requires complete
+  equal galleries covering all active identities before changing speaker fields
+  and audit metadata. Independent negative coverage preserves existing behavior
+  for every listed gate, duplicate evidence, and specialized incumbents.
+- [x] T186 Pass a warning-clean complete build and all CTest entries, then
+  replay frozen T123 and T111 at least twice. Display hashes and complete
+  mechanical change scope without correctness labels. Read every changed
+  conversation completely, first chronologically and then in reverse, against
+  `test.txt`; retain or remove FR45 only from that contextual semantic review.
+  Synchronize project state and do not claim a new real-WebSocket result,
+  ledger advance, or speaker-business closure before the review. The final
+  build has no warning/error diagnostics and all `70/70` CTest entries pass.
+  Repeated T123 output is byte-identical at
+  `5a595ca1aa5816612b2603062d8467ee60bc3a342219cf5eda066cfddc3bb61a`;
+  repeated T111 output is byte-identical and unchanged from FR44 at
+  `ad2abee782ab30ff67be1a86fa46f4ec0c16b5422ae18954107c398131157aa4`.
+  The complete raw scope splits only T123 `text_id=111` source
+  `没有意见，赶紧说，快！`. Complete forward and reverse reading of
+  `20:33-22:42` retains Zhu Jie's independent `没有意见` between Shi Yi's
+  answer and request. Only current T123 `ref-0192` advances the manual ledger
+  to `519/556`, the 1200-1800 block to `76/80`, and Zhu Jie to `77/83`.
+  No new real-WebSocket result or closure claim follows. See
+  `primary-island-alignment-gap-echo-review-2026-07-19.md`.

@@ -223,9 +223,12 @@ target_link_libraries(speaker_span_embedding_probe PRIVATE orator_core)
 # the production speaker-identity stage. It emits evidence, never evaluation.
 # ---------------------------------------------------------------------------
 add_executable(speaker_identity_replay_probe
-  tools/probes/speaker_identity_replay_probe.cc)
+  tools/probes/speaker_identity_replay_probe.cc
+  tools/probes/speaker_identity_replay_input.cc)
 set_property(TARGET speaker_identity_replay_probe
   PROPERTY CUDA_ARCHITECTURES native)
+target_include_directories(speaker_identity_replay_probe
+  PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(speaker_identity_replay_probe PRIVATE orator_core)
 
 # ---------------------------------------------------------------------------

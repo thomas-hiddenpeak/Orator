@@ -45,7 +45,11 @@ complete-source repair at `517/556` without a new real-path claim; FR44 bounds
 the critical `ref-0071` overwrite to one regular session-only phrase whose
 base source is Shi-Tang-Shi across two VAD records; deterministic replay and
 complete forward/reverse contextual review retain the phrase abstention at
-`518/556` without a new real-path claim; critical
+`518/556` without a new real-path claim; capture-faithful exact-PCM snapshot
+replay separates the source-absent `ref-0066` from the source-present
+`ref-0192` and reproduces every captured T123 identity value; strict FR45
+frozen replay and complete forward/reverse contextual review retain the bounded
+`ref-0192` repair at `519/556` without a new real-path claim; critical
 attribution, confident-wrong attribution, T102, T084, full canonical closure,
 release sign-off, and industrial readiness remain open
 **Created**: 2026-07-13
@@ -2537,6 +2541,66 @@ subject to the complete acceptance gates in this spec.
   conversation MUST receive chronological and reverse contextual semantic
   review against `test.txt` before retention or a new audio run. See
   `three-run-middle-slot-phrase-abstention-diagnosis-2026-07-19.md`.
+- **FR45 evidence gate**: No alignment-gap speaker repair MAY be specified from
+  the primary/activity topology alone. `ref-0066` has no T123 ASR source span
+  and MUST remain outside the business projector unless an upstream producer
+  supplies content or a separately specified speech-only product contract.
+  For source-present `ref-0192`, the exact primary/activity island MAY be
+  considered only after a read-only identity replay starts from the captured
+  empty-registry state, consumes the original chronological diar snapshots,
+  mechanically reproduces their identity assignments, and displays complete
+  session and robust gallery evidence for that exact common-clock interval.
+  The probe MUST preserve its existing final-segment mode, reject malformed or
+  unordered snapshots, and reject full-audio preload when configured retention
+  cannot hold the complete session. Producer equality, hashes, and embedding
+  scores are mechanical evidence only. A product candidate requires separate
+  specification and complete forward/reverse contextual semantic review; no
+  code may select it or issue a verdict. See
+  `primary-island-alignment-gap-evidence-diagnosis-2026-07-19.md`.
+- **FR45**: The typed speaker-evidence snapshot MUST include the immutable
+  primary-speaker track, and typed voiceprint evidence MUST preserve explicit
+  session-gallery completeness. The producer MAY emit a
+  `primary_alignment_gap_echo` query only for one unambiguous source/time
+  mapping. Its exact short middle primary run MUST meet the existing primary
+  minimum and remain below the existing short-span ceiling, be bracketed within
+  the existing configured alignment-boundary tolerance by two primary runs
+  with the same nonempty identity distinct from the middle, and lie wholly
+  inside exactly one temporal gap between
+  consecutive positive aligned characters of one punctuation phrase. The
+  immediately following punctuation phrase MUST be source-contiguous and its
+  visible non-punctuation/non-whitespace codepoints MUST form a nonempty strict
+  suffix of the preceding phrase's visible codepoints. The following phrase
+  MUST itself retain positive alignment. Multiple matching islands, alignment
+  gaps, phrase pairs, or source mappings MUST emit no query. The query MUST use
+  the exact middle primary interval as its acoustic range and the complete
+  following phrase as its source range; source repetition locates source only
+  and MUST NOT choose an identity.
+
+  Fusion MAY rewrite that source range only when the query embedding is
+  available; both session and robust galleries are explicitly complete;
+  their nonempty identity lists are unique, equal, and cover every active
+  session identity; and both galleries independently pass the existing short
+  score and margin gates with the same top identity. That identity MUST equal
+  the unique middle primary identity and its matching activity slot MUST cover
+  the full exact island. The two unique adjacent outer primary runs MUST share
+  one identity distinct from the middle, each meet the existing primary
+  minimum, and each be fully covered by matching activity. The target source
+  MUST remain uniformly assigned to that outer identity through only baseline,
+  primary arbitration, or generic direct-short evidence. The policy MUST
+  independently reconstruct the suffix phrase, alignment-gap, primary, and
+  activity topology rather than trust the evidence kind alone. Missing,
+  duplicate, tied, incomplete, differently ranked, differently gated,
+  non-suffix, unaligned, non-bracketed, overlapping, source-inconsistent,
+  already-specialized, or competing evidence MUST preserve existing behavior.
+  FR45 MUST change only target speaker label, identity, support audit, and
+  reason. It MUST add no TOML value, threshold, fitted constant, transcript
+  lookup, speaker name, known timestamp, reference datum, model change,
+  producer/common-clock boundary, or automated product judgment. Frozen T111
+  and T123 inputs MUST replay deterministically, and every changed complete
+  conversation MUST receive chronological and reverse contextual semantic
+  review against `test.txt` before retention or a new audio run. See
+  `primary-island-alignment-gap-evidence-diagnosis-2026-07-19.md` and
+  `primary-island-alignment-gap-echo-review-2026-07-19.md`.
 
 FR40 passes its frozen gate. Repeated T123 outputs are byte-identical and
 change only Xu Zijing's `184.240-184.320` response. Repeated T111 outputs are
@@ -2600,6 +2664,24 @@ turn repairs. The 0-600 block advances to `88/93`, and Shi Yi advances to
 `199/211`. Critical attribution, confident-wrong attribution, time-based
 evidence, real-path repeatability, and holdout gates remain open. See
 `three-run-middle-slot-phrase-abstention-review-2026-07-19.md`.
+
+FR45 passes its frozen gate. The final complete build has no warning/error
+diagnostic and all `70/70` CTest entries pass. Final T123 replays are byte-
+identical at
+`5a595ca1aa5816612b2603062d8467ee60bc3a342219cf5eda066cfddc3bb61a`
+and split only `text_id=111`: `没有意见，` moves to `spk_0`, while
+`赶紧说，快！` remains with `spk_3`. T111 is separately byte-identical and
+unchanged from FR44 at
+`ad2abee782ab30ff67be1a86fa46f4ec0c16b5422ae18954107c398131157aa4`.
+Complete forward and reverse reading of `20:33-22:42` retains Zhu Jie's
+independent response between Shi Yi's answer and request. Only current T123
+`ref-0192` advances the manually reconciled frozen ledger to `519/556`, the
+1200-1800 block to `76/80`, and Zhu Jie to `77/83`. The output preserves
+existing forced-alignment times, so speaker-time and source-time-offset gates
+remain open. Critical attribution, confident-wrong attribution, real-path
+repeatability, and holdout gates also remain open. No new real-WebSocket result
+or closure claim is attributed to FR45. See
+`primary-island-alignment-gap-echo-review-2026-07-19.md`.
 
 The first FR31 implementation passed its focused engineering test and produced
 byte-stable repeated T111 and T123 replays. Complete forward and reverse review

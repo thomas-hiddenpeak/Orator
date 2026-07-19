@@ -34,6 +34,7 @@ class SpeakerEvidenceStage {
     double phrase_min_sec = 0.5;
     double phrase_max_sec = 3.0;
     double short_max_sec = 1.5;
+    double boundary_tolerance_sec = 0.0;
     std::string punctuation = "，。？！；：、,.?!;:";
     float frame_activity_threshold = 0.5f;
     int minimum_gallery_size = 2;

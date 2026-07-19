@@ -90,6 +90,12 @@ orator_add_test(test_speaker_id_stage unit/pipeline/test_speaker_id_stage.cc)
 target_link_libraries(test_speaker_id_stage PRIVATE pthread)
 orator_add_test(test_speaker_evidence_stage
   unit/pipeline/test_speaker_evidence_stage.cc)
+orator_add_test(test_speaker_identity_replay_input
+  unit/pipeline/test_speaker_identity_replay_input.cc)
+target_sources(test_speaker_identity_replay_input PRIVATE
+  ${CMAKE_SOURCE_DIR}/tools/probes/speaker_identity_replay_input.cc)
+target_include_directories(test_speaker_identity_replay_input PRIVATE
+  ${CMAKE_SOURCE_DIR})
 
 # Protocol unit tests
 orator_add_test(test_topic_router unit/protocol/test_topic_router.cc)

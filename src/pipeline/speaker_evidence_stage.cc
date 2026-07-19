@@ -90,6 +90,38 @@ std::vector<std::pair<int, int>> PhraseRanges(
   return ranges;
 }
 
+bool IsWhitespace(const std::string& codepoint) {
+  return codepoint == " " || codepoint == "\t" || codepoint == "\n" ||
+         codepoint == "\r";
+}
+
+std::vector<std::string> VisibleCodepoints(
+    const std::vector<std::string>& source, int source_start, int source_end,
+    const std::set<std::string>& punctuation) {
+  std::vector<std::string> output;
+  for (int index = source_start; index < source_end; ++index) {
+    if (punctuation.count(source[index]) == 0 &&
+        !IsWhitespace(source[index])) {
+      output.push_back(source[index]);
+    }
+  }
+  return output;
+}
+
+bool IsStrictVisibleSuffix(const std::vector<std::string>& source,
+                           const std::pair<int, int>& preceding,
+                           const std::pair<int, int>& following,
+                           const std::set<std::string>& punctuation) {
+  const auto preceding_visible = VisibleCodepoints(
+      source, preceding.first, preceding.second, punctuation);
+  const auto following_visible = VisibleCodepoints(
+      source, following.first, following.second, punctuation);
+  return !following_visible.empty() &&
+         following_visible.size() < preceding_visible.size() &&
+         std::equal(following_visible.rbegin(), following_visible.rend(),
+                    preceding_visible.rbegin());
+}
+
 std::optional<std::pair<double, double>> TimeForRange(
     const std::vector<CharacterTime>& times, int source_start,
     int source_end) {
@@ -149,6 +181,7 @@ Timeline::SpeakerVoiceprintEvidence ConvertEvidence(
   output.start = start;
   output.end = end;
   output.embedding_available = source.embedding_available;
+  output.session_gallery_complete = source.session_gallery_complete;
   output.robust_gallery_complete = source.robust_gallery_complete;
   for (const auto& score : source.session_scores) {
     output.session_scores.push_back({score.speaker_id, score.score});
@@ -177,6 +210,8 @@ SpeakerEvidenceStage::SpeakerEvidenceStage(SpeakerIdentityStage* identity,
       std::max(config_.phrase_min_sec, config_.phrase_max_sec);
   config_.short_max_sec =
       std::max(config_.min_embed_sec, config_.short_max_sec);
+  config_.boundary_tolerance_sec =
+      std::max(0.0, config_.boundary_tolerance_sec);
   config_.minimum_gallery_size = std::max(2, config_.minimum_gallery_size);
   config_.precompute_interval_sec =
       std::max(0.0, config_.precompute_interval_sec);
@@ -479,6 +514,15 @@ SpeakerEvidenceStage::BuildVoiceprintQueries(
     output.push_back(std::move(pair));
   }
 
+  std::vector<Timeline::SpeakerInput> primary = snapshot.primary_speaker;
+  std::stable_sort(primary.begin(), primary.end(),
+                   [](const auto& left, const auto& right) {
+                     if (left.start != right.start) {
+                       return left.start < right.start;
+                     }
+                     return left.end < right.end;
+                   });
+
   for (const auto& text : snapshot.asr) {
     const auto alignment = align_by_text.find(text.id);
     const auto source_position = source_by_text.find(text.id);
@@ -531,6 +575,81 @@ SpeakerEvidenceStage::BuildVoiceprintQueries(
     output.push_back(MakeQuery(
         "complete_source:" + std::to_string(text.id), "complete_source",
         text.id, 0, static_cast<int>(source.size()), text.start, text.end));
+
+    struct EchoCandidate {
+      int source_start = 0;
+      int source_end = 0;
+      double start = 0.0;
+      double end = 0.0;
+    };
+    std::vector<EchoCandidate> echo_candidates;
+    bool echo_ambiguous = false;
+    for (std::size_t phrase_index = 0;
+         phrase_index + 1 < phrase_ranges->second.size(); ++phrase_index) {
+      const auto& preceding = phrase_ranges->second[phrase_index];
+      const auto& following = phrase_ranges->second[phrase_index + 1];
+      if (preceding.second != following.first ||
+          !IsStrictVisibleSuffix(source, preceding, following, punctuation) ||
+          !TimeForRange(character_times, following.first, following.second)) {
+        continue;
+      }
+
+      struct Candidate {
+        double start = 0.0;
+        double end = 0.0;
+      };
+      std::vector<Candidate> candidates;
+      std::vector<int> positive_indices;
+      for (int index = preceding.first; index < preceding.second; ++index) {
+        if (character_times[index].available) positive_indices.push_back(index);
+      }
+      for (std::size_t time_index = 0;
+           time_index + 1 < positive_indices.size(); ++time_index) {
+        const auto& left = character_times[positive_indices[time_index]];
+        const auto& right = character_times[positive_indices[time_index + 1]];
+        if (right.start <= left.end + 1e-9) continue;
+        for (std::size_t primary_index = 1;
+             primary_index + 1 < primary.size(); ++primary_index) {
+          const auto& outer_left = primary[primary_index - 1];
+          const auto& middle = primary[primary_index];
+          const auto& outer_right = primary[primary_index + 1];
+          const double middle_duration = middle.end - middle.start;
+          if (outer_left.speaker_id.empty() || middle.speaker_id.empty() ||
+              outer_left.speaker_id != outer_right.speaker_id ||
+              outer_left.speaker_id == middle.speaker_id ||
+              std::abs(outer_left.end - middle.start) >
+                  config_.boundary_tolerance_sec + 1e-9 ||
+              std::abs(middle.end - outer_right.start) >
+                  config_.boundary_tolerance_sec + 1e-9 ||
+              outer_left.end - outer_left.start + 1e-9 <
+                  config_.min_embed_sec ||
+              outer_right.end - outer_right.start + 1e-9 <
+                  config_.min_embed_sec ||
+              middle_duration + 1e-9 < config_.min_embed_sec ||
+              middle_duration + 1e-9 >= config_.short_max_sec ||
+              middle.start + 1e-9 < left.end ||
+              middle.end > right.start + 1e-9) {
+            continue;
+          }
+          candidates.push_back({middle.start, middle.end});
+        }
+      }
+      if (candidates.empty()) continue;
+      if (candidates.size() != 1) {
+        echo_ambiguous = true;
+        break;
+      }
+      echo_candidates.push_back(
+          {following.first, following.second, candidates.front().start,
+           candidates.front().end});
+    }
+    if (!echo_ambiguous && echo_candidates.size() == 1) {
+      const auto& candidate = echo_candidates.front();
+      output.push_back(MakeQuery(
+          "primary_alignment_gap_echo:" + std::to_string(text.id) + ":0",
+          "primary_alignment_gap_echo", text.id, candidate.source_start,
+          candidate.source_end, candidate.start, candidate.end));
+    }
   }
 
   int vad_ordinal = 0;

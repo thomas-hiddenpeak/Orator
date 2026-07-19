@@ -83,6 +83,12 @@ int main() {
         "rejected alignment conflict cannot mutate the raw track");
 
   timeline.DepositDiarization({{0.0, 3.0, "speaker_0", 0.9f, "voice_0"}});
+  timeline.DepositPrimarySpeaker(
+      {{0.5, 2.5, "speaker_1", 0.8f, "voice_1"}});
+  const auto evidence_inputs = timeline.SnapshotSpeakerEvidenceInputs();
+  CHECK(evidence_inputs.primary_speaker.size() == 1 &&
+            evidence_inputs.primary_speaker[0].speaker_id == "voice_1",
+        "reduced speaker-evidence snapshot preserves the primary track");
   const auto raw_before_business = timeline.SnapshotTracks();
   Timeline::Entry business_entry;
   business_entry.start = 1.0;
@@ -188,13 +194,15 @@ int main() {
   voiceprint.start = 1.0;
   voiceprint.end = 2.0;
   voiceprint.embedding_available = true;
+  voiceprint.session_gallery_complete = true;
   voiceprint.robust_gallery_complete = true;
   voiceprint.session_scores = {{"voice_0", 0.8f}, {"voice_1", 0.5f}};
   voiceprint.robust_scores = {{"voice_0", 0.75f}, {"voice_1", 0.45f}};
   timeline.DepositSpeakerVoiceprint({voiceprint});
   const auto voiceprint_snapshot = timeline.SnapshotSpeakerVoiceprint();
   CHECK(voiceprint_snapshot.size() == 1 &&
-            voiceprint_snapshot[0].evidence_id == "phrase:7:0",
+            voiceprint_snapshot[0].evidence_id == "phrase:7:0" &&
+            voiceprint_snapshot[0].session_gallery_complete,
         "typed voiceprint evidence is committed without a decision");
   CHECK(timeline.FindAsrFinal(7)->text == "immutable final",
         "voiceprint evidence cannot mutate finalized ASR");
@@ -203,7 +211,8 @@ int main() {
   timeline.Clear();
   const auto cleared = timeline.SnapshotTracks();
   CHECK(cleared.diarization.empty() && cleared.asr.empty() &&
-            cleared.vad.empty() && cleared.align.empty() &&
+            cleared.primary_speaker.empty() && cleared.vad.empty() &&
+            cleared.align.empty() &&
             cleared.diar_frames.empty() &&
             cleared.speaker_voiceprint.empty() &&
             cleared.business_speaker.empty(),

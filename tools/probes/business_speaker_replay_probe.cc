@@ -155,7 +155,7 @@ std::vector<ComprehensiveTimeline::SpeakerVoiceprintEvidence> ReadVoiceprint(
     if (line.empty()) continue;
     const auto columns = SplitTab(line);
     if (columns[0] == "evidence_id") continue;
-    if (columns.size() != 11) {
+    if (columns.size() != 11 && columns.size() != 12) {
       throw std::runtime_error("invalid voiceprint TSV row");
     }
     ComprehensiveTimeline::SpeakerVoiceprintEvidence item;
@@ -167,9 +167,13 @@ std::vector<ComprehensiveTimeline::SpeakerVoiceprintEvidence> ReadVoiceprint(
     item.start = std::stod(columns[5]);
     item.end = std::stod(columns[6]);
     item.embedding_available = columns[7] == "1";
-    item.robust_gallery_complete = columns[8] == "1";
-    item.session_scores = ParseScores(columns[9]);
-    item.robust_scores = ParseScores(columns[10]);
+    const bool explicit_session_complete = columns.size() == 12;
+    item.session_gallery_complete =
+        explicit_session_complete && columns[8] == "1";
+    const std::size_t robust_index = explicit_session_complete ? 9 : 8;
+    item.robust_gallery_complete = columns[robust_index] == "1";
+    item.session_scores = ParseScores(columns[robust_index + 1]);
+    item.robust_scores = ParseScores(columns[robust_index + 2]);
     out.push_back(std::move(item));
   }
   return out;

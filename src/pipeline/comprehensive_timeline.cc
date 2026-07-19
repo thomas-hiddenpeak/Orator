@@ -385,6 +385,7 @@ ComprehensiveTimeline::SnapshotSpeakerEvidenceInputs() const {
   std::lock_guard<std::mutex> lock(mutex_);
   SpeakerEvidenceSnapshot snapshot;
   snapshot.diarization = diarization_;
+  snapshot.primary_speaker = primary_speaker_;
   snapshot.asr = asr_;
   snapshot.vad = vad_;
   snapshot.align.reserve(align_.size());

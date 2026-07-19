@@ -3732,6 +3732,86 @@ block to `88/93`, and Shi Yi to `199/211`. No new real-WebSocket result or
 closing claim follows. See
 `three-run-middle-slot-phrase-abstention-review-2026-07-19.md`.
 
+The post-FR44 evidence pass separates two superficially similar alignment-gap
+contexts before attempting another fusion rule. T123 omits the complete
+`ref-0066` Tang source contribution, so the business projector has no content
+coordinate it can assign. T123 retains the repeated `ref-0192` source, while
+Zhu Jie's independent activity and primary island lies wholly inside a long
+forced-alignment time gap. The current evidence stage never queries that exact
+span, and its containing VAD mixes Zhu with Shi's following request. A
+single-centroid diagnostic displays Zhu first on the exact island but cannot
+establish the independent robust gallery.
+
+Before FR45 can exist, extend the offline `speaker_identity_replay_probe` with
+a capture-snapshot input mode. A mechanically exported TSV will group every
+raw WebSocket `diar` snapshot by its original event index and carry start, end,
+local slot, confidence, and optional captured identity. Snapshot mode will
+append full audio only when the configured retention covers it, process each
+snapshot in order after stripping captured identities, and support `-` for a
+new empty `SpeakerDatabase`. Existing final-segment replay remains unchanged.
+The tool will write the final replay view and requested dual-gallery evidence;
+captured/replayed identity equality is only a producer-reproduction contract.
+
+The implementation passes a warning-clean build and all `70/70` CTest entries.
+The original MP3-float replay diverges only because its decoder does not match
+the production client's FFmpeg PCM s16le path. Replaying the exact streamed PCM
+twice reproduces all 1,254,049 captured identity values with no difference;
+the final identity and dual-gallery artifacts are separately byte-identical.
+The exact complete primary island has complete unique session and robust
+galleries that independently select its middle primary identity under the
+existing short-span gates. The VAD-intersected subset fails the robust margin,
+and the mixed VAD and neighboring controls select the outer identity. Manual
+component review therefore passes the evidence gate only for the complete
+exact island. See
+`primary-island-alignment-gap-evidence-diagnosis-2026-07-19.md`.
+
+FR45 will first extend the reduced evidence snapshot with `primary_speaker` and
+carry `session_gallery_complete` through the typed timeline and diagnostic JSON.
+`SpeakerEvidenceStage` will derive punctuation phrases from configured
+punctuation, reconstruct positive character times, and search for one exact
+middle primary run inside one positive-character alignment gap. It emits a
+`primary_alignment_gap_echo` query only when the next source-contiguous phrase
+is a strict visible suffix of the phrase containing the gap, the two outer
+primary boundaries are adjacent within the existing configured alignment
+boundary tolerance, and the source/time mapping is unique. The query pairs that
+following source range with the exact primary-island clock span. It neither
+selects nor writes a speaker.
+
+`SpeakerFusionPolicy` will independently reconstruct the phrase, alignment,
+primary, and activity topology. It requires explicit complete equal identity
+sets in both galleries, independent passage of the existing short score and
+margin gates, agreement with the middle primary/activity identity, matching
+full-duration activity, sufficiently long same-identity outer primary runs and
+activity, and a target uniformly held by the outer identity under only ordinary
+base/primary/direct-short provenance. Every ambiguous or incomplete condition
+abstains independently. A final specialized pass rewrites only speaker fields
+for that target phrase and leaves source, text, forced alignment, and all clock
+bounds untouched. Focused tests will cover the producer positive and ambiguity
+cases plus every fusion gate separately.
+
+After a warning-clean complete build and CTest pass, the clean projector will
+replay frozen T123 and T111 twice. Automation may display only deterministic
+hashes and mechanical changed scope. Complete chronological and reverse reading
+of every changed conversation against `test.txt` alone decides whether FR45 is
+retained. No new real-WebSocket result, ledger change, or closure claim is made
+before that review.
+
+The independent frozen gate retains FR45. The final complete build has no
+warning/error diagnostic and all `70/70` CTest entries pass. Repeated T123
+outputs are byte-identical at
+`5a595ca1aa5816612b2603062d8467ee60bc3a342219cf5eda066cfddc3bb61a`;
+repeated T111 outputs are byte-identical and unchanged from FR44 at
+`ad2abee782ab30ff67be1a86fa46f4ec0c16b5422ae18954107c398131157aa4`.
+The complete T123 raw scope splits only `text_id=111`: `没有意见，` moves to
+the middle-island identity while `赶紧说，快！` remains with the outer
+identity. Complete chronological and reverse reading of `20:33-22:42` against
+`test.txt` retains Zhu Jie's independent response between Shi Yi's answer and
+request. Only current T123 `ref-0192` advances the manual frozen ledger to
+`519/556`, the 1200-1800 block to `76/80`, and Zhu Jie to `77/83`. The
+business output keeps existing forced-alignment times, so time-based gates
+remain open. No new real-WebSocket result or closing claim follows. See
+`primary-island-alignment-gap-echo-review-2026-07-19.md`.
+
 ### 8.15 FR28 120-second outcome and promotion ladder
 
 T117-T121 are complete. The frozen T116 packages replay byte-stably; their

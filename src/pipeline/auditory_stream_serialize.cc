@@ -639,11 +639,13 @@ std::string AuditoryStream::Serialize() {
           "{\"evidence_id\":\"%s\",\"evidence_kind\":\"%s\","
           "\"text_id\":%ld,\"source_start\":%d,\"source_end\":%d,"
           "\"start\":%.9f,\"end\":%.9f,"
-          "\"embedding_available\":%s,\"robust_gallery_complete\":%s,",
+          "\"embedding_available\":%s,\"session_gallery_complete\":%s,"
+          "\"robust_gallery_complete\":%s,",
           JsonEscape(evidence.evidence_id).c_str(),
           JsonEscape(evidence.kind).c_str(), evidence.text_id,
           evidence.source_start, evidence.source_end, evidence.start,
           evidence.end, evidence.embedding_available ? "true" : "false",
+          evidence.session_gallery_complete ? "true" : "false",
           evidence.robust_gallery_complete ? "true" : "false");
       out += buf;
       auto append_scores = [&](const char* name, const auto& scores) {

@@ -307,6 +307,8 @@ void AuditoryStream::Start() {
     evidence_config.phrase_min_sec = config_.speaker_fusion_phrase_min_sec;
     evidence_config.phrase_max_sec = config_.speaker_fusion_phrase_max_sec;
     evidence_config.short_max_sec = config_.speaker_fusion_short_max_sec;
+    evidence_config.boundary_tolerance_sec =
+        config_.timeline_align_boundary_split_tolerance_sec;
     evidence_config.punctuation = config_.speaker_fusion_punctuation;
     evidence_config.frame_activity_threshold =
         config_.speaker_fusion_frame_activity_threshold;

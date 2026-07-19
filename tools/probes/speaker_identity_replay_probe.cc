@@ -7,6 +7,7 @@
 #include <cstdio>
 #include <fstream>
 #include <iomanip>
+#include <limits>
 #include <set>
 #include <sstream>
 #include <stdexcept>
@@ -21,6 +22,7 @@
 #include "model/titanet_embedder.h"
 #include "pipeline/auditory_stream.h"
 #include "pipeline/speaker_identity_stage.h"
+#include "tools/probes/speaker_identity_replay_input.h"
 
 namespace {
 
@@ -148,8 +150,7 @@ void WriteScores(
   }
 }
 
-void WriteEvidenceQueries(const std::string& path,
-                          SpeakerIdentityStage* stage,
+void WriteEvidenceQueries(const std::string& path, SpeakerIdentityStage* stage,
                           const std::vector<EvidenceQuery>& queries,
                           const std::vector<std::string>& active_ids,
                           const AuditoryStream::Config& config) {
@@ -157,19 +158,20 @@ void WriteEvidenceQueries(const std::string& path,
   std::ofstream output(path);
   if (!output) throw std::runtime_error("cannot write evidence TSV: " + path);
   output << "evidence_id\tkind\ttext_id\tsource_start\tsource_end\tstart\tend\t"
-            "embedding_available\trobust_gallery_complete\tsession_scores\t"
-            "robust_scores\n";
+            "embedding_available\tsession_gallery_complete\t"
+            "robust_gallery_complete\tsession_scores\trobust_scores\n";
   output << std::fixed << std::setprecision(9);
   for (const auto& query : queries) {
-    const auto evidence = stage->EvaluateSpan(
-        query.start_sec, query.end_sec, active_ids,
-        config.speaker_fusion_min_embed_sec,
-        config.speaker_fusion_edge_margin_sec,
-        config.speaker_fusion_max_embed_window_sec);
+    const auto evidence =
+        stage->EvaluateSpan(query.start_sec, query.end_sec, active_ids,
+                            config.speaker_fusion_min_embed_sec,
+                            config.speaker_fusion_edge_margin_sec,
+                            config.speaker_fusion_max_embed_window_sec);
     output << query.evidence_id << '\t' << query.kind << '\t' << query.text_id
            << '\t' << query.source_start << '\t' << query.source_end << '\t'
            << query.start_sec << '\t' << query.end_sec << '\t'
            << (evidence.embedding_available ? 1 : 0) << '\t'
+           << (evidence.session_gallery_complete ? 1 : 0) << '\t'
            << (evidence.robust_gallery_complete ? 1 : 0) << '\t';
     WriteScores(output, evidence.session_scores);
     output << '\t';
@@ -253,13 +255,28 @@ void WriteSegments(const std::string& path,
   }
 }
 
+void AppendAllAudio(SpeakerIdentityStage* stage,
+                    const std::vector<float>& samples) {
+  if (stage == nullptr) return;
+  long consumed = 0;
+  const long total_samples = static_cast<long>(samples.size());
+  const long max_append = std::numeric_limits<int>::max();
+  while (consumed < total_samples) {
+    const long next = std::min(total_samples, consumed + max_append);
+    stage->AppendAudio(samples.data() + consumed,
+                       static_cast<int>(next - consumed));
+    consumed = next;
+  }
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
   if (argc != 7 && argc != 9) {
     std::fprintf(stderr,
                  "usage: %s <audio.mp3/wav> <titanet.safetensors> "
-                 "<registry-before> <segments.csv> <out.tsv> <config.toml> "
+                 "<registry-before|-> <segments.csv|snapshots.tsv> <out.tsv> "
+                 "<config.toml> "
                  "[queries.tsv evidence.tsv]\n",
                  argv[0]);
     return 2;
@@ -283,42 +300,71 @@ int main(int argc, char** argv) {
     }
 
     auto audio = orator::io::LoadAudioMono(audio_path, config.sample_rate);
-    auto segments = ReadSegments(segments_path);
+    const bool snapshot_mode =
+        orator::tools::IsSpeakerIdentitySnapshotInput(segments_path);
+    orator::tools::SpeakerIdentitySnapshotInput snapshot_input;
+    std::vector<DiarSegment> segments;
+    if (snapshot_mode) {
+      snapshot_input =
+          orator::tools::ReadSpeakerIdentitySnapshots(segments_path);
+    } else {
+      segments = ReadSegments(segments_path);
+    }
     orator::model::TitaNetEmbedder embedder;
     embedder.LoadWeights(weights_path);
     orator::model::SpeakerDatabase database(/*max_speakers=*/256,
                                             embedder.dim());
-    if (!database.Load(registry_path)) {
+    if (registry_path != "-" && !database.Load(registry_path)) {
       throw std::runtime_error("cannot load registry: " + registry_path);
     }
     const orator::core::TimeBase time_base(config.sample_rate);
-    SpeakerIdentityStage stage(
-        &embedder, &database, time_base,
-        MakeStageConfig(config, embedder.dim()));
+    SpeakerIdentityStage stage(&embedder, &database, time_base,
+                               MakeStageConfig(config, embedder.dim()));
 
+    orator::tools::SpeakerIdentityReplayComparison comparison;
+    std::size_t processed_snapshots = 0;
     const long total_samples = static_cast<long>(audio.samples.size());
-    const long delivery_samples = std::max<long>(
-        1, static_cast<long>(std::llround(
-               config.diar_deliver_interval_sec * config.sample_rate)));
-    const double history_sec = std::max(
-        config.speaker_retain_sec,
-        config.speaker_local_drift_competing_backfill_sec +
-            config.speaker_local_drift_competing_backfill_gap_sec);
-    long consumed = 0;
-    while (consumed < total_samples) {
-      const long next = std::min(total_samples, consumed + delivery_samples);
-      stage.AppendAudio(audio.samples.data() + consumed,
-                        static_cast<int>(next - consumed));
-      consumed = next;
-      const double now_sec = time_base.SecondsAt(consumed);
-      auto visible = VisibleSegments(segments, now_sec, history_sec);
-      stage.Process(visible);
+    if (snapshot_mode) {
+      const long retain_samples = static_cast<long>(
+          std::llround(config.speaker_retain_sec * time_base.sample_rate()));
+      if (retain_samples < total_samples) {
+        throw std::runtime_error(
+            "snapshot mode requires speaker retain_sec to cover full audio");
+      }
+      AppendAllAudio(&stage, audio.samples);
+      auto replay = orator::tools::ReplaySpeakerIdentitySnapshots(
+          snapshot_input,
+          [&stage](std::vector<DiarSegment>* snapshot_segments) {
+            stage.Process(*snapshot_segments);
+          });
+      processed_snapshots = replay.processed_snapshots;
+      comparison = std::move(replay.comparison);
+      segments = std::move(replay.final_segments);
+    } else {
+      const long delivery_samples = std::max<long>(
+          1, static_cast<long>(std::llround(config.diar_deliver_interval_sec *
+                                            config.sample_rate)));
+      const double history_sec =
+          std::max(config.speaker_retain_sec,
+                   config.speaker_local_drift_competing_backfill_sec +
+                       config.speaker_local_drift_competing_backfill_gap_sec);
+      long consumed = 0;
+      while (consumed < total_samples) {
+        const long next = std::min(total_samples, consumed + delivery_samples);
+        stage.AppendAudio(audio.samples.data() + consumed,
+                          static_cast<int>(next - consumed));
+        consumed = next;
+        const double now_sec = time_base.SecondsAt(consumed);
+        auto visible = VisibleSegments(segments, now_sec, history_sec);
+        stage.Process(visible);
+      }
+
+      // Old audio is intentionally unavailable here, so this final projection
+      // cannot create historical evidence. It only applies the frozen epochs
+      // to every final segment for business-view replay.
+      stage.Process(segments);
     }
 
-    // Old audio is intentionally unavailable here, so this final projection
-    // cannot create historical evidence. It only applies the frozen epochs to
-    // every final segment for business-view replay.
-    stage.Process(segments);
     WriteSegments(output_path, segments);
     if (!query_path.empty()) {
       const auto queries = ReadEvidenceQueries(query_path);
@@ -330,12 +376,39 @@ int main(int argc, char** argv) {
                                                 active_set.end());
       WriteEvidenceQueries(evidence_path, &stage, queries, active_ids, config);
     }
-    std::printf(
-        "segments=%zu audio_sec=%.3f registry_before=%s enrolled_after=%d "
-        "out=%s evidence=%s\n",
-        segments.size(), audio.DurationSec(), registry_path.c_str(),
-        stage.enrolled_count(), output_path.c_str(),
-        evidence_path.empty() ? "(none)" : evidence_path.c_str());
+    const char* registry_description =
+        registry_path == "-" ? "(empty)" : registry_path.c_str();
+    if (snapshot_mode) {
+      std::printf(
+          "mode=snapshots snapshots=%zu segments=%zu audio_sec=%.3f "
+          "registry_before=%s enrolled_after=%d captured_rows=%zu "
+          "identity_equal_rows=%zu identity_different_rows=%zu out=%s "
+          "evidence=%s\n",
+          processed_snapshots, segments.size(), audio.DurationSec(),
+          registry_description, stage.enrolled_count(),
+          comparison.captured_rows, comparison.equal_rows,
+          comparison.different_rows, output_path.c_str(),
+          evidence_path.empty() ? "(none)" : evidence_path.c_str());
+      if (comparison.first_different_snapshot >= 0) {
+        std::printf(
+            "first_identity_difference snapshot=%ld row=%zu captured=%s "
+            "replayed=%s\n",
+            comparison.first_different_snapshot, comparison.first_different_row,
+            comparison.first_captured_speaker_id.empty()
+                ? "(empty)"
+                : comparison.first_captured_speaker_id.c_str(),
+            comparison.first_replayed_speaker_id.empty()
+                ? "(empty)"
+                : comparison.first_replayed_speaker_id.c_str());
+      }
+    } else {
+      std::printf(
+          "segments=%zu audio_sec=%.3f registry_before=%s enrolled_after=%d "
+          "out=%s evidence=%s\n",
+          segments.size(), audio.DurationSec(), registry_description,
+          stage.enrolled_count(), output_path.c_str(),
+          evidence_path.empty() ? "(none)" : evidence_path.c_str());
+    }
     return 0;
   } catch (const std::exception& error) {
     std::fprintf(stderr, "speaker identity replay probe: %s\n", error.what());

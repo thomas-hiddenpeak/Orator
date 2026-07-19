@@ -7414,6 +7414,254 @@ int main() {
           "reversed alignment times are normalized before publication");
   }
 
+  // ---- 21h. FR45 maps one retained suffix phrase to a capture-faithful
+  // primary island only when every independent typed gate agrees. ----
+  {
+    struct CaseOptions {
+      bool embedding_available = true;
+      bool session_complete = true;
+      bool robust_complete = true;
+      bool duplicate_session_identity = false;
+      bool gallery_identity_sets_match = true;
+      bool session_margin_passes = true;
+      bool robust_margin_passes = true;
+      bool galleries_select_middle = true;
+      bool robust_selects_middle = true;
+      bool suffix_source = true;
+      bool alignment_gap = true;
+      bool following_alignment = true;
+      bool outer_primary_matches = true;
+      bool middle_primary_distinct = true;
+      bool primary_gapless = true;
+      bool middle_duration_passes = true;
+      bool outer_duration_passes = true;
+      bool middle_activity_complete = true;
+      bool middle_local_slot_matches = true;
+      bool outer_activity_complete = true;
+      bool duplicate_evidence = false;
+      bool extra_active_identity = false;
+      bool specialized_incumbent = false;
+    };
+    auto run_case = [](const CaseOptions& options) {
+      BusinessSpeakerPipeline::Config config;
+      config.voiceprint_fusion_enabled = true;
+      config.speaker_overlap_tie_policy =
+          BusinessSpeakerPipeline::SpeakerOverlapTiePolicy::kPrimarySpeaker;
+      TestBusinessSpeakerPipeline tl(config);
+
+      const double middle_start = options.middle_duration_passes ? 0.6 : 0.7;
+      const double middle_end = 1.0;
+      const double outer_left_start = options.outer_duration_passes ? 0.0 : 0.3;
+      const double left_end = middle_start - 0.08;
+      const double right_start = options.primary_gapless ? middle_end : 1.1;
+      const double outer_right_end = right_start + 0.6;
+      const double outer_activity_start = options.outer_activity_complete
+                                              ? outer_left_start
+                                              : outer_left_start + 0.1;
+      std::vector<TestBusinessSpeakerPipeline::SpeakerInput> activity = {
+          {outer_activity_start, 2.2, "speaker_0", 0.9f, "spk_a"},
+          {middle_start,
+           options.middle_activity_complete ? middle_end : middle_end - 0.1,
+           options.middle_local_slot_matches ? "speaker_1" : "speaker_2", 0.9f,
+           "spk_b"}};
+      if (options.extra_active_identity) {
+        activity.push_back({3.0, 3.5, "speaker_2", 0.9f, "spk_c"});
+      }
+      tl.ReplaceSpeakers(activity);
+      tl.ReplacePrimarySpeakers(
+          {{outer_left_start, left_end, "speaker_0", 0.9f, "spk_a"},
+           {middle_start, middle_end, "speaker_1", 0.9f,
+            options.middle_primary_distinct ? "spk_b" : "spk_a"},
+           {right_start, outer_right_end, "speaker_0", 0.9f,
+            options.outer_primary_matches ? "spk_a" : "spk_c"}});
+      const std::string source =
+          options.suffix_source ? "甲乙丙。乙丙，丁。" : "甲乙丙。甲丙，丁。";
+      tl.UpsertText(0, 0.0, 2.2, source);
+      std::vector<TestBusinessSpeakerPipeline::AlignUnitSeg> units = {
+          {0.0, 0.2, "甲"},
+          {0.2, 0.4, "乙"},
+          {options.alignment_gap ? 1.2 : 0.4, options.alignment_gap ? 1.4 : 0.6,
+           "丙"},
+          {options.alignment_gap ? 1.4 : 0.6, options.alignment_gap ? 1.5 : 0.7,
+           "。"}};
+      if (options.following_alignment) {
+        units.push_back({1.5, 1.7, options.suffix_source ? "乙" : "甲"});
+        units.push_back({1.7, 1.9, "丙"});
+        units.push_back({1.9, 2.0, "，"});
+      }
+      units.push_back({2.0, 2.1, "丁"});
+      units.push_back({2.1, 2.2, "。"});
+      tl.UpsertAlign(0, 0.0, 2.2, units);
+
+      ComprehensiveTimeline::SpeakerVoiceprintEvidence gap;
+      gap.evidence_id = "primary_alignment_gap_echo:0:0";
+      gap.kind = "primary_alignment_gap_echo";
+      gap.text_id = 0;
+      gap.source_start = 4;
+      gap.source_end = 7;
+      gap.start = middle_start;
+      gap.end = middle_end;
+      gap.embedding_available = options.embedding_available;
+      gap.session_gallery_complete = options.session_complete;
+      gap.robust_gallery_complete = options.robust_complete;
+      if (options.galleries_select_middle) {
+        gap.session_scores =
+            options.session_margin_passes
+                ? std::vector<ComprehensiveTimeline::VoiceprintScore>{{"spk_a",
+                                                                       0.20f},
+                                                                      {"spk_b",
+                                                                       0.70f}}
+                : std::vector<ComprehensiveTimeline::VoiceprintScore>{
+                      {"spk_a", 0.68f}, {"spk_b", 0.70f}};
+      } else {
+        gap.session_scores = {{"spk_a", 0.70f}, {"spk_b", 0.20f}};
+      }
+      if (options.duplicate_session_identity) {
+        gap.session_scores[0].speaker_id = gap.session_scores[1].speaker_id;
+      }
+      if (options.robust_selects_middle) {
+        gap.robust_scores =
+            options.robust_margin_passes
+                ? std::vector<ComprehensiveTimeline::VoiceprintScore>{{"spk_a",
+                                                                       0.25f},
+                                                                      {"spk_b",
+                                                                       0.65f}}
+                : std::vector<ComprehensiveTimeline::VoiceprintScore>{
+                      {"spk_a", 0.63f}, {"spk_b", 0.65f}};
+      } else {
+        gap.robust_scores = {{"spk_a", 0.65f}, {"spk_b", 0.25f}};
+      }
+      if (!options.gallery_identity_sets_match) {
+        gap.robust_scores[0].speaker_id = "spk_c";
+      }
+      std::vector<ComprehensiveTimeline::SpeakerVoiceprintEvidence> evidence = {
+          gap};
+      if (options.duplicate_evidence) {
+        auto duplicate = gap;
+        duplicate.evidence_id = "primary_alignment_gap_echo:0:1";
+        evidence.push_back(std::move(duplicate));
+      }
+      if (options.specialized_incumbent) {
+        ComprehensiveTimeline::SpeakerVoiceprintEvidence unit = gap;
+        unit.evidence_id = "aligned_unit:0:4";
+        unit.kind = "aligned_unit";
+        unit.start = 1.5;
+        unit.end = 2.0;
+        unit.session_scores = {{"spk_a", 0.70f}, {"spk_b", 0.20f}};
+        unit.robust_scores = unit.session_scores;
+        evidence.insert(evidence.begin(), std::move(unit));
+      }
+      tl.ReplaceVoiceprint(evidence);
+      return tl.Snapshot();
+    };
+    auto applied = [](const auto& entries) {
+      return std::any_of(entries.begin(), entries.end(), [](const auto& entry) {
+        return entry.text == "乙丙，" && entry.speaker_id == "spk_b" &&
+               entry.speaker_decision.reason ==
+                   "voiceprint_primary_alignment_gap_echo_override" &&
+               entry.speaker_decision.speaker_source ==
+                   "sortformer_activity+primary_top1+titanet_primary_island+"
+                   "robust_gallery+forced_alignment";
+      });
+    };
+    auto abstained = [&](const CaseOptions& options) {
+      return !applied(run_case(options));
+    };
+
+    CHECK(applied(run_case({})),
+          "complete dual-gallery primary-gap evidence rewrites only the echo");
+    CaseOptions no_embedding;
+    no_embedding.embedding_available = false;
+    CHECK(abstained(no_embedding),
+          "missing gap embedding preserves the incumbent");
+    CaseOptions incomplete_session;
+    incomplete_session.session_complete = false;
+    CHECK(abstained(incomplete_session),
+          "incomplete session gallery preserves the incumbent");
+    CaseOptions incomplete_robust;
+    incomplete_robust.robust_complete = false;
+    CHECK(abstained(incomplete_robust),
+          "incomplete robust gallery preserves the incumbent");
+    CaseOptions duplicate_identity;
+    duplicate_identity.duplicate_session_identity = true;
+    CHECK(abstained(duplicate_identity),
+          "duplicate gallery identities preserve the incumbent");
+    CaseOptions changed_identity_set;
+    changed_identity_set.gallery_identity_sets_match = false;
+    CHECK(abstained(changed_identity_set),
+          "different gallery identity sets preserve the incumbent");
+    CaseOptions extra_active;
+    extra_active.extra_active_identity = true;
+    CHECK(abstained(extra_active),
+          "a gallery missing an active identity preserves the incumbent");
+    CaseOptions session_margin;
+    session_margin.session_margin_passes = false;
+    CHECK(abstained(session_margin),
+          "a session margin failure preserves the incumbent");
+    CaseOptions robust_margin;
+    robust_margin.robust_margin_passes = false;
+    CHECK(abstained(robust_margin),
+          "a robust margin failure preserves the incumbent");
+    CaseOptions session_outer;
+    session_outer.galleries_select_middle = false;
+    CHECK(abstained(session_outer),
+          "session selection of the outer identity preserves the incumbent");
+    CaseOptions gallery_disagreement;
+    gallery_disagreement.robust_selects_middle = false;
+    CHECK(abstained(gallery_disagreement),
+          "gallery top disagreement preserves the incumbent");
+    CaseOptions no_suffix;
+    no_suffix.suffix_source = false;
+    CHECK(abstained(no_suffix), "a non-suffix phrase preserves the incumbent");
+    CaseOptions no_gap;
+    no_gap.alignment_gap = false;
+    CHECK(abstained(no_gap), "missing alignment gap preserves the incumbent");
+    CaseOptions no_following_alignment;
+    no_following_alignment.following_alignment = false;
+    CHECK(abstained(no_following_alignment),
+          "an unaligned following phrase preserves the incumbent");
+    CaseOptions changed_outer;
+    changed_outer.outer_primary_matches = false;
+    CHECK(abstained(changed_outer),
+          "different outer primary identities preserve the incumbent");
+    CaseOptions same_middle;
+    same_middle.middle_primary_distinct = false;
+    CHECK(abstained(same_middle),
+          "a non-distinct middle primary identity preserves the incumbent");
+    CaseOptions primary_gap;
+    primary_gap.primary_gapless = false;
+    CHECK(abstained(primary_gap),
+          "a noncontiguous primary bracket preserves the incumbent");
+    CaseOptions short_middle;
+    short_middle.middle_duration_passes = false;
+    CHECK(abstained(short_middle),
+          "a subminimum middle primary run preserves the incumbent");
+    CaseOptions short_outer;
+    short_outer.outer_duration_passes = false;
+    CHECK(abstained(short_outer),
+          "a subminimum outer primary run preserves the incumbent");
+    CaseOptions partial_middle_activity;
+    partial_middle_activity.middle_activity_complete = false;
+    CHECK(abstained(partial_middle_activity),
+          "partial middle activity preserves the incumbent");
+    CaseOptions changed_local_slot;
+    changed_local_slot.middle_local_slot_matches = false;
+    CHECK(abstained(changed_local_slot),
+          "a middle local-slot mismatch preserves the incumbent");
+    CaseOptions partial_outer_activity;
+    partial_outer_activity.outer_activity_complete = false;
+    CHECK(abstained(partial_outer_activity),
+          "partial outer activity preserves the incumbent");
+    CaseOptions duplicate_gap_evidence;
+    duplicate_gap_evidence.duplicate_evidence = true;
+    CHECK(abstained(duplicate_gap_evidence),
+          "duplicate typed gap evidence preserves the incumbent");
+    CaseOptions specialized_incumbent;
+    specialized_incumbent.specialized_incumbent = true;
+    CHECK(abstained(specialized_incumbent),
+          "specialized incumbent evidence is never overwritten");
+  }
+
   // ---- 23. FR29 splits only an anomalously long alignment unit crossing a
   // handoff corroborated by activity and primary views. A collapsed
   // zero-duration unit that closes the same punctuation clause stays on the
