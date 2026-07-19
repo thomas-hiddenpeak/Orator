@@ -61,9 +61,11 @@ speaker-correct, and initially records `522/556` with 20 critical residuals;
 its proposed hierarchical-consensus guard stops before implementation because
 only one material context has the complete topology; FR49's complete residual
 reread corrects the prior omission of `ref-0121`, implements one bounded
-source-leading primary-prefix topology shared with `ref-0061`, and retains
-frozen A/B at a manually signed `523/556` after four complete 556-contribution
-contextual readings; all 20 critical residuals remain; critical attribution,
+source-leading primary-prefix topology shared with `ref-0061`; clean commit
+`1f09052` completes its restarted 120/600/full A/B real-WebSocket ladder, and
+four independent complete full-artifact contextual readings retain a manually
+signed `523/556` without a new attribution regression or accumulating late
+drift; all 20 critical residuals remain; critical attribution,
 confident-wrong attribution, T102, T084, full canonical closure, release sign-
 off, and industrial readiness remain open
 **Created**: 2026-07-13
@@ -2973,6 +2975,27 @@ open. See `fr47-real-path-promotion-review-2026-07-19.md`.
   review. No executable result, hash, equality check, metric, or mechanical
   contract may promote, reject, or score the candidate. The pre-existing
   business storage MUST be preserved and restored after isolated validation.
+
+  The gate is complete on clean pushed commit `1f09052`. Two restarted
+  120-second runs and one 600-second run pass their mechanical contracts and
+  their separate complete in-scope chronological/reverse contextual reviews.
+  The 120-second scope is `ref-0001` through `ref-0018`; `ref-0061` is checked
+  at 600 seconds and `ref-0121` in the full review. Full Run A starts empty and
+  Run B restarts with only A's frozen registry. Both consume exactly
+  57,841,920 samples, close all seven common-clock extents, converge producer
+  and observers, provide complete required telemetry, and finish direct-end in
+  `29.015 s` and `28.820 s`. The small margin below 30 seconds remains an
+  operational follow-up, not a product-accuracy judgment.
+
+  Every one of the 556 contributions in full A is read chronologically and in
+  reverse fixed windows, and full B is independently read the same two ways.
+  All four complete contextual readings retain only the `ref-0061` and
+  `ref-0121` repairs. The manually signed real-path ledger is `523/556`, with
+  27 confident-wrong, five missing, one uncertain, and the same 20 critical
+  residuals. No whole-session identity permutation, accumulating late drift,
+  or new tail-only regression is found. FR49 is therefore the current
+  repeatable real-WebSocket candidate, but speaker-business closure remains
+  open. See `fr49-real-path-promotion-review-2026-07-20.md`.
 
 FR40 passes its frozen gate. Repeated T123 outputs are byte-identical and
 change only Xu Zijing's `184.240-184.320` response. Repeated T111 outputs are

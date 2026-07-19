@@ -9,12 +9,13 @@ review of each full artifact is reconciled again by FR48 under the speaker-only
 boundary, correcting the ASR-only `ref-0375` row to `522/556`; every complete
 600-second block and all four per-speaker natural-turn floors pass; the FR48
 hierarchical-consensus guard stops before implementation as a single-context fit;
-FR49 corrects the prior `ref-0121` ledger omission, retains a bounded frozen
-source-leading primary-prefix candidate at a manually signed `523/556` after
-complete A/B forward/reverse contextual review, and leaves all 20 critical
-residuals open;
+FR49 corrects the prior `ref-0121` ledger omission, retains a bounded
+source-leading primary-prefix policy, and completes its clean restarted
+120/600/full A/B real-WebSocket ladder on commit `1f09052`; four independent
+complete full-artifact contextual readings retain `523/556` while all 20
+critical residuals remain open;
 critical, confident-wrong, time-based, holdout, report, release, T102, and T084
-gates remain open 2026-07-19
+gates remain open 2026-07-20
 
 ## Phase 0: Governance
 
@@ -2879,34 +2880,55 @@ gates remain open 2026-07-19
   real-path ladder before streaming new audio. Bind all later captures to that
   exact clean revision and checked-in `orator.toml`; preserve the existing
   business storage and use no behavioral environment or command-line override.
-  The implementation is pushed on `master` as `498d7ae`.
-- [ ] T217 From the T216 clean revision, execute two independent 120-second
+  The implementation is pushed on `master` as `498d7ae`; the real-path
+  authorization is pushed as `1f09052`.
+- [x] T217 From the T216 clean revision, execute two independent 120-second
   production WebSocket runs at `1.0x` with 100 ms frames, direct `end`, early
   and late observers, required telemetry, complete manifests, and a fresh empty
   isolated registry/storage tree for each run. Archive each storage tree and
   restore the pre-existing business storage after capture. Automation may
   validate only transport, JSON, provenance, common-clock, terminal, observer,
   telemetry, artifact-identity, and raw repeatability contracts.
-- [ ] T218 Read every in-scope `test.txt` contribution for each T217 artifact
+  Both clean restarted runs consume exactly 1,920,000 samples, close all seven
+  common-clock extents, converge observers, satisfy required telemetry, and
+  finish direct-end in `1.211 s` and `1.214 s`. Their isolated storage trees
+  are archived; these are mechanical findings only.
+- [x] T218 Read every in-scope `test.txt` contribution for each T217 artifact
   completely in chronological order and again in reverse fixed windows.
   Manually retain or reject FR49 separately for each run, explicitly checking
-  the `ref-0061` and `ref-0121` repairs plus all neighboring controls. Stop the
-  ladder on any contextual speaker regression. No code, script, query,
-  formula, metric, hash, or equality check may label, count, compare, rank, or
-  issue the product decision.
-- [ ] T219 Only if both T218 reviews retain FR49, execute one isolated clean
+  all neighboring controls. The 120-second scope is `ref-0001` through
+  `ref-0018`; `ref-0061` belongs to the 600-second gate and `ref-0121` to the
+  full gate. Stop the ladder on any contextual speaker regression. No code,
+  script, query, formula, metric, hash, or equality check may label, count,
+  compare, rank, or issue the product decision.
+  Both complete forward/reverse readings retain FR49 without a new
+  contextual speaker regression; known cold-start and rapid-turn defects
+  remain.
+- [x] T219 Only if both T218 reviews retain FR49, execute one isolated clean
   600-second production WebSocket run under the same exact revision, TOML,
   direct-end, observer, telemetry, provenance, and common-clock contracts.
   Read every in-scope contribution chronologically and in reverse before
   manually deciding whether full A/B is authorized.
-- [ ] T220 Only if T219 passes, execute full Run A from an empty registry and
+  The clean run consumes 9,600,000 samples, passes its mechanical contracts,
+  and finishes direct-end in `4.956 s`. Complete contextual reading of all 93
+  in-scope contributions in both directions manually records `89/93`, retains
+  the `ref-0061` repair, and authorizes full A/B without using a script result.
+- [x] T220 Only if T219 passes, execute full Run A from an empty registry and
   restarted full Run B using only Run A's frozen registry. Require exact
   3615.120-second input, isolated storage, direct `end`, observers, telemetry,
   and complete manifests. Independently read all 556 `test.txt` contributions
   chronologically and in reverse fixed windows for each artifact before
   deriving any speaker-business ledger or real-path status.
-- [ ] T221 Record the stopped or completed FR49 ladder in a dedicated review,
+  Both exact 3615.120-second runs pass the mechanical contracts and finish
+  direct-end in `29.015 s` and `28.820 s`. Four complete independent
+  contextual readings manually retain `523/556`, with 27 confident-wrong,
+  five missing, one uncertain, and the same 20 critical residuals. No
+  whole-session permutation or accumulating tail drift is found.
+- [x] T221 Record the stopped or completed FR49 ladder in a dedicated review,
   restore the preserved business storage, verify no validation process remains,
   synchronize `PROJECT_STATE.md`, and commit/push the resulting evidence. Keep
   critical-attribution, confident-wrong, speaker-time, holdout, report, release,
   ASR, microphone, and Web UI gates explicitly separate.
+  Completed in
+  `fr49-real-path-promotion-review-2026-07-20.md`; FR49 is the current
+  repeatable real-path candidate, not a closing result.

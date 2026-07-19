@@ -4215,6 +4215,31 @@ Python files pass syntax compilation. These checks establish engineering
 consistency only. See
 `fr49-source-leading-primary-prefix-diagnosis-2026-07-19.md`.
 
+The authorized real-path ladder is complete on clean pushed commit `1f09052`.
+Two independent restarted 120-second runs pass the mechanical gate, then
+receive separate complete forward/reverse contextual reading of `ref-0001`
+through `ref-0018`; both retain FR49 without a new regression. The following
+600-second run passes mechanically, and complete two-direction reading of all
+93 in-scope contributions manually records `89/93`, confirms the `ref-0061`
+repair, and authorizes full A/B. No executable result makes either promotion
+decision.
+
+Full A starts with empty isolated storage. Full B restarts the same binary with
+only A's frozen registry. Both consume the exact 57,841,920 samples, close all
+seven tracks on the common time base, converge producer and observers, and
+provide complete required telemetry. Direct-end waits of `29.015 s` and
+`28.820 s` pass the 30-second gate with limited margin. A is then read across
+all 556 contributions chronologically and in reverse fixed windows; B receives
+the same two independent complete readings. The manually signed real-path
+ledger remains `523/556`, with 27 confident-wrong, five missing, one uncertain,
+and the same 20 critical residuals. The reviewer finds no new attribution
+regression, whole-session identity permutation, accumulating late drift, or
+tail-only collapse. FR49 is promoted to the current repeatable real-WebSocket
+candidate but does not close the speaker business. Isolated storage is
+archived, the pre-existing business storage is restored, and no validation
+process remains. See
+`fr49-real-path-promotion-review-2026-07-20.md`.
+
 ### 8.15 FR28 120-second outcome and promotion ladder
 
 T117-T121 are complete. The frozen T116 packages replay byte-stably; their
