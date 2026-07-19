@@ -5,6 +5,11 @@
 > [current-commit-full-review-2026-07-17.md](current-commit-full-review-2026-07-17.md).
 > That report supersedes this document's current-source totals and verdict;
 > the frozen-candidate findings below remain historical development evidence.
+> The later T135 complete forward/reverse reconciliation specifically
+> supersedes the historical `ref-0426`, `ref-0503`, and `ref-0518` boundary
+> judgments below;
+> see
+> [speaker-baseline-reconciliation-2026-07-19.md](speaker-baseline-reconciliation-2026-07-19.md).
 
 ## Scope and authority
 
@@ -83,9 +88,9 @@ The 38 manually confirmed incorrect contributions are:
   the reference line as an indivisible timestamp would create a false error.
 - `ref-0548` is accepted for this speaker-only review. ASR distorts the words,
   but the complete audible interval remains assigned to Shi Yi.
-- `ref-0426`, `ref-0503`, `ref-0518`, and `ref-0521` are examples where the
-  reference text combines natural multi-speaker handoffs. The candidate's
-  contextual split is retained rather than penalized by line-level matching.
+- `ref-0521` remains the historical accepted handoff example. T135 supersedes
+  this report's `ref-0426`, `ref-0503`, and `ref-0518` judgments after complete
+  forward/reverse contextual reconciliation.
 - The clearest residual cluster is `ref-0504` through `ref-0509`: several Tang
   Yunfeng contributions are absent, unknown, or assigned to Zhu Jie/Shi Yi.
   Identity recovers at `ref-0511`; the defect is a bounded tail evidence

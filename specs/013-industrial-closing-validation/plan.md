@@ -3475,6 +3475,49 @@ speaker-time sign-off, real-path repeatability, and holdout gates remain open,
 so FR38 is a transitional frozen repair and not a real-stream acceptance
 result. See `cross-vad-phrase-tail-reconstruction-review-2026-07-19.md`.
 
+FR39 addresses the reconciled `ref-0518` boundary without reviving the earlier
+historical interpretation that treated Zhu Jie's answer as part of Tang
+Yunfeng's question. Frozen T111 and T123 expose the same topology: activity and
+primary retain Tang on the source-leading exact phrase, but that local slot's
+initial stable identity and both exact-phrase galleries identify Zhu. One
+independently aligned trailing response follows a configured pause; including
+it reverses both short interval galleries to Tang, while the containing VAD and
+complete-source views remain low-confidence Zhu/Tang cross-order abstentions.
+
+The projector will require the complete source-leading phrase/isolated-tail
+topology. One unique Tang activity slot must cover the complete short interval,
+its matching primary segment must cover the phrase, and one third-identity
+primary segment must cover only the single aligned tail. Exact phrase,
+containing interval, VAD, and complete-source top-two orders must expose only
+the initial/current identity pair under their unchanged duration-class gates.
+Only the exact phrase may return to the slot's initial identity; the tail and
+all neighbouring source remain untouched. No TOML value, threshold, transcript
+lookup, identity, or time constant is added.
+
+Focused tests cover the positive topology and independent abstention for every
+source, provenance, alignment, slot, native-track, gallery, gate, containment,
+and write-scope requirement. The production projector is then replayed twice
+over frozen T123 and T111. Automation verifies only immutable hashes,
+determinism, reconstruction, time order, and displayed change scope. Every
+changed complete conversation is read chronologically and in reverse against
+`test.txt`; only that contextual semantic review may retain or reject FR39.
+No audio is rerun before the frozen gate completes. See
+`source-leading-phrase-tail-isolation-diagnosis-2026-07-19.md`.
+
+The independent frozen gate retains FR39. Repeated T123 and T111 outputs are
+separately byte-identical and differ from FR38 only by their corresponding
+source-leading exact phrase split. Complete forward and reverse reading of
+`54:05-57:54` confirms Tang Yunfeng's question, Zhu Jie's substantive answer,
+and Tang's later response as three natural contributions. The isolated
+`0.080 s` trailing `对。` remains a visible boundary residual under Tang and no
+neighbouring contribution changes. The manually reconciled frozen ledger
+advances to `513/556`; the 3000-3600 block reaches `80/87`, while Zhu Jie
+recall remains below its 90 percent gate. Critical/confident-wrong attribution,
+speaker-time sign-off, real-path repeatability, and holdout gates also remain
+open. FR39 is therefore a transitional frozen repair, not a real-stream
+acceptance result. See
+`source-leading-phrase-tail-isolation-review-2026-07-19.md`.
+
 ### 8.15 FR28 120-second outcome and promotion ladder
 
 T117-T121 are complete. The frozen T116 packages replay byte-stably; their

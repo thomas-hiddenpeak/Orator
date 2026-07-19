@@ -1217,6 +1217,255 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
     if (candidate_top_count != 1) return std::nullopt;
     return candidate_identity;
   };
+  auto source_leading_phrase_tail_isolation_challenge = [&](const auto& item)
+      -> std::optional<std::string> {
+    const double phrase_duration = item.end - item.start;
+    if (item.kind != "punctuation_phrase" || item.text_id != text.id ||
+        item.source_start != 0 || item.source_end >= character_count ||
+        !item.embedding_available || !item.robust_gallery_complete ||
+        phrase_duration + 1e-9 <
+            pipeline.config_.voiceprint_primary_consensus_min_sec ||
+        phrase_duration + 1e-9 >=
+            pipeline.config_.voiceprint_short_max_sec ||
+        pipeline.config_.voiceprint_punctuation.empty() ||
+        !has_minimum_aligned_units(item.start, item.end)) {
+      return std::nullopt;
+    }
+
+    std::string current_identity;
+    for (int index = item.source_start; index < item.source_end; ++index) {
+      if (labels[index].speaker_id.empty() || labels[index].voiceprint ||
+          labels[index].reason != "sole_diar_support" ||
+          labels[index].base_reason != "sole_diar_support" ||
+          labels[index].speaker_id != labels[index].base_speaker_id) {
+        return std::nullopt;
+      }
+      if (current_identity.empty()) {
+        current_identity = labels[index].speaker_id;
+      } else if (labels[index].speaker_id != current_identity) {
+        return std::nullopt;
+      }
+    }
+    if (current_identity.empty()) return std::nullopt;
+
+    const SpeakerVoiceprintEvidence* containing_interval = nullptr;
+    const SpeakerVoiceprintEvidence* complete_source = nullptr;
+    for (const auto* candidate : source_evidence) {
+      if (candidate->text_id != item.text_id) continue;
+      if (candidate->kind == "business_interval" &&
+          candidate->source_start == item.source_start &&
+          candidate->source_end == character_count &&
+          NearEqual(candidate->start, item.start) &&
+          candidate->end > item.end + 1e-9) {
+        if (containing_interval != nullptr) return std::nullopt;
+        containing_interval = candidate;
+      } else if (candidate->kind == "complete_source" &&
+                 candidate->source_start == 0 &&
+                 candidate->source_end == character_count) {
+        if (complete_source != nullptr) return std::nullopt;
+        complete_source = candidate;
+      }
+    }
+    if (containing_interval == nullptr || complete_source == nullptr ||
+        !containing_interval->embedding_available ||
+        !containing_interval->robust_gallery_complete ||
+        !complete_source->embedding_available ||
+        !complete_source->robust_gallery_complete ||
+        containing_interval->source_end <= item.source_end ||
+        complete_source->start > containing_interval->start + 1e-9 ||
+        complete_source->end + 1e-9 < containing_interval->end) {
+      return std::nullopt;
+    }
+    const double interval_duration =
+        containing_interval->end - containing_interval->start;
+    const double complete_duration =
+        complete_source->end - complete_source->start;
+    if (interval_duration + 1e-9 <
+            pipeline.config_.voiceprint_primary_consensus_min_sec ||
+        interval_duration + 1e-9 >=
+            pipeline.config_.voiceprint_short_max_sec ||
+        complete_duration + 1e-9 <
+            pipeline.config_.voiceprint_short_max_sec) {
+      return std::nullopt;
+    }
+
+    std::set<std::string> punctuation;
+    const auto punctuation_offsets =
+        Utf8Offsets(pipeline.config_.voiceprint_punctuation);
+    for (std::size_t index = 0; index + 1 < punctuation_offsets.size();
+         ++index) {
+      punctuation.insert(pipeline.config_.voiceprint_punctuation.substr(
+          punctuation_offsets[index],
+          punctuation_offsets[index + 1] - punctuation_offsets[index]));
+    }
+    int visible_index = -1;
+    int visible_count = 0;
+    for (int index = item.source_end; index < character_count; ++index) {
+      const std::string codepoint = text.text.substr(
+          offsets[index], offsets[index + 1] - offsets[index]);
+      if (codepoint == " " || codepoint == "\t" || codepoint == "\n" ||
+          codepoint == "\r" || punctuation.count(codepoint) != 0) {
+        continue;
+      }
+      visible_index = index;
+      ++visible_count;
+    }
+    const std::string final_codepoint = text.text.substr(
+        offsets[character_count - 1],
+        offsets[character_count] - offsets[character_count - 1]);
+    if (visible_count != 1 || visible_index != item.source_end ||
+        punctuation.count(final_codepoint) == 0) {
+      return std::nullopt;
+    }
+
+    const SpeakerVoiceprintEvidence* tail_unit = nullptr;
+    for (const auto* candidate : source_evidence) {
+      if (candidate->kind != "aligned_unit" ||
+          candidate->text_id != item.text_id ||
+          candidate->source_end <= item.source_end ||
+          candidate->source_start >= character_count ||
+          candidate->end <= candidate->start) {
+        continue;
+      }
+      if (tail_unit != nullptr || candidate->source_start != visible_index ||
+          candidate->source_end != visible_index + 1) {
+        return std::nullopt;
+      }
+      tail_unit = candidate;
+    }
+    if (tail_unit == nullptr ||
+        tail_unit->start - item.end + 1e-9 <
+            pipeline.config_.align_snap_pause_sec ||
+        !NearEqual(tail_unit->end, containing_interval->end)) {
+      return std::nullopt;
+    }
+
+    auto unique_covering_segment = [](const std::vector<SpeakerSeg>& segments,
+                                      double start, double end) {
+      const SpeakerSeg* covering = nullptr;
+      for (const auto& segment : segments) {
+        if (Overlap(start, end, segment.start, segment.end) <= 1e-9) continue;
+        if (covering != nullptr || segment.start > start + 1e-9 ||
+            segment.end + 1e-9 < end) {
+          return static_cast<const SpeakerSeg*>(nullptr);
+        }
+        covering = &segment;
+      }
+      return covering;
+    };
+    const auto* activity = unique_covering_segment(
+        pipeline.speakers_, containing_interval->start,
+        containing_interval->end);
+    const auto* phrase_primary = unique_covering_segment(
+        pipeline.primary_speakers_, item.start, item.end);
+    const auto* tail_primary = unique_covering_segment(
+        pipeline.primary_speakers_, tail_unit->start, tail_unit->end);
+    if (activity == nullptr || phrase_primary == nullptr ||
+        tail_primary == nullptr || activity->speaker.empty() ||
+        activity->speaker_id != current_identity ||
+        phrase_primary->speaker != activity->speaker ||
+        phrase_primary->speaker_id != current_identity ||
+        tail_primary->speaker_id.empty() ||
+        tail_primary->speaker_id == current_identity) {
+      return std::nullopt;
+    }
+    const auto initial = initial_identities.find(activity->speaker);
+    if (initial == initial_identities.end() || initial->second.second.empty() ||
+        initial->second.second == current_identity ||
+        initial->second.second == tail_primary->speaker_id) {
+      return std::nullopt;
+    }
+    const std::string& candidate_identity = initial->second.second;
+
+    const auto phrase_session =
+        ranked_pair(item.session_scores, phrase_duration);
+    const auto phrase_robust =
+        ranked_pair(item.robust_scores, phrase_duration);
+    if (!phrase_session || !phrase_robust ||
+        phrase_session->first.speaker_id != candidate_identity ||
+        phrase_robust->first.speaker_id != candidate_identity ||
+        phrase_session->second_id != current_identity ||
+        phrase_robust->second_id != current_identity ||
+        !phrase_session->first.score_pass ||
+        !phrase_robust->first.score_pass ||
+        (phrase_session->first.margin_pass &&
+         phrase_robust->first.margin_pass)) {
+      return std::nullopt;
+    }
+
+    const auto interval_session = ranked_pair(
+        containing_interval->session_scores, interval_duration);
+    const auto interval_robust = ranked_pair(
+        containing_interval->robust_scores, interval_duration);
+    if (!interval_session || !interval_robust ||
+        interval_session->first.speaker_id != current_identity ||
+        interval_robust->first.speaker_id != current_identity ||
+        interval_session->second_id != candidate_identity ||
+        interval_robust->second_id != candidate_identity ||
+        !interval_session->first.score_pass ||
+        !interval_robust->first.score_pass ||
+        interval_session->first.margin_pass ||
+        interval_robust->first.margin_pass) {
+      return std::nullopt;
+    }
+
+    const double tolerance =
+        pipeline.config_.align_boundary_split_tolerance_sec;
+    const SpeakerVoiceprintEvidence* containing_vad = nullptr;
+    for (const auto& candidate : pipeline.voiceprint_vad_) {
+      if (candidate.kind != "vad" ||
+          candidate.start > containing_interval->start + tolerance + 1e-9 ||
+          candidate.end + tolerance + 1e-9 < containing_interval->end) {
+        continue;
+      }
+      if (containing_vad != nullptr) return std::nullopt;
+      containing_vad = &candidate;
+    }
+    if (containing_vad == nullptr || !containing_vad->embedding_available ||
+        !containing_vad->robust_gallery_complete) {
+      return std::nullopt;
+    }
+    const double vad_duration = containing_vad->end - containing_vad->start;
+    if (vad_duration + 1e-9 < pipeline.config_.voiceprint_short_max_sec) {
+      return std::nullopt;
+    }
+    const auto vad_session =
+        ranked_pair(containing_vad->session_scores, vad_duration);
+    const auto vad_robust =
+        ranked_pair(containing_vad->robust_scores, vad_duration);
+    if (!vad_session || !vad_robust ||
+        vad_session->first.speaker_id != candidate_identity ||
+        vad_session->second_id != current_identity ||
+        vad_robust->first.speaker_id != current_identity ||
+        vad_robust->second_id != candidate_identity ||
+        vad_session->first.score_pass || vad_session->first.margin_pass ||
+        vad_robust->first.score_pass || vad_robust->first.margin_pass) {
+      return std::nullopt;
+    }
+
+    const auto complete_session =
+        ranked_pair(complete_source->session_scores, complete_duration);
+    const auto complete_robust =
+        ranked_pair(complete_source->robust_scores, complete_duration);
+    auto expected_complete_pair = [&](const auto& view) {
+      return (view.first.speaker_id == candidate_identity &&
+              view.second_id == current_identity) ||
+             (view.first.speaker_id == current_identity &&
+              view.second_id == candidate_identity);
+    };
+    if (!complete_session || !complete_robust ||
+        !expected_complete_pair(*complete_session) ||
+        !expected_complete_pair(*complete_robust) ||
+        (complete_session->first.speaker_id != candidate_identity &&
+         complete_robust->first.speaker_id != candidate_identity) ||
+        complete_session->first.score_pass ||
+        complete_session->first.margin_pass ||
+        complete_robust->first.score_pass ||
+        complete_robust->first.margin_pass) {
+      return std::nullopt;
+    }
+    return candidate_identity;
+  };
   auto cross_scale_symmetric_near_tie_challenge = [&](const auto& item)
       -> std::optional<std::string> {
     const double phrase_duration = item.end - item.start;
@@ -4240,6 +4489,14 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
       continue;
     }
 
+    const auto source_leading_tail =
+        source_leading_phrase_tail_isolation_challenge(*item);
+    if (source_leading_tail) {
+      apply(*item, *source_leading_tail,
+            "voiceprint_phrase_source_leading_tail_isolation_override");
+      continue;
+    }
+
     const auto cross_scale_near_tie =
         cross_scale_symmetric_near_tie_challenge(*item);
     if (cross_scale_near_tie) {
@@ -4683,6 +4940,13 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
         entry.speaker_decision.speaker_source =
             "sortformer_activity+primary_top1+titanet_interval+"
             "titanet_phrase+titanet_vad+robust_gallery+forced_alignment";
+      } else if (
+          label.reason ==
+          "voiceprint_phrase_source_leading_tail_isolation_override") {
+        entry.speaker_decision.speaker_source =
+            "sortformer_activity+primary_top1+initial_slot+titanet_interval+"
+            "titanet_phrase+titanet_vad+titanet_complete_source+"
+            "robust_gallery+forced_alignment";
       } else if (label.reason.find("initial_slot") != std::string::npos) {
         entry.speaker_decision.speaker_source =
             "sortformer_initial_slot+titanet_session+robust_gallery";

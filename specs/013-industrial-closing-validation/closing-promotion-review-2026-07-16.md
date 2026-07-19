@@ -5,6 +5,9 @@
 > [current-commit-full-review-2026-07-17.md](current-commit-full-review-2026-07-17.md).
 > That report supersedes this document's current-source totals and promotion
 > wording.
+> The later T135 complete forward/reverse reconciliation also supersedes the
+> historical `ref-0426`, `ref-0503`, and `ref-0518` acceptance rows below; see
+> [speaker-baseline-reconciliation-2026-07-19.md](speaker-baseline-reconciliation-2026-07-19.md).
 
 ## Evaluation boundary
 
@@ -396,9 +399,9 @@ conversation made the source turn structure explicit:
 | 0155 | Accepted | Tang carries the substantive middle clause; only adjacent Shi handoff fragments remain at the two edges |
 | 0248 | Accepted | Shi opens the invitation, Tang supplements it, Shi asks, and Tang urges; the reference row combines the alternating exchange |
 | 0263 | Accepted | Shi opens, Tang completes `我们自己别吼`, Shi confirms, and Tang continues in the next source turn |
-| 0426 | Accepted | Tang and Xu form one continuous `B+C` packaging exchange that the reference row coarsely assigns to Shi |
-| 0503 | Accepted | Zhu asks and Shi answers inside one reference row |
-| 0518 | Accepted | Tang continues his own question with `老师最有发言权`; the reference assigns that continuation to Zhu |
+| 0426 | Superseded by T135 | The complete reconciled review finds no usable Shi identity for the packaging proposal |
+| 0503 | Superseded by T135 | Most of Zhu's sustained nominee-ownership proposal remains assigned to Shi |
+| 0518 | Superseded by T135 | `老师最有发言权` is Zhu's answer and was assigned to Tang |
 | 0521 | Accepted | Zhu and Tang perform a natural two-person handoff inside one merged reference row |
 
 Short content alone was not grounds for acceptance. Complete contributions such

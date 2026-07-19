@@ -2255,3 +2255,37 @@ T102/T084 remain open 2026-07-19
   neighbouring regression. The manually reconciled frozen ledger is
   `512/556`; the 3000-3600 natural-turn block passes at `79/87`. See
   `cross-vad-phrase-tail-reconstruction-review-2026-07-19.md`.
+- [x] T161 Reconcile the historical `ref-0518` interpretation against the
+  authoritative human-listened `test.txt`, then diagnose T111 and T123 on the
+  common clock. Specify FR39 as an exact source-leading phrase restoration
+  requiring the slot-initial identity, dual exact-phrase evidence, the
+  opposite containing-interval evidence, cross-ordered abstaining VAD and
+  complete-source evidence, and one independently aligned third-primary tail.
+  Add no TOML value, threshold, transcript, timestamp, reference lookup, or
+  product verdict. See
+  `source-leading-phrase-tail-isolation-diagnosis-2026-07-19.md`.
+- [x] T162 Implement FR39 with focused positive and independent abstention
+  tests. Pass a warning-clean build and all CTest entries, then replay frozen
+  T123 and T111 producer packages at least twice. Automation may verify only
+  mechanical contracts and arrange raw changed contexts; it may not label
+  correctness, aggregate accuracy, select the candidate, or issue an
+  acceptance verdict. The clean build emits no warning/error diagnostic and
+  all `69/69` CTest entries pass. Repeated T123 outputs are byte-identical at
+  SHA-256
+  `b96cfce77bdb063964f0b6c5d86c624585e7d727a0d042b9f106d9d19ebf2de8`;
+  repeated T111 outputs are byte-identical at SHA-256
+  `8d2ad139219d084ea0a4fff1c14def6b5f5034c2dbc8ecaa0710f659b3c5fcff`.
+  Mechanical display exposes only the corresponding exact phrase split in
+  each package.
+- [x] T163 Read every FR39 changed complete conversation chronologically and
+  in reverse against `test.txt`. Retain or remove FR39 only from that
+  contextual semantic review, synchronize spec/plan/tasks/project state, and
+  label any retained commit as a transitional frozen experiment. Do not
+  attribute a new real-WebSocket result or speaker-business closure to the
+  replay. Complete forward and reverse reading of `54:05-57:54` retains Zhu
+  Jie's substantive answer between Tang Yunfeng's question and later response,
+  records the trailing `对。` as a visible `0.080 s` boundary residual, and
+  finds no neighbouring change. The manually reconciled frozen ledger is
+  `513/556`; the 3000-3600 block reaches `80/87`, while Zhu Jie recall and the
+  remaining conjunctive closing gates stay open. See
+  `source-leading-phrase-tail-isolation-review-2026-07-19.md`.

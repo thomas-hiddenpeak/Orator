@@ -24,8 +24,12 @@ regular same-slot six-view `ref-0350` repair at `510/556` and passes the
 2400-3000 fixed block; FR37 retains the bracketed-primary `ref-0478` response
 at `511/556`, with no new real-path claim; FR38 retains the cross-VAD
 `ref-0504` phrase tail at `512/556` and raises the 3000-3600 natural-turn block
-to `79/87`, with no new real-path claim; T102, T084, full canonical closure,
-release sign-off, and industrial readiness remain open
+to `79/87`, with no new real-path claim; FR39 diagnosis isolates the
+partition-stable `ref-0518` defect to a source-leading exact phrase whose
+separate aligned tail reverses wider evidence; frozen replay and complete
+context review retain the exact phrase repair at `513/556` and raise the
+3000-3600 block to `80/87`, with no new real-path claim; T102, T084, full
+canonical closure, release sign-off, and industrial readiness remain open
 **Created**: 2026-07-13
 **Scope**: Re-establish a truthful product baseline, recover full-session business
 accuracy, and define the evidence required before Orator may be declared closed.
