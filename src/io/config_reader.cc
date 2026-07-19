@@ -352,6 +352,11 @@ bool ApplyTomlConfig(const std::string& path,
         cfg.speaker_fusion_posterior_future_epoch_enable = *b;
       }
     }
+    if (auto v = sec->get("source_leading_primary_prefix_enable")) {
+      if (auto b = v->value<bool>()) {
+        cfg.speaker_fusion_source_leading_primary_prefix_enable = *b;
+      }
+    }
     if (auto v = sec->get("precompute_interval_sec")) {
       if (auto d = v->value<double>()) {
         cfg.speaker_fusion_precompute_interval_sec = *d;

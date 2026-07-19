@@ -1,7 +1,9 @@
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <cstdio>
 #include <string>
+#include <vector>
 
 #include "test_business_speaker_pipeline_access.h"
 
@@ -7953,6 +7955,277 @@ int main() {
               unaligned_gap_entries[1].speaker_id == "spk_b" &&
               unaligned_gap_entries[1].text == "丁。未丙",
           "unaligned source content blocks punctuation-edge inheritance");
+  }
+
+  // ---- 24. FR49 restores only a TitaNet-corroborated short-primary source
+  // prefix that is right-bounded by an alignment gap and a contiguous longer
+  // primary/activity continuation. ----
+  {
+    struct CaseOptions {
+      bool enabled = true;
+      bool candidate_activity = true;
+      bool following_activity = true;
+      bool extra_prefix_activity = false;
+      bool primary_embedding = true;
+      bool session_complete = true;
+      bool robust_complete = true;
+      bool session_selects_candidate = true;
+      bool robust_selects_candidate = true;
+      bool session_margin_passes = true;
+      bool robust_margin_passes = false;
+      bool duplicate_primary_evidence = false;
+      bool include_following_interval = true;
+      bool malformed_following_bounds = false;
+      bool candidate_owned_predecessor = false;
+      double candidate_start = 0.9;
+      double candidate_end = 1.3;
+      double following_primary_start = 1.3;
+      double following_primary_end = 2.0;
+      double prefix_start = 1.0;
+      double prefix_end = 1.1;
+      double following_start = 1.34;
+      double following_end = 1.94;
+    };
+    auto run_case = [](const CaseOptions& options) {
+      BusinessSpeakerPipeline::Config config;
+      config.align_snap_pause_sec = 0.25;
+      config.align_boundary_split_tolerance_sec = 0.08;
+      config.voiceprint_fusion_enabled = true;
+      config.voiceprint_short_max_sec = 1.5;
+      config.voiceprint_short_min_score = 0.0f;
+      config.voiceprint_short_min_margin = 0.04f;
+      config.voiceprint_primary_consensus_min_sec = 0.4;
+      config.source_leading_primary_prefix_enabled = options.enabled;
+      config.speaker_overlap_tie_policy =
+          BusinessSpeakerPipeline::SpeakerOverlapTiePolicy::kPrimarySpeaker;
+      TestBusinessSpeakerPipeline tl(config);
+      tl.UpsertText(0, 0.8, 2.1,
+                    options.candidate_owned_predecessor ? "戊甲乙丙丁"
+                                                        : "甲乙丙丁");
+
+      std::vector<TestBusinessSpeakerPipeline::SpeakerInput> activity;
+      if (options.candidate_activity) {
+        activity.push_back({options.candidate_owned_predecessor
+                                ? 0.8
+                                : options.candidate_start,
+                            options.candidate_end,
+                            "slot_b", 0.9f, "spk_b"});
+      }
+      if (options.following_activity) {
+        activity.push_back({options.following_primary_start,
+                            options.following_primary_end, "slot_a", 0.9f,
+                            "spk_a"});
+      }
+      if (options.extra_prefix_activity) {
+        activity.push_back({options.prefix_start, options.prefix_end,
+                            "slot_c", 0.9f, "spk_c"});
+      }
+      tl.ReplaceSpeakers(activity);
+      tl.ReplacePrimarySpeakers(
+          {{options.candidate_start, options.candidate_end, "slot_b", 0.9f,
+            "spk_b"},
+           {options.following_primary_start, options.following_primary_end,
+            "slot_a", 0.9f, "spk_a"}});
+      if (options.candidate_owned_predecessor) {
+        tl.UpsertAlign(0, 0.8, 2.1,
+                       {{0.82, 0.98, "戊"},
+                        {options.prefix_start, options.prefix_end, "甲"},
+                        {options.following_start,
+                         options.following_start + 0.2, "乙"},
+                        {options.following_start + 0.2,
+                         options.following_start + 0.4, "丙"},
+                        {options.following_start + 0.4, options.following_end,
+                         "丁"}});
+      } else {
+        tl.UpsertAlign(0, 0.8, 2.1,
+                       {{options.prefix_start, options.prefix_end, "甲"},
+                        {options.following_start,
+                         options.following_start + 0.2, "乙"},
+                        {options.following_start + 0.2,
+                         options.following_start + 0.4, "丙"},
+                        {options.following_start + 0.4, options.following_end,
+                         "丁"}});
+      }
+
+      auto make_interval = [](const std::string& id, int source_start,
+                              int source_end, double start, double end) {
+        ComprehensiveTimeline::SpeakerVoiceprintEvidence item;
+        item.evidence_id = id;
+        item.kind = "business_interval";
+        item.text_id = 0;
+        item.source_start = source_start;
+        item.source_end = source_end;
+        item.start = start;
+        item.end = end;
+        return item;
+      };
+      std::vector<ComprehensiveTimeline::SpeakerVoiceprintEvidence> evidence;
+      const int prefix_source_start =
+          options.candidate_owned_predecessor ? 1 : 0;
+      const int prefix_source_end = prefix_source_start + 1;
+      const int source_end = options.candidate_owned_predecessor ? 5 : 4;
+      if (options.candidate_owned_predecessor) {
+        evidence.push_back(
+            make_interval("business_interval:0:predecessor", 0, 1, 0.82,
+                          0.98));
+      }
+      evidence.push_back(make_interval("business_interval:0:0",
+                                       prefix_source_start, prefix_source_end,
+                                       options.prefix_start,
+                                       options.prefix_end));
+      if (options.include_following_interval) {
+        evidence.push_back(make_interval(
+            "business_interval:0:1", prefix_source_end,
+            source_end + (options.malformed_following_bounds ? 1 : 0),
+            options.following_start, options.following_end));
+      }
+
+      ComprehensiveTimeline::SpeakerVoiceprintEvidence phrase;
+      phrase.evidence_id = "punctuation_phrase:0:0";
+      phrase.kind = "punctuation_phrase";
+      phrase.text_id = 0;
+      phrase.source_start = prefix_source_start;
+      phrase.source_end = source_end;
+      phrase.start = options.prefix_start;
+      phrase.end = options.following_end;
+      phrase.embedding_available = true;
+      phrase.session_gallery_complete = true;
+      phrase.robust_gallery_complete = true;
+      phrase.session_scores = {{"spk_a", 0.80f}, {"spk_b", 0.20f}};
+      phrase.robust_scores = {{"spk_a", 0.78f}, {"spk_b", 0.22f}};
+      evidence.push_back(std::move(phrase));
+
+      auto candidate_scores = [&](bool selects_candidate,
+                                  bool margin_passes) {
+        const float winner = margin_passes ? 0.60f : 0.52f;
+        const float runner_up = 0.50f;
+        return selects_candidate
+                   ? std::vector<ComprehensiveTimeline::VoiceprintScore>{
+                         {"spk_b", winner}, {"spk_a", runner_up}}
+                   : std::vector<ComprehensiveTimeline::VoiceprintScore>{
+                         {"spk_a", winner}, {"spk_b", runner_up}};
+      };
+      ComprehensiveTimeline::SpeakerVoiceprintEvidence primary;
+      primary.evidence_id = "primary_run:0";
+      primary.kind = "primary_run";
+      primary.text_id = -1;
+      primary.start = options.candidate_start;
+      primary.end = options.candidate_end;
+      primary.embedding_available = options.primary_embedding;
+      primary.session_gallery_complete = options.session_complete;
+      primary.robust_gallery_complete = options.robust_complete;
+      primary.session_scores = candidate_scores(
+          options.session_selects_candidate, options.session_margin_passes);
+      primary.robust_scores = candidate_scores(
+          options.robust_selects_candidate, options.robust_margin_passes);
+      evidence.push_back(primary);
+      if (options.duplicate_primary_evidence) {
+        primary.evidence_id = "primary_run:duplicate";
+        evidence.push_back(std::move(primary));
+      }
+      tl.ReplaceVoiceprint(evidence);
+      return tl.Snapshot();
+    };
+    auto applied = [](const auto& entries) {
+      return std::any_of(entries.begin(), entries.end(), [](const auto& entry) {
+        return entry.text == "甲" && entry.speaker_id == "spk_b" &&
+               entry.speaker_decision.reason ==
+                   "voiceprint_source_leading_primary_prefix_restore" &&
+               entry.speaker_decision.speaker_source ==
+                   "sortformer_activity+primary_top1+titanet_primary_run+"
+                   "robust_gallery+forced_alignment";
+      });
+    };
+    auto abstained = [&](const CaseOptions& options) {
+      return !applied(run_case(options));
+    };
+
+    const auto positive = run_case({});
+    CHECK(applied(positive),
+          "right-bounded primary evidence restores the leading source prefix");
+    CHECK(positive.size() == 2 && positive[0].text == "甲" &&
+              positive[0].speaker_id == "spk_b" &&
+              positive[1].text == "乙丙丁" &&
+              positive[1].speaker_id == "spk_a",
+          "prefix restore preserves exact source text and continuation");
+
+    CaseOptions disabled;
+    disabled.enabled = false;
+    CHECK(abstained(disabled), "disabled FR49 policy preserves the incumbent");
+    CaseOptions short_candidate;
+    short_candidate.candidate_start = 0.98;
+    CHECK(abstained(short_candidate),
+          "a subminimum candidate primary preserves the incumbent");
+    CaseOptions no_candidate_activity;
+    no_candidate_activity.candidate_activity = false;
+    CHECK(abstained(no_candidate_activity),
+          "missing candidate activity preserves the incumbent");
+    CaseOptions no_following_activity;
+    no_following_activity.following_activity = false;
+    CHECK(abstained(no_following_activity),
+          "missing following activity preserves the incumbent");
+    CaseOptions third_activity;
+    third_activity.extra_prefix_activity = true;
+    CHECK(abstained(third_activity),
+          "third-identity prefix activity preserves the incumbent");
+    CaseOptions no_embedding;
+    no_embedding.primary_embedding = false;
+    CHECK(abstained(no_embedding),
+          "missing primary-run embedding preserves the incumbent");
+    CaseOptions incomplete_session;
+    incomplete_session.session_complete = false;
+    CHECK(abstained(incomplete_session),
+          "incomplete primary-run session gallery preserves the incumbent");
+    CaseOptions incomplete_robust;
+    incomplete_robust.robust_complete = false;
+    CHECK(abstained(incomplete_robust),
+          "incomplete primary-run robust gallery preserves the incumbent");
+    CaseOptions session_disagreement;
+    session_disagreement.session_selects_candidate = false;
+    CHECK(abstained(session_disagreement),
+          "session-gallery disagreement preserves the incumbent");
+    CaseOptions robust_disagreement;
+    robust_disagreement.robust_selects_candidate = false;
+    CHECK(abstained(robust_disagreement),
+          "robust-gallery disagreement preserves the incumbent");
+    CaseOptions both_margins_fail;
+    both_margins_fail.session_margin_passes = false;
+    both_margins_fail.robust_margin_passes = false;
+    CHECK(abstained(both_margins_fail),
+          "two configured margin failures preserve the incumbent");
+    CaseOptions duplicate_evidence;
+    duplicate_evidence.duplicate_primary_evidence = true;
+    CHECK(abstained(duplicate_evidence),
+          "duplicate primary-run evidence preserves the incumbent");
+    CaseOptions no_following_interval;
+    no_following_interval.include_following_interval = false;
+    CHECK(abstained(no_following_interval),
+          "missing source-adjacent business evidence preserves the incumbent");
+    CaseOptions malformed_following_bounds;
+    malformed_following_bounds.malformed_following_bounds = true;
+    CHECK(abstained(malformed_following_bounds),
+          "out-of-range following source evidence preserves the incumbent");
+    CaseOptions noncontiguous_primary;
+    noncontiguous_primary.following_primary_start = 1.32;
+    CHECK(abstained(noncontiguous_primary),
+          "a noncontiguous following primary preserves the incumbent");
+    CaseOptions short_following;
+    short_following.following_primary_end = 1.62;
+    CHECK(abstained(short_following),
+          "a subminimum or non-covering following primary preserves current");
+    CaseOptions wide_gap;
+    wide_gap.following_start = 1.38;
+    CHECK(abstained(wide_gap),
+          "an alignment gap beyond the TOML pause gate preserves current");
+    CaseOptions partial_prefix;
+    partial_prefix.prefix_end = 1.31;
+    CHECK(abstained(partial_prefix),
+          "a prefix not contained by the primary preserves the incumbent");
+    CaseOptions candidate_owned_predecessor;
+    candidate_owned_predecessor.candidate_owned_predecessor = true;
+    CHECK(abstained(candidate_owned_predecessor),
+          "candidate source already inside the primary preserves the next "
+          "speaker");
   }
 
   if (g_fail == 0) {

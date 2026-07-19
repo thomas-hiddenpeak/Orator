@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstdio>
 #include <string>
 #include <utility>
@@ -147,6 +148,7 @@ int main() {
     evidence_config.min_embed_sec = 0.4;
     evidence_config.boundary_tolerance_sec = 0.08;
     evidence_config.minimum_gallery_size = 2;
+    evidence_config.source_leading_primary_prefix_enabled = true;
     orator::pipeline::SpeakerEvidenceStage stage(&identity, evidence_config);
 
     orator::pipeline::ComprehensiveTimeline::SpeakerEvidenceSnapshot
@@ -188,6 +190,46 @@ int main() {
     CHECK(business_ranges(split_queries) ==
               std::vector<Range>({{0, 2}, {2, 4}}),
           "business projection partitions derived voiceprint queries");
+
+    query_snapshot.primary_speaker = {
+        {.start = 0.0,
+         .end = 0.3,
+         .speaker = "speaker_0",
+         .speaker_id = "spk_0"},
+        {.start = 0.3,
+         .end = 1.0,
+         .speaker = "speaker_1",
+         .speaker_id = "spk_1"}};
+    const auto primary_queries =
+        TestSpeakerEvidenceStage::BuildVoiceprintQueries(stage, query_snapshot);
+    std::vector<VoiceprintEvidence> primary_run_queries;
+    for (const auto& query : primary_queries) {
+      if (query.kind == "primary_run") primary_run_queries.push_back(query);
+    }
+    CHECK(primary_run_queries.size() == 2 &&
+              primary_run_queries[0].evidence_id == "primary_run:0" &&
+              primary_run_queries[0].text_id == -1 &&
+              primary_run_queries[0].source_start == 0 &&
+              primary_run_queries[0].source_end == 0 &&
+              primary_run_queries[0].start == 0.0 &&
+              primary_run_queries[0].end == 0.3 &&
+              primary_run_queries[1].evidence_id == "primary_run:1" &&
+              primary_run_queries[1].start == 0.3 &&
+              primary_run_queries[1].end == 1.0,
+          "enabled primary-run evidence preserves every sorted primary span");
+
+    auto disabled_config = evidence_config;
+    disabled_config.source_leading_primary_prefix_enabled = false;
+    orator::pipeline::SpeakerEvidenceStage disabled_stage(&identity,
+                                                           disabled_config);
+    const auto disabled_queries =
+        TestSpeakerEvidenceStage::BuildVoiceprintQueries(disabled_stage,
+                                                         query_snapshot);
+    CHECK(std::none_of(disabled_queries.begin(), disabled_queries.end(),
+                       [](const auto& query) {
+                         return query.kind == "primary_run";
+                       }),
+          "disabled primary-prefix policy emits no primary-run evidence");
 
     leading.end = 4.0;
     leading.text = "甲乙丙丁";

@@ -38,6 +38,7 @@ class SpeakerEvidenceStage {
     std::string punctuation = "，。？！；：、,.?!;:";
     float frame_activity_threshold = 0.5f;
     int minimum_gallery_size = 2;
+    bool source_leading_primary_prefix_enabled = false;
     double precompute_interval_sec = 0.0;
     int precompute_max_spans_per_cycle = 1;
   };

@@ -215,6 +215,7 @@ class AuditoryStream {
     int speaker_fusion_four_view_min_aligned_units = 2;
     double speaker_fusion_future_epoch_lookahead_sec = 0.0;
     bool speaker_fusion_posterior_future_epoch_enable = false;
+    bool speaker_fusion_source_leading_primary_prefix_enable = false;
     double speaker_fusion_precompute_interval_sec = 0.0;
     int speaker_fusion_precompute_max_spans_per_cycle = 1;
 

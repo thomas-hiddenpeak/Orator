@@ -4091,6 +4091,105 @@ warning or error diagnostic, and all `70/70` CTest entries pass in `53.12`
 seconds; these checks establish engineering consistency only. See
 `fr48-speaker-only-reconciliation-and-consensus-diagnosis-2026-07-19.md`.
 
+### 8.36 FR49 full-residual short-evidence reconstruction
+
+FR49 keeps the exact FR47 full A/B timelines, their repaired 1,716-entry
+baseline replays, the capture-faithful four-channel Sortformer v2.1 posterior,
+and the checked-in TOML fixed. The first pass reconciles every one of the 34
+remaining manually signed speaker residuals with all producer and identity
+evidence on the common clock. It includes noncritical rows so a reusable
+topology cannot be mistaken for a critical-reference special case. Each
+conversation and its accepted controls is read forward and reverse; no
+executable component groups or judges the findings.
+
+The mechanical pass then emits one source-free display for all short primary
+runs that touch a positive aligned unit, a zero-duration unit, or one temporal
+gap between adjacent units and conflict with at least one mechanically
+associated current business piece. Every row also carries immediate same-
+source and adjacent primary/business controls and preserves the original text
+ID, source bounds, primary interval, intersecting alignment, raw posterior
+frames, activity, VAD, voiceprint completeness and raw score lists, current
+business pieces, and identity epochs. The display contains no reference file,
+expected identity, correctness field, aggregate, candidate score, or ranking.
+A and B must expose the same structural inventory before contextual work
+continues.
+
+The reviewer reads every displayed conversation in both directions against
+`test.txt`, including all apparently correct controls. Only a manually
+established topology shared by at least two independent material contexts may
+advance. Source-absent speech cannot be repaired by manufacturing text or a
+source coordinate. A retained design must use existing TOML-owned gates and
+typed evidence, preserve all producer tracks and clock values, and define
+independent abstention for positive, zero-duration, source-gap, overlap, and
+neighboring-control representations. If those conditions are not met, FR49
+records the evidence boundary and stops without implementation or audio.
+
+If and only if the manual gate passes, update spec, plan, and tasks with one
+bounded false-by-default behavior switch before editing runtime code. Add
+focused positive and independent abstention tests, replay both frozen A and B
+inputs twice with a disabled control, expose raw changed scope mechanically,
+then read every changed complete context forward and reverse. A retained
+candidate still requires independent complete 556-contribution A/B
+speaker-only reviews before any real-WebSocket ladder can be authorized.
+
+The gate passed after complete review of all 271 A/B inventory rows and their
+controls. `ref-0061` and the newly discovered `ref-0121` residual are two
+independent material contexts with the same source-free topology: a
+TitaNet-corroborated short primary/activity identity owns a complete leading
+business source interval, a positive alignment gap right-bounds that interval,
+and a contiguous longer primary/activity identity owns the source-adjacent
+continuation that currently absorbed the prefix. Both use the existing
+`0.4 s` embedding floor, `1.5 s` short ceiling, `0.25 s` alignment-pause gate,
+`0.08 s` boundary tolerance, and configured voiceprint score/margin gates.
+
+Implementation adds `primary_run:N` queries to `SpeakerEvidenceStage` only
+when the new `speaker_fusion.source_leading_primary_prefix_enable` switch is
+enabled. Query ordinals follow the sorted immutable primary track; they carry
+no text ID, source range, or product label. `SpeakerFusionPolicy` then performs
+the full conjunction specified by FR49 after existing fusion writes and before
+final source reconstruction. It restores only the exact leading
+`business_interval` source range and records a dedicated reason and evidence
+source. The default in typed C++ configuration is `false`; the checked-in TOML
+is the sole production opt-in. See
+`fr49-source-leading-primary-prefix-diagnosis-2026-07-19.md`.
+
+The first frozen candidate replay is an implementation gate, not an accepted
+result. Its mechanical changed-scope display exposes a third write at
+`2177.260-2177.500`. Complete context against `test.txt` shows that 唐云峰 owns
+the whole following contribution, while the draft policy extends 徐子景's
+immediately preceding contribution into its first two source characters. The
+policy therefore also requires that no earlier positive-duration source
+character inside the same short primary already retain the candidate identity.
+The preceding 石一 source character for `ref-0121` ends before its candidate
+primary and remains admissible. This uses no new numeric setting and rejects a
+candidate-tail leak while retaining the two independently authorized
+source-leading contexts.
+
+The corrected frozen replay completes the authorized evidence ladder. Two A
+and two B candidate replays are byte-identical with 1,718 business entries at
+SHA-256
+`91e1e7ab08f6c593b73762b158b5c4ee9c58eaf68ea59eb8f9ee34c21f747c30`.
+The independently generated disabled A/B controls contain 1,716 entries, are
+byte-identical at SHA-256
+`75fc0b39fdf4530ec98a54f8e6ac113e8eef1aee00839c3d9c6577adafb8302e`,
+and exactly reproduce FR48. The raw changed scope is limited to the existing
+`467.564-467.644` and `817.692-818.412` source prefixes; no other text, source
+index, time, or speaker label changes.
+
+Complete contextual review first confirms both changed conversations and the
+`ref-0304` abstention. Candidate A is then read across all 556 contributions in
+chronological and reverse fixed-window order; candidate B is independently read
+the same way. The four complete readings agree. Only `ref-0061` and
+`ref-0121` move from confident-wrong to accepted relative to the corrected
+`521/556` pre-candidate ledger. The manually transcribed frozen result is
+`523/556`, with 27 confident-wrong, five missing, one uncertain, and the same 20
+critical residuals. FR49 is retained as a frozen policy candidate, not a new
+real-WebSocket or closing result. The `--clean-first` build has no warning or
+error diagnostic, all `71/71` CTest entries pass in `53.22 s`, and both new
+Python files pass syntax compilation. These checks establish engineering
+consistency only. See
+`fr49-source-leading-primary-prefix-diagnosis-2026-07-19.md`.
+
 ### 8.15 FR28 120-second outcome and promotion ladder
 
 T117-T121 are complete. The frozen T116 packages replay byte-stably; their

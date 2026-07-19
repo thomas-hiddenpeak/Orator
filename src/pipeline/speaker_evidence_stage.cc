@@ -652,6 +652,16 @@ SpeakerEvidenceStage::BuildVoiceprintQueries(
     }
   }
 
+  if (config_.source_leading_primary_prefix_enabled) {
+    for (std::size_t index = 0; index < primary.size(); ++index) {
+      const auto& segment = primary[index];
+      if (segment.end <= segment.start) continue;
+      output.push_back(MakeQuery("primary_run:" + std::to_string(index),
+                                 "primary_run", -1, 0, 0, segment.start,
+                                 segment.end));
+    }
+  }
+
   int vad_ordinal = 0;
   for (const auto& vad : snapshot.vad) {
     if (vad.end - vad.start + 1e-9 < config_.min_embed_sec) continue;

@@ -132,6 +132,8 @@ void AuditoryStream::Start() {
       config_.speaker_fusion_future_epoch_lookahead_sec;
   business_config.posterior_future_epoch_enabled =
       config_.speaker_fusion_posterior_future_epoch_enable;
+  business_config.source_leading_primary_prefix_enabled =
+      config_.speaker_fusion_source_leading_primary_prefix_enable;
   business_config.posterior_frame_activity_threshold =
       config_.speaker_fusion_frame_activity_threshold;
   business_config.posterior_identity_backfill_sec =
@@ -320,6 +322,8 @@ void AuditoryStream::Start() {
         config_.speaker_fusion_frame_activity_threshold;
     evidence_config.minimum_gallery_size =
         config_.speaker_fusion_minimum_gallery_size;
+    evidence_config.source_leading_primary_prefix_enabled =
+        config_.speaker_fusion_source_leading_primary_prefix_enable;
     evidence_config.precompute_interval_sec =
         config_.speaker_fusion_precompute_interval_sec;
     evidence_config.precompute_max_spans_per_cycle =

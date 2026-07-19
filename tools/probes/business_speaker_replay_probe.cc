@@ -435,6 +435,8 @@ int main(int argc, char** argv) {
         config.speaker_fusion_future_epoch_lookahead_sec;
     business_config.posterior_future_epoch_enabled =
         config.speaker_fusion_posterior_future_epoch_enable;
+    business_config.source_leading_primary_prefix_enabled =
+        config.speaker_fusion_source_leading_primary_prefix_enable;
     business_config.posterior_frame_activity_threshold =
         config.speaker_fusion_frame_activity_threshold;
     business_config.posterior_identity_backfill_sec =

@@ -57,9 +57,13 @@ restarted 120/600/full A/B real-WebSocket ladder, and separate complete
 forward/reverse contextual review of each full artifact initially transcribes
 `521/556` without long-term identity drift; FR48 repeats both complete reviews
 under the speaker-only boundary, corrects the ASR-only `ref-0375` row to
-speaker-correct, and records `522/556` with 20 critical residuals; its proposed
-hierarchical-consensus guard stops before implementation because only one
-material context has the complete topology; critical attribution,
+speaker-correct, and initially records `522/556` with 20 critical residuals;
+its proposed hierarchical-consensus guard stops before implementation because
+only one material context has the complete topology; FR49's complete residual
+reread corrects the prior omission of `ref-0121`, implements one bounded
+source-leading primary-prefix topology shared with `ref-0061`, and retains
+frozen A/B at a manually signed `523/556` after four complete 556-contribution
+contextual readings; all 20 critical residuals remain; critical attribution,
 confident-wrong attribution, T102, T084, full canonical closure, release sign-
 off, and industrial readiness remain open
 **Created**: 2026-07-13
@@ -2853,6 +2857,102 @@ open. See `fr47-real-path-promotion-review-2026-07-19.md`.
   or error diagnostic, and all `70/70` CTest entries pass in `53.12` seconds.
   These checks validate engineering contracts only and do not produce the
   contextual product verdict.
+
+- **FR49 full-residual short-evidence and source-clock gate**: FR49 MUST keep
+  commit `64034af` and the exact FR47 full Run A/B artifacts frozen. It MUST
+  investigate all 34 manually signed speaker residuals, not only the 20
+  critical rows or a selected tail window. Each residual and its accepted
+  neighboring controls MUST be read in complete chronological and reverse
+  conversational context against `test.txt`, while ASR source, forced
+  alignment, activity, primary, four-channel Sortformer posterior, identity
+  epochs, VAD, session/robust galleries, and final business output remain on
+  the common clock.
+
+  Automation MAY emit a reference-free inventory of every short primary island
+  that intersects a positive aligned unit, a zero-duration unit, or a gap
+  between adjacent aligned units and whose identity conflicts with at least one
+  mechanically associated current business piece. The inventory MUST include
+  the immediate same-source and adjacent primary/business controls. It MAY copy
+  and order raw typed evidence and verify hashes and source/time reconstruction.
+  It MUST NOT read `test.txt`,
+  attach a reference ID or expected speaker, label correctness, aggregate a
+  result, rank a topology, select a candidate, or issue a verdict. The reviewer
+  MUST inspect every inventory match and its controls in both directions; a
+  residual-only list is insufficient.
+
+  A product rule MAY be specified only when at least two independent material
+  contributions from different conversational contexts share the same exact
+  reference-free topology and independently reviewed accepted controls define
+  its abstention boundary. The rule MUST preserve immutable source text and
+  producer times, MUST NOT synthesize a contribution that ASR did not retain,
+  MUST reuse existing TOML-owned durations, thresholds, margins, punctuation,
+  and common-clock tolerances, and MUST add no fitted numeric parameter. A
+  source-absent row remains diagnostic unless an existing typed source range
+  can be located without reference data. A single-context fit, inconsistent
+  A/B evidence, or any accepted-control conflict ends FR49 before product code,
+  TOML changes, candidate replay, or a new audio run.
+
+  The complete FR49 review authorizes exactly one bounded topology, named the
+  source-leading right-bounded primary-prefix restore. It applies only when a
+  short Sortformer primary run is at least `speaker_fusion.min_embed_sec` and
+  shorter than `speaker_fusion.short_max_sec`; the same identity completely
+  covers that run in the activity view; and one exact `primary_run` TitaNet
+  query has complete session and robust galleries that both rank that identity
+  first, pass both configured score gates, and pass at least one configured
+  margin gate. A different immediately following primary run MUST start at the
+  same boundary, last at least `speaker_fusion.min_embed_sec`, and be completely
+  covered by its own activity identity.
+
+  The writable source range MUST be one existing leading business interval
+  made entirely of positive-duration forced-alignment characters. Its complete
+  aligned time MUST be contained by the short primary run. The current final
+  labels over that range MUST be one uniform voiceprint identity equal to the
+  following primary identity, and the immediately preceding source character
+  MUST not have that following identity. Before the writable prefix, no
+  positive-duration source character whose aligned interval overlaps the same
+  short primary MAY already have the short-primary candidate identity. This
+  establishes a swallowed candidate ownership island rather than extending an
+  already retained candidate tail into the next contribution. Exactly one
+  source-adjacent following business interval MUST retain the following-primary
+  identity. The temporal gap between the two source intervals MUST be positive
+  and no larger than
+  `timeline.align_snap_pause_sec`; the short-primary end MUST remain inside
+  that gap within `timeline.align_boundary_split_tolerance_sec`. No third
+  activity identity may overlap the writable aligned prefix. The following
+  business interval MUST be contained by the following primary run.
+
+  When every condition holds, only the existing characters in the leading
+  business interval MAY be restored to the short-primary identity. Producer
+  intervals, source offsets, text, and all other labels remain immutable.
+  Zero-duration-only, source-gap-only, interior-phrase, subminimum-primary,
+  noncontiguous-primary, gallery-incomplete, dual-gallery-disagreement,
+  both-margin-fail, extra-activity, candidate-source-already-present, and
+  source-absent cases MUST abstain. The behavior and its matching `primary_run`
+  evidence production MUST share one false-by-default TOML switch,
+  `speaker_fusion.source_leading_primary_prefix_enable`; no numeric setting is
+  added or changed.
+
+  The corrected implementation passes the frozen reproducibility and semantic
+  review gates. Candidate A and B each replay byte-identically twice with 1,718
+  business entries; their shared SHA-256 is
+  `91e1e7ab08f6c593b73762b158b5c4ee9c58eaf68ea59eb8f9ee34c21f747c30`.
+  Independently generated disabled A/B controls contain 1,716 entries, share
+  SHA-256
+  `75fc0b39fdf4530ec98a54f8e6ac113e8eef1aee00839c3d9c6577adafb8302e`,
+  and reproduce the FR48 baseline. The raw changed scope contains only
+  `467.564-467.644` and `817.692-818.412`; the rejected `ref-0304` tail leak is
+  absent.
+
+  Every one of the 556 reference contributions is read chronologically and in
+  reverse fixed windows for candidate A and then independently for candidate B.
+  Only `ref-0061` and `ref-0121` move from confident-wrong to accepted. The
+  manually transcribed frozen ledger is `523/556`, with 27 confident-wrong, five
+  missing, one uncertain, and the same 20 critical residuals. This retains FR49
+  as frozen policy evidence only; it does not establish a new real-WebSocket or
+  closing result. The final clean build emits no warning or error diagnostic,
+  all `71/71` CTest entries pass in `53.22 s`, and both new Python files pass
+  syntax compilation. These are engineering checks only. See
+  `fr49-source-leading-primary-prefix-diagnosis-2026-07-19.md`.
 
 FR40 passes its frozen gate. Repeated T123 outputs are byte-identical and
 change only Xu Zijing's `184.240-184.320` response. Repeated T111 outputs are

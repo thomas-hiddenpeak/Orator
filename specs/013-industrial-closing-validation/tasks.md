@@ -9,6 +9,10 @@ review of each full artifact is reconciled again by FR48 under the speaker-only
 boundary, correcting the ASR-only `ref-0375` row to `522/556`; every complete
 600-second block and all four per-speaker natural-turn floors pass; the FR48
 hierarchical-consensus guard stops before implementation as a single-context fit;
+FR49 corrects the prior `ref-0121` ledger omission, retains a bounded frozen
+source-leading primary-prefix candidate at a manually signed `523/556` after
+complete A/B forward/reverse contextual review, and leaves all 20 critical
+residuals open;
 critical, confident-wrong, time-based, holdout, report, release, T102, and T084
 gates remain open 2026-07-19
 
@@ -2805,3 +2809,68 @@ gates remain open 2026-07-19
   T208 single-context stop precedes candidate generation; no audio run is
   authorized. See
   `fr48-speaker-only-reconciliation-and-consensus-diagnosis-2026-07-19.md`.
+- [x] T211 Freeze FR49 to commit `64034af`, the exact FR47 full Run A/B
+  artifacts, their repaired 1,716-entry baseline replays, the capture-faithful
+  four-channel Sortformer v2.1 posterior, and the checked-in TOML. Define the
+  investigation over all 34 manually signed residuals and accepted controls;
+  do not rerun audio, tune a parameter, or alter product behavior before the
+  evidence gate. Initial comparison rejects grouping `ref-0049`, `ref-0102`,
+  and `ref-0461`: their correct secondary channel crosses the existing frame
+  gate in different source-relative regions. Initial comparison also rejects
+  grouping `ref-0118`, `ref-0327`, `ref-0331`, and `ref-0390`: they differ in
+  positive alignment, activity coverage, source presence, and temporal
+  displacement. These are manual evidence-boundary findings, not automated
+  candidate ranking.
+- [x] T212 Emit a reference-free A/B inventory of every short primary run that
+  intersects a positive aligned unit, one zero-duration aligned unit, or one
+  gap between adjacent aligned units and conflicts with at least one
+  mechanically associated current business piece. Include immediate same-
+  source and adjacent primary/business controls. Display raw posterior frames,
+  identity epochs, activity, primary, VAD, complete session/robust score lists,
+  current source pieces, and exact common-clock bounds. Automation may copy,
+  order, hash, and validate only; it must not read `test.txt`, attach expected
+  labels, count product results, rank a topology, or issue a verdict. A and B
+  each expose 271 rows and the same records SHA-256
+  `3acf4a1bbbdf84498929d0c7ae348b0e016417f0a882ba8dd533c066e81e60e0`.
+- [x] T213 Read every T212 match and accepted neighboring control completely in
+  chronological and reverse conversational order against `test.txt`. Reconcile
+  all 34 current residuals, including the 14 noncritical rows. Manually decide
+  whether at least two independent material contexts share one exact reusable
+  source-free topology with explicit abstention boundaries. Stop without code,
+  TOML, replay, or audio if the gate fails. The review found one prior ledger
+  omission, `ref-0121`, so the corrected pre-candidate scope is 35 residuals.
+  `ref-0061` and `ref-0121` establish the same source-leading right-bounded
+  primary-prefix topology. Controls `short_primary:644`, `713`, `753`, `849`,
+  `1014`, `1249`, and `1265` establish distinct identity, interior-source,
+  incomplete-unit, subminimum, missing-activity, voiceprint-conflict/short-
+  continuation, and noncontiguous-primary abstention boundaries. The first
+  T214 frozen replay subsequently exposed missed accepted control
+  `short_primary:748` / `ref-0304`: a candidate identity already owning
+  positive-duration source earlier inside the same short primary is a trailing
+  leak, not a swallowed source-leading contribution, and MUST abstain.
+- [x] T214 If T213 authorizes one topology, update the SDD artifacts before
+  implementation, add one bounded false-by-default behavior switch with no new
+  numeric parameter, and add focused positive plus independent abstention
+  tests. Preserve source text, producer tracks, and common-clock coordinates;
+  never synthesize a source-absent contribution. Authorized implementation:
+  TOML key `speaker_fusion.source_leading_primary_prefix_enable`, typed
+  `primary_run` evidence from `SpeakerEvidenceStage`, and the exact FR49
+  conjunction in `SpeakerFusionPolicy`, including the corrected same-primary
+  candidate-source-already-present abstention gate. Focused tests cover both
+  retained contexts, disabled evidence production, subminimum evidence, query
+  ordering, and independent fusion abstentions.
+- [x] T215 If T214 is implemented, pass a warning-clean build and complete
+  CTest, replay frozen full A and B twice beside a disabled control, and verify
+  hashes and raw changed scope mechanically. Read every changed complete
+  conversation forward and reverse. A retained result still requires fresh,
+  independent complete 556-contribution speaker-only review of A and B before
+  any real-WebSocket run. The replay and semantic portions are complete: all
+  four candidate outputs are byte-identical, disabled A/B exactly reproduce
+  FR48, and raw scope contains only `ref-0061` and `ref-0121`. Four complete
+  556-contribution contextual readings manually retain `523/556`, with 27
+  confident-wrong, five missing, one uncertain, and the same 20 critical
+  residuals. The final clean build has no warning or error diagnostic, both new
+  Python files pass syntax compilation, and all `71/71` CTest entries pass in
+  `53.22 s`. Post-build A1/A2/B1/B2 and disabled A/B replays reproduce the
+  already reviewed hashes byte for byte. These are engineering checks only; no
+  new audio run is claimed.
