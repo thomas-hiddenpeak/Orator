@@ -3252,6 +3252,44 @@ neighboring contribution. The warning-clean build and 69/69 CTest pass permit
 the conditional commit and real-WebSocket ladder. See
 `exact-cross-scale-primary-return-review-2026-07-19.md`.
 
+### 8.23 FR32 full promotion and partition-invariant abstention
+
+T142 freezes transitional experimental commit
+`72d81c8084757b4c4210ba90ac14b5d1c1155e89` and completes the entire
+real-WebSocket promotion ladder. The 30-second silence run emits no product
+record. Independent 120-second runs have byte-identical normalized seven-track
+entries, and complete forward/reverse review of all 18 contributions finds no
+new regression. The 600-second run closes all tracks at `9,600,000` samples;
+complete forward/reverse review of all 93 contributions also finds no new
+regression.
+
+Full empty-registry Run A and restarted frozen-registry Run B both process
+`3615.120` seconds at `0.995x`, satisfy direct-end, common-clock, provenance,
+observer, telemetry, and normalized seven-track repeatability contracts, and
+preserve the same frozen registry. Each artifact receives an independent
+complete 556-contribution chronological reading and reverse six-block reading
+against `test.txt`. Both manual reviews record `506/556`. FR32 repairs only
+`ref-0154` relative to T123 and introduces no new contextual regression or
+long-session identity swap. Two fixed blocks, 朱杰 recall, critical
+attribution, and confident-wrong attribution fail, so FR32 remains a bounded
+transitional repair and does not close the speaker business. See
+`exact-cross-scale-primary-return-full-promotion-review-2026-07-19.md`.
+
+The next iteration returns to frozen evidence before another audio run. FR33
+tests a partition-invariant abstention topology exposed at `ref-0517`: an
+ordinary short phrase may not replace a uniform current identity when phrase-
+scale session evidence alone proposes the challenger, phrase robust evidence
+abstains with the current identity second, the unique containing VAD reverses
+that ordering, and both broader same-text business and complete-source views
+select the current identity in both galleries under unchanged gates. Activity
+and primary must cover the exact phrase with the current identity, alignment
+must meet the existing minimum-unit contract, all galleries must be complete,
+and specialized challenge rules retain precedence. FR33 adds no threshold,
+duration, identity, transcript, timestamp, or reference input. Focused tests
+and repeated T111/T123 production-projector replays precede complete forward
+and reverse review of every changed context. A failed frozen review removes the
+candidate without an audio run.
+
 ### 8.15 FR28 120-second outcome and promotion ladder
 
 T117-T121 are complete. The frozen T116 packages replay byte-stably; their

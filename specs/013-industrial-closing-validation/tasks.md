@@ -2050,9 +2050,35 @@ T102/T084 remain open 2026-07-19
   and leave the business view unchanged. Complete forward and reverse review
   retains the Tang Yunfeng `不含` repair with no changed neighbor. See
   `exact-cross-scale-primary-return-review-2026-07-19.md`.
-- [ ] T142 Only if T141 retains FR32, commit and push the transitional
+- [x] T142 Only if T141 retains FR32, commit and push the transitional
   experiment, then repeat the silence, independent 120-second, complete
   600-second, and full empty/frozen-registry real-WebSocket promotion ladder.
   Each accuracy gate is decided only by complete forward and reverse contextual
   semantic review; mechanical tooling remains limited to transport, timing,
-  provenance, telemetry, determinism, and evidence arrangement.
+  provenance, telemetry, determinism, and evidence arrangement. Clean commit
+  `72d81c8084757b4c4210ba90ac14b5d1c1155e89` passes the lower ladder and
+  completes both full paths at `0.995x` with direct-end waits of `16.768 s`
+  and `16.684 s`. The full normalized seven-track entries are byte-identical.
+  Independent complete forward and reverse contextual reviews each manually
+  record `506/556`: FR32 repairs `ref-0154` without a new regression, but two
+  fixed blocks, 朱杰 recall, critical attribution, and confident-wrong
+  attribution fail. FR32 remains a bounded transitional repair; closure stays
+  open. See
+  `exact-cross-scale-primary-return-full-promotion-review-2026-07-19.md`.
+- [ ] T143 Diagnose the remaining frozen full-session speaker errors by
+  displaying each pipeline's typed evidence on the common time base. Specify
+  FR33 only for the partition-invariant `ref-0517` topology: uniform activity
+  and primary current identity, session-only phrase challenge, opposite
+  containing-VAD abstention, broader same-text and complete-source support for
+  the current identity, complete galleries, and existing alignment/TOML gates.
+  Add no fitted value or reference-specific input; document why each condition
+  is independently available at runtime and why specialized challenges keep
+  precedence.
+- [ ] T144 Implement FR33 in the final fusion policy with focused positive and
+  abstention tests. Pass a warning-clean build and all CTest entries, replay
+  frozen T111 and T123 packages at least twice, verify only mechanical
+  contracts, and arrange all changed evidence. Read every changed complete
+  conversation forward and reverse against `test.txt` before retaining or
+  rejecting the candidate. No executable mechanism may label correctness,
+  aggregate accuracy, rank/select the candidate, or issue the verdict. Do not
+  run new audio until this frozen review passes.

@@ -12,9 +12,10 @@ review, but its full T133/T134 A/B promotion is rejected at corrected
 T111/T123/T133 ledgers and withdraws the prior all-natural-turn-gates-passed
 claim; FR31 deterministic frozen replay passes but complete changed-context
 review rejects its broad primary-return guard; FR32 exact cross-scale
-primary-return precedence passes deterministic T111/T123 replay, complete
-changed-context review, and the 69-test engineering gate; real-WebSocket
-promotion remains pending; T102, T084, full
+primary-return precedence passes deterministic frozen replay and the complete
+real-WebSocket promotion ladder; independent full Run A and Run B contextual
+reviews each record `506/556`, but two fixed blocks, 朱杰 recall, critical
+turns, and confident-wrong attribution fail; T102, T084, full
 canonical closure, release sign-off, and industrial readiness remain open
 **Created**: 2026-07-13
 **Scope**: Re-establish a truthful product baseline, recover full-session business
@@ -2199,6 +2200,22 @@ unchanged. The clean build has no warning/error lines and all 69 CTest entries
 pass as engineering evidence only. FR32 is retained for the real-WebSocket
 promotion ladder; this does not close any full-session acceptance gate. See
 `exact-cross-scale-primary-return-review-2026-07-19.md`.
+
+T142 subsequently completes FR32's real-WebSocket promotion ladder from clean
+transitional commit `72d81c8084757b4c4210ba90ac14b5d1c1155e89`.
+The silence, repeated 120-second, and complete 600-second gates pass their
+mechanical contracts and complete in-scope contextual reviews. Independent
+full empty-registry Run A and restarted frozen-registry Run B are byte-stable
+across the seven normalized product tracks, close all active tracks at
+`57,841,920` samples, remain at `0.995x`, and terminate in `16.768 s` and
+`16.684 s`. Every one of the 556 contributions in each run is read in complete
+chronological context and again in reverse 600-second blocks. Both reviews
+manually record `506/556`: FR32 repairs only `ref-0154`, with no new
+contextual regression or long-session identity swap. The 2400-3000 and
+3000-3600 blocks, 朱杰 recall, critical-turn, and confident-wrong gates still
+fail. FR32 is therefore retained as a bounded repeatable repair, while
+speaker-business closure remains open. See
+`exact-cross-scale-primary-return-full-promotion-review-2026-07-19.md`.
 
 ## 5. Acceptance Gates
 
