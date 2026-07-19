@@ -3985,6 +3985,30 @@ contribution chronological and reverse contextual review. A failure stops the
 ladder for diagnosis; hashes and output equality cannot make the product
 decision.
 
+The first 600-second attempt stops at that failure boundary. Server-side
+session persistence proves finalization completed, while the persisted
+`speaker_voiceprint` JSON contains truncated `false` and `true` tokens at the
+former 256-byte scratch-buffer boundary. The client reader consequently has no
+parseable terminal message. Preserve the malformed persisted session, process
+state, and client timeout as mechanical evidence; do not generate a review
+packet or infer any speaker result from it.
+
+Repair the serializer at its ownership boundary. Move one complete
+speaker-voiceprint record into the shared JSON serialization module. Assemble
+escaped variable-length identifiers directly into `std::string`; append only
+numeric and boolean fragments with a dynamically sized `vsnprintf` helper; and
+serialize score identifiers without a fixed buffer. Add a unit regression with
+identifiers longer than 256 bytes and an exact expected record, so truncation,
+missing commas, incomplete booleans, and lost suffixes fail deterministically.
+No runtime dependency or configuration field is added.
+
+After focused and complete engineering tests pass, commit and push the fix.
+Since the server binary changes, discard the old promotion ordering as release
+evidence and restart it on that clean commit: independent empty-registry 120 A
+and 120 B, complete forward/reverse review, then 600 seconds, then full A/B only
+after the preceding gate passes. Mechanical JSON parsing and terminal equality
+remain protocol checks, never product evaluation.
+
 ### 8.15 FR28 120-second outcome and promotion ladder
 
 T117-T121 are complete. The frozen T116 packages replay byte-stably; their

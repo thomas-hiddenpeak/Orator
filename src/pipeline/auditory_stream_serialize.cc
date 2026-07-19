@@ -633,38 +633,7 @@ std::string AuditoryStream::Serialize() {
         ",{\"kind\":\"speaker_voiceprint\",\"source\":\"titanet_large\","
         "\"entries\":[";
     for (std::size_t i = 0; i < voiceprint_view.size(); ++i) {
-      const auto& evidence = voiceprint_view[i];
-      std::snprintf(
-          buf, sizeof(buf),
-          "{\"evidence_id\":\"%s\",\"evidence_kind\":\"%s\","
-          "\"text_id\":%ld,\"source_start\":%d,\"source_end\":%d,"
-          "\"start\":%.9f,\"end\":%.9f,"
-          "\"embedding_available\":%s,\"session_gallery_complete\":%s,"
-          "\"robust_gallery_complete\":%s,",
-          JsonEscape(evidence.evidence_id).c_str(),
-          JsonEscape(evidence.kind).c_str(), evidence.text_id,
-          evidence.source_start, evidence.source_end, evidence.start,
-          evidence.end, evidence.embedding_available ? "true" : "false",
-          evidence.session_gallery_complete ? "true" : "false",
-          evidence.robust_gallery_complete ? "true" : "false");
-      out += buf;
-      auto append_scores = [&](const char* name, const auto& scores) {
-        out += "\"" + std::string(name) + "\":[";
-        for (std::size_t score_index = 0; score_index < scores.size();
-             ++score_index) {
-          const auto& score = scores[score_index];
-          std::snprintf(buf, sizeof(buf),
-                        "{\"speaker_id\":\"%s\",\"score\":%.9g}",
-                        JsonEscape(score.speaker_id).c_str(), score.score);
-          out += buf;
-          if (score_index + 1 < scores.size()) out += ",";
-        }
-        out += "]";
-      };
-      append_scores("session_scores", evidence.session_scores);
-      out += ",";
-      append_scores("robust_scores", evidence.robust_scores);
-      out += "}";
+      out += SerializeSpeakerVoiceprintEvidenceToJson(voiceprint_view[i]);
       if (i + 1 < voiceprint_view.size()) out += ",";
     }
     out += "]}";

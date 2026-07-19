@@ -56,5 +56,10 @@ std::string SerializeRevisionToJson(
 std::string SerializeSpeakerDecisionToJson(
     const ComprehensiveTimeline::SpeakerDecisionAudit& decision);
 
+// Serialize one complete speaker-voiceprint evidence object without assuming
+// a maximum identifier or formatted-record length.
+std::string SerializeSpeakerVoiceprintEvidenceToJson(
+    const ComprehensiveTimeline::SpeakerVoiceprintEvidence& evidence);
+
 }  // namespace pipeline
 }  // namespace orator

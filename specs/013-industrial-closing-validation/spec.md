@@ -2734,6 +2734,24 @@ stage. Each full run MUST receive a separate complete 556-contribution review;
 frozen replay evidence MUST NOT be reported as a real-path result. See
 `post-fr47-residual-reconciliation-2026-07-19.md`.
 
+The first 600-second FR47 promotion attempt exposes a terminal serialization
+defect before any contextual review can begin. The server finishes the session
+and persists a `speaker_voiceprint` track, but its fixed 256-byte formatting
+buffer truncates sufficiently long evidence records, including JSON boolean
+tokens. The producer therefore receives no parseable terminal document within
+its 600-second wait. This attempt is mechanical failure evidence only and MUST
+NOT be treated as a speaker-product result.
+
+Before promotion resumes, every terminal speaker-voiceprint record MUST be
+serialized without a fixed output-size assumption. A focused regression MUST
+cover evidence and speaker identifiers longer than the former buffer and MUST
+preserve escaped strings, complete boolean tokens, score arrays, and the exact
+record suffix. The warning-clean build and complete CTest suite MUST pass. The
+fix changes no model, fusion policy, time code, speaker assignment, or TOML
+parameter. Because it changes the runtime binary, promotion MUST restart from
+two independent 120-second runs on one new clean committed revision before a
+new 600-second attempt.
+
 FR40 passes its frozen gate. Repeated T123 outputs are byte-identical and
 change only Xu Zijing's `184.240-184.320` response. Repeated T111 outputs are
 separately byte-identical and split only Zhu Jie's first reaction from the

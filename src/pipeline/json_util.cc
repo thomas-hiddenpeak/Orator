@@ -2,9 +2,11 @@
 
 #include "pipeline/comprehensive_timeline.h"
 
+#include <cstdarg>
 #include <cstdio>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 namespace orator {
 namespace pipeline {
@@ -21,7 +23,67 @@ int SpeakerIndex(const std::string& speaker) {
   }
 }
 
+void AppendFormatted(std::string* output, const char* format, ...) {
+  va_list arguments;
+  va_start(arguments, format);
+  va_list measure_arguments;
+  va_copy(measure_arguments, arguments);
+  const int required = std::vsnprintf(nullptr, 0, format, measure_arguments);
+  va_end(measure_arguments);
+  if (required < 0) {
+    va_end(arguments);
+    throw std::runtime_error("failed to measure formatted JSON fragment");
+  }
+
+  std::vector<char> buffer(static_cast<std::size_t>(required) + 1);
+  const int written =
+      std::vsnprintf(buffer.data(), buffer.size(), format, arguments);
+  va_end(arguments);
+  if (written != required) {
+    throw std::runtime_error("failed to format complete JSON fragment");
+  }
+  output->append(buffer.data(), static_cast<std::size_t>(written));
+}
+
 }  // namespace
+
+std::string SerializeSpeakerVoiceprintEvidenceToJson(
+    const ComprehensiveTimeline::SpeakerVoiceprintEvidence& evidence) {
+  std::string out = "{\"evidence_id\":\"";
+  out += JsonEscape(evidence.evidence_id);
+  out += "\",\"evidence_kind\":\"";
+  out += JsonEscape(evidence.kind);
+  AppendFormatted(&out,
+                  "\",\"text_id\":%ld,\"source_start\":%d,\"source_end\":%d,"
+                  "\"start\":%.9f,\"end\":%.9f,"
+                  "\"embedding_available\":%s,\"session_gallery_complete\":%s,"
+                  "\"robust_gallery_complete\":%s,",
+                  evidence.text_id, evidence.source_start, evidence.source_end,
+                  evidence.start, evidence.end,
+                  evidence.embedding_available ? "true" : "false",
+                  evidence.session_gallery_complete ? "true" : "false",
+                  evidence.robust_gallery_complete ? "true" : "false");
+
+  auto append_scores = [&](const char* name, const auto& scores) {
+    out += "\"";
+    out += name;
+    out += "\":[";
+    for (std::size_t index = 0; index < scores.size(); ++index) {
+      const auto& score = scores[index];
+      if (index > 0) out += ",";
+      out += "{\"speaker_id\":\"";
+      out += JsonEscape(score.speaker_id);
+      AppendFormatted(&out, "\",\"score\":%.9g}", score.score);
+    }
+    out += "]";
+  };
+
+  append_scores("session_scores", evidence.session_scores);
+  out += ",";
+  append_scores("robust_scores", evidence.robust_scores);
+  out += "}";
+  return out;
+}
 
 std::string SerializeSpeakerDecisionToJson(
     const ComprehensiveTimeline::SpeakerDecisionAudit& decision) {

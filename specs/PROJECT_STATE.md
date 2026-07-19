@@ -1092,6 +1092,35 @@ remain passed. FR47 is retained as a frozen transitional candidate and may
 enter the clean 120/600/full A/B real-WebSocket ladder after commit. It is not
 a closing or real-path result. See
 `013-industrial-closing-validation/post-fr47-residual-reconciliation-2026-07-19.md`.
+
+T201 is complete on clean pushed commit `68016fd`. Two independent
+empty-registry 120-second WebSocket runs close every product track at
+1,920,000 common-clock samples, pass producer/observer terminal equality and
+required telemetry contracts, and have the same normalized seven-track entry
+bundle SHA-256
+`e8613dfbdffbbb3394d5e80955eb73d30e7f200c4ffb4b3058df3a1b805928b8`.
+Complete chronological and reverse contextual reading of `ref-0001` through
+`ref-0018` finds no new speaker regression; known cold-start and rapid-short-
+turn defects remain visible.
+
+The first T202 attempt stops at a mechanical terminal defect and contributes
+no speaker-product result. It consumes all 9,600,000 input samples, and the
+server persists a 1,385,739-byte session document at SHA-256
+`6b4b48b771809a29bf2276a2659fc39900677e7a058f5b41c301180f3c4f8258`,
+but fixed 256-byte `speaker_voiceprint` formatting truncates long records and
+produces incomplete JSON boolean tokens. The producer receives no parseable
+terminal document during its 600-second wait, so no review packet or contextual
+judgment is derived from this attempt.
+
+T204 is complete. Speaker-voiceprint records now use a
+shared variable-length serializer: escaped identifiers append directly and
+numeric/boolean fragments use dynamically sized formatting. A focused exact-
+record regression covers escaped evidence and speaker identifiers longer than
+256 bytes. The full build has no warning diagnostics and all `70/70` CTest
+entries pass in 52.99 seconds. No model, fusion policy, time code, speaker
+assignment, or TOML parameter changes. Because the binary changes, promotion
+must restart with two independent 120-second runs after this fix is committed
+and pushed.
 T112 is complete and does not alter the speaker baseline. T084 closes only
 after both A and B independently pass every applicable gate.
 ASR, browser/microphone, locked holdout, final-report review, and release signing

@@ -2682,19 +2682,45 @@ repeatability, holdout, T102, and T084 gates remain open 2026-07-19
   critical. No new contextual regression is found. The frozen candidate is
   retained and a gated real-WebSocket ladder is justified; closure remains
   open. See `post-fr47-residual-reconciliation-2026-07-19.md`.
-- [ ] T201 Commit and push the exact FR47 transitional revision before any new
+- [x] T201 Commit and push the exact FR47 transitional revision before any new
   audio run. From that clean revision, execute two independent 120-second real-
   WebSocket streams using only checked-in `orator.toml`. Verify direct-end,
   common-clock, producer, observer, telemetry, and deterministic raw contracts,
   then read every in-scope `test.txt` conversation forward and reverse. Stop
-  and diagnose on any contextual regression.
+  and diagnose on any contextual regression. Commit `68016fd` is pushed and
+  both empty-registry runs close all seven tracks at 1,920,000 samples with no
+  contract issue, complete telemetry coverage, matching producer/observer
+  terminals, and the same normalized product-entry bundle. Complete forward
+  and reverse reading of `ref-0001` through `ref-0018` finds no new contextual
+  speaker regression; the known cold-start and rapid-short-turn defects remain
+  visible. This result is historical evidence for `68016fd` and cannot qualify
+  a later changed binary.
 - [ ] T202 If both T201 runs pass, execute one clean 600-second real-WebSocket
   stream from the same revision and apply the same mechanical contracts plus
   complete forward/reverse review of every in-scope contribution. Do not infer
-  a product result from equality or hashes.
+  a product result from equality or hashes. The first attempt consumes all 600
+  seconds and finalizes server-side, but the fixed-size speaker-voiceprint JSON
+  formatter truncates long records and no parseable terminal timeline reaches
+  the client. No contextual review or product result is attributed to that
+  failed attempt. Repeat this task only after T204-T205 pass on one new clean
+  commit.
 - [ ] T203 If T202 passes, execute full Run A from an empty registry and full
   Run B from Run A's frozen registry on the same revision. Each run must pass
   all mechanical gates and receive its own complete 556-contribution
   chronological and reverse contextual semantic review before FR47 can replace
   the frozen comparison baseline. Time-based, holdout, report, and release
   gates remain separately required.
+- [x] T204 Replace fixed-buffer speaker-voiceprint terminal formatting with a
+  dynamically sized, shared JSON record serializer. Add an exact regression
+  using escaped evidence and speaker identifiers longer than 256 bytes. Pass
+  the focused test, warning-clean build, and complete CTest suite. Preserve the
+  failed 600-second artifact as mechanical evidence and change no model,
+  speaker policy, time code, or TOML parameter. The failed persisted session is
+  retained at SHA-256
+  `6b4b48b771809a29bf2276a2659fc39900677e7a058f5b41c301180f3c4f8258`.
+  The exact long-record regression passes, the full build emits no warning,
+  and all `70/70` CTest entries pass in 52.99 seconds.
+- [ ] T205 Commit and push T204, then restart promotion on that exact clean
+  revision with two independent empty-registry 120-second real-WebSocket runs.
+  Require parseable terminal JSON, all mechanical contracts, and complete
+  chronological and reverse contextual review before T202 is retried.

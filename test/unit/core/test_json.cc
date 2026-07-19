@@ -5,6 +5,7 @@
 
 #include "core/types.h"
 #include "io/json_sink.h"
+#include "pipeline/json_util.h"
 
 using namespace orator;
 
@@ -111,6 +112,46 @@ int main() {
     std::string compact = io::TimelineToJson(tl, false);
     CHECK(!Contains(compact, "\n"), "compact output has no newlines");
     std::printf("  compact: %s\n", compact.c_str());
+  }
+
+  // ── Speaker voiceprint record: variable-length fields ───────────────
+  std::printf("\n-- Speaker voiceprint variable-length JSON --\n");
+  {
+    pipeline::ComprehensiveTimeline::SpeakerVoiceprintEvidence evidence;
+    evidence.evidence_id = std::string(320, 'e') + "\"\\tail";
+    evidence.kind = std::string(300, 'k') + "\nkind";
+    evidence.text_id = 42;
+    evidence.source_start = 7;
+    evidence.source_end = 11;
+    evidence.start = 1.25;
+    evidence.end = 2.5;
+    evidence.embedding_available = true;
+    evidence.session_gallery_complete = false;
+    evidence.robust_gallery_complete = true;
+    const std::string session_speaker = std::string(300, 's') + "\"session";
+    const std::string robust_speaker = std::string(300, 'r') + "\\robust";
+    evidence.session_scores.push_back({session_speaker, 0.75f});
+    evidence.robust_scores.push_back({robust_speaker, 0.25f});
+
+    const std::string actual =
+        pipeline::SerializeSpeakerVoiceprintEvidenceToJson(evidence);
+    const std::string expected =
+        "{\"evidence_id\":\"" + pipeline::JsonEscape(evidence.evidence_id) +
+        "\",\"evidence_kind\":\"" + pipeline::JsonEscape(evidence.kind) +
+        "\",\"text_id\":42,\"source_start\":7,\"source_end\":11,"
+        "\"start\":1.250000000,\"end\":2.500000000,"
+        "\"embedding_available\":true,"
+        "\"session_gallery_complete\":false,"
+        "\"robust_gallery_complete\":true,\"session_scores\":[{"
+        "\"speaker_id\":\"" +
+        pipeline::JsonEscape(session_speaker) +
+        "\",\"score\":0.75}],\"robust_scores\":[{\"speaker_id\":\"" +
+        pipeline::JsonEscape(robust_speaker) + "\",\"score\":0.25}]}";
+    CHECK(actual == expected,
+          "speaker voiceprint record preserves fields beyond 256 bytes");
+    CHECK(actual.find("fals\"") == std::string::npos &&
+              actual.find("tru\"") == std::string::npos,
+          "speaker voiceprint booleans are not truncated");
   }
 
   // ── JsonSink::Consume ───────────────────────────────────────────────
