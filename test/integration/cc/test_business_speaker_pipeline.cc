@@ -2565,6 +2565,221 @@ int main() {
           "an available unit embedding stays on the ordinary evidence path");
   }
 
+  // ---- 20g5b. FR36: a regular native phrase may recover one initial slot
+  // identity only when exact phrase evidence and both outer acoustic scales
+  // expose the complete partition-invariant reversal. ----
+  {
+    using Entry = ComprehensiveTimeline::Entry;
+    struct CaseOptions {
+      bool include_initial_identity = true;
+      bool primary_matches_activity = true;
+      bool competing_activity = false;
+      bool enough_alignment = true;
+      bool phrase_second_is_initial = true;
+      bool exactly_one_phrase_margin = true;
+      int vad_count = 1;
+      bool vad_initial_first = true;
+      bool vad_outer_abstention = true;
+      int complete_source_count = 1;
+      bool complete_source_initial_first = true;
+      bool complete_source_outer_abstention = true;
+      bool protected_labels = false;
+    };
+    auto run_case = [](const CaseOptions& options) -> std::vector<Entry> {
+      BusinessSpeakerPipeline::Config config;
+      config.voiceprint_fusion_enabled = true;
+      config.speaker_overlap_tie_policy =
+          BusinessSpeakerPipeline::SpeakerOverlapTiePolicy::kPrimarySpeaker;
+      TestBusinessSpeakerPipeline tl(config);
+
+      std::vector<TestBusinessSpeakerPipeline::SpeakerInput> activity;
+      if (options.include_initial_identity) {
+        activity.push_back({-2.0, -1.0, "slot_0", 0.9f, "spk_b"});
+      }
+      activity.push_back({0.0, 2.0, "slot_0", 0.9f, "spk_a"});
+      if (options.competing_activity) {
+        activity.push_back({0.0, 1.8, "slot_1", 0.8f, "spk_c"});
+      }
+      tl.ReplaceSpeakers(activity);
+      tl.ReplacePrimarySpeakers(
+          {{0.0, 2.0, "slot_0", 0.9f,
+            options.primary_matches_activity ? "spk_a" : "spk_c"}});
+      tl.UpsertText(0, 0.0, 2.0, "甲乙丙。");
+      tl.UpsertAlign(
+          0, 0.0, 2.0,
+          options.enough_alignment
+              ? std::vector<TestBusinessSpeakerPipeline::AlignUnitSeg>{
+                    {0.0, 0.6, "甲"}, {0.6, 1.2, "乙"}, {1.2, 1.8, "丙"}}
+              : std::vector<TestBusinessSpeakerPipeline::AlignUnitSeg>{
+                    {0.0, 1.8, "甲乙丙"}});
+
+      ComprehensiveTimeline::SpeakerVoiceprintEvidence phrase;
+      phrase.evidence_id = "punctuation_phrase:0:0";
+      phrase.kind = "punctuation_phrase";
+      phrase.text_id = 0;
+      phrase.source_start = 0;
+      phrase.source_end = 4;
+      phrase.start = 0.0;
+      phrase.end = 1.8;
+      phrase.embedding_available = true;
+      phrase.robust_gallery_complete = true;
+      phrase.session_scores = options.phrase_second_is_initial
+                                  ? std::vector<ComprehensiveTimeline::VoiceprintScore>{
+                                        {"spk_a", 0.50f}, {"spk_b", 0.44f},
+                                        {"spk_c", 0.20f}}
+                                  : std::vector<ComprehensiveTimeline::VoiceprintScore>{
+                                        {"spk_a", 0.50f}, {"spk_c", 0.44f},
+                                        {"spk_b", 0.20f}};
+      phrase.robust_scores = options.exactly_one_phrase_margin
+                                 ? std::vector<ComprehensiveTimeline::VoiceprintScore>{
+                                       {"spk_a", 0.49f}, {"spk_b", 0.47f},
+                                       {"spk_c", 0.20f}}
+                                 : std::vector<ComprehensiveTimeline::VoiceprintScore>{
+                                       {"spk_a", 0.50f}, {"spk_b", 0.44f},
+                                       {"spk_c", 0.20f}};
+
+      auto outer = [](const std::string& id, const std::string& kind,
+                      double start, double end, bool initial_first,
+                      bool abstains) {
+        ComprehensiveTimeline::SpeakerVoiceprintEvidence evidence;
+        evidence.evidence_id = id;
+        evidence.kind = kind;
+        evidence.text_id = kind == "complete_source" ? 0 : -1;
+        evidence.source_start = 0;
+        evidence.source_end = kind == "complete_source" ? 4 : 0;
+        evidence.start = start;
+        evidence.end = end;
+        evidence.embedding_available = true;
+        evidence.robust_gallery_complete = true;
+        const std::string first = initial_first ? "spk_b" : "spk_a";
+        const std::string second = initial_first ? "spk_a" : "spk_b";
+        evidence.session_scores =
+            abstains
+                ? std::vector<ComprehensiveTimeline::VoiceprintScore>{
+                      {first, 0.50f}, {second, 0.48f}, {"spk_c", 0.20f}}
+                : std::vector<ComprehensiveTimeline::VoiceprintScore>{
+                      {first, 0.70f}, {second, 0.50f}, {"spk_c", 0.20f}};
+        evidence.robust_scores =
+            abstains
+                ? std::vector<ComprehensiveTimeline::VoiceprintScore>{
+                      {first, 0.49f}, {second, 0.48f}, {"spk_c", 0.20f}}
+                : std::vector<ComprehensiveTimeline::VoiceprintScore>{
+                      {first, 0.69f}, {second, 0.49f}, {"spk_c", 0.20f}};
+        return evidence;
+      };
+
+      std::vector<ComprehensiveTimeline::SpeakerVoiceprintEvidence> evidence = {
+          phrase};
+      for (int index = 0; index < options.vad_count; ++index) {
+        evidence.push_back(outer("vad:" + std::to_string(index), "vad", -0.1,
+                                 1.9, options.vad_initial_first,
+                                 options.vad_outer_abstention));
+      }
+      for (int index = 0; index < options.complete_source_count; ++index) {
+        evidence.push_back(outer("complete_source:" + std::to_string(index),
+                                 "complete_source", -0.2, 2.0,
+                                 options.complete_source_initial_first,
+                                 options.complete_source_outer_abstention));
+      }
+      if (options.protected_labels) {
+        ComprehensiveTimeline::SpeakerVoiceprintEvidence direct = phrase;
+        direct.evidence_id = "business_interval:0:0";
+        direct.kind = "business_interval";
+        direct.session_scores = {{"spk_a", 0.75f}, {"spk_b", 0.50f}};
+        direct.robust_scores = {{"spk_a", 0.74f}, {"spk_b", 0.49f}};
+        evidence.push_back(direct);
+      }
+      tl.ReplaceVoiceprint(evidence);
+      return tl.Snapshot();
+    };
+
+    const std::string reason =
+        "voiceprint_phrase_partition_invariant_regular_initial_slot_override";
+    auto selected = [&](const std::vector<Entry>& entries) {
+      return !entries.empty() &&
+             std::all_of(entries.begin(), entries.end(), [&](const auto& entry) {
+               return entry.speaker_id == "spk_b" &&
+                      entry.speaker_decision.reason == reason;
+             });
+    };
+    auto abstained = [&](const std::vector<Entry>& entries) {
+      return std::none_of(entries.begin(), entries.end(), [&](const auto& entry) {
+        return entry.speaker_decision.reason == reason;
+      });
+    };
+
+    const auto positive = run_case({});
+    CHECK(selected(positive),
+          "six-view regular reversal recovers the initial slot identity");
+    CHECK(!positive.empty() &&
+              positive.front().speaker_decision.speaker_source ==
+                  "sortformer_initial_slot+activity+primary_top1+"
+                  "titanet_phrase+titanet_vad+titanet_complete_source+"
+                  "robust_gallery+forced_alignment",
+          "regular initial-slot reversal exposes every contributing track");
+
+    CaseOptions missing_initial;
+    missing_initial.include_initial_identity = false;
+    CHECK(abstained(run_case(missing_initial)),
+          "missing initial identity preserves ordinary attribution");
+    CaseOptions primary_mismatch;
+    primary_mismatch.primary_matches_activity = false;
+    CHECK(abstained(run_case(primary_mismatch)),
+          "activity and primary slot disagreement blocks the reversal");
+    CaseOptions competing;
+    competing.competing_activity = true;
+    CHECK(abstained(run_case(competing)),
+          "competing activity blocks the regular initial-slot reversal");
+    CaseOptions insufficient_alignment;
+    insufficient_alignment.enough_alignment = false;
+    CHECK(abstained(run_case(insufficient_alignment)),
+          "insufficient phrase alignment blocks the reversal");
+    CaseOptions phrase_rank;
+    phrase_rank.phrase_second_is_initial = false;
+    CHECK(abstained(run_case(phrase_rank)),
+          "a different exact-phrase runner-up blocks the reversal");
+    CaseOptions phrase_gate;
+    phrase_gate.exactly_one_phrase_margin = false;
+    CHECK(abstained(run_case(phrase_gate)),
+          "a different exact-phrase margin pattern blocks the reversal");
+    CaseOptions missing_vad;
+    missing_vad.vad_count = 0;
+    CHECK(abstained(run_case(missing_vad)),
+          "missing containing VAD blocks the reversal");
+    CaseOptions duplicate_vad;
+    duplicate_vad.vad_count = 2;
+    CHECK(abstained(run_case(duplicate_vad)),
+          "duplicate containing VAD blocks the reversal");
+    CaseOptions eligible_vad;
+    eligible_vad.vad_outer_abstention = false;
+    CHECK(abstained(run_case(eligible_vad)),
+          "an independently eligible VAD stays on the ordinary path");
+    CaseOptions reversed_vad;
+    reversed_vad.vad_initial_first = false;
+    CHECK(abstained(run_case(reversed_vad)),
+          "a current-first VAD blocks the initial-slot reversal");
+    CaseOptions missing_complete;
+    missing_complete.complete_source_count = 0;
+    CHECK(abstained(run_case(missing_complete)),
+          "missing complete-source evidence blocks the reversal");
+    CaseOptions duplicate_complete;
+    duplicate_complete.complete_source_count = 2;
+    CHECK(abstained(run_case(duplicate_complete)),
+          "duplicate complete-source evidence blocks the reversal");
+    CaseOptions eligible_complete;
+    eligible_complete.complete_source_outer_abstention = false;
+    CHECK(abstained(run_case(eligible_complete)),
+          "an independently eligible complete source stays ordinary");
+    CaseOptions reversed_complete;
+    reversed_complete.complete_source_initial_first = false;
+    CHECK(abstained(run_case(reversed_complete)),
+          "a current-first complete source blocks the reversal");
+    CaseOptions protected_labels;
+    protected_labels.protected_labels = true;
+    CHECK(abstained(run_case(protected_labels)),
+          "an existing voiceprint write protects the current phrase");
+  }
+
   // ---- 20g6. FR16ABC: a different primary micro-run may own one complete
   // no-embedding aligned unit only when the current primary identity brackets
   // it on both sides and the sole activity track remains uncontested. ----

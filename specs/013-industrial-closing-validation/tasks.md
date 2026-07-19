@@ -2164,3 +2164,34 @@ T102/T084 remain open 2026-07-19
   manually reconciled frozen ledger is `509/556`; both late fixed blocks and
   every other conjunctive failure keep closure open. See
   `aligned-unit-isolation-tolerance-review-2026-07-19.md`.
+- [x] T152 Diagnose the T111/T123 `ref-0350` partition regression using only
+  frozen typed evidence on the common time base. Specify FR36 as a strict
+  regular-phrase same-slot reversal: native activity/primary and exact phrase
+  retain current identity A, the slot's initial identity is B, and the unique
+  VAD plus complete-source views all reverse to B under the exact unchanged-
+  gate pattern. Add no future epoch, TOML value, threshold, transcript,
+  timestamp, reference lookup, or product verdict. See
+  `partition-invariant-regular-initial-slot-diagnosis-2026-07-19.md`.
+- [x] T153 Implement FR36 with focused positive and independent abstention
+  tests. Pass a warning-clean build and all CTest entries, then replay frozen
+  T123 and T111 producer packages at least twice. Automation may verify only
+  mechanical contracts and arrange raw changed contexts; it may not label
+  correctness, aggregate accuracy, select the candidate, or issue an
+  acceptance verdict.
+  The warning-clean build and all `69/69` CTest entries pass. Repeated T123
+  replays are byte-identical at SHA-256
+  `6a34e272cd64c2513358c55f9c41b390bc17a4d048fd32ba1147c6b2766833cb`
+  and repeated T111 replays are byte-identical to FR35 at SHA-256
+  `646ea91b357cafaf8af82c4f45e5cc771c622a501e71b12f2d1aa1555fb055f2`.
+  Mechanical display exposes only the complete `text_id=217` phrase change.
+- [x] T154 Read every FR36 changed complete conversation chronologically and
+  in reverse against `test.txt`. Retain or remove FR36 only from that
+  contextual semantic review, synchronize spec/plan/tasks/project state, and
+  label any commit as a transitional frozen experiment. Do not attribute a new
+  real-WebSocket result or speaker-business closure to the replay.
+  Complete forward and reverse reading of `40:45-42:32` retains Zhu Jie's
+  response between Tang Yunfeng's profitability question and follow-up
+  question and finds no neighbouring change. The manually reconciled frozen
+  ledger is `510/556`; the 2400-3000 block passes at `117/129`, while the
+  3000-3600 block and every other conjunctive failure keep closure open. See
+  `partition-invariant-regular-initial-slot-review-2026-07-19.md`.

@@ -14,7 +14,7 @@ work is specified under [specs/](.).
 > pass is the consistency proof. Status lines advance to `Implemented` in the
 > same change that lands the code, with the commit reference.
 
-- **Last updated**: 2026-07-19 (FR35 frozen candidate retained; closure open)
+- **Last updated**: 2026-07-19 (FR36 frozen candidate retained; closure open)
 - **Branch**: `master`
 - **Constitution**: v1.7.0
 - **Speaker-business closure**: **BEST FROZEN FULL AVERAGE ABOVE FLOOR;
@@ -199,6 +199,25 @@ work is specified under [specs/](.).
   `013-industrial-closing-validation/aligned-unit-isolation-tolerance-diagnosis-2026-07-19.md`
   and
   `013-industrial-closing-validation/aligned-unit-isolation-tolerance-review-2026-07-19.md`.
+  T152-T154 then isolate the separate T111/T123 `ref-0350` regular-phrase
+  partition regression. FR36 requires one native current identity A in the
+  same uncontested activity/primary local slot, that slot's different initial
+  identity B, exact phrase views that rank A first in the specified existing-
+  gate abstention pattern, and unique containing VAD plus complete-source views
+  that all reverse to B under their unchanged regular gates. It adds no future
+  epoch, TOML value, or threshold. Repeated T123 replays are byte-identical and
+  change only the complete `text_id=217` phrase; repeated T111 replays remain
+  byte-identical to FR35. Complete chronological and reverse reading of
+  `40:45-42:32` retains Zhu Jie's response between Tang Yunfeng's profitability
+  question and follow-up question and finds no neighbouring change. The
+  warning-clean build and all 69 CTest entries pass. The manually reconciled
+  frozen candidate is `510/556`; the 2400-3000 fixed block now passes at
+  `117/129`. No real-WebSocket result is attributed to FR36. The 3000-3600
+  block, Zhu Jie recall, speaker-time sign-off, critical attribution, and
+  confident-wrong attribution still fail; see
+  `013-industrial-closing-validation/partition-invariant-regular-initial-slot-diagnosis-2026-07-19.md`
+  and
+  `013-industrial-closing-validation/partition-invariant-regular-initial-slot-review-2026-07-19.md`.
 - **Result-evaluation rule**: product accuracy and candidate decisions may be
   produced only by complete item-by-item contextual semantic review. No code,
   test, script, notebook, formula, query, automated metric, or algorithm may
@@ -765,7 +784,7 @@ treated as a repair for `ref-0503`, which is already wrong in T111.
 Speaker-time, per-speaker time, and source-time offsets remain to be manually
 signed at `test.txt`'s recorded precision; no duplicate listening or invented
 sub-second boundary is required.
-T136-T151 are complete. FR31 is rejected after deterministic frozen replay and
+T136-T154 are complete. FR31 is rejected after deterministic frozen replay and
 complete review of every changed T111/T123 context. FR32 is retained after
 changing only T123 `text_id=84`, repairing `ref-0154`, leaving T111 unchanged,
 and completing the full real-WebSocket ladder. Independent full empty/frozen-
@@ -779,9 +798,11 @@ is `507/556`, but no new full real-path result follows. T145 records FR33 as a
 warning-clean, `69/69` transitional checkpoint. T146-T148 retain FR34 after a
 separate deterministic T111/T123 replay and complete forward/reverse review,
 advancing the frozen candidate to `508/556`. T149-T151 retain FR35 after the
-same bounded frozen gate, advancing it to `509/556`. Neither result is a new
-real-WebSocket run, and both late fixed blocks remain below their conjunctive
-acceptance gates.
+same bounded frozen gate, advancing it to `509/556`. T152-T154 retain FR36
+after a separate same-slot six-view diagnosis and complete forward/reverse
+review, advancing the frozen candidate to `510/556` and passing the 2400-3000
+fixed block at `117/129`. None of these results is a new real-WebSocket run;
+the 3000-3600 fixed block and the other conjunctive gates remain open.
 T112 is complete and does not alter the speaker baseline. T084 closes only
 after both A and B independently pass every applicable gate.
 ASR, browser/microphone, locked holdout, final-report review, and release signing

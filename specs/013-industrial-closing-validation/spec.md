@@ -19,9 +19,10 @@ turns, and confident-wrong attribution fail; FR33 deterministic T111/T123
 replay and complete changed-context review retain a frozen `ref-0517` repair
 at `507/556`; FR34 independently retains an exact `ref-0406` phrase repair on
 frozen evidence at `508/556`; FR35 retains the partition-invariant
-`ref-0420` isolated response on frozen evidence at `509/556`, with no new
-real-path claim; T102, T084, full canonical closure, release sign-off, and
-industrial readiness remain open
+`ref-0420` isolated response on frozen evidence at `509/556`; FR36 retains the
+regular same-slot six-view `ref-0350` repair at `510/556` and passes the
+2400-3000 fixed block, with no new real-path claim; T102, T084, full canonical
+closure, release sign-off, and industrial readiness remain open
 **Created**: 2026-07-13
 **Scope**: Re-establish a truthful product baseline, recover full-session business
 accuracy, and define the evidence required before Orator may be declared closed.
@@ -2262,6 +2263,33 @@ subject to the complete acceptance gates in this spec.
   MUST replay deterministically, and every changed complete conversation MUST
   receive chronological and reverse contextual semantic review against
   `test.txt` before retention or a new audio run.
+- **FR36**: A regular-duration punctuation phrase MAY replace one uniform
+  native current identity A with the different initial identity B of the same
+  local slot only when all partition-invariant typed scales prove one strict
+  cross-scale reversal. The phrase MUST be embedding-backed,
+  robust-complete, within the existing regular phrase duration bounds, and
+  contain the existing minimum aligned-unit count. Every current label MUST
+  be unprotected native `sole_diar_support`, equal its base identity, and name
+  A. Activity and primary MUST each expose exactly one completely covering
+  local slot with current identity A, those slots MUST be identical, and no
+  competing slot may overlap. That slot's unique initial identity MUST be B.
+  Both exact-phrase galleries MUST rank A first and B second, both MUST fail
+  the unchanged regular absolute-score gate, and exactly one MUST pass the
+  unchanged regular margin. Exactly one embedding-backed, robust-complete VAD
+  and exactly one same-text embedding-backed, robust-complete complete-source
+  record MUST contain the phrase. All four outer galleries MUST rank B first
+  and A second and fail both unchanged regular score and margin gates.
+  Existing specialized challenges MUST retain precedence, and the write MUST
+  cover only the exact phrase source and forced-alignment range. Missing,
+  duplicate, eligible, differently ranked, differently gated, competing,
+  mixed, protected, unaligned, or source/time-inconsistent evidence MUST
+  preserve existing behavior. FR36 MUST add no future lookahead, TOML value,
+  score, margin, duration, identity, transcript, speaker name, timestamp,
+  reference datum, or fitted constant and MUST alter no producer evidence or
+  common-clock coordinate. Frozen T111/T123 inputs MUST replay
+  deterministically, and every changed complete conversation MUST receive
+  chronological and reverse contextual semantic review against `test.txt`
+  before retention or a new audio run.
 
 The first FR31 implementation passed its focused engineering test and produced
 byte-stable repeated T111 and T123 replays. Complete forward and reverse review
@@ -2367,6 +2395,33 @@ manually reconciled frozen candidate is `509/556`; the 2400-3000 and
 confident-wrong attribution, and speaker-time sign-off still fail. No new
 real-WebSocket result or closure claim is attributed to FR35. See
 `aligned-unit-isolation-tolerance-review-2026-07-19.md`.
+
+FR36 isolates the separate T111/T123 partition regression at `ref-0350`.
+Activity and primary are identical and expose one uncontested local slot whose
+current identity is Tang Yunfeng and whose initial identity is Zhu Jie. T123's
+exact phrase ranks the current identity first in both galleries, while its
+unique containing VAD and complete-source evidence reverse to the initial
+identity in all four outer views; all six views abstain under the existing
+regular gates in the strict pattern specified above. T111 includes a trailing
+discourse particle in the punctuation phrase, ranks the initial identity first
+in both phrase galleries, and activates the existing regular initial-slot
+rule. FR36 tests only this same-slot six-view partition-invariant reversal. It
+uses no future epoch, new threshold, TOML change, transcript value, or known
+time. See
+`partition-invariant-regular-initial-slot-diagnosis-2026-07-19.md`.
+
+Repeated FR36 T123 replays are byte-identical and change only the
+`2483.660-2485.500` `text_id=217` phrase from Tang Yunfeng to Zhu Jie. T111
+remains byte-identical to FR35. Complete reading of the changed
+`40:45-42:32` conversation chronologically and in reverse confirms Zhu Jie's
+response between Tang Yunfeng's profitability question and follow-up question,
+then preserves Zhu's explanation and Tang's answer. The warning-clean build
+and all 69 CTest entries pass as engineering evidence. The manually reconciled
+frozen candidate is `510/556`; the 2400-3000 fixed block now passes at
+`117/129`. The 3000-3600 block, Zhu Jie recall, critical attribution,
+confident-wrong attribution, and speaker-time sign-off still fail. No new
+real-WebSocket result or closure claim is attributed to FR36. See
+`partition-invariant-regular-initial-slot-review-2026-07-19.md`.
 
 ## 5. Acceptance Gates
 

@@ -3362,6 +3362,40 @@ blocks and the other conjunctive closing gates remain open, so FR35 is a
 transitional frozen repair and not a real-stream acceptance result. See
 `aligned-unit-isolation-tolerance-review-2026-07-19.md`.
 
+FR36 remains on the same frozen producer tracks and addresses a separate
+regular-phrase partition regression. The production projector first confirms
+uniform native A labels, one uncontested same local slot in activity and
+primary, and that slot's different initial identity B. It then requires the
+exact phrase's two galleries to rank A first and B second in the specified
+one-margin-pass regular abstention pattern. One unique containing VAD and one
+unique same-text complete-source record must reverse to B first and A second in
+all four outer views while independently failing the unchanged regular score
+and margin gates. No individual abstaining view may write the result; only the
+complete same-slot six-view topology may challenge the exact phrase. Existing
+specialized challenges run first.
+
+Focused positive and independent abstention tests cover every provenance,
+slot, identity, alignment, containment, gallery-rank, and existing-gate
+condition. The production C++ projector is then replayed twice over frozen
+T123 and T111. Automation verifies only hashes, immutable inputs, source
+reconstruction, time order, and displayed change scope. Every changed complete
+conversation is read chronologically and in reverse against `test.txt`; only
+that contextual semantic review may retain or reject FR36. No audio is rerun
+until the current frozen candidate passes this independent gate. See
+`partition-invariant-regular-initial-slot-diagnosis-2026-07-19.md`.
+
+The independent frozen gate retains FR36. T123 Run A and Run B have the same
+SHA-256 and differ from FR35 only at the complete `text_id=217` phrase; T111 is
+byte-identical to FR35. The reviewer reads the entire displayed
+`40:45-42:32` conversation forward and reverse and confirms Zhu Jie's response
+between Tang Yunfeng's profitability question and follow-up question without a
+neighbouring change. The frozen ledger advances by one reviewed critical Zhu
+Jie contribution to `510/556`, and the 2400-3000 fixed block reaches
+`117/129` and passes. The 3000-3600 block and the other conjunctive closing
+gates remain open, so FR36 is a transitional frozen repair and not a
+real-stream acceptance result. See
+`partition-invariant-regular-initial-slot-review-2026-07-19.md`.
+
 ### 8.15 FR28 120-second outcome and promotion ladder
 
 T117-T121 are complete. The frozen T116 packages replay byte-stably; their
