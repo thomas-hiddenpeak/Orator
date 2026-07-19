@@ -1209,6 +1209,165 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
     }
     return candidate_identity;
   };
+  // Keep a native phrase only when every typed scale exposes the same
+  // challenger/current abstention pattern under the existing gates.
+  auto partition_invariant_cross_scale_preserves_current =
+      [&](const auto& item, const std::string& challenger_identity) {
+        const double phrase_duration = item.end - item.start;
+        if (item.kind != "punctuation_phrase" ||
+            item.text_id != text.id || challenger_identity.empty() ||
+            phrase_duration + 1e-9 <
+                pipeline.config_.voiceprint_primary_consensus_min_sec ||
+            phrase_duration + 1e-9 >=
+                pipeline.config_.voiceprint_short_max_sec ||
+            !item.embedding_available || !item.robust_gallery_complete ||
+            !has_minimum_aligned_units(item.start, item.end)) {
+          return false;
+        }
+
+        std::string current_identity;
+        for (int index = item.source_start; index < item.source_end; ++index) {
+          if (labels[index].speaker_id.empty() || labels[index].voiceprint ||
+              labels[index].base_speaker_id != labels[index].speaker_id) {
+            return false;
+          }
+          if (current_identity.empty()) {
+            current_identity = labels[index].speaker_id;
+          } else if (labels[index].speaker_id != current_identity) {
+            return false;
+          }
+        }
+        if (current_identity.empty() ||
+            current_identity == challenger_identity) {
+          return false;
+        }
+
+        auto uncontested_native_slot = [&](const auto& segments,
+                                            std::string* slot) {
+          std::set<std::string> overlapping_slots;
+          for (const auto& segment : segments) {
+            if (Overlap(item.start, item.end, segment.start, segment.end) <=
+                1e-9) {
+              continue;
+            }
+            if (segment.speaker_id != current_identity ||
+                segment.speaker.empty()) {
+              return false;
+            }
+            overlapping_slots.insert(segment.speaker);
+          }
+          if (overlapping_slots.size() != 1 ||
+              identity_coverage(segments, item.start, item.end,
+                                current_identity) +
+                      1e-9 <
+                  phrase_duration) {
+            return false;
+          }
+          *slot = *overlapping_slots.begin();
+          return true;
+        };
+        std::string activity_slot;
+        std::string primary_slot;
+        if (!uncontested_native_slot(pipeline.speakers_, &activity_slot) ||
+            !uncontested_native_slot(pipeline.primary_speakers_,
+                                     &primary_slot) ||
+            activity_slot != primary_slot) {
+          return false;
+        }
+
+        const auto phrase_session =
+            ranked_pair(item.session_scores, phrase_duration);
+        const auto phrase_robust =
+            ranked_pair(item.robust_scores, phrase_duration);
+        if (!phrase_session || !phrase_robust ||
+            phrase_session->first.speaker_id != challenger_identity ||
+            phrase_session->second_id != current_identity ||
+            !phrase_session->first.score_pass ||
+            !phrase_session->first.margin_pass ||
+            phrase_robust->first.speaker_id != challenger_identity ||
+            phrase_robust->second_id != current_identity ||
+            !phrase_robust->first.score_pass ||
+            phrase_robust->first.margin_pass) {
+          return false;
+        }
+
+        const double tolerance =
+            pipeline.config_.align_boundary_split_tolerance_sec;
+        const SpeakerVoiceprintEvidence* containing_vad = nullptr;
+        for (const auto& candidate : pipeline.voiceprint_vad_) {
+          if (candidate.kind != "vad" ||
+              candidate.start > item.start + tolerance ||
+              candidate.end + tolerance < item.end) {
+            continue;
+          }
+          if (containing_vad != nullptr) return false;
+          containing_vad = &candidate;
+        }
+        if (containing_vad == nullptr ||
+            !containing_vad->embedding_available ||
+            !containing_vad->robust_gallery_complete) {
+          return false;
+        }
+        const double vad_duration = containing_vad->end - containing_vad->start;
+        const auto vad_session =
+            ranked_pair(containing_vad->session_scores, vad_duration);
+        const auto vad_robust =
+            ranked_pair(containing_vad->robust_scores, vad_duration);
+        if (!vad_session || !vad_robust ||
+            vad_session->first.speaker_id != challenger_identity ||
+            vad_session->second_id != current_identity ||
+            !vad_session->first.score_pass ||
+            !vad_session->first.margin_pass ||
+            vad_robust->first.speaker_id != current_identity ||
+            vad_robust->second_id != challenger_identity ||
+            !vad_robust->first.score_pass ||
+            vad_robust->first.margin_pass) {
+          return false;
+        }
+
+        const SpeakerVoiceprintEvidence* containing_interval = nullptr;
+        const SpeakerVoiceprintEvidence* complete_source = nullptr;
+        for (const auto& candidate : text_voiceprint) {
+          if (candidate.text_id != item.text_id ||
+              (candidate.kind != "business_interval" &&
+               candidate.kind != "complete_source") ||
+              candidate.source_start > item.source_start ||
+              candidate.source_end < item.source_end ||
+              candidate.start > item.start + tolerance ||
+              candidate.end + tolerance < item.end) {
+            continue;
+          }
+          auto** destination = candidate.kind == "business_interval"
+                                   ? &containing_interval
+                                   : &complete_source;
+          if (*destination != nullptr) return false;
+          *destination = &candidate;
+        }
+
+        auto broad_view_supports_current = [&](const auto* broad) {
+          if (broad == nullptr || !broad->embedding_available ||
+              !broad->robust_gallery_complete) {
+            return false;
+          }
+          const double duration = broad->end - broad->start;
+          if (duration + 1e-9 <
+              pipeline.config_.voiceprint_short_max_sec) {
+            return false;
+          }
+          const auto session = ranked_pair(broad->session_scores, duration);
+          const auto robust = ranked_pair(broad->robust_scores, duration);
+          return session && robust &&
+                 session->first.speaker_id == current_identity &&
+                 session->second_id == challenger_identity &&
+                 !session->first.score_pass &&
+                 session->first.margin_pass &&
+                 robust->first.speaker_id == current_identity &&
+                 robust->second_id == challenger_identity &&
+                 !robust->first.score_pass && robust->first.margin_pass;
+        };
+        return broad_view_supports_current(containing_interval) &&
+               broad_view_supports_current(complete_source);
+      };
   auto exact_interval_primary_conflict_challenge = [&](const auto& item)
       -> std::optional<std::string> {
     const double interval_duration = item.end - item.start;
@@ -3298,6 +3457,10 @@ std::vector<BusinessSpeakerPipeline::Entry> SpeakerFusionPolicy::Apply(
                             : std::nullopt;
     const bool dual_agreement =
         robust && robust->speaker_id == session->speaker_id;
+    if (partition_invariant_cross_scale_preserves_current(
+            *item, session->speaker_id)) {
+      continue;
+    }
     if (native_views_preserve_current(*item, session->speaker_id)) {
       continue;
     }

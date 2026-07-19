@@ -15,7 +15,9 @@ review rejects its broad primary-return guard; FR32 exact cross-scale
 primary-return precedence passes deterministic frozen replay and the complete
 real-WebSocket promotion ladder; independent full Run A and Run B contextual
 reviews each record `506/556`, but two fixed blocks, 朱杰 recall, critical
-turns, and confident-wrong attribution fail; T102, T084, full
+turns, and confident-wrong attribution fail; FR33 deterministic T111/T123
+replay and complete changed-context review retain a frozen `ref-0517` repair
+at `507/556`, with no new real-path claim; T102, T084, full
 canonical closure, release sign-off, and industrial readiness remain open
 **Created**: 2026-07-13
 **Scope**: Re-establish a truthful product baseline, recover full-session business
@@ -2183,6 +2185,33 @@ subject to the complete acceptance gates in this spec.
   clock. Frozen T111 and T123 inputs MUST replay deterministically, and every
   changed context MUST receive complete chronological and reverse contextual
   semantic review against `test.txt` before retention or a real-WebSocket run.
+- **FR33**: An ordinary short punctuation-phrase session write MAY preserve
+  the existing identity only when the complete typed evidence proves one
+  partition-invariant cross-scale abstention topology. Every phrase character
+  and base label MUST carry one non-voiceprint current identity. One activity
+  slot and one primary slot of that identity MUST cover the phrase completely
+  without a competing overlap, and the phrase MUST satisfy the existing
+  aligned-unit minimum. The phrase session gallery MUST select one challenger
+  under the existing short score and margin gates; the complete phrase robust
+  gallery MUST rank that challenger first and the current identity second,
+  pass score, and fail margin. Exactly one embedding-backed, robust-complete
+  typed VAD interval MUST contain the phrase. Its session gallery MUST select
+  the same challenger with the current identity second, while its robust
+  gallery MUST reverse that pair, rank the current identity first, pass score,
+  and fail margin. Exactly one containing same-text `business_interval` and
+  exactly one containing same-text `complete_source` MUST be embedding-backed,
+  robust-complete regular spans. Their session and robust galleries MUST all
+  rank the current identity first and the same challenger second, pass the
+  unchanged regular margin, and fail only the unchanged regular absolute-score
+  gate. Specialized challenges MUST retain precedence. Any missing, duplicate,
+  ineligible, differently ranked, differently gated, competing, unaligned, or
+  non-native evidence MUST preserve ordinary behavior. FR33 MUST add no TOML
+  value, score, margin, duration, identity, transcript, name, timestamp,
+  reference datum, or fitted constant and MUST alter no producer evidence or
+  common-clock coordinate. Frozen T111/T123 inputs MUST replay
+  deterministically, and every changed context MUST receive complete forward
+  and reverse contextual semantic review against `test.txt` before retention
+  or a new audio run.
 
 The first FR31 implementation passed its focused engineering test and produced
 byte-stable repeated T111 and T123 replays. Complete forward and reverse review
@@ -2216,6 +2245,27 @@ contextual regression or long-session identity swap. The 2400-3000 and
 fail. FR32 is therefore retained as a bounded repeatable repair, while
 speaker-business closure remains open. See
 `exact-cross-scale-primary-return-full-promotion-review-2026-07-19.md`.
+
+The frozen T123 diagnosis after T142 identifies a separate partition-sensitive
+abstention at `ref-0517`. Activity and primary uniformly support Tang Yunfeng.
+The short phrase's session gallery alone selects Zhu Jie, its robust gallery
+abstains, the unique containing VAD reverses to Tang in the robust view, and
+both broader same-text scales rank Tang first in both galleries while failing
+only the unchanged regular absolute-score gate. FR33 is therefore specified as
+a preservation rule over the complete typed topology, not a new speaker
+override or threshold adjustment. Implementation, replay, and complete
+changed-context review follow the same frozen-evidence gate. Repeated T123
+replays are byte-identical and change only `text_id=289`; repeated T111
+replays are byte-identical to FR32. Complete forward and reverse reading of
+`ref-0508` through `ref-0525` confirms that the changed phrase is Tang
+Yunfeng's `ref-0517` question, while Shi Yi's preceding `ref-0516` and every
+following contribution remain unchanged. FR33 is retained on frozen evidence,
+moving the manually reconciled frozen candidate to `507/556`. The two late
+fixed blocks, 朱杰 recall, critical-turn, and confident-wrong gates continue to
+fail, and no new real-path result is attributed to FR33. See
+`partition-invariant-cross-scale-abstention-diagnosis-2026-07-19.md`.
+See also
+`partition-invariant-cross-scale-abstention-review-2026-07-19.md`.
 
 ## 5. Acceptance Gates
 

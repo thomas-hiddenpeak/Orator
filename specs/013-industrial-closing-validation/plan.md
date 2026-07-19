@@ -3290,6 +3290,18 @@ and repeated T111/T123 production-projector replays precede complete forward
 and reverse review of every changed context. A failed frozen review removes the
 candidate without an audio run.
 
+The frozen review retains FR33. Repeated T123 outputs are byte-identical and
+change only `text_id=289`; repeated T111 outputs remain byte-identical to
+FR32. Complete chronological and reverse reading of `ref-0508` through
+`ref-0525` assigns the changed question to Tang Yunfeng's `ref-0517` and finds
+no change to Shi Yi's preceding contribution or any following turn. The
+manually reconciled frozen candidate advances from `506/556` to `507/556`, but
+both late fixed blocks, 朱杰 recall, critical attribution, and confident-wrong
+attribution still fail. FR33 is retained only as frozen evidence. The next
+candidate remains frozen and separately specified; no audio rerun follows
+from this result. See
+`partition-invariant-cross-scale-abstention-review-2026-07-19.md`.
+
 ### 8.15 FR28 120-second outcome and promotion ladder
 
 T117-T121 are complete. The frozen T116 packages replay byte-stably; their

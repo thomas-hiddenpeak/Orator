@@ -2065,7 +2065,7 @@ T102/T084 remain open 2026-07-19
   attribution fail. FR32 remains a bounded transitional repair; closure stays
   open. See
   `exact-cross-scale-primary-return-full-promotion-review-2026-07-19.md`.
-- [ ] T143 Diagnose the remaining frozen full-session speaker errors by
+- [x] T143 Diagnose the remaining frozen full-session speaker errors by
   displaying each pipeline's typed evidence on the common time base. Specify
   FR33 only for the partition-invariant `ref-0517` topology: uniform activity
   and primary current identity, session-only phrase challenge, opposite
@@ -2073,12 +2073,36 @@ T102/T084 remain open 2026-07-19
   the current identity, complete galleries, and existing alignment/TOML gates.
   Add no fitted value or reference-specific input; document why each condition
   is independently available at runtime and why specialized challenges keep
-  precedence.
-- [ ] T144 Implement FR33 in the final fusion policy with focused positive and
+  precedence. Frozen `text_id=289` confirms uniform Tang activity/primary,
+  a session-only Zhu phrase challenge, a robust VAD reversal to Tang, and
+  session/robust broad Tang support that fails only the existing regular score
+  gate. FR33 is bounded to that exact typed topology; see
+  `partition-invariant-cross-scale-abstention-diagnosis-2026-07-19.md`.
+- [x] T144 Implement FR33 in the final fusion policy with focused positive and
   abstention tests. Pass a warning-clean build and all CTest entries, replay
   frozen T111 and T123 packages at least twice, verify only mechanical
   contracts, and arrange all changed evidence. Read every changed complete
   conversation forward and reverse against `test.txt` before retaining or
   rejecting the candidate. No executable mechanism may label correctness,
   aggregate accuracy, rank/select the candidate, or issue the verdict. Do not
-  run new audio until this frozen review passes.
+  run new audio until this frozen review passes. Repeated T123 replays are
+  byte-identical at SHA-256
+  `c1b3622c36daa34537984ed8036e45a40199a4612ba3a4590dc2f02a3d7e172e`
+  and change only `text_id=289`; repeated T111 replays remain byte-identical
+  to FR32 at SHA-256
+  `646ea91b357cafaf8af82c4f45e5cc771c622a501e71b12f2d1aa1555fb055f2`.
+  Complete forward and reverse reading of `ref-0508` through `ref-0525`
+  retains the Tang Yunfeng `ref-0517` repair with no neighboring regression.
+  The frozen candidate is manually reconciled at `507/556`, but all remaining
+  conjunctive failures keep closure open. See
+  `partition-invariant-cross-scale-abstention-review-2026-07-19.md`.
+- [x] T145 Commit and push FR33 as a transitional experimental checkpoint only
+  after the warning-clean full build and all CTest entries pass. The complete
+  build emits no warning/error line and all `69/69` CTest entries pass; these
+  are engineering checks only. The checkpoint explicitly leaves speaker
+  closing open and attributes no new real-WebSocket result to FR33.
+- [ ] T146 Specify FR34 independently on frozen evidence for the exact phrase/
+  unique VAD versus coarse-direct topology exposed at `ref-0406`. Add no fitted
+  value or source-specific input, and do not start another real-audio promotion
+  ladder until the frozen upper-bound candidates have completed contextual
+  review.
