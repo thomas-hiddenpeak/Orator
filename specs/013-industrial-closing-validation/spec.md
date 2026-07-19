@@ -22,7 +22,9 @@ frozen evidence at `508/556`; FR35 retains the partition-invariant
 `ref-0420` isolated response on frozen evidence at `509/556`; FR36 retains the
 regular same-slot six-view `ref-0350` repair at `510/556` and passes the
 2400-3000 fixed block; FR37 retains the bracketed-primary `ref-0478` response
-at `511/556`, with no new real-path claim; T102, T084, full canonical closure,
+at `511/556`, with no new real-path claim; FR38 retains the cross-VAD
+`ref-0504` phrase tail at `512/556` and raises the 3000-3600 natural-turn block
+to `79/87`, with no new real-path claim; T102, T084, full canonical closure,
 release sign-off, and industrial readiness remain open
 **Created**: 2026-07-13
 **Scope**: Re-establish a truthful product baseline, recover full-session business
@@ -2324,6 +2326,41 @@ subject to the complete acceptance gates in this spec.
   changed complete conversation MUST receive chronological and reverse
   contextual semantic review against `test.txt` before retention or a new
   audio run.
+- **FR38**: The no-embedding tail of one source-leading punctuation phrase MAY
+  inherit the preceding direct identity B only when a strict cross-VAD
+  partition topology separates it from the following native identity C. The
+  embedding-backed phrase MUST start at source zero, remain within the
+  existing regular phrase bounds, and consist of one leading embedded
+  interval plus one source-contiguous subminimum tail interval. The tail MUST
+  contain exactly one positive-duration visible aligned character followed
+  only by configured punctuation. One separately embedded following interval
+  MUST start exactly at the phrase source end, and both of its galleries MUST
+  rank C first. The three intervals MUST be ordered without time overlap.
+  Leading labels MUST be uniformly ordinary
+  short-direct B over uniform native A; tail and following labels MUST be
+  unprotected native sole-support C; A, B, and C MUST be pairwise distinct.
+  Activity and primary MUST each expose exactly one completely covering A
+  local slot over the leading interval and one completely covering C local
+  slot over the tail and following interval, with no competing overlap. Both
+  leading interval galleries MUST rank B first and A second and pass the
+  unchanged short gates. The phrase session view MUST rank A then B, the
+  robust view B then A, both MUST fail the unchanged regular score gate, and
+  exactly one MUST pass the unchanged regular margin. Exactly one leading VAD
+  MUST rank B then A in both galleries under the unchanged short score gate
+  with exactly one margin pass. Exactly one different tail VAD MUST begin
+  within the existing alignment boundary tolerance, contain the tail, extend
+  into the following interval, rank C then B in both galleries, and pass both
+  unchanged short gates. Existing specialized writes MUST retain precedence,
+  and only the exact tail source/alignment range may change. Missing,
+  duplicate, differently ranked, differently gated, mixed, protected,
+  unaligned, non-leading, non-punctuation, competing, or source/time-
+  inconsistent evidence MUST preserve existing behavior. FR38 MUST add no
+  TOML value, score, margin, duration, future lookahead, identity, transcript,
+  speaker name, timestamp, reference datum, or fitted constant and MUST alter
+  no producer evidence or common-clock coordinate. Frozen T111/T123 inputs
+  MUST replay deterministically, and every changed complete conversation MUST
+  receive chronological and reverse contextual semantic review against
+  `test.txt` before retention or a new audio run.
 
 The first FR31 implementation passed its focused engineering test and produced
 byte-stable repeated T111 and T123 replays. Complete forward and reverse review
@@ -2482,6 +2519,31 @@ Zhu Jie recall, critical attribution, confident-wrong attribution, and
 speaker-time sign-off also remain open. No new real-WebSocket result or closure
 claim is attributed to FR37. See
 `bracketed-primary-adjacent-vad-reconstruction-review-2026-07-19.md`.
+
+FR38 corrects the separate T123 `ref-0504` boundary rather than restoring the
+disabled broad future-epoch experiment. T123 already assigns the leading
+`就在这边站` interval to Tang Yunfeng. Its source-leading punctuation phrase
+continues across a VAD gap with one aligned visible tail character plus
+punctuation, and that no-embedding tail inherits the following Shi Yi native
+clause. FR38 requires the exact three-identity interval/phrase, unique
+activity/primary, leading-VAD, and tail-VAD topology specified above and
+rewrites only the tail. It changes no TOML value, threshold, producer track,
+text, or common-clock coordinate. See
+`cross-vad-phrase-tail-reconstruction-diagnosis-2026-07-19.md`.
+
+Repeated FR38 T123 replays are byte-identical and split only `text_id=280`:
+`3301.164-3301.244` `着，` moves from Shi Yi to Tang Yunfeng, while the
+following `3301.404-3303.964` clause remains on Shi Yi's original sole-support
+path. T111 remains byte-identical to FR37. Complete reading of the changed
+`53:49-55:45` conversation chronologically and in reverse confirms Tang's
+complete ownership correction and preserves the adjacent known `ref-0503` and
+`ref-0505` failures. The warning-clean build and all 69 CTest entries pass as
+engineering evidence. The manually reconciled frozen candidate is `512/556`;
+the 3000-3600 natural-turn block now passes at `79/87`. Zhu Jie recall,
+critical attribution, confident-wrong attribution, speaker-time sign-off,
+real-path repeatability, and holdout evidence remain open. No new
+real-WebSocket result or closure claim is attributed to FR38. See
+`cross-vad-phrase-tail-reconstruction-review-2026-07-19.md`.
 
 ## 5. Acceptance Gates
 

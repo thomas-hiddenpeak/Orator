@@ -2225,3 +2225,33 @@ T102/T084 remain open 2026-07-19
   change. The manually reconciled frozen ledger is `511/556`; the 3000-3600
   block advances to `78/87` but still fails. See
   `bracketed-primary-adjacent-vad-reconstruction-review-2026-07-19.md`.
+- [x] T158 Correct the `ref-0504` diagnosis boundary on frozen T111/T123
+  evidence. Reject re-enabling the broad future-epoch lookahead because T123
+  already assigns the leading interval to Tang Yunfeng. Specify FR38 as a
+  strict cross-VAD reconstruction of only one no-embedding, one-visible-
+  character punctuation-phrase tail, requiring the exact three-identity,
+  interval, phrase, activity/primary, and two-VAD topology under unchanged
+  gates. Add no TOML value, threshold, transcript, timestamp, reference lookup,
+  or product verdict. See
+  `cross-vad-phrase-tail-reconstruction-diagnosis-2026-07-19.md`.
+- [x] T159 Implement FR38 with focused positive and independent abstention
+  tests. Pass a warning-clean build and all CTest entries, then replay frozen
+  T123 and T111 producer packages at least twice. Automation may verify only
+  mechanical contracts and arrange raw changed contexts; it may not label
+  correctness, aggregate accuracy, select the candidate, or issue an
+  acceptance verdict. The warning-clean build and all `69/69` CTest entries
+  pass. Repeated T123 replays are byte-identical at SHA-256
+  `090e2cb5b859e4f8df5ba4e2fb014a5c65180e9c945a4663883bf0759a08305a`;
+  repeated T111 replays remain byte-identical to FR37 at SHA-256
+  `646ea91b357cafaf8af82c4f45e5cc771c622a501e71b12f2d1aa1555fb055f2`.
+  Mechanical display exposes only the `text_id=280` tail split.
+- [x] T160 Read every FR38 changed complete conversation chronologically and
+  in reverse against `test.txt`. Retain or remove FR38 only from that
+  contextual semantic review, synchronize spec/plan/tasks/project state, and
+  label any commit as a transitional frozen experiment. Do not attribute a new
+  real-WebSocket result or speaker-business closure to the replay. Complete
+  forward and reverse reading of `53:49-55:45` retains Tang Yunfeng's complete
+  ownership correction, preserves the following known error, and finds no new
+  neighbouring regression. The manually reconciled frozen ledger is
+  `512/556`; the 3000-3600 natural-turn block passes at `79/87`. See
+  `cross-vad-phrase-tail-reconstruction-review-2026-07-19.md`.

@@ -4082,6 +4082,380 @@ int main() {
           "an abstaining VAD blocks interval reconstruction");
   }
 
+  // ---- 20g12c. FR38: a source-leading punctuation phrase may recover only
+  // one cross-VAD, no-embedding tail character while preserving the following
+  // native clause.
+  // ----
+  {
+    using Entry = ComprehensiveTimeline::Entry;
+    struct CaseOptions {
+      bool phrase_starts_at_source_zero = true;
+      bool valid_tail_source_shape = true;
+      bool tail_embedding = false;
+      bool include_following = true;
+      bool following_embedding = true;
+      bool following_same_identity = true;
+      bool native_primary_slots_match = true;
+      bool include_competing_activity = false;
+      bool leading_interval_eligible = true;
+      bool leading_robust_order = true;
+      bool phrase_rank_pattern = true;
+      bool phrase_score_abstains = true;
+      bool phrase_exactly_one_margin = true;
+      bool include_tail_unit = true;
+      bool duplicate_tail_unit = false;
+      int leading_vad_count = 1;
+      bool leading_vad_rank_pattern = true;
+      bool leading_vad_exactly_one_margin = true;
+      int tail_vad_count = 1;
+      bool tail_vad_rank_pattern = true;
+      bool tail_vad_eligible = true;
+      bool tail_vad_starts_near = true;
+      bool tail_vad_extends_following = true;
+      bool vad_gap_isolated = true;
+      bool following_rank_native = true;
+    };
+    auto run_case = [](const CaseOptions& options) -> std::vector<Entry> {
+      BusinessSpeakerPipeline::Config config;
+      config.voiceprint_fusion_enabled = true;
+      config.speaker_overlap_tie_policy =
+          BusinessSpeakerPipeline::SpeakerOverlapTiePolicy::kPrimarySpeaker;
+      TestBusinessSpeakerPipeline tl(config);
+
+      const std::string following_identity =
+          options.following_same_identity ? "spk_c" : "spk_d";
+      std::vector<TestBusinessSpeakerPipeline::SpeakerInput> activity = {
+          {0.1, 1.0, "slot_a", 0.9f, "spk_a"},
+          {1.5, options.following_same_identity ? 4.0 : 1.75, "slot_c",
+           0.9f, "spk_c"}};
+      if (!options.following_same_identity) {
+        activity.push_back({1.75, 4.0, "slot_d", 0.9f, "spk_d"});
+      }
+      if (options.include_competing_activity) {
+        activity.push_back({1.6, 1.72, "slot_x", 0.7f, "spk_x"});
+      }
+      tl.ReplaceSpeakers(activity);
+
+      const std::string primary_c_slot =
+          options.native_primary_slots_match ? "slot_c" : "slot_x";
+      std::vector<TestBusinessSpeakerPipeline::SpeakerInput> primary = {
+          {0.1, 1.0, "slot_a", 0.9f, "spk_a"},
+          {1.5, options.following_same_identity ? 4.0 : 1.75,
+           primary_c_slot, 0.9f, "spk_c"}};
+      if (!options.following_same_identity) {
+        primary.push_back({1.75, 4.0, "slot_d", 0.9f, "spk_d"});
+      }
+      tl.ReplacePrimarySpeakers(primary);
+
+      tl.UpsertText(0, 0.0, 4.0, "甲乙丙丁戊，己庚辛。");
+      tl.UpsertAlign(0, 0.0, 4.0,
+                     {{0.2, 0.3, "甲"}, {0.3, 0.4, "乙"},
+                      {0.4, 0.5, "丙"}, {0.5, 0.8, "丁"},
+                      {1.6, 1.72, "戊"}, {1.8, 2.0, "己"},
+                      {2.0, 2.2, "庚"}, {2.2, 2.4, "辛"}});
+
+      ComprehensiveTimeline::SpeakerVoiceprintEvidence leading;
+      leading.evidence_id = "business_interval:0:0";
+      leading.kind = "business_interval";
+      leading.text_id = 0;
+      leading.source_start = 0;
+      leading.source_end = 4;
+      leading.start = 0.2;
+      leading.end = 0.8;
+      leading.embedding_available = true;
+      leading.robust_gallery_complete = true;
+      const float leading_top =
+          options.leading_interval_eligible ? 0.70f : 0.52f;
+      const float leading_second =
+          options.leading_interval_eligible ? 0.50f : 0.50f;
+      leading.session_scores = {{"spk_b", leading_top},
+                                {"spk_a", leading_second},
+                                {"spk_c", 0.20f}};
+      leading.robust_scores = options.leading_robust_order
+                                  ? std::vector<ComprehensiveTimeline::VoiceprintScore>{
+                                        {"spk_b", leading_top - 0.01f},
+                                        {"spk_a", leading_second - 0.01f},
+                                        {"spk_c", 0.20f}}
+                                  : std::vector<ComprehensiveTimeline::VoiceprintScore>{
+                                        {"spk_a", leading_top - 0.01f},
+                                        {"spk_b", leading_second - 0.01f},
+                                        {"spk_c", 0.20f}};
+
+      const int phrase_source_end =
+          options.valid_tail_source_shape ? 6 : 7;
+      ComprehensiveTimeline::SpeakerVoiceprintEvidence tail;
+      tail.evidence_id = "business_interval:0:1";
+      tail.kind = "business_interval";
+      tail.text_id = 0;
+      tail.source_start = 4;
+      tail.source_end = phrase_source_end;
+      tail.start = 1.6;
+      tail.end = 1.72;
+      tail.embedding_available = options.tail_embedding;
+
+      ComprehensiveTimeline::SpeakerVoiceprintEvidence following;
+      following.evidence_id = "business_interval:0:2";
+      following.kind = "business_interval";
+      following.text_id = 0;
+      following.source_start = phrase_source_end;
+      following.source_end = 10;
+      following.start = 1.8;
+      following.end = 3.8;
+      following.embedding_available = options.following_embedding;
+      following.robust_gallery_complete = true;
+      const std::string following_top =
+          options.following_rank_native ? following_identity : "spk_b";
+      const std::string following_second =
+          options.following_rank_native ? "spk_a" : following_identity;
+      following.session_scores = {{following_top, 0.53f},
+                                  {following_second, 0.31f},
+                                  {"spk_b", 0.20f}};
+      following.robust_scores = {{following_top, 0.52f},
+                                 {following_second, 0.30f},
+                                 {"spk_b", 0.20f}};
+
+      ComprehensiveTimeline::SpeakerVoiceprintEvidence phrase;
+      phrase.evidence_id = "punctuation_phrase:0:0";
+      phrase.kind = "punctuation_phrase";
+      phrase.text_id = 0;
+      phrase.source_start = options.phrase_starts_at_source_zero ? 0 : 1;
+      phrase.source_end = phrase_source_end;
+      phrase.start = 0.2;
+      phrase.end = 1.72;
+      phrase.embedding_available = true;
+      phrase.robust_gallery_complete = true;
+      const float phrase_session_top =
+          options.phrase_score_abstains ? 0.50f : 0.62f;
+      phrase.session_scores = options.phrase_rank_pattern
+                                  ? std::vector<ComprehensiveTimeline::VoiceprintScore>{
+                                        {"spk_a", phrase_session_top},
+                                        {"spk_b", 0.45f},
+                                        {"spk_c", 0.20f}}
+                                  : std::vector<ComprehensiveTimeline::VoiceprintScore>{
+                                        {"spk_b", phrase_session_top},
+                                        {"spk_a", 0.45f},
+                                        {"spk_c", 0.20f}};
+      phrase.robust_scores =
+          options.phrase_exactly_one_margin
+              ? std::vector<ComprehensiveTimeline::VoiceprintScore>{
+                    {"spk_b", 0.50f}, {"spk_a", 0.49f},
+                    {"spk_c", 0.20f}}
+              : std::vector<ComprehensiveTimeline::VoiceprintScore>{
+                    {"spk_b", 0.52f}, {"spk_a", 0.47f},
+                    {"spk_c", 0.20f}};
+
+      std::vector<ComprehensiveTimeline::SpeakerVoiceprintEvidence> evidence =
+          {leading, tail, phrase};
+      if (options.include_following) evidence.push_back(following);
+
+      if (options.include_tail_unit) {
+        ComprehensiveTimeline::SpeakerVoiceprintEvidence unit;
+        unit.evidence_id = "aligned_unit:0:4";
+        unit.kind = "aligned_unit";
+        unit.text_id = 0;
+        unit.source_start = 4;
+        unit.source_end = 5;
+        unit.start = 1.6;
+        unit.end = 1.72;
+        evidence.push_back(unit);
+        if (options.duplicate_tail_unit) {
+          unit.evidence_id = "aligned_unit:0:4-duplicate";
+          evidence.push_back(unit);
+        }
+      }
+
+      for (int index = 0; index < options.leading_vad_count; ++index) {
+        ComprehensiveTimeline::SpeakerVoiceprintEvidence vad;
+        vad.evidence_id = "vad:leading:" + std::to_string(index);
+        vad.kind = "vad";
+        vad.text_id = -1;
+        vad.start = 0.1 - index * 0.01;
+        vad.end = (options.vad_gap_isolated ? 0.9 : 1.4) + index * 0.01;
+        vad.embedding_available = true;
+        vad.robust_gallery_complete = true;
+        const std::string first =
+            options.leading_vad_rank_pattern ? "spk_b" : "spk_a";
+        const std::string second =
+            options.leading_vad_rank_pattern ? "spk_a" : "spk_b";
+        vad.session_scores = {
+            {first, 0.55f}, {second, 0.53f}, {"spk_c", 0.20f}};
+        vad.robust_scores =
+            options.leading_vad_exactly_one_margin
+                ? std::vector<ComprehensiveTimeline::VoiceprintScore>{
+                      {first, 0.62f}, {second, 0.54f}, {"spk_c", 0.20f}}
+                : std::vector<ComprehensiveTimeline::VoiceprintScore>{
+                      {first, 0.55f}, {second, 0.53f}, {"spk_c", 0.20f}};
+        evidence.push_back(vad);
+      }
+
+      for (int index = 0; index < options.tail_vad_count; ++index) {
+        ComprehensiveTimeline::SpeakerVoiceprintEvidence vad;
+        vad.evidence_id = "vad:tail:" + std::to_string(index);
+        vad.kind = "vad";
+        vad.text_id = -1;
+        vad.start =
+            (options.tail_vad_starts_near ? 1.55 : 1.40) - index * 0.01;
+        vad.end =
+            (options.tail_vad_extends_following ? 2.4 : 1.75) + index * 0.01;
+        vad.embedding_available = true;
+        vad.robust_gallery_complete = true;
+        const std::string first =
+            options.tail_vad_rank_pattern ? "spk_c" : "spk_b";
+        const std::string second =
+            options.tail_vad_rank_pattern ? "spk_b" : "spk_c";
+        const float top = options.tail_vad_eligible ? 0.70f : 0.52f;
+        const float runner_up = options.tail_vad_eligible ? 0.50f : 0.50f;
+        vad.session_scores = {
+            {first, top}, {second, runner_up}, {"spk_a", 0.20f}};
+        vad.robust_scores = {{first, top - 0.01f},
+                             {second, runner_up - 0.01f},
+                             {"spk_a", 0.20f}};
+        evidence.push_back(vad);
+      }
+      tl.ReplaceVoiceprint(evidence);
+      return tl.Snapshot();
+    };
+
+    const std::string reason =
+        "voiceprint_cross_vad_phrase_tail_reconstruction";
+    auto selected = [&](const std::vector<Entry>& entries) {
+      bool tail_selected = false;
+      bool following_preserved = false;
+      for (const auto& entry : entries) {
+        if (entry.text == "戊，" && entry.speaker_id == "spk_b" &&
+            entry.speaker_decision.reason == reason &&
+            entry.speaker_decision.speaker_source ==
+                "sortformer_activity+primary_top1+titanet_interval+"
+                "titanet_phrase+titanet_vad+robust_gallery+"
+                "forced_alignment") {
+          tail_selected = true;
+        }
+        if (entry.text.find("己庚辛") != std::string::npos &&
+            entry.speaker_id == "spk_c" &&
+            entry.speaker_decision.reason != reason) {
+          following_preserved = true;
+        }
+      }
+      return tail_selected && following_preserved;
+    };
+    auto abstained = [&](const std::vector<Entry>& entries) {
+      return std::none_of(entries.begin(), entries.end(), [&](const auto& entry) {
+        return entry.speaker_decision.reason == reason;
+      });
+    };
+
+    CHECK(selected(run_case({})),
+          "cross-VAD phrase tail is restored without repainting next clause");
+    CaseOptions nonleading_phrase;
+    nonleading_phrase.phrase_starts_at_source_zero = false;
+    CHECK(abstained(run_case(nonleading_phrase)),
+          "a nonleading phrase blocks tail reconstruction");
+    CaseOptions invalid_tail_shape;
+    invalid_tail_shape.valid_tail_source_shape = false;
+    CHECK(abstained(run_case(invalid_tail_shape)),
+          "multiple visible tail characters block reconstruction");
+    CaseOptions embedded_tail;
+    embedded_tail.tail_embedding = true;
+    CHECK(abstained(run_case(embedded_tail)),
+          "an independently embedded tail keeps ordinary behavior");
+    CaseOptions missing_following;
+    missing_following.include_following = false;
+    CHECK(abstained(run_case(missing_following)),
+          "missing following interval blocks reconstruction");
+    CaseOptions unembedded_following;
+    unembedded_following.following_embedding = false;
+    CHECK(abstained(run_case(unembedded_following)),
+          "an unembedded following interval blocks reconstruction");
+    CaseOptions changed_following_identity;
+    changed_following_identity.following_same_identity = false;
+    CHECK(abstained(run_case(changed_following_identity)),
+          "a different following native identity blocks reconstruction");
+    CaseOptions primary_slot_mismatch;
+    primary_slot_mismatch.native_primary_slots_match = false;
+    CHECK(abstained(run_case(primary_slot_mismatch)),
+          "activity and primary local-slot mismatch blocks reconstruction");
+    CaseOptions competing_activity;
+    competing_activity.include_competing_activity = true;
+    CHECK(abstained(run_case(competing_activity)),
+          "competing tail activity blocks reconstruction");
+    CaseOptions weak_leading;
+    weak_leading.leading_interval_eligible = false;
+    CHECK(abstained(run_case(weak_leading)),
+          "an abstaining leading interval blocks reconstruction");
+    CaseOptions leading_order;
+    leading_order.leading_robust_order = false;
+    CHECK(abstained(run_case(leading_order)),
+          "a changed leading robust order blocks reconstruction");
+    CaseOptions phrase_order;
+    phrase_order.phrase_rank_pattern = false;
+    CHECK(abstained(run_case(phrase_order)),
+          "a changed phrase top-two order blocks reconstruction");
+    CaseOptions eligible_phrase;
+    eligible_phrase.phrase_score_abstains = false;
+    CHECK(abstained(run_case(eligible_phrase)),
+          "an independently eligible phrase stays on its ordinary path");
+    CaseOptions phrase_margins;
+    phrase_margins.phrase_exactly_one_margin = false;
+    CHECK(abstained(run_case(phrase_margins)),
+          "a changed phrase margin pattern blocks reconstruction");
+    CaseOptions missing_unit;
+    missing_unit.include_tail_unit = false;
+    CHECK(abstained(run_case(missing_unit)),
+          "missing tail alignment blocks reconstruction");
+    CaseOptions duplicate_unit;
+    duplicate_unit.duplicate_tail_unit = true;
+    CHECK(abstained(run_case(duplicate_unit)),
+          "duplicate tail alignment blocks reconstruction");
+    CaseOptions missing_leading_vad;
+    missing_leading_vad.leading_vad_count = 0;
+    CHECK(abstained(run_case(missing_leading_vad)),
+          "missing leading VAD blocks reconstruction");
+    CaseOptions duplicate_leading_vad;
+    duplicate_leading_vad.leading_vad_count = 2;
+    CHECK(abstained(run_case(duplicate_leading_vad)),
+          "duplicate leading VAD blocks reconstruction");
+    CaseOptions leading_vad_order;
+    leading_vad_order.leading_vad_rank_pattern = false;
+    CHECK(abstained(run_case(leading_vad_order)),
+          "a changed leading VAD order blocks reconstruction");
+    CaseOptions leading_vad_margins;
+    leading_vad_margins.leading_vad_exactly_one_margin = false;
+    CHECK(abstained(run_case(leading_vad_margins)),
+          "a changed leading VAD margin pattern blocks reconstruction");
+    CaseOptions missing_tail_vad;
+    missing_tail_vad.tail_vad_count = 0;
+    CHECK(abstained(run_case(missing_tail_vad)),
+          "missing tail VAD blocks reconstruction");
+    CaseOptions duplicate_tail_vad;
+    duplicate_tail_vad.tail_vad_count = 2;
+    CHECK(abstained(run_case(duplicate_tail_vad)),
+          "duplicate tail VAD blocks reconstruction");
+    CaseOptions tail_vad_order;
+    tail_vad_order.tail_vad_rank_pattern = false;
+    CHECK(abstained(run_case(tail_vad_order)),
+          "a changed tail VAD order blocks reconstruction");
+    CaseOptions weak_tail_vad;
+    weak_tail_vad.tail_vad_eligible = false;
+    CHECK(abstained(run_case(weak_tail_vad)),
+          "an abstaining tail VAD blocks reconstruction");
+    CaseOptions distant_tail_vad;
+    distant_tail_vad.tail_vad_starts_near = false;
+    CHECK(abstained(run_case(distant_tail_vad)),
+          "a tail VAD outside alignment tolerance blocks reconstruction");
+    CaseOptions short_tail_vad;
+    short_tail_vad.tail_vad_extends_following = false;
+    CHECK(abstained(run_case(short_tail_vad)),
+          "a tail VAD that excludes the following clause blocks reconstruction");
+    CaseOptions short_vad_gap;
+    short_vad_gap.vad_gap_isolated = false;
+    CHECK(abstained(run_case(short_vad_gap)),
+          "a sub-pause VAD gap blocks cross-VAD reconstruction");
+    CaseOptions following_order;
+    following_order.following_rank_native = false;
+    CHECK(abstained(run_case(following_order)),
+          "a changed following interval rank blocks reconstruction");
+  }
+
   // ---- 20g13. FR16ABJ: a subminimum interval may restore uncontested native
   // evidence only under the exact phrase/VAD cross-scale abstention pattern.
   // ----

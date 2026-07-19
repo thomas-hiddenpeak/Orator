@@ -236,6 +236,25 @@ work is specified under [specs/](.).
   `013-industrial-closing-validation/bracketed-primary-adjacent-vad-reconstruction-diagnosis-2026-07-19.md`
   and
   `013-industrial-closing-validation/bracketed-primary-adjacent-vad-reconstruction-review-2026-07-19.md`.
+  T158-T160 then correct the separate T123 `ref-0504` diagnosis boundary.
+  FR38 requires one source-leading punctuation phrase split across two VADs:
+  eligible leading B-over-A direct evidence, a one-visible-character
+  no-embedding tail inherited by following native C, unique A/C
+  activity/primary support, exact phrase top-two reversal, and distinct
+  leading/tail VAD rank patterns under unchanged gates. It adds no TOML value
+  or threshold and writes only the phrase tail. Repeated T123 replays are
+  byte-identical and split only `3301.164-3301.244` `着，`; repeated T111
+  replays remain byte-identical to FR37. Complete chronological and reverse
+  reading of `53:49-55:45` retains Tang Yunfeng's complete ownership correction
+  while preserving the adjacent known failures. The warning-clean build and
+  all 69 CTest entries pass. The manually reconciled frozen candidate is
+  `512/556`; the 3000-3600 natural-turn block reaches `79/87` and now passes.
+  No real-WebSocket result is attributed to FR38. Zhu Jie recall, speaker-time
+  sign-off, critical attribution, confident-wrong attribution, real-path
+  repeatability, and holdout evidence remain open; see
+  `013-industrial-closing-validation/cross-vad-phrase-tail-reconstruction-diagnosis-2026-07-19.md`
+  and
+  `013-industrial-closing-validation/cross-vad-phrase-tail-reconstruction-review-2026-07-19.md`.
 - **Result-evaluation rule**: product accuracy and candidate decisions may be
   produced only by complete item-by-item contextual semantic review. No code,
   test, script, notebook, formula, query, automated metric, or algorithm may
@@ -821,9 +840,13 @@ after a separate same-slot six-view diagnosis and complete forward/reverse
 review, advancing the frozen candidate to `510/556` and passing the 2400-3000
 fixed block at `117/129`. T155-T157 retain FR37 after a separate bracketed-
 primary/adjacent-VAD diagnosis and complete forward/reverse review, advancing
-the frozen candidate to `511/556` and the 3000-3600 block to `78/87`. None of
-these results is a new real-WebSocket run; the 3000-3600 fixed block and the
-other conjunctive gates remain open.
+the frozen candidate to `511/556` and the 3000-3600 block to `78/87`.
+T158-T160 retain FR38 after a separate cross-VAD phrase-tail diagnosis and
+complete forward/reverse review, advancing the frozen candidate to `512/556`
+and passing the 3000-3600 natural-turn block at `79/87`. None of these results
+is a new real-WebSocket run; Zhu Jie recall, critical and confident-wrong
+attribution, speaker-time sign-off, repeatability, and holdout gates remain
+open.
 T112 is complete and does not alter the speaker baseline. T084 closes only
 after both A and B independently pass every applicable gate.
 ASR, browser/microphone, locked holdout, final-report review, and release signing

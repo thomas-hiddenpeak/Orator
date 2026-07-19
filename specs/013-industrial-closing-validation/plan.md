@@ -3431,6 +3431,50 @@ fails. The other conjunctive closing gates remain open, so FR37 is a
 transitional frozen repair and not a real-stream acceptance result. See
 `bracketed-primary-adjacent-vad-reconstruction-review-2026-07-19.md`.
 
+FR38 first corrects the diagnosis boundary around `ref-0504`: the disabled
+future-epoch experiment repaired only T111's leading interval, while the
+retained T123 package already assigns that interval to Tang Yunfeng. The T123
+defect is the final one-character aligned tail of a source-leading punctuation
+phrase. It crosses into a second VAD and inherits the following native clause,
+even though the leading exact interval and the complete phrase's robust view
+retain the preceding identity.
+
+The projector will test one strict three-identity topology. A leading embedded
+interval is native A but already written to B by eligible dual short evidence;
+one source-contiguous no-embedding tail is native C and contains exactly one
+visible aligned character plus configured punctuation; and one separately
+embedded following interval begins at the phrase source end and remains C.
+Activity and primary must uniquely corroborate A on the leading interval and C
+on both later intervals. Exact interval, complete phrase, leading VAD, and tail
+VAD top-two orders must match the FR38 contract under only the existing
+duration-class gates. The tail VAD must begin within the configured alignment
+tolerance and extend into the following C interval, proving why it cannot own
+the phrase tail independently. Only the tail is rewritten; the following
+clause remains untouched.
+
+Focused positive and independent abstention tests cover every source,
+alignment, provenance, identity, native-track, gallery, gate, VAD, and
+following-clause condition. The production projector is then replayed twice
+over frozen T123 and T111. Automation verifies only immutable hashes,
+determinism, reconstruction, time order, and displayed change scope. Every
+changed complete conversation is read chronologically and in reverse against
+`test.txt`; only that contextual semantic review may retain or reject FR38.
+No audio is rerun until the frozen gate completes. See
+`cross-vad-phrase-tail-reconstruction-diagnosis-2026-07-19.md`.
+
+The independent frozen gate retains FR38. Repeated T123 outputs are
+byte-identical and differ from FR37 only by the exact `text_id=280` phrase-tail
+split; repeated T111 outputs remain byte-identical to FR37. The reviewer reads
+the entire displayed `53:49-55:45` conversation forward and reverse, confirms
+Tang Yunfeng's complete ownership correction, and verifies that the preceding
+Zhu Jie proposal and following Hangzhou-stake clause remain visible as their
+existing errors. The frozen ledger advances by one reviewed critical Tang
+contribution to `512/556`, and the 3000-3600 natural-turn block reaches `79/87`
+and passes. Zhu Jie recall, critical and confident-wrong attribution,
+speaker-time sign-off, real-path repeatability, and holdout gates remain open,
+so FR38 is a transitional frozen repair and not a real-stream acceptance
+result. See `cross-vad-phrase-tail-reconstruction-review-2026-07-19.md`.
+
 ### 8.15 FR28 120-second outcome and promotion ladder
 
 T117-T121 are complete. The frozen T116 packages replay byte-stably; their
