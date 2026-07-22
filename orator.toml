@@ -242,6 +242,9 @@ posterior_future_epoch_enable = true
 # FR49: emit source-independent primary-run TitaNet evidence and permit only
 # the fully corroborated source-leading prefix restoration contract.
 source_leading_primary_prefix_enable = true
+# FR50 transitional experiment: restore one aligned codepoint only for the
+# frozen right-bounded short-primary/activity-filter topology.
+right_bounded_short_primary_unit_enable = true
 # Spread acoustic-only TitaNet embedding extraction across idle points in the
 # live session. Work starts only after the gallery is mature and all real-time
 # producer pipelines have reached the common-clock head. Final gallery scoring

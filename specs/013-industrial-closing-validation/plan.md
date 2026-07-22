@@ -4329,6 +4329,30 @@ Only those human readings may retain or reject the experiment and authorize a
 real-WebSocket ladder. Any upstream producer change invalidates the frozen
 review and returns the work to exact capture.
 
+T229-T231 are complete. The first frozen replay changed one additional
+`2241.356-2241.436 s` Tang codepoint; complete conversation establishes that
+as a regression. Its positive aligned duration is exactly the existing
+alignment boundary-split tolerance, so the final policy requires a positive
+target to be strictly longer than that tolerance while preserving the separate
+unique zero-duration-point form. This reuses an existing TOML value and adds no
+numeric tuning parameter.
+
+The final full A/B candidate outputs and both repeats are byte-identical at
+SHA-256
+`d36227140dc8fcba9e40f116946ed8f8222e1b0aad73777665478a0f9f14d88c`;
+the disabled baseline controls agree separately at
+`814dc276749bec2f652df896aa662811baf99de3361c607ef6b341ad8700ac32`.
+This is deterministic projection evidence only. Four complete independent
+contextual readings, A/B chronological and A/B reverse fixed windows, manually
+retain the candidate: `ref-0327` is restored to Shi Yi, `ref-0417` is restored
+to Tang Yunfeng, `ref-0418` remains Shi Yi, and no additional contextual
+regression is found. The manually reconciled frozen candidate ledger is
+`525/556`, with 26 confident-wrong, four missing, one uncertain, and 19
+critical residuals. FR49 remains the `523/556` real-path baseline until T232
+executes and reviews the real 120-second, 600-second, full empty-registry A,
+and restarted frozen-registry B ladder. See
+`fr50-right-bounded-short-primary-unit-review-2026-07-23.md`.
+
 ### 8.15 FR28 120-second outcome and promotion ladder
 
 T117-T121 are complete. The frozen T116 packages replay byte-stably; their

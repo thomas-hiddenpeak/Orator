@@ -65,7 +65,13 @@ source-leading primary-prefix topology shared with `ref-0061`; clean commit
 `1f09052` completes its restarted 120/600/full A/B real-WebSocket ladder, and
 four independent complete full-artifact contextual readings retain a manually
 signed `523/556` without a new attribution regression or accumulating late
-drift; all 20 critical residuals remain; critical attribution,
+drift; all 20 critical residuals remain; FR50 T229-T231 implement one
+false-default, TOML-enabled right-bounded short-primary aligned-unit policy,
+complete deterministic frozen FR49 A/B replay, and retain `ref-0327` and
+`ref-0417` through four independent complete candidate readings; the manually
+reconciled frozen candidate is `525/556` with 19 critical residuals, but no
+FR50 live run has occurred and FR49 remains the `523/556` real-path baseline;
+critical attribution,
 confident-wrong attribution, T102, T084, full canonical closure, release sign-
 off, and industrial readiness remain open
 **Created**: 2026-07-13
@@ -3061,7 +3067,8 @@ open. See `fr47-real-path-promotion-review-2026-07-19.md`.
   `speaker_fusion.right_bounded_short_primary_unit_enable` in `orator.toml`.
   It MUST reuse the existing `min_embed_sec`, `short_max_sec`, punctuation,
   alignment, activity, primary, and identity-epoch contracts; it MUST add no
-  numeric tuning parameter. For one source, it MAY restore exactly one aligned
+  numeric tuning parameter. Duration gates use only one common-time-base sample
+  as serialization tolerance. For one source, it MAY restore exactly one aligned
   lexical codepoint, plus only its immediately trailing configured
   punctuation, from incumbent identity A to primary identity B only when all
   of the following raw conditions hold:
@@ -3069,8 +3076,13 @@ open. See `fr47-real-path-promotion-review-2026-07-19.md`.
   - one and only one mapped primary-B run intersects the lexical unit; its
     duration is at least `min_embed_sec` and strictly below `short_max_sec`;
   - the lexical unit is wholly contained by that run, or it is one unique
-    zero-duration alignment point strictly inside that run; no partial,
-    duplicate, multi-codepoint, or second aligned unit may overlap the run;
+    zero-duration alignment point strictly inside that run; no duplicate,
+    multi-codepoint, or second wholly contained aligned unit may overlap the
+    run. A positive-duration unit must be strictly longer than the existing
+    `align_boundary_split_tolerance_sec`; a boundary-scale positive unit
+    abstains. The sole permitted partial overlap is the immediately following
+    A codepoint starting at that unique zero point and crossing B's right
+    boundary; every other partial overlap abstains;
   - thresholded activity contains no B interval overlapping the candidate;
     this explicitly identifies a primary-versus-activity filtering boundary,
     rather than treating the two correlated Sortformer views as independent
@@ -3085,14 +3097,18 @@ open. See `fr47-real-path-promotion-review-2026-07-19.md`.
     text, time, identity, or producer evidence.
 
   The experiment MUST abstain when disabled; on source-absent text; on missing,
-  partial, duplicate, multi-codepoint, or ambiguous alignment; when a second
-  aligned unit overlaps the short primary; when B activity is present; when
+  duplicate, multi-codepoint, or ambiguous alignment; on any partial overlap
+  other than the exact zero-point/immediate-A-successor form above; when a
+  second aligned unit is wholly contained by the short primary; when B activity is present; when
   the right-bounded primary/activity continuation is missing, duplicated,
   short, gapped, or owned by another identity; when the incumbent is unknown,
   mixed, non-voiceprint, or not `voiceprint_direct_regular`; when B is already
   retained; or when any third-identity evidence enters the exact writable
   range. `ref-0118`, `ref-0135`, `ref-0102`, `ref-0049`, `ref-0390`, and all
   source-absent contexts remain explicit contextual abstention boundaries.
+  The accepted Tang continuation at `2241.356-2241.436 s`, discovered by the
+  frozen candidate replay, is an additional mandatory abstention control: its
+  positive aligned unit is exactly boundary-scale and MUST remain Tang.
 
   Focused tests may verify only these structural gates, immutable source/time
   preservation, deterministic projection, reason/source diagnostics, and

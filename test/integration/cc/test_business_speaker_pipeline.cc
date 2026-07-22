@@ -8228,6 +8228,241 @@ int main() {
           "speaker");
   }
 
+  // ---- 25. FR50 may restore one aligned codepoint from an activity-filtered
+  // short primary only when a contiguous long primary/activity continuation
+  // owns the current direct-regular voiceprint label. ----
+  {
+    struct CaseOptions {
+      bool enabled = true;
+      bool zero_duration_target = false;
+      bool target_at_right_boundary = false;
+      bool include_target_alignment = true;
+      bool partial_target_alignment = false;
+      bool boundary_scale_target = false;
+      bool multi_codepoint_target = false;
+      bool second_contained_unit = false;
+      bool candidate_activity = false;
+      bool following_activity = true;
+      bool third_activity = false;
+      bool duplicate_candidate_primary = false;
+      bool duplicate_following_primary = false;
+      bool candidate_embedding = false;
+      bool incumbent_regular = true;
+      bool incumbent_is_candidate = false;
+      double candidate_start = 1.000000009;
+      double candidate_end = 1.4;
+      double following_primary_start = 1.4;
+      double following_primary_end = 3.0;
+    };
+    auto run_case = [](const CaseOptions& options) {
+      BusinessSpeakerPipeline::Config config;
+      config.voiceprint_fusion_enabled = true;
+      config.voiceprint_short_max_sec = 1.5;
+      config.voiceprint_regular_min_score = 0.55f;
+      config.voiceprint_regular_min_margin = 0.04f;
+      config.voiceprint_primary_consensus_min_sec = 0.4;
+      config.right_bounded_short_primary_unit_enabled = options.enabled;
+      config.speaker_overlap_tie_policy =
+          BusinessSpeakerPipeline::SpeakerOverlapTiePolicy::kPrimarySpeaker;
+      TestBusinessSpeakerPipeline tl(config);
+      tl.UpsertText(0, 0.4, 3.4, "前甲，乙后");
+
+      std::vector<TestBusinessSpeakerPipeline::SpeakerInput> activity;
+      if (options.following_activity) {
+        activity.push_back({options.following_primary_start,
+                            options.following_primary_end, "slot_a", 0.9f,
+                            "spk_a"});
+      }
+      if (options.candidate_activity) {
+        activity.push_back({1.08, 1.24, "slot_b", 0.9f, "spk_b"});
+      }
+      if (options.third_activity) {
+        activity.push_back({1.12, 1.28, "slot_c", 0.9f, "spk_c"});
+      }
+      tl.ReplaceSpeakers(activity);
+
+      std::vector<TestBusinessSpeakerPipeline::SpeakerInput> primary = {
+          {options.candidate_start, options.candidate_end, "slot_b", 0.9f,
+           "spk_b"},
+          {options.following_primary_start, options.following_primary_end,
+           "slot_a", 0.9f, "spk_a"}};
+      if (options.duplicate_candidate_primary) {
+        primary.push_back({options.candidate_start, options.candidate_end,
+                           "slot_b_copy", 0.8f, "spk_b"});
+      }
+      if (options.duplicate_following_primary) {
+        primary.push_back({options.following_primary_start,
+                           options.following_primary_end, "slot_a_copy", 0.8f,
+                           "spk_a"});
+      }
+      tl.ReplacePrimarySpeakers(primary);
+
+      std::vector<ComprehensiveTimeline::AlignUnitSeg> units = {
+          {0.7, 0.9, "前"}};
+      if (options.include_target_alignment) {
+        if (options.multi_codepoint_target) {
+          units.push_back({1.08, 1.24, "甲乙"});
+        } else if (options.zero_duration_target) {
+          const double point =
+              options.target_at_right_boundary ? options.candidate_end : 1.28;
+          units.push_back({point, point, "甲"});
+        } else if (options.partial_target_alignment) {
+          units.push_back({0.92, 1.12, "甲"});
+        } else {
+          units.push_back(
+              {1.08, options.boundary_scale_target ? 1.16 : 1.24, "甲"});
+        }
+      }
+      if (options.second_contained_unit) {
+        units.push_back({1.26, 1.34, "乙"});
+        units.push_back({1.6, 1.9, "后"});
+      } else if (options.zero_duration_target) {
+        const double point =
+            options.target_at_right_boundary ? options.candidate_end : 1.28;
+        units.push_back({point, 1.6, "乙"});
+        units.push_back({2.0, 2.3, "后"});
+      } else {
+        units.push_back({1.6, 1.9, "乙"});
+        units.push_back({2.0, 2.3, "后"});
+      }
+      tl.UpsertAlign(0, 0.4, 3.4, units);
+
+      ComprehensiveTimeline::SpeakerVoiceprintEvidence interval;
+      interval.evidence_id = "business_interval:0:0";
+      interval.kind = "business_interval";
+      interval.text_id = 0;
+      interval.source_start = 0;
+      interval.source_end = 5;
+      interval.start = 0.7;
+      interval.end = options.incumbent_regular ? 2.3 : 2.0;
+      interval.embedding_available = true;
+      interval.session_gallery_complete = true;
+      interval.session_scores =
+          options.incumbent_is_candidate
+              ? std::vector<ComprehensiveTimeline::VoiceprintScore>{
+                    {"spk_b", 0.90f}, {"spk_a", 0.20f}}
+              : std::vector<ComprehensiveTimeline::VoiceprintScore>{
+                    {"spk_a", 0.90f}, {"spk_b", 0.20f}};
+      std::vector<ComprehensiveTimeline::SpeakerVoiceprintEvidence> evidence = {
+          interval};
+      if (options.candidate_embedding) {
+        ComprehensiveTimeline::SpeakerVoiceprintEvidence candidate;
+        candidate.evidence_id = "primary_run:candidate";
+        candidate.kind = "primary_run";
+        candidate.text_id = -1;
+        candidate.start = options.candidate_start;
+        candidate.end = options.candidate_end;
+        candidate.embedding_available = true;
+        evidence.push_back(std::move(candidate));
+      }
+      tl.ReplaceVoiceprint(evidence);
+      return tl.Snapshot();
+    };
+    auto applied = [](const auto& entries) {
+      return std::any_of(entries.begin(), entries.end(), [](const auto& entry) {
+        return entry.text == "甲，" && entry.speaker_id == "spk_b" &&
+               entry.speaker_decision.reason ==
+                   "primary_speaker_right_bounded_aligned_unit_restore" &&
+               entry.speaker_decision.speaker_source ==
+                   "sortformer_primary_top1+thresholded_activity_absence+"
+                   "following_activity+speaker_identity_epoch+"
+                   "forced_alignment";
+      });
+    };
+    auto abstained = [&](const CaseOptions& options) {
+      return !applied(run_case(options));
+    };
+    auto source_text = [](const auto& entries) {
+      std::string result;
+      for (const auto& entry : entries) result += entry.text;
+      return result;
+    };
+
+    const auto positive = run_case({});
+    CHECK(applied(positive),
+          "a wholly contained aligned codepoint is restored structurally");
+    CHECK(source_text(positive) == "前甲，乙后",
+          "right-bounded restore preserves the immutable source text");
+
+    CaseOptions zero_duration;
+    zero_duration.zero_duration_target = true;
+    const auto zero_positive = run_case(zero_duration);
+    CHECK(applied(zero_positive),
+          "a unique zero point permits only its crossing A successor");
+    CHECK(source_text(zero_positive) == "前甲，乙后",
+          "zero-point restore preserves every source codepoint");
+
+    CaseOptions disabled;
+    disabled.enabled = false;
+    CHECK(abstained(disabled), "the false-by-default policy abstains");
+    CaseOptions subminimum;
+    subminimum.candidate_start = 1.01;
+    CHECK(abstained(subminimum), "a subminimum primary run abstains");
+    CaseOptions candidate_activity;
+    candidate_activity.candidate_activity = true;
+    CHECK(abstained(candidate_activity),
+          "thresholded candidate activity routes away from this policy");
+    CaseOptions third_activity;
+    third_activity.third_activity = true;
+    CHECK(abstained(third_activity),
+          "third-identity activity in the candidate run abstains");
+    CaseOptions no_following_activity;
+    no_following_activity.following_activity = false;
+    CHECK(abstained(no_following_activity),
+          "an uncovered following primary abstains");
+    CaseOptions noncontiguous_primary;
+    noncontiguous_primary.following_primary_start = 1.41;
+    CHECK(abstained(noncontiguous_primary),
+          "a noncontiguous following primary abstains");
+    CaseOptions short_following;
+    short_following.following_primary_end = 1.7;
+    CHECK(abstained(short_following),
+          "a subminimum following primary abstains");
+    CaseOptions duplicate_candidate;
+    duplicate_candidate.duplicate_candidate_primary = true;
+    CHECK(abstained(duplicate_candidate),
+          "overlapping candidate primary evidence abstains");
+    CaseOptions duplicate_following;
+    duplicate_following.duplicate_following_primary = true;
+    CHECK(abstained(duplicate_following),
+          "duplicate right-bound primary evidence abstains");
+    CaseOptions no_alignment;
+    no_alignment.include_target_alignment = false;
+    CHECK(abstained(no_alignment), "missing target alignment abstains");
+    CaseOptions partial_alignment;
+    partial_alignment.partial_target_alignment = true;
+    CHECK(abstained(partial_alignment), "partial target alignment abstains");
+    CaseOptions boundary_scale;
+    boundary_scale.boundary_scale_target = true;
+    CHECK(abstained(boundary_scale),
+          "a positive unit at the configured boundary scale abstains");
+    CaseOptions multi_codepoint;
+    multi_codepoint.multi_codepoint_target = true;
+    CHECK(abstained(multi_codepoint),
+          "a multi-codepoint candidate alignment abstains");
+    CaseOptions second_unit;
+    second_unit.second_contained_unit = true;
+    CHECK(abstained(second_unit),
+          "a second contained alignment unit abstains");
+    CaseOptions boundary_point;
+    boundary_point.zero_duration_target = true;
+    boundary_point.target_at_right_boundary = true;
+    CHECK(abstained(boundary_point),
+          "a zero point on the primary boundary abstains");
+    CaseOptions candidate_embedding;
+    candidate_embedding.candidate_embedding = true;
+    CHECK(abstained(candidate_embedding),
+          "an independently embedded candidate routes away from this policy");
+    CaseOptions short_incumbent;
+    short_incumbent.incumbent_regular = false;
+    CHECK(abstained(short_incumbent),
+          "a non-regular incumbent voiceprint decision abstains");
+    CaseOptions already_retained;
+    already_retained.incumbent_is_candidate = true;
+    CHECK(abstained(already_retained),
+          "an already retained candidate does not rewrite the source");
+  }
+
   if (g_fail == 0) {
     std::printf("BusinessSpeakerPipeline test PASSED\n");
     return 0;

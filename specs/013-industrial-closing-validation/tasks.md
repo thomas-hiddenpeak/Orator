@@ -13,10 +13,12 @@ FR49 corrects the prior `ref-0121` ledger omission, retains a bounded
 source-leading primary-prefix policy, and completes its clean restarted
 120/600/full A/B real-WebSocket ladder on commit `1f09052`; four independent
 complete full-artifact contextual readings retain `523/556` while all 20
-critical residuals remain open; FR50 is active as a frozen, display-only
-all-residual earliest-evidence-loss audit; current-config posterior provenance
-and deterministic A/B evidence capture are complete, with four human readings
-pending and no product change authorized;
+critical residuals remain open; FR50 T229-T231 implement the false-default,
+TOML-enabled right-bounded short-primary aligned-unit policy, complete
+deterministic frozen FR49 A/B replay, and retain `ref-0327` and `ref-0417`
+through four independent complete contextual readings; the frozen candidate is
+manually reconciled at `525/556` with 19 critical residuals, while FR49 remains
+the `523/556` real-path baseline until T232;
 critical, confident-wrong, time-based, holdout, report, release, T102, and T084
 gates remain open 2026-07-23
 
@@ -3013,26 +3015,47 @@ gates remain open 2026-07-23
   abstentions are frozen in `spec.md`, `plan.md`, and
   `fr50-full-residual-earliest-loss-review-2026-07-23.md`. This is an
   implementation authorization, not a product verdict or ledger change.
-- [ ] T229 Implement the false-by-default typed
+- [x] T229 Implement the false-by-default typed
   `speaker_fusion.right_bounded_short_primary_unit_enable` path without new
   numeric tuning. Preserve immutable source/time/producer evidence; restore at
   most one aligned codepoint plus immediate punctuation; emit a dedicated
   decision reason/source; and add focused positive, zero-duration, disabled,
   ambiguity, activity-present, continuation, incumbent, third-identity, and
   source-preservation contract tests.
-- [ ] T230 Complete a warning-clean build and full CTest, then replay the exact
+  The typed switch is wired through TOML loading, resolved-config
+  serialization, `AuditoryStream`, the production policy, and the replay probe.
+  Focused tests cover both retained forms and all specified abstention
+  families. The first replay exposed the accepted Tang control at
+  `2241.356-2241.436 s`; the final policy abstains on positive alignment units
+  at or below the existing boundary-split tolerance without adding a numeric
+  parameter.
+- [x] T230 Complete a warning-clean build and full CTest, then replay the exact
   frozen FR49 A/B artifacts under the checked-in TOML. Capture deterministic
   candidate business output and display only raw changed contexts and named
   controls. Automation MUST NOT assign correctness, aggregate/count product
   changes, rank/select the branch, or issue an acceptance verdict. Do not run
   `test.mp3` through the live path at this stage.
-- [ ] T231 Read every displayed candidate change and control completely against
+  The full candidate A/B outputs and their independent repeats are byte-
+  identical at SHA-256
+  `d36227140dc8fcba9e40f116946ed8f8222e1b0aad73777665478a0f9f14d88c`.
+  The disabled baseline controls agree separately. The final build emits no
+  warning or error diagnostic and all `72/72` CTest entries pass in `53.56 s`.
+  This is mechanical replay evidence only; no live audio run or executable
+  product evaluation occurred.
+- [x] T231 Read every displayed candidate change and control completely against
   `test.txt`, then independently read complete A and B candidate artifacts in
   chronological and reverse fixed-window order. Manually record every retained
   repair, regression, uncertainty, and abstention; reconcile all four readings
   without executable evaluation. Retain or reject the experiment only from
   this contextual-semantic review. Keep the FR49 ledger unchanged until all
   readings are signed.
+  All four complete readings retain the candidate. They manually accept
+  `ref-0327` and `ref-0417`, preserve `ref-0418` and the named controls, and
+  find no additional contextual regression. The frozen candidate ledger is
+  manually reconciled at `525/556`, with 26 confident-wrong, four missing, one
+  uncertain, and 19 critical residuals. FR49's real-path ledger remains
+  `523/556` until T232. See
+  `fr50-right-bounded-short-primary-unit-review-2026-07-23.md`.
 - [ ] T232 Only if T231 manually retains the experiment, commit the exact clean
   candidate and execute the constitutional 120-second, 600-second, full empty-
   registry A, and restarted frozen-registry B real-WebSocket ladder. Complete

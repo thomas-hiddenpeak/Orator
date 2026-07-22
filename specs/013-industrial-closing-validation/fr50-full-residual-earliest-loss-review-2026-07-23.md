@@ -250,6 +250,18 @@ and is fully covered by activity A. The existing source-scale decision labels
 the candidate codepoint as A with `voiceprint_direct_regular`. Thus the useful
 primary boundary survives, the activity view filters it out, and the later
 source-scale voiceprint branch extends A left across the retained codepoint.
+At `ref-0327`, the immediately following A codepoint starts at the target's
+zero-duration point and crosses the primary right boundary; this exact
+zero-point successor is continuation evidence, not a second candidate. No
+other partial aligned-unit overlap is authorized.
+
+The first frozen candidate replay exposed a previously unnamed control at
+`2241.356-2241.436 s`. Complete `test.txt` context identifies its `对` as part
+of Tang Yunfeng's uninterrupted explanation, so changing it to Shi Yi is a
+manual contextual regression. Its positive aligned duration is exactly the
+configured boundary-split tolerance, unlike the longer positive unit at
+`ref-0417`; it is now a mandatory abstention control. This finding came from
+reading the complete conversation, not from an executable comparison.
 
 The shared shape is narrow enough to authorize one frozen experiment, but not
 to accept a repair. The rejected broad primary-aligned experiment changed many
@@ -273,4 +285,7 @@ T228 is complete. It authorizes only a false-by-default,
 `orator.toml`-enabled implementation and frozen FR49 A/B replay. It does not
 authorize a real audio run, product score, ledger change, or speaker-business
 closure. Complete candidate A/B chronological and reverse contextual-semantic
-review remains mandatory before any such decision.
+review remains mandatory before any such decision. That subsequent T229-T231
+implementation, replay, and four-pass review is recorded separately in
+`fr50-right-bounded-short-primary-unit-review-2026-07-23.md`; this document
+remains the immutable pre-implementation topology decision.

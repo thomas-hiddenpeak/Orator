@@ -46,6 +46,7 @@ class BusinessSpeakerPipeline {
     double voiceprint_future_epoch_lookahead_sec = 0.0;
     bool posterior_future_epoch_enabled = false;
     bool source_leading_primary_prefix_enabled = false;
+    bool right_bounded_short_primary_unit_enabled = false;
     float posterior_frame_activity_threshold = 0.5f;
     double posterior_identity_backfill_sec = 0.0;
     std::string voiceprint_punctuation = "，。？！；：、,.?!;:";
