@@ -13,9 +13,10 @@ FR49 corrects the prior `ref-0121` ledger omission, retains a bounded
 source-leading primary-prefix policy, and completes its clean restarted
 120/600/full A/B real-WebSocket ladder on commit `1f09052`; four independent
 complete full-artifact contextual readings retain `523/556` while all 20
-critical residuals remain open;
+critical residuals remain open; FR50 is active as a frozen, display-only
+all-residual earliest-evidence-loss audit with no product change authorized;
 critical, confident-wrong, time-based, holdout, report, release, T102, and T084
-gates remain open 2026-07-20
+gates remain open 2026-07-23
 
 ## Phase 0: Governance
 
@@ -2932,3 +2933,52 @@ gates remain open 2026-07-20
   Completed in
   `fr49-real-path-promotion-review-2026-07-20.md`; FR49 is the current
   repeatable real-path candidate, not a closing result.
+- [x] T222 Freeze FR50 to current documentation commit `ae522cc`, the exact
+  FR49 full Run A/B artifacts captured on clean implementation commit
+  `1f09052`, checked-in `orator.toml`, `test.mp3`, `test.txt`, registry, and
+  manually signed `523/556` ledger. Before viewing any new candidate, record
+  the current 33 residual references and the already signed 20-critical subset
+  by manual transcription only. This freezes the next-candidate audit scope;
+  it does not retroactively close the all-turn T032 criticality task.
+- [ ] T223 Add one display-only FR50 evidence worksheet tool and focused
+  mechanical tests. Its manually authored context table may contain reference
+  IDs, accepted-control IDs, and absolute common-clock bounds, but no expected
+  speaker, correctness label, causal class, score, rank, candidate identity,
+  or verdict. For each context and each FR49 A/B artifact, copy complete
+  `test.txt` sections, final business pieces and decision audits, ASR, forced
+  alignment, VAD, activity diarization, primary speaker, all intersecting or
+  source-related TitaNet evidence, local identity epochs, and four-channel
+  Sortformer posterior rows without modifying their values.
+- [ ] T224 Prove mechanically whether the frozen T191 posterior remains the
+  exact source of FR49 A/B activity and primary evidence. Compare only model,
+  TOML, PCM, local-slot ordering, common-clock frame extent, and top-1 primary
+  compression. If any provenance or producer field differs, run
+  `diar_evidence_probe` twice on the exact current PCM and checked-in TOML and
+  retain the repeated raw capture instead. No reference or product judgment
+  may enter this gate.
+- [ ] T225 Generate independent FR49 full A and full B worksheet trees for all
+  33 residual contexts and their accepted controls. Require complete files,
+  exact source/config/artifact identities, common-clock bounds, deterministic
+  ordering, raw-value preservation, and content manifests. Mechanical A/B
+  equality or difference may be displayed but may not classify, combine, or
+  decide a product result.
+- [ ] T226 Read every T225 context and accepted control completely against
+  `test.txt`, first in chronological order for full A and independently for
+  full B. Manually record the earliest layer at which usable speaker-business
+  evidence is absent, displaced, contradictory, or overwritten: source/VAD/
+  ASR, alignment, raw posterior/activity/primary, identity/gallery, or final
+  fusion/source reconstruction. Do not treat these names as executable rules
+  or let automation assign them.
+- [ ] T227 Repeat the complete T226 review from the final context back to the
+  first for A and independently for B, re-read every named control, reconcile
+  all forward/reverse disagreements manually, and record whether an ASR/VAD/
+  alignment change would invalidate FR49 speaker evidence. No script, query,
+  formula, metric, hash, or equality check may count classes, rank a repair,
+  select a branch, or issue a verdict.
+- [ ] T228 Decide from the four complete FR50 readings whether at least two
+  independent material contexts share one low-blast, reference-free final-
+  fusion topology with explicit abstentions. If yes, update SDD again before
+  implementation. If the earliest loss is upstream, specify and freeze the
+  required ASR/VAD/alignment contract before the final speaker seal. Otherwise
+  stop without code, TOML, replay, audio, ledger, or closure change. Record the
+  decision, synchronize `PROJECT_STATE.md`, and commit/push the evidence.

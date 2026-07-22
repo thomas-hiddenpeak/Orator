@@ -2997,6 +2997,48 @@ open. See `fr47-real-path-promotion-review-2026-07-19.md`.
   repeatable real-WebSocket candidate, but speaker-business closure remains
   open. See `fr49-real-path-promotion-review-2026-07-20.md`.
 
+- **FR50 full-residual earliest-evidence-loss audit**: FR50 MUST freeze
+  documentation commit `ae522cc`, the exact FR49 full Run A/B artifacts
+  captured on clean implementation commit `1f09052`, checked-in
+  `orator.toml`, `test.mp3`, `test.txt`, and both isolated registry states.
+  Its scope is the manually transcribed FR49 ledger of 33 residual references,
+  including the separately signed 20-critical subset. This inventory freezes
+  the audit population only; it MUST NOT be treated as an executable score or
+  as completion of the all-turn criticality gate.
+
+  A display-only worksheet tool MAY arrange evidence for manually authored
+  context bounds and accepted-control IDs. It MUST copy raw values without
+  assigning an expected speaker, correctness label, causal class, score, rank,
+  candidate identity, aggregate, or verdict. Each independent A/B packet MUST
+  include the complete reference context, final business pieces and decision
+  audit, ASR, forced alignment, VAD, diarization activity, primary speaker,
+  intersecting and source-related TitaNet evidence, local identity epochs, and
+  all four Sortformer posterior channels on the common time base.
+
+  Before the frozen T191 posterior can be reused, mechanical provenance MUST
+  establish that its model, TOML, PCM, local-slot ordering, frame extent, and
+  top-1 primary compression are the exact producer inputs and output of both
+  FR49 artifacts. A mismatch requires two repeated raw captures from the exact
+  current PCM and checked-in TOML. This check may establish identity and
+  repeatability only; it may not interpret speaker correctness.
+
+  A reviewer MUST read every residual and its controls against `test.txt`
+  chronologically for A and independently for B, then repeat both complete
+  reviews in reverse context order. Only those four complete contextual
+  semantic readings may identify the earliest layer where useful
+  speaker-business evidence becomes absent, displaced, contradictory, or
+  overwritten. Any causal grouping, count, prioritization, candidate choice,
+  or acceptance decision MUST be manually derived and recorded.
+
+  FR50 MAY authorize a later implementation specification only when the four
+  readings find one reference-free, low-blast final-fusion topology shared by
+  at least two independent material contexts and bounded by explicit accepted
+  controls. Source-absent evidence MUST NOT be synthesized. If the earliest
+  loss is in ASR, VAD, or forced alignment, that upstream contract MUST be
+  specified, validated, and frozen before the final speaker-business seal.
+  Otherwise FR50 stops without production code, TOML, model, audio replay,
+  ledger, or closure change.
+
 FR40 passes its frozen gate. Repeated T123 outputs are byte-identical and
 change only Xu Zijing's `184.240-184.320` response. Repeated T111 outputs are
 separately byte-identical and split only Zhu Jie's first reaction from the

@@ -4240,6 +4240,49 @@ archived, the pre-existing business storage is restored, and no validation
 process remains. See
 `fr49-real-path-promotion-review-2026-07-20.md`.
 
+### 8.37 FR50 full-residual earliest-evidence-loss audit
+
+FR50 keeps the exact FR49 A/B artifacts, registries, checked-in TOML, audio,
+reference, and manually signed ledger immutable. Before inspecting evidence,
+manually transcribe the 33 residual reference IDs, the 20-critical subset, and
+accepted neighboring controls into a context table containing only IDs and
+absolute common-clock bounds. The table carries no expected speaker,
+correctness, causal class, candidate, rank, score, or verdict.
+
+Add one display-only worksheet generator with focused mechanical tests. For
+each context it copies the complete `test.txt` section and unmodified rows from
+the final business view and decision audit, ASR, forced alignment, VAD,
+activity diarization, primary speaker, TitaNet evidence, local identity epochs,
+and four-channel Sortformer posterior. It emits separate A and B trees with
+source/config/artifact identities, deterministic order, common-clock bounds,
+and content manifests. Tests cover parsing, overlap boundaries, source-related
+evidence inclusion, raw-value preservation, and deterministic output only.
+
+First compare the frozen T191 posterior's producer identity and top-1
+compression mechanically with both FR49 artifacts. Reuse is allowed only when
+the model, TOML, PCM, local-slot sequence, frame extent, and compressed primary
+runs agree exactly. Otherwise execute `diar_evidence_probe` twice against the
+same checked-in TOML and exact PCM and retain both repeated captures. Neither
+path may consult the reference or infer correctness.
+
+After packet generation, manually read all contexts and controls in four
+independent passes: A chronological, B chronological, A reverse, and B
+reverse. Compare each complete conversation with `test.txt`, inspect every
+pipeline's evidence on the shared time base, and manually record the earliest
+layer where useful speaker evidence is absent, displaced, contradictory, or
+overwritten. Reconcile disagreements by rereading the source context; do not
+use executable counts, formulas, queries, scores, or rankings.
+
+Only after all four passes may the reviewer decide the next branch. A shared,
+reference-free final-fusion topology present in at least two independent
+material contexts with explicit accepted controls can proceed to a new SDD
+implementation step. An upstream ASR/VAD/alignment loss instead opens a
+separate contract-and-freeze stage before the final speaker seal. If neither
+condition is established, stop and preserve the evidence. FR50 itself changes
+no production policy, TOML, model, audio result, ledger, or closure status, and
+no new real-WebSocket run occurs before this frozen-evidence upper-bound audit
+is complete.
+
 ### 8.15 FR28 120-second outcome and promotion ladder
 
 T117-T121 are complete. The frozen T116 packages replay byte-stably; their
