@@ -4295,6 +4295,40 @@ complete T226/T227 contextual readings; no candidate implementation or audio
 run is authorized. See
 `fr50-full-residual-evidence-capture-2026-07-23.md`.
 
+The four T226/T227 readings are now complete and manually reconciled. T228
+authorizes a frozen experiment for the narrow topology independently observed
+at `ref-0327` and `ref-0417`: one short primary-B run wholly contains exactly
+one aligned codepoint while thresholded activity omits B, and a contiguous
+long primary/activity-A continuation supplies the source-scale
+`voiceprint_direct_regular` incumbent that currently overwrites the codepoint.
+This differs from the rejected broad primary-aligned and A-B-A experiments:
+it does not accept activity-correlated primary as a general identity vote and
+does not rewrite a phrase or interval. It recognizes only the exact
+right-bounded filtering/overwrite shape and writes one existing codepoint plus
+immediately trailing punctuation.
+
+Implementation adds one false-by-default typed boolean from
+`speaker_fusion.right_bounded_short_primary_unit_enable`, wired through
+`AuditoryStream::Config` into `BusinessSpeakerPipeline::Config`. The policy
+retains alignment-unit source mappings, including a unique zero-duration point,
+then inspects immutable primary/activity tracks after existing voiceprint
+decisions have populated per-codepoint labels. It emits a dedicated reason and
+speaker-source diagnostic only after every FR50 structural guard passes. No
+producer, identity epoch, gallery, source text, alignment time, VAD, or raw
+speaker track is changed, and no new numeric threshold is introduced.
+
+Focused C++ and config tests cover the positive-duration and zero-duration
+forms plus every specified abstention family. Build, warnings, and CTest are
+mechanical contract gates only. Next, replay the frozen FR49 A/B artifacts with
+the exact implementation and checked-in TOML, retain raw output and a
+display-only changed-context packet, and inspect it without executable
+correctness labels, counts, ranking, or verdicts. The reviewer first reads
+every displayed change and named control in complete conversational context,
+then independently rereads full A and full B chronologically and in reverse.
+Only those human readings may retain or reject the experiment and authorize a
+real-WebSocket ladder. Any upstream producer change invalidates the frozen
+review and returns the work to exact capture.
+
 ### 8.15 FR28 120-second outcome and promotion ladder
 
 T117-T121 are complete. The frozen T116 packages replay byte-stably; their

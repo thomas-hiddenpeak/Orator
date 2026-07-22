@@ -3051,6 +3051,58 @@ open. See `fr47-real-path-promotion-review-2026-07-19.md`.
   reading, product change, or closure decision has yet occurred. See
   `fr50-full-residual-evidence-capture-2026-07-23.md`.
 
+  The four complete contextual-semantic readings are now manually reconciled.
+  T228 authorizes one **experimental, right-bounded short-primary aligned-unit
+  restore** because `ref-0327` and `ref-0417` independently expose the same
+  reference-free final-reconstruction topology. The authorization is not a
+  product acceptance and does not change the FR49 ledger.
+
+  The experiment MUST be disabled by the C++ default and enabled only through
+  `speaker_fusion.right_bounded_short_primary_unit_enable` in `orator.toml`.
+  It MUST reuse the existing `min_embed_sec`, `short_max_sec`, punctuation,
+  alignment, activity, primary, and identity-epoch contracts; it MUST add no
+  numeric tuning parameter. For one source, it MAY restore exactly one aligned
+  lexical codepoint, plus only its immediately trailing configured
+  punctuation, from incumbent identity A to primary identity B only when all
+  of the following raw conditions hold:
+
+  - one and only one mapped primary-B run intersects the lexical unit; its
+    duration is at least `min_embed_sec` and strictly below `short_max_sec`;
+  - the lexical unit is wholly contained by that run, or it is one unique
+    zero-duration alignment point strictly inside that run; no partial,
+    duplicate, multi-codepoint, or second aligned unit may overlap the run;
+  - thresholded activity contains no B interval overlapping the candidate;
+    this explicitly identifies a primary-versus-activity filtering boundary,
+    rather than treating the two correlated Sortformer views as independent
+    votes;
+  - every writable source codepoint currently has one known identity A with
+    reason `voiceprint_direct_regular`, and A differs from B;
+  - exactly one primary-A run starts at the candidate's right boundary, lasts
+    at least `min_embed_sec`, and is fully covered by thresholded activity A;
+    the immediately following non-punctuation source codepoint also remains A;
+  - B is already a known global identity from the current immutable speaker
+    evidence. The policy may relabel existing text only; it may not synthesize
+    text, time, identity, or producer evidence.
+
+  The experiment MUST abstain when disabled; on source-absent text; on missing,
+  partial, duplicate, multi-codepoint, or ambiguous alignment; when a second
+  aligned unit overlaps the short primary; when B activity is present; when
+  the right-bounded primary/activity continuation is missing, duplicated,
+  short, gapped, or owned by another identity; when the incumbent is unknown,
+  mixed, non-voiceprint, or not `voiceprint_direct_regular`; when B is already
+  retained; or when any third-identity evidence enters the exact writable
+  range. `ref-0118`, `ref-0135`, `ref-0102`, `ref-0049`, `ref-0390`, and all
+  source-absent contexts remain explicit contextual abstention boundaries.
+
+  Focused tests may verify only these structural gates, immutable source/time
+  preservation, deterministic projection, reason/source diagnostics, and
+  disabled-default behavior. A frozen FR49 A/B replay may display changed
+  contexts but may not score, rank, select, or accept the experiment. Any
+  product judgment requires complete manual contextual-semantic reading of all
+  changed contexts and accepted controls, followed by independent complete A/B
+  chronological and reverse review against `test.txt`. A real audio run is
+  prohibited until that frozen-evidence review authorizes the next gate.
+
 FR40 passes its frozen gate. Repeated T123 outputs are byte-identical and
 change only Xu Zijing's `184.240-184.320` response. Repeated T111 outputs are
 separately byte-identical and split only Zhu Jie's first reaction from the

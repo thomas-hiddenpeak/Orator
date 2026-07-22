@@ -2974,23 +2974,69 @@ gates remain open 2026-07-23
   Both trees contain 33 context directories and 201 non-empty files. Their
   content manifests pass and repeated exports reproduce the same hashes. See
   `fr50-full-residual-evidence-capture-2026-07-23.md`.
-- [ ] T226 Read every T225 context and accepted control completely against
+- [x] T226 Read every T225 context and accepted control completely against
   `test.txt`, first in chronological order for full A and independently for
   full B. Manually record the earliest layer at which usable speaker-business
   evidence is absent, displaced, contradictory, or overwritten: source/VAD/
   ASR, alignment, raw posterior/activity/primary, identity/gallery, or final
   fusion/source reconstruction. Do not treat these names as executable rules
   or let automation assign them.
-- [ ] T227 Repeat the complete T226 review from the final context back to the
+  Completed independently for full A and full B in chronological order. The
+  manually written per-context observations are recorded in
+  `fr50-full-residual-earliest-loss-review-2026-07-23.md`; they remain
+  provisional until T227's two reverse readings are complete.
+- [x] T227 Repeat the complete T226 review from the final context back to the
   first for A and independently for B, re-read every named control, reconcile
   all forward/reverse disagreements manually, and record whether an ASR/VAD/
   alignment change would invalidate FR49 speaker evidence. No script, query,
   formula, metric, hash, or equality check may count classes, rank a repair,
   select a branch, or issue a verdict.
-- [ ] T228 Decide from the four complete FR50 readings whether at least two
+  Full A and full B reverse readings are complete and manually reconciled
+  without a forward/reverse disagreement. Their per-context observations and
+  upstream dependencies are in
+  `fr50-full-residual-earliest-loss-review-2026-07-23.md`. The review records
+  that any ASR/VAD/alignment or speaker-evidence producer change invalidates
+  the affected FR49 judgments and requires a fresh exact capture plus complete
+  chronological/reverse contextual-semantic review.
+- [x] T228 Decide from the four complete FR50 readings whether at least two
   independent material contexts share one low-blast, reference-free final-
   fusion topology with explicit abstentions. If yes, update SDD again before
   implementation. If the earliest loss is upstream, specify and freeze the
   required ASR/VAD/alignment contract before the final speaker seal. Otherwise
   stop without code, TOML, replay, audio, ledger, or closure change. Record the
   decision, synchronize `PROJECT_STATE.md`, and commit/push the evidence.
+  The manual four-pass reconciliation authorizes one frozen experiment shared
+  by `ref-0327` and `ref-0417`: restore one wholly contained aligned codepoint
+  from a unique short primary-B run only when B is omitted by thresholded
+  activity and a contiguous, fully activity-covered primary-A continuation
+  owns the current `voiceprint_direct_regular` label. The exact guards and
+  abstentions are frozen in `spec.md`, `plan.md`, and
+  `fr50-full-residual-earliest-loss-review-2026-07-23.md`. This is an
+  implementation authorization, not a product verdict or ledger change.
+- [ ] T229 Implement the false-by-default typed
+  `speaker_fusion.right_bounded_short_primary_unit_enable` path without new
+  numeric tuning. Preserve immutable source/time/producer evidence; restore at
+  most one aligned codepoint plus immediate punctuation; emit a dedicated
+  decision reason/source; and add focused positive, zero-duration, disabled,
+  ambiguity, activity-present, continuation, incumbent, third-identity, and
+  source-preservation contract tests.
+- [ ] T230 Complete a warning-clean build and full CTest, then replay the exact
+  frozen FR49 A/B artifacts under the checked-in TOML. Capture deterministic
+  candidate business output and display only raw changed contexts and named
+  controls. Automation MUST NOT assign correctness, aggregate/count product
+  changes, rank/select the branch, or issue an acceptance verdict. Do not run
+  `test.mp3` through the live path at this stage.
+- [ ] T231 Read every displayed candidate change and control completely against
+  `test.txt`, then independently read complete A and B candidate artifacts in
+  chronological and reverse fixed-window order. Manually record every retained
+  repair, regression, uncertainty, and abstention; reconcile all four readings
+  without executable evaluation. Retain or reject the experiment only from
+  this contextual-semantic review. Keep the FR49 ledger unchanged until all
+  readings are signed.
+- [ ] T232 Only if T231 manually retains the experiment, commit the exact clean
+  candidate and execute the constitutional 120-second, 600-second, full empty-
+  registry A, and restarted frozen-registry B real-WebSocket ladder. Complete
+  the required contextual-semantic review at every gate, then synchronize the
+  ledger, project state, review evidence, and release decision. Otherwise
+  revert only the experimental policy/TOML branch to FR49 and preserve the
+  rejected evidence.
