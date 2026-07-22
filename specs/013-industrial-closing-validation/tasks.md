@@ -14,7 +14,9 @@ source-leading primary-prefix policy, and completes its clean restarted
 120/600/full A/B real-WebSocket ladder on commit `1f09052`; four independent
 complete full-artifact contextual readings retain `523/556` while all 20
 critical residuals remain open; FR50 is active as a frozen, display-only
-all-residual earliest-evidence-loss audit with no product change authorized;
+all-residual earliest-evidence-loss audit; current-config posterior provenance
+and deterministic A/B evidence capture are complete, with four human readings
+pending and no product change authorized;
 critical, confident-wrong, time-based, holdout, report, release, T102, and T084
 gates remain open 2026-07-23
 
@@ -2940,7 +2942,7 @@ gates remain open 2026-07-23
   the current 33 residual references and the already signed 20-critical subset
   by manual transcription only. This freezes the next-candidate audit scope;
   it does not retroactively close the all-turn T032 criticality task.
-- [ ] T223 Add one display-only FR50 evidence worksheet tool and focused
+- [x] T223 Add one display-only FR50 evidence worksheet tool and focused
   mechanical tests. Its manually authored context table may contain reference
   IDs, accepted-control IDs, and absolute common-clock bounds, but no expected
   speaker, correctness label, causal class, score, rank, candidate identity,
@@ -2949,19 +2951,29 @@ gates remain open 2026-07-23
   alignment, VAD, activity diarization, primary speaker, all intersecting or
   source-related TitaNet evidence, local identity epochs, and four-channel
   Sortformer posterior rows without modifying their values.
-- [ ] T224 Prove mechanically whether the frozen T191 posterior remains the
+  Implemented by `speaker_residual_evidence_packet.py`; five focused tests
+  cover the permitted parsing, boundary, raw-copy, source relation,
+  determinism, artifact-identity, and producer-rejection contracts.
+- [x] T224 Prove mechanically whether the frozen T191 posterior remains the
   exact source of FR49 A/B activity and primary evidence. Compare only model,
   TOML, PCM, local-slot ordering, common-clock frame extent, and top-1 primary
   compression. If any provenance or producer field differs, run
   `diar_evidence_probe` twice on the exact current PCM and checked-in TOML and
   retain the repeated raw capture instead. No reference or product judgment
   may enter this gate.
-- [ ] T225 Generate independent FR49 full A and full B worksheet trees for all
+  The historical TOML hash differs, so the exact PCM is rerun twice under the
+  current TOML. Both raw frame and segment outputs are byte-identical;
+  mechanical top-1 compression reproduces all 1,348 ordered primary runs in
+  each FR49 artifact. This establishes source provenance only.
+- [x] T225 Generate independent FR49 full A and full B worksheet trees for all
   33 residual contexts and their accepted controls. Require complete files,
   exact source/config/artifact identities, common-clock bounds, deterministic
   ordering, raw-value preservation, and content manifests. Mechanical A/B
   equality or difference may be displayed but may not classify, combine, or
   decide a product result.
+  Both trees contain 33 context directories and 201 non-empty files. Their
+  content manifests pass and repeated exports reproduce the same hashes. See
+  `fr50-full-residual-evidence-capture-2026-07-23.md`.
 - [ ] T226 Read every T225 context and accepted control completely against
   `test.txt`, first in chronological order for full A and independently for
   full B. Manually record the earliest layer at which usable speaker-business

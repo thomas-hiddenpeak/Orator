@@ -3039,6 +3039,18 @@ open. See `fr47-real-path-promotion-review-2026-07-19.md`.
   Otherwise FR50 stops without production code, TOML, model, audio replay,
   ledger, or closure change.
 
+  The FR50 capture gate is complete. Because the historical T191 TOML hash
+  differs from the current checked-in TOML, the exact PCM is run twice through
+  the current v2.1 probe. Both executions emit byte-identical 45,189-row raw
+  frame files and 755 segment rows. Mechanical `0.5` top-1 compression
+  independently reproduces all 1,348 ordered local-slot primary runs in each
+  FR49 artifact within the frozen serialization tolerance. Separate A/B
+  worksheet trees each contain all 33 contexts, every required track, content
+  manifests, and no empty file; repeated exports are deterministic. These are
+  provenance and evidence-availability findings only. No contextual causal
+  reading, product change, or closure decision has yet occurred. See
+  `fr50-full-residual-evidence-capture-2026-07-23.md`.
+
 FR40 passes its frozen gate. Repeated T123 outputs are byte-identical and
 change only Xu Zijing's `184.240-184.320` response. Repeated T111 outputs are
 separately byte-identical and split only Zhu Jie's first reaction from the

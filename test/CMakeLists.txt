@@ -239,6 +239,14 @@ if(Python3_EXECUTABLE)
     TIMEOUT 30
     LABELS "python;unit;manual-review")
 
+  add_test(NAME test_speaker_residual_evidence_packet
+    COMMAND ${Python3_EXECUTABLE}
+      ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/test_speaker_residual_evidence_packet.py)
+  set_tests_properties(test_speaker_residual_evidence_packet PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    TIMEOUT 30
+    LABELS "python;unit;manual-review")
+
   add_test(NAME test_ws_contract
     COMMAND ${Python3_EXECUTABLE}
       ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/run_ws_integration.py

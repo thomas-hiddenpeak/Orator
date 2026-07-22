@@ -4283,6 +4283,18 @@ no production policy, TOML, model, audio result, ledger, or closure status, and
 no new real-WebSocket run occurs before this frozen-evidence upper-bound audit
 is complete.
 
+The FR50 capture phase is complete. The historical T191 TOML does not have the
+current file identity, so two current-TOML v2.1 executions are retained rather
+than assuming provenance. Their 45,189-row posterior and 755-row segment files
+are byte-identical. Existing `0.5` top-1 compression reproduces all 1,348
+ordered local-slot primary runs independently for frozen full A and full B.
+The display-only tool then emits deterministic 33-context A/B trees with all
+required tracks, exact source identities, complete file manifests, and no
+empty file. No evidence has yet been interpreted. The next action is the four
+complete T226/T227 contextual readings; no candidate implementation or audio
+run is authorized. See
+`fr50-full-residual-evidence-capture-2026-07-23.md`.
+
 ### 8.15 FR28 120-second outcome and promotion ladder
 
 T117-T121 are complete. The frozen T116 packages replay byte-stably; their
