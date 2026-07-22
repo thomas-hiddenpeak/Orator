@@ -70,9 +70,9 @@ std::vector<std::pair<int, int>> PhraseRanges(
   int start = 0;
   auto visible = [&](int begin, int end) {
     for (int index = begin; index < end; ++index) {
-      if (punctuation.count(source[index]) == 0 &&
-          source[index] != " " && source[index] != "\t" &&
-          source[index] != "\n" && source[index] != "\r") {
+      if (punctuation.count(source[index]) == 0 && source[index] != " " &&
+          source[index] != "\t" && source[index] != "\n" &&
+          source[index] != "\r") {
         return true;
       }
     }
@@ -100,8 +100,7 @@ std::vector<std::string> VisibleCodepoints(
     const std::set<std::string>& punctuation) {
   std::vector<std::string> output;
   for (int index = source_start; index < source_end; ++index) {
-    if (punctuation.count(source[index]) == 0 &&
-        !IsWhitespace(source[index])) {
+    if (punctuation.count(source[index]) == 0 && !IsWhitespace(source[index])) {
       output.push_back(source[index]);
     }
   }
@@ -112,10 +111,10 @@ bool IsStrictVisibleSuffix(const std::vector<std::string>& source,
                            const std::pair<int, int>& preceding,
                            const std::pair<int, int>& following,
                            const std::set<std::string>& punctuation) {
-  const auto preceding_visible = VisibleCodepoints(
-      source, preceding.first, preceding.second, punctuation);
-  const auto following_visible = VisibleCodepoints(
-      source, following.first, following.second, punctuation);
+  const auto preceding_visible =
+      VisibleCodepoints(source, preceding.first, preceding.second, punctuation);
+  const auto following_visible =
+      VisibleCodepoints(source, following.first, following.second, punctuation);
   return !following_visible.empty() &&
          following_visible.size() < preceding_visible.size() &&
          std::equal(following_visible.rbegin(), following_visible.rend(),
@@ -123,8 +122,7 @@ bool IsStrictVisibleSuffix(const std::vector<std::string>& source,
 }
 
 std::optional<std::pair<double, double>> TimeForRange(
-    const std::vector<CharacterTime>& times, int source_start,
-    int source_end) {
+    const std::vector<CharacterTime>& times, int source_start, int source_end) {
   double start = 0.0;
   double end = 0.0;
   bool found = false;
@@ -140,7 +138,7 @@ std::optional<std::pair<double, double>> TimeForRange(
     }
   }
   if (!found || end <= start) return std::nullopt;
-  return std::make_pair(start, end);
+  return std::pair<double, double>{start, end};
 }
 
 std::vector<std::string> ActiveSpeakerIds(
@@ -150,6 +148,15 @@ std::vector<std::string> ActiveSpeakerIds(
     if (!segment.speaker_id.empty()) ids.insert(segment.speaker_id);
   }
   return {ids.begin(), ids.end()};
+}
+
+std::size_t DiarSpeakerPopulation(
+    const std::vector<Timeline::SpeakerInput>& diarization) {
+  std::set<std::string> speakers;
+  for (const auto& segment : diarization) {
+    if (!segment.speaker.empty()) speakers.insert(segment.speaker);
+  }
+  return speakers.size();
 }
 
 Timeline::SpeakerVoiceprintEvidence MakeQuery(const std::string& evidence_id,
@@ -234,7 +241,74 @@ void SpeakerEvidenceStage::StartPrecompute(ComprehensiveTimeline* timeline,
   precompute_stop_ = false;
   precompute_drain_ = false;
   precomputed_spans_.clear();
+  pending_primary_spans_.clear();
+  primary_run_open_ = false;
+  primary_run_start_ = 0.0;
+  primary_run_end_ = 0.0;
+  primary_run_local_speaker_ = -1;
+  live_precomputed_spans_ = 0;
+  drain_precomputed_spans_ = 0;
   precompute_thread_ = std::thread([this] { PrecomputeLoop(); });
+}
+
+void SpeakerEvidenceStage::ClosePrimaryRunLocked() {
+  if (!primary_run_open_) return;
+  if (primary_run_end_ - primary_run_start_ + 1e-9 >= config_.min_embed_sec) {
+    pending_primary_spans_.push_back({primary_run_start_, primary_run_end_});
+  }
+  primary_run_open_ = false;
+  primary_run_local_speaker_ = -1;
+}
+
+void SpeakerEvidenceStage::ObserveDiarFrameBlock(
+    const Timeline::DiarFrameBlock& block) {
+  if (!config_.enabled || !config_.source_leading_primary_prefix_enabled ||
+      config_.precompute_interval_sec <= 0.0 || block.num_frames <= 0 ||
+      block.num_speakers <= 0 || block.frame_period_sec <= 0.0 ||
+      block.probabilities.size() !=
+          static_cast<std::size_t>(block.num_frames) * block.num_speakers) {
+    return;
+  }
+
+  std::lock_guard<std::mutex> lock(precompute_mutex_);
+  for (int frame = 0; frame < block.num_frames; ++frame) {
+    int best_slot = 0;
+    float best_score = block.probabilities[static_cast<std::size_t>(frame) *
+                                           block.num_speakers];
+    for (int slot = 1; slot < block.num_speakers; ++slot) {
+      const float score = block.probabilities[static_cast<std::size_t>(frame) *
+                                                  block.num_speakers +
+                                              slot];
+      if (score > best_score) {
+        best_slot = slot;
+        best_score = score;
+      }
+    }
+
+    const double start = block.start + frame * block.frame_period_sec;
+    const double end = start + block.frame_period_sec;
+    if (best_score + 1e-9f < config_.frame_activity_threshold) {
+      ClosePrimaryRunLocked();
+      continue;
+    }
+
+    const int local_speaker = block.local_speaker_offset + best_slot;
+    if (!primary_run_open_ || primary_run_local_speaker_ != local_speaker ||
+        std::abs(primary_run_end_ - start) > 1e-6) {
+      ClosePrimaryRunLocked();
+      primary_run_open_ = true;
+      primary_run_start_ = start;
+      primary_run_end_ = end;
+      primary_run_local_speaker_ = local_speaker;
+    } else {
+      primary_run_end_ = end;
+    }
+  }
+}
+
+void SpeakerEvidenceStage::FinalizePrimaryPrecompute() {
+  std::lock_guard<std::mutex> lock(precompute_mutex_);
+  ClosePrimaryRunLocked();
 }
 
 void SpeakerEvidenceStage::StopPrecompute(bool drain) {
@@ -254,6 +328,16 @@ void SpeakerEvidenceStage::StopPrecompute(bool drain) {
 std::size_t SpeakerEvidenceStage::precomputed_span_count() const {
   std::lock_guard<std::mutex> lock(precompute_mutex_);
   return precomputed_spans_.size();
+}
+
+std::size_t SpeakerEvidenceStage::live_precomputed_span_count() const {
+  std::lock_guard<std::mutex> lock(precompute_mutex_);
+  return live_precomputed_spans_;
+}
+
+std::size_t SpeakerEvidenceStage::drain_precomputed_span_count() const {
+  std::lock_guard<std::mutex> lock(precompute_mutex_);
+  return drain_precomputed_spans_;
 }
 
 void SpeakerEvidenceStage::PrecomputeLoop() {
@@ -279,7 +363,8 @@ void SpeakerEvidenceStage::PrecomputeLoop() {
           drain ? 0
                 : static_cast<std::size_t>(
                       config_.precompute_max_spans_per_cycle);
-      Precompute(timeline->SnapshotSpeakerEvidenceInputs(), max_spans);
+      PrecomputeCycle(timeline->SnapshotSpeakerEvidenceInputs(), max_spans,
+                      drain);
     }
     if (stop) return;
   }
@@ -351,9 +436,8 @@ SpeakerEvidenceStage::BuildAdjacentBusinessPairs(
         continue;
       }
       Timeline::SpeakerVoiceprintEvidence pair;
-      pair.evidence_id = "adjacent_business_pair:" +
-                         std::to_string(text_id) + ":" +
-                         std::to_string(ordinal++);
+      pair.evidence_id = "adjacent_business_pair:" + std::to_string(text_id) +
+                         ":" + std::to_string(ordinal++);
       pair.kind = "adjacent_business_pair";
       pair.text_id = text_id;
       pair.source_start = leading.source_start;
@@ -366,8 +450,7 @@ SpeakerEvidenceStage::BuildAdjacentBusinessPairs(
   return output;
 }
 
-std::vector<Timeline::SpeakerInput>
-SpeakerEvidenceStage::BuildPrimarySpeaker(
+std::vector<Timeline::SpeakerInput> SpeakerEvidenceStage::BuildPrimarySpeaker(
     const Timeline::TrackSnapshot& snapshot) {
   std::vector<Timeline::SpeakerInput> output;
   if (!config_.enabled) return output;
@@ -386,8 +469,7 @@ SpeakerEvidenceStage::BuildPrimarySpeaker(
   auto flush_primary = [&] {
     if (!run || run->end <= run->start) return;
     output.push_back(
-        {run->start, run->end,
-         "speaker_" + std::to_string(run->local),
+        {run->start, run->end, "speaker_" + std::to_string(run->local),
          static_cast<float>(run->confidence_total / run->frame_count),
          run->speaker_id});
     run.reset();
@@ -395,11 +477,13 @@ SpeakerEvidenceStage::BuildPrimarySpeaker(
   for (const auto& block : snapshot.diar_frames) {
     for (int frame = 0; frame < block.num_frames; ++frame) {
       int best_slot = 0;
-      float best_score = block.probabilities[
-          static_cast<std::size_t>(frame) * block.num_speakers];
+      float best_score = block.probabilities[static_cast<std::size_t>(frame) *
+                                             block.num_speakers];
       for (int slot = 1; slot < block.num_speakers; ++slot) {
-        const float score = block.probabilities[
-            static_cast<std::size_t>(frame) * block.num_speakers + slot];
+        const float score =
+            block.probabilities[static_cast<std::size_t>(frame) *
+                                    block.num_speakers +
+                                slot];
         if (score > best_score) {
           best_slot = slot;
           best_score = score;
@@ -468,11 +552,11 @@ SpeakerEvidenceStage::BuildVoiceprintQueries(
   }
   std::vector<Timeline::SpeakerVoiceprintEvidence> business_intervals;
   for (auto& [text_id, entries] : entries_by_text) {
-    std::stable_sort(entries.begin(), entries.end(),
-                     [](const Timeline::Entry& left,
-                        const Timeline::Entry& right) {
-                       return left.start < right.start;
-                     });
+    std::stable_sort(
+        entries.begin(), entries.end(),
+        [](const Timeline::Entry& left, const Timeline::Entry& right) {
+          return left.start < right.start;
+        });
     int source_cursor = 0;
     int ordinal = 0;
     for (const auto& entry : entries) {
@@ -483,8 +567,8 @@ SpeakerEvidenceStage::BuildVoiceprintQueries(
           {source_cursor, source_end}};
       const auto phrase_ranges = phrase_ranges_by_text.find(text_id);
       if (phrase_ranges != phrase_ranges_by_text.end()) {
-        query_ranges = SplitPartialPhraseEdges(
-            source_cursor, source_end, phrase_ranges->second);
+        query_ranges = SplitPartialPhraseEdges(source_cursor, source_end,
+                                               phrase_ranges->second);
       }
       for (const auto& range : query_ranges) {
         double query_start = entry.start;
@@ -540,9 +624,9 @@ SpeakerEvidenceStage::BuildVoiceprintQueries(
     for (const auto& unit : alignment->second.units) {
       if (unit.end <= unit.start) continue;
       const auto unit_text = Utf8Codepoints(unit.text);
-      auto found = std::search(
-          source.begin() + static_cast<long>(unit_source_cursor), source.end(),
-          unit_text.begin(), unit_text.end());
+      auto found =
+          std::search(source.begin() + static_cast<long>(unit_source_cursor),
+                      source.end(), unit_text.begin(), unit_text.end());
       if (found == source.end()) continue;
       const int source_start =
           static_cast<int>(std::distance(source.begin(), found));
@@ -558,7 +642,8 @@ SpeakerEvidenceStage::BuildVoiceprintQueries(
     const auto phrase_ranges = phrase_ranges_by_text.find(text.id);
     if (phrase_ranges == phrase_ranges_by_text.end()) continue;
     for (const auto& range : phrase_ranges->second) {
-      const auto time = TimeForRange(character_times, range.first, range.second);
+      const auto time =
+          TimeForRange(character_times, range.first, range.second);
       if (!time) continue;
       const double duration = time->second - time->first;
       if (duration + 1e-9 < config_.phrase_min_sec ||
@@ -603,13 +688,13 @@ SpeakerEvidenceStage::BuildVoiceprintQueries(
       for (int index = preceding.first; index < preceding.second; ++index) {
         if (character_times[index].available) positive_indices.push_back(index);
       }
-      for (std::size_t time_index = 0;
-           time_index + 1 < positive_indices.size(); ++time_index) {
+      for (std::size_t time_index = 0; time_index + 1 < positive_indices.size();
+           ++time_index) {
         const auto& left = character_times[positive_indices[time_index]];
         const auto& right = character_times[positive_indices[time_index + 1]];
         if (right.start <= left.end + 1e-9) continue;
-        for (std::size_t primary_index = 1;
-             primary_index + 1 < primary.size(); ++primary_index) {
+        for (std::size_t primary_index = 1; primary_index + 1 < primary.size();
+             ++primary_index) {
           const auto& outer_left = primary[primary_index - 1];
           const auto& middle = primary[primary_index];
           const auto& outer_right = primary[primary_index + 1];
@@ -639,9 +724,9 @@ SpeakerEvidenceStage::BuildVoiceprintQueries(
         echo_ambiguous = true;
         break;
       }
-      echo_candidates.push_back(
-          {following.first, following.second, candidates.front().start,
-           candidates.front().end});
+      echo_candidates.push_back({following.first, following.second,
+                                 candidates.front().start,
+                                 candidates.front().end});
     }
     if (!echo_ambiguous && echo_candidates.size() == 1) {
       const auto& candidate = echo_candidates.front();
@@ -671,11 +756,11 @@ SpeakerEvidenceStage::BuildVoiceprintQueries(
   return output;
 }
 
-void SpeakerEvidenceStage::Precompute(
+std::size_t SpeakerEvidenceStage::Precompute(
     const Timeline::SpeakerEvidenceSnapshot& snapshot, std::size_t max_spans) {
-  if (ActiveSpeakerIds(snapshot.diarization).size() <
+  if (DiarSpeakerPopulation(snapshot.diarization) <
       static_cast<std::size_t>(config_.minimum_gallery_size)) {
-    return;
+    return 0;
   }
   std::size_t computed = 0;
   for (const auto& query : BuildVoiceprintQueries(snapshot)) {
@@ -695,8 +780,66 @@ void SpeakerEvidenceStage::Precompute(
     std::lock_guard<std::mutex> lock(precompute_mutex_);
     precomputed_spans_.insert(key);
     ++computed;
-    if (max_spans > 0 && computed >= max_spans) return;
+    if (max_spans > 0 && computed >= max_spans) return computed;
   }
+  return computed;
+}
+
+std::size_t SpeakerEvidenceStage::PrecomputePendingPrimarySpans(
+    std::size_t max_spans) {
+  std::size_t computed = 0;
+  for (;;) {
+    std::pair<double, double> span;
+    std::pair<long, long> key;
+    {
+      std::lock_guard<std::mutex> lock(precompute_mutex_);
+      if (pending_primary_spans_.empty() ||
+          (max_spans > 0 && computed >= max_spans)) {
+        return computed;
+      }
+      span = pending_primary_spans_.front();
+      pending_primary_spans_.pop_front();
+      key = {static_cast<long>(std::llround(span.first * 1000000.0)),
+             static_cast<long>(std::llround(span.second * 1000000.0))};
+      if (precomputed_spans_.count(key) != 0) continue;
+    }
+
+    if (!identity_->PrecomputeSpan(
+            span.first, span.second, config_.min_embed_sec,
+            config_.edge_margin_sec, config_.max_embed_window_sec)) {
+      continue;
+    }
+    {
+      std::lock_guard<std::mutex> lock(precompute_mutex_);
+      precomputed_spans_.insert(key);
+    }
+    ++computed;
+  }
+}
+
+std::size_t SpeakerEvidenceStage::PrecomputeCycle(
+    const Timeline::SpeakerEvidenceSnapshot& snapshot, std::size_t max_spans,
+    bool drain) {
+  if (DiarSpeakerPopulation(snapshot.diarization) <
+      static_cast<std::size_t>(config_.minimum_gallery_size)) {
+    return 0;
+  }
+
+  std::size_t computed = PrecomputePendingPrimarySpans(max_spans);
+  const std::size_t remaining =
+      max_spans == 0 ? 0 : max_spans - std::min(max_spans, computed);
+  if (max_spans == 0 || remaining > 0) {
+    computed += Precompute(snapshot, remaining);
+  }
+  {
+    std::lock_guard<std::mutex> lock(precompute_mutex_);
+    if (drain) {
+      drain_precomputed_spans_ += computed;
+    } else {
+      live_precomputed_spans_ += computed;
+    }
+  }
+  return computed;
 }
 
 std::vector<Timeline::SpeakerVoiceprintEvidence>
@@ -713,12 +856,12 @@ SpeakerEvidenceStage::BuildVoiceprint(
 
   using SpanKey = std::pair<long, long>;
   std::map<SpanKey, SpeakerIdentityStage::SpanEvidence> cache;
-  auto evaluate = [&](double start, double end)
-      -> const SpeakerIdentityStage::SpanEvidence& {
+  auto evaluate = [&](double start,
+                      double end) -> const SpeakerIdentityStage::SpanEvidence& {
     const SpanKey key = {static_cast<long>(std::llround(start * 1000000.0)),
                          static_cast<long>(std::llround(end * 1000000.0))};
-    auto [position, inserted] = cache.emplace(
-        key, SpeakerIdentityStage::SpanEvidence{});
+    auto [position, inserted] =
+        cache.emplace(key, SpeakerIdentityStage::SpanEvidence{});
     if (inserted) {
       position->second = identity_->EvaluateSpan(
           start, end, active_ids, config_.min_embed_sec,

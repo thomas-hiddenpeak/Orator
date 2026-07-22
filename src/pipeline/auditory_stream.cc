@@ -144,8 +144,7 @@ void AuditoryStream::Start() {
   if (config_.timeline_speaker_overlap_tie_policy == "higher_confidence") {
     business_config.speaker_overlap_tie_policy =
         BusinessSpeakerPipeline::SpeakerOverlapTiePolicy::kHigherConfidence;
-  } else if (config_.timeline_speaker_overlap_tie_policy ==
-             "primary_speaker") {
+  } else if (config_.timeline_speaker_overlap_tie_policy == "primary_speaker") {
     business_config.speaker_overlap_tie_policy =
         BusinessSpeakerPipeline::SpeakerOverlapTiePolicy::kPrimarySpeaker;
   } else {
@@ -310,8 +309,7 @@ void AuditoryStream::Start() {
     SpeakerEvidenceStage::Config evidence_config;
     evidence_config.enabled = config_.speaker_fusion_enable;
     evidence_config.min_embed_sec = config_.speaker_fusion_min_embed_sec;
-    evidence_config.edge_margin_sec =
-        config_.speaker_fusion_edge_margin_sec;
+    evidence_config.edge_margin_sec = config_.speaker_fusion_edge_margin_sec;
     evidence_config.max_embed_window_sec =
         config_.speaker_fusion_max_embed_window_sec;
     evidence_config.phrase_min_sec = config_.speaker_fusion_phrase_min_sec;
@@ -366,22 +364,25 @@ void AuditoryStream::StartWorkers() {
               diar_handle_.get(),
               [this](const std::string& json) { EmitLocked(json); }, segs);
         });
-    diar_worker_->set_frame_sink(
-        [this](const core::DiarizationFrames& frames, int local_offset) {
-          ComprehensiveTimeline::DiarFrameBlock block;
-          block.start = frames.t_start_sec;
-          block.frame_period_sec = frames.frame_period_sec;
-          block.num_frames = frames.num_frames;
-          block.num_speakers = frames.num_speakers;
-          block.local_speaker_offset = local_offset;
-          block.probabilities = frames.probs;
-          const auto result = comp_.DepositDiarFrameBlock(block);
-          if (result == ComprehensiveTimeline::DepositResult::kConflict ||
-              result == ComprehensiveTimeline::DepositResult::kInvalid) {
-            LOG_ERROR("[diar] rejected raw frame block at %.3f\n",
-                      frames.t_start_sec);
-          }
-        });
+    diar_worker_->set_frame_sink([this](const core::DiarizationFrames& frames,
+                                        int local_offset) {
+      ComprehensiveTimeline::DiarFrameBlock block;
+      block.start = frames.t_start_sec;
+      block.frame_period_sec = frames.frame_period_sec;
+      block.num_frames = frames.num_frames;
+      block.num_speakers = frames.num_speakers;
+      block.local_speaker_offset = local_offset;
+      block.probabilities = frames.probs;
+      const auto result = comp_.DepositDiarFrameBlock(block);
+      if (result == ComprehensiveTimeline::DepositResult::kConflict ||
+          result == ComprehensiveTimeline::DepositResult::kInvalid) {
+        LOG_ERROR("[diar] rejected raw frame block at %.3f\n",
+                  frames.t_start_sec);
+      } else if (result == ComprehensiveTimeline::DepositResult::kInserted &&
+                 speaker_evidence_stage_) {
+        speaker_evidence_stage_->ObserveDiarFrameBlock(block);
+      }
+    });
     // Spec 010: resolve global voiceprint identities on the segment view before
     // it is delivered. The worker depends only on a std::function (Art. III);
     // identity needs no VAD -- Sortformer's confidence + no-overlap already
@@ -638,6 +639,9 @@ void AuditoryStream::StopWorkers() {
   if (asr_audio_) asr_audio_->Close();
   if (vad_audio_) vad_audio_->Close();
   if (diar_thread_.joinable()) diar_thread_.join();
+  if (speaker_evidence_stage_) {
+    speaker_evidence_stage_->FinalizePrimaryPrecompute();
+  }
   if (asr_thread_.joinable()) asr_thread_.join();
   if (vad_thread_.joinable()) vad_thread_.join();
   // The ASR collector never waits for VAD. Once both independent producers
@@ -684,7 +688,8 @@ void AuditoryStream::StopWorkers() {
         "[finalize] producers=%.3fms align=%.3fms "
         "primary_build_and_deposit=%.3fms precompute_drain=%.3fms "
         "voiceprint_build=%.3fms "
-        "voiceprint_deposit=%.3fms precomputed=%zu cached=%zu\n",
+        "voiceprint_deposit=%.3fms precomputed=%zu live=%zu drain=%zu "
+        "cached=%zu\n",
         millis(producers_drained, finalize_begin),
         millis(align_drained, producers_drained),
         millis(primary_deposited, primary_build_begin),
@@ -692,6 +697,8 @@ void AuditoryStream::StopWorkers() {
         millis(voiceprint_built, precompute_drained),
         millis(voiceprint_deposited, voiceprint_built),
         speaker_evidence_stage_->precomputed_span_count(),
+        speaker_evidence_stage_->live_precomputed_span_count(),
+        speaker_evidence_stage_->drain_precomputed_span_count(),
         speaker_id_stage_ ? speaker_id_stage_->cached_embedding_count() : 0);
   }
   if (business_speaker_pipeline_) {

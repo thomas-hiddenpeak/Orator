@@ -2,13 +2,14 @@
 
 // Final/revisable speaker evidence producer. It reads upstream producer tracks
 // and the current base business projection from ComprehensiveTimeline, then
-// reuses the diarization pipeline's retained audio and TitaNet gallery. Business
-// intervals follow the projection's source partition. The stage emits acoustic
-// evidence only; speaker selection remains BusinessSpeakerPipeline's
+// reuses the diarization pipeline's retained audio and TitaNet gallery.
+// Business intervals follow the projection's source partition. The stage emits
+// acoustic evidence only; speaker selection remains BusinessSpeakerPipeline's
 // responsibility.
 
 #include <condition_variable>
 #include <cstddef>
+#include <deque>
 #include <functional>
 #include <mutex>
 #include <set>
@@ -51,8 +52,13 @@ class SpeakerEvidenceStage {
 
   void StartPrecompute(ComprehensiveTimeline* timeline,
                        std::function<bool()> ready);
+  void ObserveDiarFrameBlock(
+      const ComprehensiveTimeline::DiarFrameBlock& block);
+  void FinalizePrimaryPrecompute();
   void StopPrecompute(bool drain);
   std::size_t precomputed_span_count() const;
+  std::size_t live_precomputed_span_count() const;
+  std::size_t drain_precomputed_span_count() const;
 
   std::vector<ComprehensiveTimeline::SpeakerInput> BuildPrimarySpeaker(
       const ComprehensiveTimeline::TrackSnapshot& snapshot);
@@ -74,9 +80,14 @@ class SpeakerEvidenceStage {
   std::vector<ComprehensiveTimeline::SpeakerVoiceprintEvidence>
   BuildVoiceprintQueries(
       const ComprehensiveTimeline::SpeakerEvidenceSnapshot& snapshot) const;
-  void Precompute(
+  std::size_t Precompute(
       const ComprehensiveTimeline::SpeakerEvidenceSnapshot& snapshot,
       std::size_t max_spans);
+  std::size_t PrecomputePendingPrimarySpans(std::size_t max_spans);
+  std::size_t PrecomputeCycle(
+      const ComprehensiveTimeline::SpeakerEvidenceSnapshot& snapshot,
+      std::size_t max_spans, bool drain);
+  void ClosePrimaryRunLocked();
   void PrecomputeLoop();
 
   SpeakerIdentityStage* identity_ = nullptr;
@@ -89,6 +100,13 @@ class SpeakerEvidenceStage {
   bool precompute_stop_ = false;
   bool precompute_drain_ = false;
   std::set<std::pair<long, long>> precomputed_spans_;
+  std::deque<std::pair<double, double>> pending_primary_spans_;
+  bool primary_run_open_ = false;
+  double primary_run_start_ = 0.0;
+  double primary_run_end_ = 0.0;
+  int primary_run_local_speaker_ = -1;
+  std::size_t live_precomputed_spans_ = 0;
+  std::size_t drain_precomputed_spans_ = 0;
 };
 
 }  // namespace pipeline

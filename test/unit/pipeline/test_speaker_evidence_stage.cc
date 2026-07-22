@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <string>
 #include <utility>
@@ -14,12 +15,12 @@ namespace {
 
 int failures = 0;
 
-#define CHECK(condition, message)    \
-  do {                               \
-    if (!(condition)) {              \
+#define CHECK(condition, message)         \
+  do {                                    \
+    if (!(condition)) {                   \
       std::printf("FAIL: %s\n", message); \
-      ++failures;                    \
-    }                                \
+      ++failures;                         \
+    }                                     \
   } while (0)
 
 using Range = std::pair<int, int>;
@@ -93,8 +94,7 @@ int main() {
     return value;
   };
   const auto adjacent = TestSpeakerEvidenceStage::BuildAdjacentBusinessPairs(
-      {interval(0, 1, 2.0, 2.16), interval(1, 4, 2.16, 2.80)}, 0.4,
-      1.5);
+      {interval(0, 1, 2.0, 2.16), interval(1, 4, 2.16, 2.80)}, 0.4, 1.5);
   CHECK(adjacent.size() == 1,
         "a subminimum interval and regular adjacent interval form one query");
   if (adjacent.size() == 1) {
@@ -105,28 +105,23 @@ int main() {
           "adjacent query preserves typed source and common-clock bounds");
   }
   CHECK(TestSpeakerEvidenceStage::BuildAdjacentBusinessPairs(
-            {interval(0, 1, 2.0, 2.16), interval(2, 4, 2.16, 2.80)},
-            0.4, 1.5)
+            {interval(0, 1, 2.0, 2.16), interval(2, 4, 2.16, 2.80)}, 0.4, 1.5)
             .empty(),
         "a source gap does not form an adjacent query");
   CHECK(TestSpeakerEvidenceStage::BuildAdjacentBusinessPairs(
-            {interval(0, 1, 2.0, 2.16), interval(1, 4, 2.20, 2.80)},
-            0.4, 1.5)
+            {interval(0, 1, 2.0, 2.16), interval(1, 4, 2.20, 2.80)}, 0.4, 1.5)
             .empty(),
         "a common-clock gap does not form an adjacent query");
   CHECK(TestSpeakerEvidenceStage::BuildAdjacentBusinessPairs(
-            {interval(0, 2, 2.0, 2.40), interval(2, 4, 2.40, 2.80)},
-            0.4, 1.5)
+            {interval(0, 2, 2.0, 2.40), interval(2, 4, 2.40, 2.80)}, 0.4, 1.5)
             .empty(),
         "a regular leading interval does not form an adjacent query");
   CHECK(TestSpeakerEvidenceStage::BuildAdjacentBusinessPairs(
-            {interval(0, 1, 2.0, 2.16), interval(1, 2, 2.16, 2.40)},
-            0.4, 1.5)
+            {interval(0, 1, 2.0, 2.16), interval(1, 2, 2.16, 2.40)}, 0.4, 1.5)
             .empty(),
         "a subminimum following interval does not form an adjacent query");
   CHECK(TestSpeakerEvidenceStage::BuildAdjacentBusinessPairs(
-            {interval(0, 1, 2.0, 2.16), interval(1, 4, 2.16, 3.60)},
-            0.4, 1.5)
+            {interval(0, 1, 2.0, 2.16), interval(1, 4, 2.16, 3.60)}, 0.4, 1.5)
             .empty(),
         "a pair at the short-span ceiling does not form an adjacent query");
 
@@ -154,14 +149,13 @@ int main() {
     orator::pipeline::ComprehensiveTimeline::SpeakerEvidenceSnapshot
         query_snapshot;
     query_snapshot.asr.push_back({7, 0.0, 4.0, "甲乙丙丁"});
-    query_snapshot.align.push_back(
-        {7,
-         0.0,
-         4.0,
-         {{0.0, 1.0, "甲"},
-          {1.0, 2.0, "乙"},
-          {2.0, 3.0, "丙"},
-          {3.0, 4.0, "丁"}}});
+    query_snapshot.align.push_back({7,
+                                    0.0,
+                                    4.0,
+                                    {{0.0, 1.0, "甲"},
+                                     {1.0, 2.0, "乙"},
+                                     {2.0, 3.0, "丙"},
+                                     {3.0, 4.0, "丁"}}});
     orator::pipeline::ComprehensiveTimeline::Entry leading;
     leading.start = 0.0;
     leading.end = 2.0;
@@ -187,19 +181,18 @@ int main() {
     };
     const auto split_queries =
         TestSpeakerEvidenceStage::BuildVoiceprintQueries(stage, query_snapshot);
-    CHECK(business_ranges(split_queries) ==
-              std::vector<Range>({{0, 2}, {2, 4}}),
-          "business projection partitions derived voiceprint queries");
+    CHECK(
+        business_ranges(split_queries) == std::vector<Range>({{0, 2}, {2, 4}}),
+        "business projection partitions derived voiceprint queries");
 
-    query_snapshot.primary_speaker = {
-        {.start = 0.0,
-         .end = 0.3,
-         .speaker = "speaker_0",
-         .speaker_id = "spk_0"},
-        {.start = 0.3,
-         .end = 1.0,
-         .speaker = "speaker_1",
-         .speaker_id = "spk_1"}};
+    query_snapshot.primary_speaker = {{.start = 0.0,
+                                       .end = 0.3,
+                                       .speaker = "speaker_0",
+                                       .speaker_id = "spk_0"},
+                                      {.start = 0.3,
+                                       .end = 1.0,
+                                       .speaker = "speaker_1",
+                                       .speaker_id = "spk_1"}};
     const auto primary_queries =
         TestSpeakerEvidenceStage::BuildVoiceprintQueries(stage, query_snapshot);
     std::vector<VoiceprintEvidence> primary_run_queries;
@@ -221,14 +214,13 @@ int main() {
     auto disabled_config = evidence_config;
     disabled_config.source_leading_primary_prefix_enabled = false;
     orator::pipeline::SpeakerEvidenceStage disabled_stage(&identity,
-                                                           disabled_config);
+                                                          disabled_config);
     const auto disabled_queries =
         TestSpeakerEvidenceStage::BuildVoiceprintQueries(disabled_stage,
                                                          query_snapshot);
-    CHECK(std::none_of(disabled_queries.begin(), disabled_queries.end(),
-                       [](const auto& query) {
-                         return query.kind == "primary_run";
-                       }),
+    CHECK(std::none_of(
+              disabled_queries.begin(), disabled_queries.end(),
+              [](const auto& query) { return query.kind == "primary_run"; }),
           "disabled primary-prefix policy emits no primary-run evidence");
 
     leading.end = 4.0;
@@ -242,32 +234,30 @@ int main() {
     auto alignment_gap_snapshot = [] {
       orator::pipeline::ComprehensiveTimeline::SpeakerEvidenceSnapshot value;
       value.asr.push_back({9, 0.0, 2.2, "甲乙丙。乙丙，丁。"});
-      value.align.push_back(
-          {9,
-           0.0,
-           2.2,
-           {{0.0, 0.2, "甲"},
-            {0.2, 0.4, "乙"},
-            {1.2, 1.4, "丙"},
-            {1.4, 1.5, "。"},
-            {1.5, 1.7, "乙"},
-            {1.7, 1.9, "丙"},
-            {1.9, 2.0, "，"},
-            {2.0, 2.1, "丁"},
-            {2.1, 2.2, "。"}}});
-      value.primary_speaker = {
-          {.start = 0.0,
-           .end = 0.52,
-           .speaker = "speaker_0",
-           .speaker_id = "spk_a"},
-          {.start = 0.6,
-           .end = 1.0,
-           .speaker = "speaker_1",
-           .speaker_id = "spk_b"},
-          {.start = 1.0,
-           .end = 1.6,
-           .speaker = "speaker_0",
-           .speaker_id = "spk_a"}};
+      value.align.push_back({9,
+                             0.0,
+                             2.2,
+                             {{0.0, 0.2, "甲"},
+                              {0.2, 0.4, "乙"},
+                              {1.2, 1.4, "丙"},
+                              {1.4, 1.5, "。"},
+                              {1.5, 1.7, "乙"},
+                              {1.7, 1.9, "丙"},
+                              {1.9, 2.0, "，"},
+                              {2.0, 2.1, "丁"},
+                              {2.1, 2.2, "。"}}});
+      value.primary_speaker = {{.start = 0.0,
+                                .end = 0.52,
+                                .speaker = "speaker_0",
+                                .speaker_id = "spk_a"},
+                               {.start = 0.6,
+                                .end = 1.0,
+                                .speaker = "speaker_1",
+                                .speaker_id = "spk_b"},
+                               {.start = 1.0,
+                                .end = 1.6,
+                                .speaker = "speaker_0",
+                                .speaker_id = "spk_a"}};
       return value;
     };
     auto alignment_gap_queries = [&](const auto& value) {
@@ -284,8 +274,8 @@ int main() {
     const auto gap_queries = alignment_gap_queries(gap_snapshot);
     CHECK(gap_queries.size() == 1 && gap_queries[0].text_id == 9 &&
               gap_queries[0].source_start == 4 &&
-              gap_queries[0].source_end == 7 &&
-              gap_queries[0].start == 0.6 && gap_queries[0].end == 1.0,
+              gap_queries[0].source_end == 7 && gap_queries[0].start == 0.6 &&
+              gap_queries[0].end == 1.0,
           "a unique bracketed primary island emits one typed echo query");
 
     auto no_suffix = alignment_gap_snapshot();
@@ -323,86 +313,84 @@ int main() {
     missing_following_alignment.align[0].units.erase(
         missing_following_alignment.align[0].units.begin() + 4,
         missing_following_alignment.align[0].units.begin() + 7);
-    CHECK(alignment_gap_queries(missing_following_alignment).empty(),
-          "a following source phrase without positive alignment emits no query");
+    CHECK(
+        alignment_gap_queries(missing_following_alignment).empty(),
+        "a following source phrase without positive alignment emits no query");
 
     auto ambiguous_islands = alignment_gap_snapshot();
     ambiguous_islands.align[0].units[2].start = 2.4;
     ambiguous_islands.align[0].units[2].end = 2.6;
-    ambiguous_islands.primary_speaker = {
-        {.start = 0.0,
-         .end = 0.52,
-         .speaker = "speaker_0",
-         .speaker_id = "spk_a"},
-        {.start = 0.6,
-         .end = 1.0,
-         .speaker = "speaker_1",
-         .speaker_id = "spk_b"},
-        {.start = 1.0,
-         .end = 1.4,
-         .speaker = "speaker_0",
-         .speaker_id = "spk_a"},
-        {.start = 1.4,
-         .end = 1.8,
-         .speaker = "speaker_1",
-         .speaker_id = "spk_b"},
-        {.start = 1.8,
-         .end = 2.4,
-         .speaker = "speaker_0",
-         .speaker_id = "spk_a"}};
+    ambiguous_islands.primary_speaker = {{.start = 0.0,
+                                          .end = 0.52,
+                                          .speaker = "speaker_0",
+                                          .speaker_id = "spk_a"},
+                                         {.start = 0.6,
+                                          .end = 1.0,
+                                          .speaker = "speaker_1",
+                                          .speaker_id = "spk_b"},
+                                         {.start = 1.0,
+                                          .end = 1.4,
+                                          .speaker = "speaker_0",
+                                          .speaker_id = "spk_a"},
+                                         {.start = 1.4,
+                                          .end = 1.8,
+                                          .speaker = "speaker_1",
+                                          .speaker_id = "spk_b"},
+                                         {.start = 1.8,
+                                          .end = 2.4,
+                                          .speaker = "speaker_0",
+                                          .speaker_id = "spk_a"}};
     CHECK(alignment_gap_queries(ambiguous_islands).empty(),
           "multiple primary islands inside one alignment gap emit no query");
 
     auto multiple_phrase_pairs = alignment_gap_snapshot();
-    multiple_phrase_pairs.asr[0] =
-        {10, 0.0, 5.0, "甲乙丙。乙丙，甲乙丙。乙丙，"};
-    multiple_phrase_pairs.align[0] =
-        {10,
-         0.0,
-         5.0,
-         {{0.0, 0.2, "甲"},
-          {0.2, 0.4, "乙"},
-          {1.2, 1.4, "丙"},
-          {1.4, 1.5, "。"},
-          {1.5, 1.7, "乙"},
-          {1.7, 1.9, "丙"},
-          {1.9, 2.0, "，"},
-          {3.0, 3.2, "甲"},
-          {3.2, 3.4, "乙"},
-          {4.2, 4.4, "丙"},
-          {4.4, 4.5, "。"},
-          {4.5, 4.7, "乙"},
-          {4.7, 4.9, "丙"},
-          {4.9, 5.0, "，"}}};
+    multiple_phrase_pairs.asr[0] = {10, 0.0, 5.0,
+                                    "甲乙丙。乙丙，甲乙丙。乙丙，"};
+    multiple_phrase_pairs.align[0] = {10,
+                                      0.0,
+                                      5.0,
+                                      {{0.0, 0.2, "甲"},
+                                       {0.2, 0.4, "乙"},
+                                       {1.2, 1.4, "丙"},
+                                       {1.4, 1.5, "。"},
+                                       {1.5, 1.7, "乙"},
+                                       {1.7, 1.9, "丙"},
+                                       {1.9, 2.0, "，"},
+                                       {3.0, 3.2, "甲"},
+                                       {3.2, 3.4, "乙"},
+                                       {4.2, 4.4, "丙"},
+                                       {4.4, 4.5, "。"},
+                                       {4.5, 4.7, "乙"},
+                                       {4.7, 4.9, "丙"},
+                                       {4.9, 5.0, "，"}}};
     multiple_phrase_pairs.primary_speaker.insert(
-        multiple_phrase_pairs.primary_speaker.end(),
-        {{.start = 3.0,
-          .end = 3.52,
-          .speaker = "speaker_2",
-          .speaker_id = "spk_c"},
-         {.start = 3.6,
-          .end = 4.0,
-          .speaker = "speaker_3",
-          .speaker_id = "spk_d"},
-         {.start = 4.0,
-          .end = 4.6,
-          .speaker = "speaker_2",
-          .speaker_id = "spk_c"}});
+        multiple_phrase_pairs.primary_speaker.end(), {{.start = 3.0,
+                                                       .end = 3.52,
+                                                       .speaker = "speaker_2",
+                                                       .speaker_id = "spk_c"},
+                                                      {.start = 3.6,
+                                                       .end = 4.0,
+                                                       .speaker = "speaker_3",
+                                                       .speaker_id = "spk_d"},
+                                                      {.start = 4.0,
+                                                       .end = 4.6,
+                                                       .speaker = "speaker_2",
+                                                       .speaker_id = "spk_c"}});
     CHECK(alignment_gap_queries(multiple_phrase_pairs).empty(),
           "multiple matching phrase mappings emit no gap query");
 
     orator::pipeline::ComprehensiveTimeline::SpeakerEvidenceSnapshot snapshot;
     snapshot.diarization.push_back(
-        {.start = 0.0, .end = 1.0, .speaker_id = "spk_0"});
+        {.start = 0.0, .end = 1.0, .speaker = "speaker_0"});
     snapshot.vad = {{.start = 0.0, .end = 1.0},
                     {.start = 1.0, .end = 2.0},
                     {.start = 2.0, .end = 3.0}};
     TestSpeakerEvidenceStage::Precompute(&stage, snapshot, 1);
     CHECK(embedder.calls() == 0 && stage.precomputed_span_count() == 0,
-          "precompute waits for the minimum active gallery");
+          "precompute waits for the minimum diar speaker population");
 
     snapshot.diarization.push_back(
-        {.start = 1.0, .end = 2.0, .speaker_id = "spk_1"});
+        {.start = 1.0, .end = 2.0, .speaker = "speaker_1"});
     TestSpeakerEvidenceStage::Precompute(&stage, snapshot, 1);
     CHECK(embedder.calls() == 1 && stage.precomputed_span_count() == 1,
           "one live cycle caches at most one available span");
@@ -412,6 +400,122 @@ int main() {
     TestSpeakerEvidenceStage::Precompute(&stage, snapshot, 0);
     CHECK(embedder.calls() == 3 && stage.precomputed_span_count() == 3,
           "unlimited final drain caches every remaining span");
+  }
+
+  {
+    constexpr int kSampleRate = 10;
+    CountingEmbedder embedder;
+    orator::model::SpeakerDatabase database(/*max_speakers=*/4, embedder.dim());
+    orator::pipeline::SpeakerIdConfig identity_config;
+    identity_config.embedding_dim = embedder.dim();
+    identity_config.retain_sec = 10.0;
+    orator::pipeline::SpeakerIdentityStage identity(
+        &embedder, &database, orator::core::TimeBase(kSampleRate, 0),
+        identity_config);
+    std::vector<float> audio(3 * kSampleRate, 0.25f);
+    identity.AppendAudio(audio.data(), static_cast<int>(audio.size()));
+
+    orator::pipeline::SpeakerEvidenceStage::Config evidence_config;
+    evidence_config.enabled = true;
+    evidence_config.min_embed_sec = 0.4;
+    evidence_config.frame_activity_threshold = 0.5f;
+    evidence_config.minimum_gallery_size = 2;
+    evidence_config.source_leading_primary_prefix_enabled = true;
+    evidence_config.precompute_interval_sec = 0.5;
+    evidence_config.precompute_max_spans_per_cycle = 1;
+    orator::pipeline::SpeakerEvidenceStage stage(&identity, evidence_config);
+
+    using FrameBlock = orator::pipeline::ComprehensiveTimeline::DiarFrameBlock;
+    FrameBlock first;
+    first.start = 0.0;
+    first.frame_period_sec = 0.1;
+    first.num_frames = 4;
+    first.num_speakers = 2;
+    first.probabilities = {0.8f, 0.2f, 0.8f, 0.2f, 0.8f, 0.2f, 0.8f, 0.2f};
+    stage.ObserveDiarFrameBlock(first);
+
+    FrameBlock second;
+    second.start = 0.4;
+    second.frame_period_sec = 0.1;
+    second.num_frames = 6;
+    second.num_speakers = 2;
+    second.probabilities = {0.8f, 0.2f, 0.2f, 0.8f, 0.2f, 0.8f,
+                            0.2f, 0.8f, 0.2f, 0.8f, 0.2f, 0.8f};
+    stage.ObserveDiarFrameBlock(second);
+
+    FrameBlock third;
+    third.start = 1.0;
+    third.frame_period_sec = 0.1;
+    third.num_frames = 5;
+    third.num_speakers = 2;
+    third.probabilities = {0.8f, 0.2f, 0.8f, 0.2f, 0.8f,
+                           0.2f, 0.8f, 0.2f, 0.3f, 0.2f};
+    stage.ObserveDiarFrameBlock(third);
+
+    FrameBlock trailing;
+    trailing.start = 1.5;
+    trailing.frame_period_sec = 0.1;
+    trailing.num_frames = 4;
+    trailing.num_speakers = 2;
+    trailing.local_speaker_offset = 2;
+    trailing.probabilities = {0.2f, 0.8f, 0.2f, 0.8f, 0.2f, 0.8f, 0.2f, 0.8f};
+    stage.ObserveDiarFrameBlock(trailing);
+    stage.FinalizePrimaryPrecompute();
+
+    const auto pending = TestSpeakerEvidenceStage::PendingPrimarySpans(stage);
+    auto near = [](double left, double right) {
+      return std::abs(left - right) < 1e-9;
+    };
+    CHECK(pending.size() == 4,
+          "primary precompute forms four completed active runs");
+    if (pending.size() == 4) {
+      CHECK(near(pending[0].first, 0.0) && near(pending[0].second, 0.5),
+            "same local slot coalesces across frame-block boundaries");
+      CHECK(near(pending[1].first, 0.5) && near(pending[1].second, 1.0),
+            "a local-slot change closes the preceding primary run");
+      CHECK(near(pending[2].first, 1.0) && near(pending[2].second, 1.4),
+            "an inactive frame closes an active primary run");
+      CHECK(near(pending[3].first, 1.5) && near(pending[3].second, 1.9),
+            "finalization closes the trailing reset-aware primary run");
+    }
+
+    orator::pipeline::ComprehensiveTimeline::SpeakerEvidenceSnapshot snapshot;
+    snapshot.diarization = {{.start = 0.0,
+                             .end = 1.0,
+                             .speaker = "speaker_0"},
+                            {.start = 1.0,
+                             .end = 2.0,
+                             .speaker = "speaker_1"}};
+    CHECK(TestSpeakerEvidenceStage::PrecomputeCycle(&stage, snapshot, 1) == 1 &&
+              embedder.calls() == 1 &&
+              stage.live_precomputed_span_count() == 1 &&
+              TestSpeakerEvidenceStage::PendingPrimarySpans(stage).size() == 3,
+          "one live cycle services at most the TOML-bounded primary span");
+    CHECK(TestSpeakerEvidenceStage::PrecomputeCycle(&stage, snapshot, 0,
+                                                    /*drain=*/true) == 3 &&
+              embedder.calls() == 4 &&
+              stage.drain_precomputed_span_count() == 3 &&
+              TestSpeakerEvidenceStage::PendingPrimarySpans(stage).empty(),
+          "unlimited final cycle drains all remaining primary spans");
+
+    snapshot.primary_speaker = {
+        {.start = 0.0, .end = 0.5, .speaker_id = "spk_0"},
+        {.start = 0.5, .end = 1.0, .speaker_id = "spk_1"},
+        {.start = 1.0, .end = 1.4, .speaker_id = "spk_0"},
+        {.start = 1.5, .end = 1.9, .speaker_id = "spk_1"}};
+    snapshot.diarization[0].speaker_id = "spk_0";
+    snapshot.diarization[1].speaker_id = "spk_1";
+    const auto evidence = stage.BuildVoiceprint(snapshot);
+    CHECK(evidence.size() == 4 && embedder.calls() == 4,
+          "final primary evidence reuses acoustic-only precompute exactly");
+
+    auto disabled_config = evidence_config;
+    disabled_config.source_leading_primary_prefix_enabled = false;
+    orator::pipeline::SpeakerEvidenceStage disabled(&identity, disabled_config);
+    disabled.ObserveDiarFrameBlock(first);
+    disabled.FinalizePrimaryPrecompute();
+    CHECK(TestSpeakerEvidenceStage::PendingPrimarySpans(disabled).empty(),
+          "disabled primary evidence queues no acoustic work");
   }
 
   if (failures == 0) {

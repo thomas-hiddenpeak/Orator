@@ -3119,6 +3119,51 @@ open. See `fr47-real-path-promotion-review-2026-07-19.md`.
   chronological and reverse review against `test.txt`. A real audio run is
   prohibited until that frozen-evidence review authorizes the next gate.
 
+- **FR50 direct-end margin remediation gate**: The first authorized FR50 real-
+  WebSocket ladder MUST remain non-promotable because full empty-registry Run A
+  reaches its complete terminal document `30.144 s` after direct `end`, above
+  the existing `30.0 s` mechanical limit. Run B reaches the same boundary in
+  `29.258 s`; passing one restarted run does not compensate for the failed A
+  run. Both full artifacts have nevertheless completed their independent
+  chronological and reverse contextual-semantic reviews. Those readings MAY
+  establish product-output observations for the captured source revision, but
+  they MUST NOT waive or average the failed latency gate.
+
+  The remediation MUST address the terminal critical path without increasing
+  the client timeout or changing a model, speaker decision, producer value,
+  common-clock coordinate, or business parameter. FR49 introduced source-
+  independent `primary_run` voiceprint queries, while the current controller
+  constructs the primary track only after all producers and alignment have
+  drained. The full artifact contains 1,348 such runs, so their acoustic
+  embeddings cannot enter the existing low-priority live precompute path and
+  first become eligible during finalization.
+
+  Completed raw Sortformer top-1 runs MAY therefore be queued for acoustic-only
+  TitaNet precomputation as their immutable frame blocks arrive. Run formation
+  MUST use only each block's common-clock start, frame period, reset-aware local
+  slot, and the existing TOML activity threshold. It MUST NOT read mutable
+  identity epochs from the background thread. The final primary track and final
+  gallery scoring remain constructed in the existing finalization order; an
+  early embedding cache hit may remove work only, never supply a speaker vote.
+  Because extraction is acoustic-only, its population gate MUST depend on the
+  existing minimum number of distinct typed diarization-local speaker tracks,
+  not on global identity/gallery maturity. The unchanged final evidence stage
+  MUST still require mature global identities before it emits scores.
+  Per-cycle work remains bounded by the existing TOML
+  `speaker_fusion.precompute_interval_sec` and
+  `speaker_fusion.precompute_max_spans_per_cycle` settings. No new numeric
+  parameter is authorized.
+
+  Focused tests MUST prove block-boundary run coalescing, activity and local-
+  slot boundaries, final trailing-run drain, disabled behavior, bounded live
+  cycles, and cached/uncached final evidence identity. Mechanical diagnostics
+  MUST separate live and final-drain precompute work. After a warning-clean
+  build and full CTest, the exact clean revision MUST repeat the 120-second,
+  600-second, full empty-registry A, and restarted frozen-registry B ladder.
+  Every output-affecting contextual gate remains subject to complete semantic
+  review under Article VI; no timing, hash, equality check, or executable result
+  may promote or accept the candidate.
+
 FR40 passes its frozen gate. Repeated T123 outputs are byte-identical and
 change only Xu Zijing's `184.240-184.320` response. Repeated T111 outputs are
 separately byte-identical and split only Zhu Jie's first reaction from the

@@ -3063,3 +3063,46 @@ gates remain open 2026-07-23
   ledger, project state, review evidence, and release decision. Otherwise
   revert only the experimental policy/TOML branch to FR49 and preserve the
   rejected evidence.
+  The first ladder on clean pushed commit `b449dfa` completes every required
+  contextual reading. Both 120-second runs, the 600-second run, and full B pass
+  their mechanical contracts, but full A receives its complete terminal
+  document in `30.144 s`, above the fixed `30.0 s` direct-end limit. Full B is
+  `29.258 s`. T232 therefore remains open without averaging or waiving the
+  failed run.
+- [x] T232A Remove the FR49 `primary_run` acoustic work from the terminal-only
+  path without changing final evidence semantics. Queue completed immutable
+  Sortformer top-1 local-slot runs in `SpeakerEvidenceStage`, service them on
+  the existing lowest-priority periodic precompute worker under the existing
+  TOML cadence/cycle bound, close the trailing run after diar joins, and retain
+  mature-gallery scoring at finalization. Add separate live/final-drain
+  diagnostics and focused run-boundary, disabled, bounded-cycle, and final-
+  evidence-equivalence tests. Add no numeric parameter and do not read mutable
+  identity state from the background worker.
+  The first 600-second diagnostic moves 338 preparations live but leaves 422
+  in a `4412.655 ms` final drain. Refine the acoustic-only readiness gate to the
+  existing minimum count of typed diarization-local speaker tracks while
+  retaining the mature-global-gallery gate for final evidence scoring. Keep
+  the TOML cadence and one-span cycle bound unchanged, then repeat diagnosis.
+  The refined 600-second diagnostic completes at `0.997x` with a `1.769 s`
+  direct-end wait. It moves 651 successful preparations live and leaves 132 in
+  a `1429.699 ms` final drain. Its canonical product/comprehensive entries are
+  byte-identical to the first diagnostic; this is mechanical scheduling
+  evidence only. Final focused/full engineering verification remains under
+  T232B.
+- [x] T232B Complete a warning-clean build and all CTest entries, then use a
+  TOML-only info-log diagnostic run to verify that primary acoustic work moves
+  into the live phase and that final-drain latency falls without a producer,
+  common-clock, terminal, stability, or telemetry contract failure. Hashes and
+  timings are mechanical evidence only and cannot evaluate or accept output.
+  The clean build emits no `warning:` or `error:` diagnostic and all `72/72`
+  CTest entries pass in `53.23 s`. The two isolated 600-second diagnostics
+  complete through the production WebSocket path with required telemetry and
+  exact product-entry equality. See
+  `fr50-real-path-terminal-remediation-2026-07-23.md`.
+- [ ] T232C Commit and push the exact clean transitional remediation revision,
+  then repeat the constitutional 120-second, 600-second, full empty-registry A,
+  and restarted frozen-registry B ladder. Complete every required independent
+  forward/reverse contextual-semantic review against `test.txt`; only those
+  readings may retain the speaker result. Close T232 only when both full runs
+  also independently satisfy the unchanged 30-second terminal contract and
+  all documentation matches the exact revision.

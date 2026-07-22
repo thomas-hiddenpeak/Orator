@@ -4353,6 +4353,93 @@ executes and reviews the real 120-second, 600-second, full empty-registry A,
 and restarted frozen-registry B ladder. See
 `fr50-right-bounded-short-primary-unit-review-2026-07-23.md`.
 
+### 8.38 FR50 direct-end critical-path remediation
+
+The authorized real-path ladder has completed capture and contextual review on
+clean commit `b449dfa`. Both 120-second runs and the 600-second run pass their
+mechanical gates and complete forward/reverse in-scope review. Full A and full
+B each receive independent complete 556-contribution chronological and reverse
+readings; all four readings agree with the frozen FR50 ledger and find no new
+speaker regression. This semantic evidence does not promote the revision:
+empty-registry full A receives the complete terminal timeline in `30.144 s`,
+which fails the fixed `30.0 s` direct-end limit. Restarted frozen-registry full
+B completes in `29.258 s`, leaving insufficient repeatable margin.
+
+The phase boundary explains the regression. The existing precompute worker can
+cache business, alignment, phrase, and VAD spans while producers run. FR49 also
+enabled `primary_run` acoustic evidence, but `AuditoryStream::StopWorkers`
+builds and deposits the primary track only after producer and align drains. The
+1,348 immutable top-1 runs in each full artifact are consequently invisible to
+live precompute and enter its unlimited final drain at `end`. Historical full
+waits rise from `25.597/26.305 s` before that evidence family to
+`29.015/28.820 s` after FR49; FR50 does not create another acoustic query
+family. These timing and track-count facts identify an engineering critical
+path, not a product-accuracy result.
+
+Implement one producer-side observation path into `SpeakerEvidenceStage`:
+
+1. `AuditoryStream` continues depositing each immutable typed
+   `DiarFrameBlock`, then passes the same block to the evidence stage.
+2. Under the evidence-stage mutex, top-1 frames are coalesced across block
+   boundaries by reset-aware local slot and exact common-clock continuity.
+   Inactive frames and local-slot changes close a run. No global identity is
+   read and no speaker decision is made.
+3. Completed runs at least as long as the existing fusion minimum enter a FIFO
+   of acoustic spans. The existing periodic worker services that FIFO and the
+   snapshot-derived queries together, with total successful work in a live
+   cycle bounded by the existing TOML maximum. The lowest-priority CUDA stream
+   and embedding cache remain unchanged.
+4. After the diar worker joins, close the one possible trailing run. The normal
+   final primary construction and deposit then run unchanged. Unlimited final
+   drain retries any remaining spans and final scoring reads the mature
+   galleries exactly as before.
+5. Record separate live and final-drain successful-precompute counters in the
+   existing finalization diagnostic. They are mechanical observability only.
+
+The first dirty-tree 600-second diagnostic validates run formation but does not
+provide enough terminal margin. It completes at `0.992x` with a `4.749 s`
+direct-end wait. The phase log records 760 successful span preparations: 338
+live and 422 in the final drain; final drain alone takes `4412.655 ms`. This
+shows that queue visibility is no longer the sole blocker. `PrecomputeCycle`
+still requires `minimum_gallery_size` distinct global IDs before performing
+acoustic-only extraction, even though `PrecomputeSpan` reads no gallery and
+assigns no identity. The mature-ID gate therefore leaves most available live
+cycles unused.
+
+Refine only that readiness contract. Count distinct typed diarization-local
+speaker labels for the existing `minimum_gallery_size` population threshold,
+then permit acoustic-only cache filling. Keep `BuildVoiceprint`'s distinct
+global-ID gate unchanged so no evidence or vote is emitted before the galleries
+are mature. Keep the checked-in TOML cadence at `0.5 s` and one successful span
+per cycle. Repeat the same 600-second diagnostic before considering a broader
+throughput adjustment. The counts and timings above are mechanical performance
+evidence only.
+
+The repeated dirty-tree 600-second diagnostic confirms the refined phase
+boundary without requiring a throughput change. It completes at `0.997x` with
+a `1.769 s` direct-end wait. The phase log records 783 successful span
+preparations: 651 live and 132 in the final drain; final drain falls to
+`1429.699 ms`. The canonical product-track entries plus comprehensive entries
+are byte-identical between the two diagnostics. This equality is an
+engineering scheduling observation, not a correctness comparison or
+acceptance verdict. Both diagnostics remain ineligible for promotion because
+the worktree was deliberately dirty. See
+`fr50-real-path-terminal-remediation-2026-07-23.md`.
+
+Focused tests compare run formation across frame-block splits, inactivity,
+local-slot changes, and terminal closure; verify disabled behavior and one-
+cycle bounds; and retain the existing cached/uncached evidence equality
+contract. Then run a warning-clean build and full CTest. A diagnostic
+600-second real-WebSocket run with TOML info logging may establish phase-time
+movement only. The accepted revision must be committed cleanly before the
+constitutional 120/600/full A/B ladder is repeated. Any output difference is
+reviewed contextually in full; mechanical equality may narrow engineering
+diagnosis but cannot issue a product verdict.
+
+T232A/T232B engineering validation is complete: the clean build has no
+`warning:` or `error:` diagnostic and all `72/72` CTest entries pass in
+`53.23 s`. T232C remains the only promotion step.
+
 ### 8.15 FR28 120-second outcome and promotion ladder
 
 T117-T121 are complete. The frozen T116 packages replay byte-stably; their
