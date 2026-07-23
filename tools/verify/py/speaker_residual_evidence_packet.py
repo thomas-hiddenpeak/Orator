@@ -14,6 +14,7 @@ import argparse
 import csv
 import hashlib
 import json
+import math
 import re
 import sys
 from collections import defaultdict
@@ -35,6 +36,16 @@ TRACK_KINDS = [
     "align",
     "speaker_voiceprint",
     "business_speaker",
+]
+VAD_WINDOW_COLUMNS = [
+    "evidence_id", "start_sample", "end_sample", "start_sec", "end_sec",
+    "speech_probability",
+]
+VAD_STATE_COLUMNS = [
+    "evidence_id", "final", "in_speech", "observed_until_sample",
+    "observed_until_sec", "active_start_sample", "active_start_sec",
+    "active_stable_until_sample", "active_stable_until_sec",
+    "silence_stable_until_sample", "silence_stable_until_sec",
 ]
 REFERENCE_TS_RE = re.compile(r"^(\d{2}):(\d{2}):(\d{2})\s+(.+?)\s*$")
 REFERENCE_ID_RE = re.compile(r"^(?:ref-)?(\d{4})$")
@@ -69,6 +80,12 @@ class PosteriorRow:
     line: str
 
 
+@dataclass(frozen=True)
+class RawTsvEvidence:
+    columns: tuple[str, ...]
+    rows: tuple[dict[str, str], ...]
+
+
 def sha256_file(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as source:
@@ -79,6 +96,81 @@ def sha256_file(path: Path) -> str:
 
 def load_json(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def load_raw_tsv(path: Path, expected_columns: list[str]) -> RawTsvEvidence:
+    with path.open(encoding="utf-8", newline="") as source:
+        reader = csv.DictReader(source, delimiter="\t")
+        if reader.fieldnames != expected_columns:
+            raise ValueError(
+                f"raw evidence columns differ for {path.name}")
+        rows = tuple(dict(row) for row in reader)
+    if not rows:
+        raise ValueError(f"raw evidence is empty: {path.name}")
+    return RawTsvEvidence(tuple(expected_columns), rows)
+
+
+def verify_vad_window_evidence(
+    evidence: RawTsvEvidence, sample_rate: int,
+) -> None:
+    prior_end = 0
+    for index, row in enumerate(evidence.rows):
+        if row["evidence_id"] != f"vad_window:{index}":
+            raise ValueError("VAD window evidence IDs are not contiguous")
+        start = int(row["start_sample"])
+        end = int(row["end_sample"])
+        start_sec = float(row["start_sec"])
+        end_sec = float(row["end_sec"])
+        probability = float(row["speech_probability"])
+        if start != prior_end or end <= start:
+            raise ValueError("VAD window sample bounds are not contiguous")
+        if not all(math.isfinite(value) for value in (
+                start_sec, end_sec, probability)):
+            raise ValueError("VAD window evidence contains a non-finite value")
+        if (abs(start_sec - start / sample_rate) > 1e-9 or
+                abs(end_sec - end / sample_rate) > 1e-9):
+            raise ValueError("VAD window time differs from sample bounds")
+        if not 0.0 <= probability <= 1.0:
+            raise ValueError("VAD window probability is outside [0,1]")
+        prior_end = end
+
+
+def verify_vad_state_evidence(
+    evidence: RawTsvEvidence, sample_rate: int,
+) -> None:
+    prior_observed = -1
+    for index, row in enumerate(evidence.rows):
+        if row["evidence_id"] != f"vad_state:{index}":
+            raise ValueError("VAD state evidence IDs are not contiguous")
+        if row["final"] not in ("true", "false"):
+            raise ValueError("VAD final state is not boolean")
+        if (row["final"] == "true") != (index == len(evidence.rows) - 1):
+            raise ValueError("VAD final state is not the last observation")
+        if row["in_speech"] not in ("true", "false"):
+            raise ValueError("VAD speech state is not boolean")
+        observed = int(row["observed_until_sample"])
+        observed_sec = float(row["observed_until_sec"])
+        if observed < prior_observed:
+            raise ValueError("VAD observed frontiers are not monotonic")
+        if not math.isfinite(observed_sec):
+            raise ValueError("VAD observed time is not finite")
+        if abs(observed_sec - observed / sample_rate) > 1e-9:
+            raise ValueError("VAD observed time differs from sample frontier")
+        for sample_field, sec_field in (
+                ("active_start_sample", "active_start_sec"),
+                ("active_stable_until_sample", "active_stable_until_sec"),
+                ("silence_stable_until_sample",
+                 "silence_stable_until_sec")):
+            frontier = int(row[sample_field])
+            frontier_sec = float(row[sec_field])
+            if frontier > observed:
+                raise ValueError("VAD state exceeds its observed frontier")
+            if not math.isfinite(frontier_sec):
+                raise ValueError("VAD state time is not finite")
+            expected_sec = -1.0 if frontier == -1 else frontier / sample_rate
+            if frontier < -1 or abs(frontier_sec - expected_sec) > 1e-9:
+                raise ValueError("VAD state time differs from sample frontier")
+        prior_observed = observed
 
 
 def write_json(path: Path, value: Any) -> None:
@@ -581,6 +673,50 @@ def write_posterior(
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def write_raw_tsv(path: Path, evidence: RawTsvEvidence,
+                  rows: list[dict[str, str]]) -> None:
+    with path.open("w", encoding="utf-8", newline="") as destination:
+        writer = csv.DictWriter(
+            destination, fieldnames=evidence.columns, delimiter="\t",
+            lineterminator="\n")
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def context_vad_windows(
+    evidence: RawTsvEvidence, context: Context,
+) -> list[dict[str, str]]:
+    return [
+        row for row in evidence.rows
+        if interval_intersects(
+            float(row["start_sec"]), float(row["end_sec"]),
+            context.start, context.end)
+    ]
+
+
+def context_vad_states(
+    evidence: RawTsvEvidence, context: Context,
+) -> list[dict[str, str]]:
+    observed = [float(row["observed_until_sec"]) for row in evidence.rows]
+    selected = {
+        index for index, value in enumerate(observed)
+        if context.start - EPSILON <= value <= context.end + EPSILON
+    }
+    preceding = [
+        index for index, value in enumerate(observed)
+        if value < context.start - EPSILON
+    ]
+    following = [
+        index for index, value in enumerate(observed)
+        if value > context.end + EPSILON
+    ]
+    if preceding:
+        selected.add(preceding[-1])
+    if following:
+        selected.add(following[0])
+    return [evidence.rows[index] for index in sorted(selected)]
+
+
 def write_content_manifest(root: Path) -> Path:
     manifest_path = root / "content.sha256"
     rows = []
@@ -600,7 +736,11 @@ def export_packet(
     contexts_path: Path,
     posterior_path: Path,
     out_dir: Path,
+    vad_window_path: Path | None = None,
+    vad_state_path: Path | None = None,
 ) -> dict[str, Any]:
+    if (vad_window_path is None) != (vad_state_path is None):
+        raise ValueError("raw VAD window and state evidence must be paired")
     contexts = load_contexts(contexts_path)
     package = load_json(artifact_path)
     timeline, tracks = timeline_and_tracks(package)
@@ -614,6 +754,16 @@ def export_packet(
         posterior_path)
     producer_check = verify_primary_producer(
         timeline, tracks, posterior, frame_period, speaker_columns)
+    vad_windows = None
+    vad_states = None
+    if vad_window_path is not None and vad_state_path is not None:
+        vad_windows = load_raw_tsv(vad_window_path, VAD_WINDOW_COLUMNS)
+        vad_states = load_raw_tsv(vad_state_path, VAD_STATE_COLUMNS)
+        sample_rate = int(timeline.get("sample_rate", 0))
+        if sample_rate <= 0:
+            raise ValueError("timeline sample rate is invalid")
+        verify_vad_window_evidence(vad_windows, sample_rate)
+        verify_vad_state_evidence(vad_states, sample_rate)
     epochs = derive_identity_epochs(tracks["diarization"], audio_sec)
     reference_by_context = {
         context.context_id: context_reference(blocks, context)
@@ -646,6 +796,13 @@ def export_packet(
             header,
             context_posterior(posterior, frame_period, context),
         )
+        if vad_windows is not None and vad_states is not None:
+            write_raw_tsv(
+                context_dir / "vad-window-probabilities.tsv", vad_windows,
+                context_vad_windows(vad_windows, context))
+            write_raw_tsv(
+                context_dir / "vad-endpoint-states.tsv", vad_states,
+                context_vad_states(vad_states, context))
 
     packet_manifest = {
         "schema_version": 1,
@@ -703,6 +860,15 @@ def export_packet(
             for item in contexts
         ],
     }
+    if vad_window_path is not None and vad_state_path is not None:
+        packet_manifest["sources"]["vad_window_probabilities"] = {
+            "path": str(vad_window_path.resolve()),
+            "sha256": sha256_file(vad_window_path),
+        }
+        packet_manifest["sources"]["vad_endpoint_states"] = {
+            "path": str(vad_state_path.resolve()),
+            "sha256": sha256_file(vad_state_path),
+        }
     write_json(out_dir / "packet-manifest.json", packet_manifest)
     content_manifest = write_content_manifest(out_dir)
     packet_manifest["content_manifest_sha256"] = sha256_file(content_manifest)
@@ -717,6 +883,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--contexts", required=True)
     parser.add_argument("--sortformer-frames", required=True)
     parser.add_argument("--out-dir", required=True)
+    parser.add_argument("--vad-window-probabilities")
+    parser.add_argument("--vad-endpoint-states")
     return parser.parse_args(argv)
 
 
@@ -729,6 +897,10 @@ def main(argv: list[str]) -> int:
         contexts_path=Path(args.contexts),
         posterior_path=Path(args.sortformer_frames),
         out_dir=Path(args.out_dir),
+        vad_window_path=(Path(args.vad_window_probabilities)
+                         if args.vad_window_probabilities else None),
+        vad_state_path=(Path(args.vad_endpoint_states)
+                        if args.vad_endpoint_states else None),
     )
     print(json.dumps({
         "kind": result["kind"],

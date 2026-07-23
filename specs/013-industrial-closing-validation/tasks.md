@@ -20,8 +20,12 @@ through four independent complete contextual readings; the frozen candidate is
 manually reconciled at `525/556` with 19 critical residuals; T232 completes the
 exact-clean 120/600/full A/B real-WebSocket ladder on commit `a6f0d33`, making
 FR50 the current real-path baseline; FR51 T233-T235 complete four independent
-exact-baseline contextual evidence readings, stop the single-context final-
-fusion branch, and leave FR52 T236-T238 open at the short-response source edge;
+exact-baseline contextual evidence readings and stop the single-context final-
+fusion branch; FR52 T236-T238 complete four independent short-response source-
+edge readings and authorize only FR53's false-default, text-free primary-
+activity experiment; FR53 T239-T243 reject and remove all three candidate
+variants; FR54 T244-T247 retain evidence-only raw VAD capture but stop after
+four complete readings find no shared safe speech-presence topology;
 critical, confident-wrong, time-based, holdout, report, release, T102, and T084
 gates remain open 2026-07-23
 
@@ -3165,22 +3169,129 @@ gates remain open 2026-07-23
   controls require that branch elsewhere, T235 stops the final-fusion branch.
   It names short-response source-edge provenance as the next upstream phase;
   FR50 remains unchanged.
-- [ ] T236 Freeze the manually related short-response source-edge contexts in
+- [x] T236 Freeze the manually related short-response source-edge contexts in
   `fr52-short-response-source-edge-contexts-2026-07-23.tsv`. From the existing
   exact FR50 A/B packets, arrange a display-only worksheet for each complete
   ASR source, every aligned codepoint including zero-duration units, VAD
   boundaries, Sortformer posterior/activity/primary intervals, identity
   evidence, and final projected pieces. Validate only source hashes, ordering,
   bounds, and raw-copy identity. Do not run new audio or classify a context.
-- [ ] T237 Read every T236 A context and control chronologically and in reverse,
+  The A/B worksheet content manifests have SHA-256
+  `c690871443d5b3f7b18303680d44c5645872624f817f800457bdfce5a385f7e7`
+  and `a46f824a0c6c1f9d0ae3bd2c0e9c56445d26305937050e640257bd2ea9ba3989`.
+  Every listed raw-copy payload passes its mechanical hash check; no new audio
+  was run.
+- [x] T237 Read every T236 A context and control chronologically and in reverse,
   then repeat both readings independently for B. Against complete `test.txt`
   context, manually distinguish source omission, alignment displacement,
   source-edge merging, and genuine speaker-evidence conflict. No query,
   formula, script, or metric may assign those labels or select a repair.
-- [ ] T238 Reconcile the four T237 readings manually. Authorize a producer
+  Run A chronological, Run B chronological, Run A reverse, and Run B reverse
+  readings are complete. They independently agree on the six context findings
+  recorded in `fr52-short-response-source-edge-review-2026-07-23.md`.
+- [x] T238 Reconcile the four T237 readings manually. Authorize a producer
   experiment only if at least two material contexts and their accepted controls
   establish one reference-free source-edge contract that preserves existing
   source text and common-clock evidence without inventing a word. Otherwise
   stop and name the specific ASR-source, forced-alignment, or speaker-producer
   contract that requires a separate phase. No implementation, TOML change,
   replay, or product run precedes this decision.
+  Manual reconciliation identifies one shared, reference-free contract at
+  `ref-0066` and `ref-0331`: retain an identity-resolved primary-speaker
+  interval as text-free business activity when that identity has no overlapping
+  text-bearing business entry. `ref-0049` lacks a candidate primary interval,
+  `ref-0118` already represents Tang in text, and `ref-0313`/`ref-0390` contain
+  native-slot alias conflicts. Those are mandatory abstentions. FR53 is
+  authorized as a false-default frozen-evidence experiment; FR50 remains
+  unchanged.
+- [x] T239 Specify and implement FR53's TOML-disabled primary source-gap
+  activity branch. Add `content_kind=speaker_activity` plus explicit primary
+  overlap/confidence provenance to business entries without changing existing
+  text entries. Require a contained primary interval, a non-empty global
+  identity, no text-bearing entry anywhere in the ASR source for that identity,
+  and exactly
+  one native label for that identity across diarization/primary evidence in the
+  ASR source span. Also require overlap with one contiguous unaligned interval
+  of at least existing `align_snap_pause_sec`, no more than existing
+  `align_boundary_split_tolerance_sec` total overlap with positive-duration
+  aligned units, and no zero-duration aligned unit on or inside the candidate.
+  Preserve exact timestamps and emit empty text. Add focused positive,
+  aligned-speech counterexample, short-gap, zero-point, duplicate-text,
+  alias-conflict, no-primary, serialization, and disabled-path tests.
+  The first broad candidate is rejected at its first manually read change:
+  aligned Zhu Jie speech at `3.199999928-4.239999905 s` received a false Tang
+  activity entry. T239 remains open for the narrowed contract; see
+  `fr53-primary-source-gap-activity-diagnosis-2026-07-23.md`.
+  The first alignment-gap refinement is also rejected at its first changed
+  context because it tests only temporal overlap and duplicates an identity
+  already represented earlier in the same ASR source. Source-wide absence is
+  now mandatory. The source-wide refinement also produces unsupported activity;
+  the complete experimental implementation is removed rather than retained.
+- [x] T240 Complete warning-clean build and all CTest entries. Replay frozen
+  FR50 evidence with the new flag disabled and verify byte identity of the
+  product tracks. These are engineering/mechanical checks only.
+  Before rejection, every disabled A/B replay is byte-identical to FR50 at
+  SHA-256 `d36227140dc8fcba9e40f116946ed8f8222e1b0aad73777665478a0f9f14d88c`.
+  After complete FR53 code/config removal, the warning-clean build and all
+  `72/72` CTest entries pass.
+- [x] T241 Enable FR53 only in an isolated TOML candidate, replay exact frozen
+  Run A and Run B once, and arrange every changed business entry with complete
+  source, alignment, VAD, posterior/activity/primary, identity, voiceprint, and
+  neighbouring business context. Automation may verify integrity and display
+  changes, but may not label, rank, count correctness, or issue a verdict.
+  The initial broad replay is diagnostic only and is abandoned after its first
+  changed context fails manual semantic review. Two narrowed A/B replays are
+  also frozen; their hashes and disabled identity checks are recorded in the
+  FR53 diagnosis.
+- [x] T242 Read every T241 changed context and accepted control chronologically
+  and in reverse for A, then repeat both readings independently for B. Manually
+  determine whether each text-free activity entry preserves a real speaker
+  contribution without changing text ownership or introducing a duplicate.
+  Retention review terminates at the first complete Run A hard counterexample,
+  as required. The remaining final-candidate Run A contexts are read only for
+  diagnostic topology; independent reverse/B readings are not used or claimed
+  because rejection is already mandatory.
+- [x] T243 Reconcile all four T242 readings manually. Stop and revert the
+  enabled branch on any unsupported activity or contextual regression. Only a
+  retained candidate may advance to a checked-in TOML enablement and a fresh
+  constitutional real-WebSocket ladder; FR50 remains the baseline until then.
+  FR53 is rejected and all runtime implementation is removed. `ref-0066` and
+  `ref-0331` remain open because six accepted controls share the same available
+  final-view evidence topology. FR50 remains the baseline.
+- [x] T244 Freeze FR54's context-only table containing the eight final FR53
+  intervals plus the FR52 abstention controls. Record exact Run A/B, PCM,
+  configuration, model, reference, and context-table hashes. The table may
+  contain only IDs, common-clock bounds, and focus/control roles. The frozen
+  table SHA-256 is
+  `2c5e4a64c3d4466b75c3d471b102f5e1e3ceacf95eebf5b68f811e9b238bbf7c`;
+  all source hashes are recorded in
+  `fr54-vad-evidence-capture-design-2026-07-23.md`.
+- [x] T245 Inspect the existing VAD evidence contract. Specify and, only if
+  necessary, implement a typed evidence-only capture for pre-threshold VAD and
+  endpoint state without changing VAD output, scheduling, or runtime decisions.
+  Arrange complete A/B audio, VAD, diarization, source/alignment, identity,
+  voiceprint, and business packets. Automation performs mechanical provenance
+  checks only.
+  `vad_segment_probe` now optionally writes raw window probabilities and
+  production-cadence endpoint states from separate fresh `GpuVad` instances;
+  its existing invocation is unchanged. The display-only packet tool accepts
+  the paired raw TSVs and copies only requested clock ranges. Exact full output
+  and A/B packet hashes are recorded in the FR54 design document; every payload
+  hash passes, and focused `test_vad`/packet tests pass.
+- [x] T246 Read every FR54 packet in complete Run A chronological/reverse and
+  independent Run B chronological/reverse context. Only these semantic readings
+  may determine whether one speech-presence topology separates at least two
+  material contexts from every accepted control.
+  All four readings are complete and agree on every context. See
+  `fr54-short-primary-speech-presence-review-2026-07-23.md`.
+- [x] T247 Reconcile T246 manually. Authorize one false-default producer
+  experiment only if the shared reference-free topology exists; otherwise stop
+  with the unresolved evidence boundary. No parameter sweep, executable
+  evaluation, final-fusion primary-only rule, or real-WebSocket rerun is allowed
+  before this decision.
+  T247 stops the branch. `ref-0066` is true overlap inside continuous speech;
+  `ref-0331` is an isolated subminimum VAD burst. VAD cannot distinguish the
+  first from continuous-speech false islands, while the second has no second
+  material example and nearby controls prove that speech presence does not
+  establish identity. No shared topology, threshold, union rule, runtime/TOML
+  change, product rerun, or ledger change is authorized. FR50 remains baseline.

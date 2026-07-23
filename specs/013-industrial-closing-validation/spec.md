@@ -75,7 +75,13 @@ A/B real-WebSocket ladder, so FR50 is the current `525/556` real-path baseline;
 FR51's four exact-baseline contextual evidence readings identify only
 `ref-0099` as a final-only overwrite, stop that single-context final-fusion
 branch, and open FR52's short-response source-edge provenance gate without a
-runtime change; critical attribution,
+runtime change; FR52's four complete A/B chronological/reverse readings
+authorize only FR53's false-default, text-free primary-activity experiment for
+the shared `ref-0066`/`ref-0331` contract and retain explicit alias/source
+abstentions; FR53's broad, alignment-gap, and source-wide variants are rejected
+and fully removed; FR54's raw VAD evidence capture and four independent
+complete-context readings find no shared safe speech-presence topology and
+stop without a runtime, TOML, model, ledger, or baseline change; critical attribution,
 confident-wrong attribution, T102, T084, full canonical closure, release sign-
 off, and industrial readiness remain open
 **Created**: 2026-07-13
@@ -3252,6 +3258,96 @@ open. See `fr47-real-path-promotion-review-2026-07-19.md`.
   MUST NOT invent a missing word or use the reference at runtime, and MUST be
   specified in SDD before implementation. Until T238, no code, TOML, model,
   replay, new audio run, ledger, or closure change is authorized.
+
+  T236-T238 are complete. All four complete contextual readings identify
+  `ref-0066` and `ref-0331` as material source-omission contexts with a surviving
+  primary-speaker interval and one native label for its global identity.
+  `ref-0049` lacks a candidate primary interval, `ref-0118` already has a Tang
+  text-bearing interval, and `ref-0313`/`ref-0390` contain native-label alias
+  conflicts. The manual record is
+  `fr52-short-response-source-edge-review-2026-07-23.md`.
+
+- **FR53 text-free primary activity experiment (rejected)**: FR53 MAY add one
+  false-default TOML-controlled business-view branch for the FR52 contract. It
+  MUST NOT alter producer evidence, existing text, text ownership, or a
+  timestamp. It MUST emit an activity entry only when a primary interval is
+  wholly inside one ASR source span, has a non-empty global identity, has no
+  text-bearing business entry anywhere in that ASR source for that identity,
+  and that identity
+  maps to exactly one native label across all diarization and primary evidence
+  intersecting the source span. The primary interval MUST overlap one
+  contiguous forced-alignment gap by at least existing TOML
+  `timeline.align_snap_pause_sec`; its total overlap with positive-duration
+  aligned units MUST NOT exceed existing TOML
+  `timeline.align_boundary_split_tolerance_sec`; and no zero-duration aligned
+  unit may lie on or inside the primary interval. FR53 introduces no numeric
+  parameter.
+
+  An emitted entry MUST reuse the source `text_id`, carry
+  `content_kind=speaker_activity`, retain the primary interval's exact clock,
+  label, identity, and confidence, expose primary-evidence provenance, and have
+  empty text. Existing text entries MUST keep their prior wire shape. The
+  disabled branch MUST be byte-identical to FR50 behavior.
+
+  Frozen A/B candidate replay and display-only change arrangement MAY follow
+  clean engineering verification. Every changed context and accepted control
+  MUST receive complete chronological and reverse semantic review for A and
+  independently for B. No executable may decide whether an activity is real,
+  count repairs, rank the branch, or issue retention or acceptance. FR50 stays
+  authoritative until the four manual candidate readings are reconciled.
+
+  The first broad candidate omitted the alignment-gap requirements and is
+  rejected by manual reading of its first changed conversation. At
+  `3.199999928-4.239999905 s`, ordinary aligned Zhu Jie source text and complete
+  TitaNet/business evidence coexist with a local primary misclassification;
+  the broad rule incorrectly appended Tang Yunfeng activity. The narrowed
+  alignment-gap candidate is also rejected at its first changed conversation:
+  it appends Tang inside Zhu Jie's `00:03:10-00:03:21` contribution even though
+  Tang already owns text earlier in the same ASR source. Source-wide absence,
+  rather than temporal non-overlap, is therefore required before another
+  frozen candidate. See
+  `fr53-primary-source-gap-activity-diagnosis-2026-07-23.md`.
+
+  The source-wide refinement is also rejected. Complete Run A chronological
+  context finds only `ref-0066` and `ref-0331` material among its displayed
+  entries; six entries insert a speaker into another participant's continuous
+  contribution. The material and unsupported cases share the same final-view
+  containment, alignment-gap, identity-absence, and alias guards. Primary
+  identity is therefore not speech-presence evidence. FR53's code, TOML, wire,
+  Web UI, and test changes MUST be removed; no real-WebSocket run, ledger
+  change, or retention review follows.
+
+- **FR54 short-primary speech-presence evidence audit**: The next phase MUST
+  investigate whether evidence upstream of final fusion can establish that a
+  short primary-speaker island contains real speech. Its immutable context set
+  MUST contain every final FR53 displayed interval plus the named FR52
+  abstention controls. It MUST preserve exact common-clock bounds and include
+  unaltered audio, VAD pre-threshold evidence and endpoint state, diarization
+  posterior/activity/primary evidence, ASR source/alignment, identity mapping,
+  and existing business output.
+
+  Automation MAY capture, hash, validate, index, and display those raw signals.
+  It MUST NOT label speech presence, compare correctness, select a threshold or
+  evidence family, aggregate a result, or issue a verdict. Run A chronological
+  and reverse readings MUST be repeated independently for Run B before any
+  producer contract is authorized. A runtime experiment requires one
+  reference-free speech-presence topology shared by at least two material
+  contexts and rejected by every accepted control. Otherwise the source-
+  omission residuals remain open and no final-view activity branch may return.
+
+  T244-T247 are complete. Exact full raw VAD capture and independent A/B packet
+  arrangement pass their mechanical provenance checks. Four complete
+  contextual readings agree that `ref-0066` and `ref-0331` are material, but
+  they do not share one speech-presence topology: the former is simultaneous
+  speech inside continuous finalized VAD and aligned source text, while the
+  latter is an isolated subminimum raw VAD burst between ASR sources. Accepted
+  controls show both continuous-speech false islands and short raw rises with
+  absent or contradictory identity. Selecting a new probability/timing value,
+  combining two single-case rules, or treating VAD as identity evidence is not
+  authorized. FR54 therefore stops without a runtime, TOML, model, replay,
+  product-run, ledger, or baseline change. The evidence-only tooling is
+  retained; see
+  `fr54-short-primary-speech-presence-review-2026-07-23.md`.
 
 FR40 passes its frozen gate. Repeated T123 outputs are byte-identical and
 change only Xu Zijing's `184.240-184.320` response. Repeated T111 outputs are

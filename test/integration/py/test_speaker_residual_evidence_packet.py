@@ -22,6 +22,35 @@ SPEC.loader.exec_module(speaker_residual_evidence_packet)
 
 
 class SpeakerResidualEvidencePacketTest(unittest.TestCase):
+    def write_vad_fixture(self, root):
+        window_path = root / "vad-windows.tsv"
+        with window_path.open("w", encoding="utf-8", newline="") as output:
+            writer = csv.writer(output, delimiter="\t", lineterminator="\n")
+            writer.writerow(
+                speaker_residual_evidence_packet.VAD_WINDOW_COLUMNS)
+            for index in range(6):
+                writer.writerow([
+                    f"vad_window:{index}", index * 16000,
+                    (index + 1) * 16000, f"{index:.9f}",
+                    f"{index + 1:.9f}", f"{index / 10:.9f}",
+                ])
+
+        state_path = root / "vad-states.tsv"
+        with state_path.open("w", encoding="utf-8", newline="") as output:
+            writer = csv.writer(output, delimiter="\t", lineterminator="\n")
+            writer.writerow(
+                speaker_residual_evidence_packet.VAD_STATE_COLUMNS)
+            for index in range(6):
+                observed = index * 16000 + 8000
+                writer.writerow([
+                    f"vad_state:{index}",
+                    "true" if index == 5 else "false",
+                    "false", observed, f"{index + 0.5:.9f}",
+                    -1, "-1.000000000", -1, "-1.000000000",
+                    observed, f"{index + 0.5:.9f}",
+                ])
+        return window_path, state_path
+
     def write_fixture(self, root):
         reference_path = root / "reference.txt"
         reference_path.write_text(
@@ -200,6 +229,59 @@ class SpeakerResidualEvidencePacketTest(unittest.TestCase):
             self.assertEqual(
                 (first / "content.sha256").read_text(encoding="utf-8"),
                 (second / "content.sha256").read_text(encoding="utf-8"))
+
+    def test_exports_paired_raw_vad_evidence_without_interpretation(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            inputs = self.write_fixture(root)
+            window_path, state_path = self.write_vad_fixture(root)
+            out_dir = root / "packet"
+            result = speaker_residual_evidence_packet.export_packet(
+                *inputs[:5], out_dir, window_path, state_path)
+
+            context_dir = out_dir / "ref-0002"
+            with (context_dir / "vad-window-probabilities.tsv").open(
+                    encoding="utf-8", newline="") as source:
+                windows = list(csv.DictReader(source, delimiter="\t"))
+            with (context_dir / "vad-endpoint-states.tsv").open(
+                    encoding="utf-8", newline="") as source:
+                states = list(csv.DictReader(source, delimiter="\t"))
+            self.assertEqual(
+                [row["evidence_id"] for row in windows],
+                ["vad_window:1", "vad_window:2", "vad_window:3",
+                 "vad_window:4"])
+            self.assertEqual(
+                [row["evidence_id"] for row in states],
+                ["vad_state:0", "vad_state:1", "vad_state:2",
+                 "vad_state:3", "vad_state:4", "vad_state:5"])
+            self.assertEqual(
+                result["sources"]["vad_window_probabilities"]["sha256"],
+                hashlib.sha256(window_path.read_bytes()).hexdigest())
+            self.assertEqual(
+                result["sources"]["vad_endpoint_states"]["sha256"],
+                hashlib.sha256(state_path.read_bytes()).hexdigest())
+
+    def test_rejects_unpaired_raw_vad_evidence(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            inputs = self.write_fixture(root)
+            window_path, _ = self.write_vad_fixture(root)
+            with self.assertRaises(ValueError):
+                speaker_residual_evidence_packet.export_packet(
+                    *inputs[:5], root / "packet", window_path)
+
+    def test_rejects_non_finite_raw_vad_evidence(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            inputs = self.write_fixture(root)
+            window_path, state_path = self.write_vad_fixture(root)
+            window_path.write_text(
+                window_path.read_text(encoding="utf-8").replace(
+                    "0.100000000\n", "nan\n", 1),
+                encoding="utf-8")
+            with self.assertRaises(ValueError):
+                speaker_residual_evidence_packet.export_packet(
+                    *inputs[:5], root / "packet", window_path, state_path)
 
     def test_rejects_context_columns_that_could_carry_judgments(self):
         with tempfile.TemporaryDirectory() as temp:
