@@ -14,13 +14,14 @@ work is specified under [specs/](.).
 > pass is the consistency proof. Status lines advance to `Implemented` in the
 > same change that lands the code, with the commit reference.
 
-- **Last updated**: 2026-07-23 (FR56 completes four independent Sortformer
-  producer-boundary readings and stops because no shared safe local-slot or
-  identity-epoch topology exists; FR50 remains the real-path baseline)
+- **Last updated**: 2026-07-23 (FR57 completes the manual-only T102 FR50
+  speaker-time and source-time-offset audit; all current time floors pass,
+  while critical and confident-wrong gates keep canonical closure open)
 - **Branch**: `master`
 - **Constitution**: v1.7.0
 - **Speaker-business closure**: **CURRENT REAL-PATH BASELINE `525/556`;
-  19 CRITICAL RESIDUALS REMAIN; FULL CANONICAL CLOSURE OPEN**. FR49's
+  SPEAKER-TIME GATES PASS; 19 CRITICAL RESIDUALS REMAIN; FULL CANONICAL
+  CLOSURE OPEN**. FR49's
   bounded policy repairs only `ref-0061` and `ref-0121`. Clean commit
   `1f09052` completes two 120-second runs, one 600-second run, and independent
   full empty/frozen-registry A/B runs. Full A and B are each read completely
@@ -100,6 +101,20 @@ work is specified under [specs/](.).
   trace. T257 stops FR56 without a runtime, TOML, model, product-run, ledger,
   baseline, or closure change. See
   [fr56-speaker-producer-boundary-review-2026-07-23.md](013-industrial-closing-validation/fr56-speaker-producer-boundary-review-2026-07-23.md).
+  FR57 then freezes the exact FR50 A/B evidence and performs the remaining
+  T102 audit without rerunning audio or changing the product. Run A
+  chronological, Run B chronological, Run A reverse, and Run B reverse
+  complete-context time readings manually establish 3529 correctly attributed
+  source seconds out of 3612 for each run, approximately 97.70 percent. Every
+  complete 600-second block passes; the lowest is `3000-3600` at approximately
+  92.67 percent. Every canonical speaker passes; the lowest is Zhu Jie at
+  approximately 92.66 percent. The review explicitly signs all 22 duplicate-
+  timestamp groups, the backward timestamp pair, six fixed-boundary crossings,
+  and every material source-time offset. No executable or formula assigns,
+  totals, calculates, compares, or judges the result. T102 is complete, but its
+  critical and confident-wrong breakdowns remain failed, so T084 and canonical
+  closure remain open. See
+  [fr57-speaker-time-review-2026-07-23.md](013-industrial-closing-validation/fr57-speaker-time-review-2026-07-23.md).
   Transitional experimental commit `6b1cb79fa4f5` completed
   warning-clean build, `68/68` CTest, 120-second, 600-second, and full-length
   FR16ABN real-WebSocket promotion. Full Run A used an empty registry and the
@@ -115,8 +130,9 @@ work is specified under [specs/](.).
   parameter change. `test.txt` is the human-listened reference; the 3000-3600
   fixed block, 朱杰 natural-turn recall, critical-turn, and confident-wrong
   gates fail. Speaker-time, per-speaker time, and source-time-
-  offset breakdowns remain unsigned, so T102, T084, and
-  Spec 013 remain open. ASR and independent holdout are not implied.
+  offset breakdowns were unsigned at that historical checkpoint. FR57 now
+  signs the current FR50 time breakdowns; T084 and Spec 013 remain open. ASR
+  and independent holdout are not implied.
   Transitional experimental commit `d610de36ed13` separately closes T112 with
   a warning-clean build, `69/69` CTest, and a clean 120-second real-WebSocket
   cadence check; it changes no speaker behavior or product conclusion.
@@ -752,8 +768,8 @@ voiceprint construction from `5934.740 ms` to `10.886 ms`, with
 mechanical engineering observations, not correctness or acceptance judgments.
 The subsequent full clean-commit A/B recapture completed with direct terminal
 waits of `25.597 s` and `26.305 s`. Complete contextual semantic review retains
-the natural-turn gate at 512/556 and 509/556. T101 is complete; T102 and T084
-remain open.
+the natural-turn gate at 512/556 and 509/556. T101 was complete while T102 and
+T084 remained open at that checkpoint; FR57 later completes T102 for FR50.
 
 **Native-handoff full promotion checkpoint (2026-07-18)**: FR16ABM prevents a
 generic phrase-level voiceprint decision from erasing exactly one sustained,
@@ -770,8 +786,8 @@ and reverse contextual review records 514/556 and 515/556. The rule repairs
   displayed next-timestamp edge; the whole-second source mark cannot provide a
   contradictory sub-second boundary. T106 is complete. T107-T109 subsequently
   traced and retained the separate delayed-alignment candidate described below.
-  T102's manual result breakdowns remain open; full speaker closure is not
-  claimed. See
+  T102's manual result breakdowns remained open at that checkpoint; FR57 later
+  completes them for FR50. Full speaker closure is not claimed. See
 [native-handoff-full-promotion-review-2026-07-18.md](013-industrial-closing-validation/native-handoff-full-promotion-review-2026-07-18.md).
 
 **Delayed-alignment frozen replay checkpoint (2026-07-18)**: FR16ABN reuses
@@ -784,7 +800,8 @@ within each path and change only the same `569.26-569.42` speaker sequence.
 Complete chronological and reverse conversational review retains Xu Zijing's
 short confirmations while preserving Shi Yi's following substantive turn. The
 candidate advances to the 120/600-second real-WebSocket ladder but is not yet a
-new production baseline. T102, T084, and full closure remain open. See
+new production baseline. T102, T084, and full closure remained open at that
+checkpoint; FR57 later completes T102 for FR50. See
 [delayed-alignment-clause-review-2026-07-18.md](013-industrial-closing-validation/delayed-alignment-clause-review-2026-07-18.md).
 
 **Delayed-alignment full promotion checkpoint (2026-07-18)**: clean
@@ -803,7 +820,9 @@ supersedes that result with `514/556` for each frozen run and records failures
 in the 3000-3600 block and 朱杰 recall.
 FR16ABN repairs `ref-0090` on both paths without a contextual regression or
 long-range identity drift. T110 and T111 are complete. T102, T084, and full
-closure remain open. The separate T112 telemetry cadence fix is now complete.
+closure remained open at that checkpoint; FR57 later completes T102 for FR50,
+while T084 and full closure remain open. The separate T112 telemetry cadence
+fix is now complete.
 See
 [delayed-alignment-full-promotion-review-2026-07-18.md](013-industrial-closing-validation/delayed-alignment-full-promotion-review-2026-07-18.md).
 
@@ -861,14 +880,14 @@ finds no FR28 natural-turn speaker regression. FR28 is retained for the
 | WebSocket server (libwebsockets v4.3.3) | ✅ Refactored | Replaced hand-rolled POSIX WS with libwebsockets (multi-client, RFC 6455/7692). One connection owns audio production while browser and diagnostic observers receive the same broadcast stream without resetting it; concurrent producer bytes are rejected. Eliminated file-scope static variables (`serve_server`, `serve_factory`, `pss_list_head`) → instance members via `lws_context_user`. Thread-safe `SendText` with wakeup/cancel-service. ServeOnce mode for unit tests. |
 | ASR + WS integration | FR28 120-second stability gate passed; full acceptance open | `AuditoryStream` owns one private `PipelineAudioCache` per active producer and uses separate worker threads. One session-owned `TimeBase` is injected into all active stores and workers. Final ASR live emission and its typed sink reuse one `text_id`; partial rejection emits a matching retract, and the terminal ASR track serializes the ID. ASR now buffers undecided audio, reads typed stable VAD frontiers from `ComprehensiveTimeline`, applies TOML lead/chunk settings, and drains only after final VAD is frozen; forced alignment consumes the resulting finalized ASR records. Focused publication-order tests and two independent 120-second real-WebSocket runs produce identical canonical product tracks. Full repeatability and contextual accuracy remain open. |
 | Incremental KV-cache ASR streaming (Spec 003) | ✅ Implemented, verified, committed (8cc31ab); params refined 2026-07-03 | Persistent KV cache + prefix caching + chunk-local windowed encoder; partial-emission every 1 s via WebSocket. Full 1hr CER 16.1% / 6.22x; beats production Silero-VAD at every scale. **Current params**: `kStreamWindowMel=100` (1 s), `max_new_tokens=32`, `unfixed_chunks=2`, `unfixed_tokens=15`, `segment_sec=24.0`, `vad_min_overlap_sec=0.12`. 2026-07-03 real WS `test.mp3` 600 s A/B after the VAD-overlap filter: `segment_sec=24` produced 49 ASR finals vs 67 at 12 s, with the same final comprehensive count (115) and better `To C` wording; default restored to 24 s for ASR semantic stability. |
-| Revisable comprehensive timeline (Spec 004) | FR50 is the current real-path speaker baseline; canonical closure open | `ComprehensiveTimeline` stores typed diarization, raw diar frame posterior, primary speaker, ASR, VAD, alignment, voiceprint, and business tracks and publishes immutable snapshots/typed updates. Its VAD snapshot includes observed, active, and confirmed-silence frontiers used by scheduling-invariant ASR gating. `BusinessSpeakerPipeline` consumes typed `SpeakerEvidenceStage` output and owns orchestration/publication; the internal `SpeakerFusionPolicy` owns rule execution. FR49's clean `1f09052` ladder manually retains `523/556`. FR50's false-default TOML policy repairs `ref-0327` and `ref-0417`; exact-clean remediation commit `a6f0d33` moves acoustic-only primary-run work into live precompute without changing final scoring. Its full empty/frozen-registry A/B artifacts both receive complete chronological and reverse contextual review and manually retain `525/556`, with 26 confident-wrong, four missing, one uncertain, and 19 critical failures. No executable result produces the ledger. Full direct-end waits pass independently at `26.013/26.789 s`, so T232 promotes FR50 as the real-path baseline. FR51 stops the unsupported single-context final-fusion branch. FR53's attempted text-free primary activity is rejected and fully removed because six unsupported controls share its final-view topology. FR54 retains evidence-only raw VAD capture/packet support, but four contextual readings find no shared safe topology and stop without a runtime change. Checked-in VAD threshold is `0.5`. Critical residual, speaker-time, ASR, locked holdout, browser/microphone, report, and release gates remain open. |
+| Revisable comprehensive timeline (Spec 004) | FR50 is the current real-path speaker baseline; T102 time gates pass; canonical closure open | `ComprehensiveTimeline` stores typed diarization, raw diar frame posterior, primary speaker, ASR, VAD, alignment, voiceprint, and business tracks and publishes immutable snapshots/typed updates. Its VAD snapshot includes observed, active, and confirmed-silence frontiers used by scheduling-invariant ASR gating. `BusinessSpeakerPipeline` consumes typed `SpeakerEvidenceStage` output and owns orchestration/publication; the internal `SpeakerFusionPolicy` owns rule execution. FR49's clean `1f09052` ladder manually retains `523/556`. FR50's false-default TOML policy repairs `ref-0327` and `ref-0417`; exact-clean remediation commit `a6f0d33` moves acoustic-only primary-run work into live precompute without changing final scoring. Its full empty/frozen-registry A/B artifacts both receive complete chronological and reverse contextual review and manually retain `525/556`, with 26 confident-wrong, four missing, one uncertain, and 19 critical failures. No executable result produces the ledger. Full direct-end waits pass independently at `26.013/26.789 s`, so T232 promotes FR50 as the real-path baseline. FR51 stops the unsupported single-context final-fusion branch. FR53's attempted text-free primary activity is rejected and fully removed because six unsupported controls share its final-view topology. FR54 retains evidence-only raw VAD capture/packet support, but four contextual readings find no shared safe topology and stop without a runtime change. FR57 completes four independent complete-context time readings and manually signs each run at 3529/3612 source seconds, approximately 97.70 percent; all complete fixed blocks and canonical speakers pass. Checked-in VAD threshold is `0.5`. Critical residual, confident-wrong-zero, ASR, locked holdout, browser/microphone, report, and release gates remain open. |
 | Reusable common time base (Spec 004) | FR50 full-session A/B mechanical gate passed; product closure open | `AuditoryStream` owns one immutable `TimeBase` and injects it into every active private cache, worker, and retained audio store. Finalization reconciles exact sample extents for input, diarization, speaker identity, ASR, VAD, alignment, and business speaker. FR50 exact-clean full Run A and restarted Run B both close all seven tracks at exactly 57,841,920 samples with zero declared extent gap and true reconciliation flags. This is a mechanical contract result; product closure remains open under Spec 013. |
 | Pipeline protocol layer (Spec 004) | ✅ Implemented | Phases 7–12 complete: data types (topic.h, schema.h), pipeline registry, topic router, storage layer (MEMORY + DISK), ProtocolTimeline integration, WS v2 envelope with describe command, --storage-disk-path flag. 25/25 tests pass. |
 | Streaming validation | FR50 exact-clean ladder passed; later closure gates remain open | `ws_unified_test.py` has one socket reader, captures source/config/binary pre/post hashes, continuous `tegrastats`, runtime telemetry, and independent terminal-command timing. Acceptance mode sends `end` directly after the final audio frame. Exact clean pushed commit `a6f0d33` passes independent empty-registry 120 A/B, 600, full empty-registry A, and restarted frozen-registry B production-WebSocket runs. Full A/B close all seven tracks at 3615.120 seconds, run at `0.993x`, and return terminal timelines in `26.013/26.789 s`, each independently below `30.0 s`. Every output-affecting artifact receives complete forward/reverse contextual review; structural checks never evaluate correctness or issue a product verdict. Browser/microphone and later Spec 013 release gates remain open. |
 | Logging system | ✅ Include-level `core/log.h` | Level-based macros (`LOG_DEBUG`/`INFO`/`WARN`/`ERROR`) with compile-time floor (`ORATOR_LOG_LEVEL`) and runtime env-var gate. All 14 `fprintf(stderr)` calls in src/ replaced. |
 | CUDA kernel unit tests | ✅ `test_kernels`: 13/13 passed | GPU kernel operations (Add, Multiply, NormalizeVector, CosineSimilarity, BatchCosineSimilarity) validated against CPU reference; includes edge cases (zero, single-element, large 1M vectors). |
 | CI pipeline | ✅ GitHub Actions | `.github/workflows/ci.yml`: CUDA 12.5, CMake build + ctest + warning check + Python syntax verification. Triggered on push/PR to master. |
-| Test suite | 74 configured CTest entries | The active Sortformer gates are bound to v2.1. Focused C++ tests cover typed speaker evidence, capture-ordered speaker-identity replay input, embedding-cache lifecycle, bounded precompute, final draining, accepted production fusion/abstention policy, and monotonic telemetry deadlines; active Python tests cover source/time/config invariants, immutable raw tracks, WebSocket manifests, telemetry, evidence integrity, replay inputs, and unjudged review packets. Thirty-three historical candidate tests are archived outside CTest. FR50 covers the right-bounded aligned-unit policy plus raw-frame primary-run coalescing across blocks, inactive and slot boundaries, terminal closure, disabled behavior, live-cycle limits, final drain, and exact cache reuse. The current full CTest run passes all `74/74` entries in `53.34 s`; the final build emits no warning or error diagnostic. Browser and physical-microphone acceptance remain outside CTest. No automated result may assign correctness, aggregate accuracy, rank/select a candidate, or produce product acceptance. |
+| Test suite | 74 configured CTest entries | The active Sortformer gates are bound to v2.1. Focused C++ tests cover typed speaker evidence, capture-ordered speaker-identity replay input, embedding-cache lifecycle, bounded precompute, final draining, accepted production fusion/abstention policy, and monotonic telemetry deadlines; active Python tests cover source/time/config invariants, immutable raw tracks, WebSocket manifests, telemetry, evidence integrity, replay inputs, and unjudged review packets. Thirty-three historical candidate tests are archived outside CTest. FR50 covers the right-bounded aligned-unit policy plus raw-frame primary-run coalescing across blocks, inactive and slot boundaries, terminal closure, disabled behavior, live-cycle limits, final drain, and exact cache reuse. The current full CTest run passes all `74/74` entries in `53.46 s`; the final build emits no warning or error diagnostic. Browser and physical-microphone acceptance remain outside CTest. No automated result may assign correctness, aggregate accuracy, rank/select a candidate, or produce product acceptance. |
 | Diar tail parameter experiments | ❌ No accepted fix | 2026-07-10 TOML experiments used `diar_evidence_probe` on full `test.mp3` for strict onset/offset, `min_dur_on=1.2`, `min_dur_on=2.0`, `chunk_left_context=2`, `chunk_right_context=0`, and `left2_right0`. Threshold/min-duration changes deleted evidence without recovering the correct speaker; context variants did not solve 3270-3304 s and some removed the small local-2 hint at 3299.76 s. NeMo full-length reference on the same audio produced the same hard-window spk3 bias (`3270-3304.5`: spk3 313/431 frames; `3240-3360`: spk3 1013/1500 frames). The historical v2 numerical gate passed at that time; its checkpoint and CTest have since been removed. See Spec 012 `diar-tail-toml-experiments-2026-07-10.md`. |
 | TitaNet tail voiceprint review | ❌ No accepted override | 2026-07-10 orthogonal speaker-embedding review used `speaker_embedding_probe` on full `test.mp3` with 600 s, 60 s, and 30 s buckets. The hard-window `L3@3270-3300` bucket remains closest to historical L3 (`L3@3300-3330=0.762`, historical L3 up to 0.724) while best non-L3 alternatives are lower (`L0=0.440`, `L1=0.424`, `L2=0.321`). This rejects direct TitaNet override for 3270-3304 s. See Spec 012 `titanet-tail-evidence-2026-07-10.md`. |
 | OnText protocol matching | ✅ Fixed | Substring `text.find("end")` → JSON key `text.find("\"end\"")` to prevent false positives on partial matches. Same for reset/flush. |
@@ -1022,10 +1041,11 @@ Findings:
 - [specs/011-observability/spec.md](011-observability/spec.md) — **Implemented** (2026-06-30): offline [rerun](https://rerun.io) visualization, kept entirely in `tools/` (no runtime third-party dep, Art. I). **Phase 1**: `tools/verify/py/ws_unified_test.py` captures the runtime's periodic `gpu_telemetry`/cursor WS samples into a `telemetry` array; `tools/observability/timeline_to_rerun.py` keys diarization/comprehensive lanes by the global `speaker_id` (`spk_N`) + per-pipeline RTF lanes. **Phase 2 (comprehensive dashboard)**: `TegraSampler` records a continuous `device_series`; the exporter renders six namespaced dimensions on one `audio_time` axis — `pipelines/*`, `comprehensive/<id>` swimlanes, `scheduler/<pipe>/{rtf,compute_sec,active,cuda_priority}`, `cursors/<pipe>/{position_sec,pending_sec}`, `device/{mem,cpu,gpu,temp,power}/*` (extended tegrastats parse; Orin `GR3D_FREQ` optional, omitted on Thor), and `session/summary` — laid out by a `rerun.blueprint` persisted in the `.rrd`. Methodology + best practices in `tools/observability/README.md`. **Config fix**: nested `[telemetry.cursor]` was never read (`config["telemetry.cursor"]` literal-key lookup) → now `config["telemetry"]["cursor"]`, with a `test_config` regression. Validated on a `rate=1` 120 s run: 125 gpu + 125 cursor + 126 device samples, six dimensions populated, stream_rt 0.964×, ctest 47/47, zero warnings. Follow-ups: live WS→rerun consumer, full-hour acceptance recording.
 - [specs/010-speaker-id/spec.md](010-speaker-id/spec.md) — **Implemented, with Phase H experiment not accepted as accuracy fix; local-diar operating profile restored**: speaker identity (TitaNet-Large voiceprint enrollment / re-identification as a post-diarization stage inside the diar pipeline, Art. III). **Phase A complete & committed**: A1 acquire+convert weights → `models/speaker/titanet_large.safetensors` (108 tensors); A2 NeMo oracle (`tools/reference/titanet_oracle.py`, isolated `tools/.venv-nemo`); A3 pure C++/CUDA `model::TitaNetEmbedder` (`include/model/titanet_embedder.h` + `src/model/titanet_embedder.cu`, time-major [T,C]: mel+per_feature → 5-block ContextNet encoder → attentive statistics pooling → 192-d, F32 weights); A4 `test_titanet` validated vs NeMo oracle (**span cosine 1.000000/0.999999/1.000000, cross-span matrix to 4 decimals; ctest 46/46, no warnings**). **Phase B complete & committed**: `pipeline::SpeakerIdentityStage` (clean-segment gate + per-local embed/match/enroll via `SpeakerDatabase` + revisable local→global map), wired into the diar pipeline behind a `DiarizationWorker` segment-processor hook + `[speaker]` config; diar message/track expose a backward-compatible `speaker_id` field. **2026-07-06 validation**: Phase H conservative cross-session candidate (`/tmp/orator_phaseh_full.json`) was rejected by context review [local-diar-review-2026-07-06.md](010-speaker-id/local-diar-review-2026-07-06.md): it reduced wrong late globals into local-only gaps but did not restore attribution. Follow-up restored Sortformer local-diar runtime tuning to the async/no-reset profile (`spkcache_update_period=188`, `chunk_right_context=1`, `spkcache_sil_frames=3`) in `orator.toml`; lower-level `SortformerConfig` defaults remain tied to the existing NeMo oracle fixture. Full-length real WS `/tmp/orator_full_async_default_20260706.json`: 3615 s audio, 3618.487 s wall, stream RT 0.999x, diar 773, ASR 288, VAD 972, 3611 tegrastats samples, stable 4 global ids and no local-only gaps; context review [local-diar-default-188-review-2026-07-06.md](010-speaker-id/local-diar-default-188-review-2026-07-06.md) accepts the stable operating profile but records residual rapid-turn fragmentation in 3000-3615 s and an ASR repeat burst at 1927-1944 s.
 - [specs/012-evidence-fusion-timeline/spec.md](012-evidence-fusion-timeline/spec.md) — **Runtime candidate validated (2026-07-08); tail evidence reviewed and support diagnostics added (2026-07-09)**: evidence-first comprehensive timeline fusion plus TOML-gated runtime adoption. `tools/verify/py/fusion_audit.py` and `speaker_business_review_packet.py` read frozen `ws_unified_test.py` JSON packages, audit ASR/diar/VAD/align consistency, and emit candidate/business-turn views without mutating captured tracks. After the 2026-07-07 context review showed forced alignment alone did not recover speaker-business accuracy, 2026-07-08 fixes added local-speaker drift/competing-identity split and backfill, per-entry comprehensive `speaker_id`, and `[timeline]` align-run split parameters. Full-length real WS run `/tmp/orator_timelinefusion_full_20260708.json`: 3615.0 s audio, 3618.74 s wall, stream RT 0.999x, diar 773, ASR 288, align 288/288. Fusion audit `/tmp/orator_timelinefusion_full_20260708_fusion_bt_timeline.json`: business_turns=728, unknown 171.860 s (4.75%), no mechanical audit issues. Complete contextual review [drift-epoch-review-2026-07-08.md](012-evidence-fusion-timeline/drift-epoch-review-2026-07-08.md) follows [speaker-business-method.md](012-evidence-fusion-timeline/speaker-business-method.md). Follow-up candidate decisions are historical context-review records. All code-derived percentages and evidence scores in Spec 012 are mechanical records only; they may not evaluate accuracy, rank/select a candidate, or issue a product verdict under Constitution 1.7.0.
-- [specs/013-industrial-closing-validation/spec.md](013-industrial-closing-validation/spec.md) - **FR50 remains the current real-path speaker baseline; FR53 is rejected and removed; FR54-FR56 evidence audits are complete; canonical closure remains open**. Earlier FR16ABO, FR28, FR29, FR30, and FR31 promotions remain rejected; FR32-FR47 are retained bounded historical repairs and FR46 is evidence-only. FR49's clean ladder manually retains `523/556`. FR50's current-config v2.1 evidence audit authorizes a false-default TOML topology for `ref-0327` and `ref-0417`; frozen replay manually retains `525/556`. After the first clean `b449dfa` ladder fails full A's terminal limit, pushed transitional remediation commit `a6f0d33` moves acoustic-only primary-run preparation into the low-priority live worker without changing a numeric TOML value or final scoring. Its exact-clean 120 A/B, 600, and full empty/frozen-registry A/B ladder passes. Full A/B run at `0.993x` and independently return terminal timelines in `26.013/26.789 s`. Both full artifacts are read completely in chronological and reverse fixed-window context, and all four readings manually retain `525/556`, with 26 confidently wrong, four missing, one uncertain, and 19 critical residuals. FR51's four independent contextual evidence readings identify `ref-0099` as the only final-only overwrite, but the accepted controls provide no second material topology, so that final-fusion branch stops without a runtime change. FR53's primary-only activity variants fail contextual controls and are fully removed. FR54 captures raw VAD evidence and completes four independent context readings, but the two material contexts require different evidence paths; T247 stops without a threshold or runtime change. FR55 retains exact TitaNet gallery provenance but finds only one material circular-reference context. FR56 completes four independent local-slot and identity-epoch readings but finds only one epoch-adjacent focus, whose accepted controls reject backfill. See [fr50-real-path-terminal-remediation-2026-07-23.md](013-industrial-closing-validation/fr50-real-path-terminal-remediation-2026-07-23.md), [fr55-gallery-independence-review-2026-07-23.md](013-industrial-closing-validation/fr55-gallery-independence-review-2026-07-23.md), and [fr56-speaker-producer-boundary-review-2026-07-23.md](013-industrial-closing-validation/fr56-speaker-producer-boundary-review-2026-07-23.md). No code evaluates correctness, calculates the ledger, or produces the product verdict. Checked-in `vad.threshold` is `0.5`. Critical residual, speaker-time, per-speaker time, source-time-offset, ASR, browser/microphone, locked holdout, report-review, and release-tag gates remain open.
+- [specs/013-industrial-closing-validation/spec.md](013-industrial-closing-validation/spec.md) - **FR50 remains the current real-path speaker baseline; FR53 is rejected and removed; FR54-FR57 evidence audits are complete; T102 time gates pass; canonical closure remains open**. Earlier FR16ABO, FR28, FR29, FR30, and FR31 promotions remain rejected; FR32-FR47 are retained bounded historical repairs and FR46 is evidence-only. FR49's clean ladder manually retains `523/556`. FR50's current-config v2.1 evidence audit authorizes a false-default TOML topology for `ref-0327` and `ref-0417`; frozen replay manually retains `525/556`. After the first clean `b449dfa` ladder fails full A's terminal limit, pushed transitional remediation commit `a6f0d33` moves acoustic-only primary-run preparation into the low-priority live worker without changing a numeric TOML value or final scoring. Its exact-clean 120 A/B, 600, and full empty/frozen-registry A/B ladder passes. Full A/B run at `0.993x` and independently return terminal timelines in `26.013/26.789 s`. Both full artifacts are read completely in chronological and reverse fixed-window context, and all four readings manually retain `525/556`, with 26 confidently wrong, four missing, one uncertain, and 19 critical residuals. FR51's four independent contextual evidence readings identify `ref-0099` as the only final-only overwrite, but the accepted controls provide no second material topology, so that final-fusion branch stops without a runtime change. FR53's primary-only activity variants fail contextual controls and are fully removed. FR54 captures raw VAD evidence and completes four independent context readings, but the two material contexts require different evidence paths; T247 stops without a threshold or runtime change. FR55 retains exact TitaNet gallery provenance but finds only one material circular-reference context. FR56 completes four independent local-slot and identity-epoch readings but finds only one epoch-adjacent focus, whose accepted controls reject backfill. FR57 completes four independent full-context time readings and manually signs each FR50 run at 3529/3612 source seconds, approximately 97.70 percent; every complete fixed block and canonical speaker exceeds 90.0 percent. See [fr50-real-path-terminal-remediation-2026-07-23.md](013-industrial-closing-validation/fr50-real-path-terminal-remediation-2026-07-23.md), [fr56-speaker-producer-boundary-review-2026-07-23.md](013-industrial-closing-validation/fr56-speaker-producer-boundary-review-2026-07-23.md), and [fr57-speaker-time-review-2026-07-23.md](013-industrial-closing-validation/fr57-speaker-time-review-2026-07-23.md). No code evaluates correctness, calculates the ledger, or produces the product verdict. Checked-in `vad.threshold` is `0.5`. Critical residual, confident-wrong-zero, ASR, browser/microphone, locked holdout, report-review, and release-tag gates remain open.
 
 - [specs/013-industrial-closing-validation/fr55-gallery-independence-review-2026-07-23.md](013-industrial-closing-validation/fr55-gallery-independence-review-2026-07-23.md) - **FR55 complete; evidence tooling retained; product experiment rejected**. Exact A/B replay preserves every captured identity row, reference/query outputs are byte-identical, and all packet hashes pass. Four independent complete-context readings find one materially wrong self-overlapping reference at `ref-0503`, but no second material topology; coherent controls show overlap can also be legitimate. T252 stops without changing runtime, TOML, model, product output, ledger, or FR50.
 - [specs/013-industrial-closing-validation/fr56-speaker-producer-boundary-review-2026-07-23.md](013-industrial-closing-validation/fr56-speaker-producer-boundary-review-2026-07-23.md) - **FR56 complete; producer experiment rejected**. Four independent complete-context readings find only `ref-0499` adjacent to an identity epoch change. Its accepted controls reject moving the boundary backward, while the other nine contexts are distinct stable-epoch source or producer conflicts. T257 stops without a diagnostic trace, runtime/TOML/model/product-run/ledger/baseline change, or closure claim.
+- [specs/013-industrial-closing-validation/fr57-speaker-time-review-2026-07-23.md](013-industrial-closing-validation/fr57-speaker-time-review-2026-07-23.md) - **FR57 and T102 complete; time gates pass; canonical closure remains open**. Four independent complete-context readings and independently repeated manual additions sign each FR50 run at 3529/3612 source seconds, approximately 97.70 percent. Every complete 600-second block and canonical speaker passes the 90.0 percent floor. The 19 critical residuals and 26 confidently wrong natural contributions remain separate failures.
 
 ## 7. Immediate next step
 
@@ -1050,22 +1070,33 @@ boundary backward. The other nine FR56 contexts are distinct stable-epoch
 source or producer conflicts. Neither phase authorizes a product experiment;
 FR50 remains unchanged.
 
-The next highest-priority speaker activity is T102: manually sign the existing
-FR50 Run A and Run B speaker-time, per-speaker-time, and source-time-offset
-evidence at `test.txt`'s recorded precision. Freeze a context-only worksheet
-and review protocol before deriving any total. Read each complete conversation
-chronologically and in reverse for both runs, record material boundary
-judgments in prose, and cross-check every manually derived duration
-independently. No script, compiled program, notebook, formula, query, metric,
-or algorithm may assign correctness, sum judged time, rank a result, or issue
-the gate verdict.
+T102 is now complete. FR57 reads Run A chronological, Run B chronological, Run
+A reverse, and Run B reverse under complete conversation and manually signs
+each run at 3529 correctly attributed source seconds out of 3612,
+approximately 97.70 percent. All six complete fixed blocks and all four
+canonical speakers exceed 90.0 percent. The signed record includes every
+duplicate, backward, crossing, mixed, and source-displaced interval; no
+executable or formula assigns or aggregates the result.
 
-Do not start ASR-accuracy closure or change VAD, alignment, identity,
-diarization, fusion parameters, models, or product output during T102. Such
-changes would alter the evidence partitions and require a fresh constitutional
-full-session review. T102 can sign or reject only the time-based speaker gates;
-the 19 critical residuals and confident-wrong-zero gate still keep T084 and
-canonical closure open independently.
+The next highest-priority speaker activity is the remaining critical and
+confident-wrong evidence ceiling, not ASR-accuracy closure. Keep the FR50 code,
+TOML, v2.1 model, audio, A/B artifacts, identity map, and natural-turn ledger
+fixed. Consolidate the exact existing evidence for all 19 critical residuals
+and their accepted controls across Sortformer activity, primary speaker,
+TitaNet identity, VAD, forced alignment, ASR-bearing intervals, and final
+fusion. Read Run A and Run B chronologically and in reverse. Manually determine
+which residuals still have independent correct-speaker evidence and which are
+source-evidence absences; do not let an executable classify, total, rank, or
+select them.
+
+Any later product experiment must be reference-free at runtime, share one
+explicit evidence topology across at least two independent material residuals,
+and have accepted controls that establish its abstention boundary. Otherwise
+stop at the evidence ceiling. Do not change VAD, alignment, identity,
+diarization, fusion parameters, models, or product output before that review;
+doing so would spend another full constitutional A/B review without an
+established multi-context contract. T084 remains open because all 19 critical
+residuals and the confident-wrong-zero gate are conjunctive requirements.
 
 T110-T116 and T135 are complete. `test.txt` is the human-
 listened reference; T116 used it for complete 556-row chronological and tail-

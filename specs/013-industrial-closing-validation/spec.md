@@ -88,9 +88,12 @@ so it also stops without changing the product; FR56's four independent complete-
 context producer-boundary readings find only `ref-0499` adjacent to an identity
 epoch transition, whose accepted controls reject backfill, while the other nine
 contexts have distinct stable-epoch evidence failures; FR56 therefore stops
-without authorizing a candidate; critical attribution, confident-
-wrong attribution, T102, T084, full canonical closure, release sign-off, and
-industrial readiness remain open
+without authorizing a candidate; FR57 completes T102 from four independent
+full-context readings of the unchanged FR50 evidence, manually recording each
+run at 3529/3612 correctly attributed source seconds, approximately 97.70
+percent, with every complete 600-second block and every canonical speaker above
+90.0 percent; critical attribution, confident-wrong attribution, T084, full
+canonical closure, release sign-off, and industrial readiness remain open
 **Created**: 2026-07-13
 **Scope**: Re-establish a truthful product baseline, recover full-session business
 accuracy, and define the evidence required before Orator may be declared closed.
@@ -110,7 +113,17 @@ accepted and 42 incorrect contributions, approximately 92.45 percent. Their
 direct-end runs also satisfy the terminal-latency gate mechanically. The
 3000-3600 fixed block, 朱杰 natural-turn recall, critical-turn, and
 confident-wrong gates fail. Speaker-time, per-speaker time,
-source-time-offset, ASR, release, and independent-holdout gates remain open.
+source-time-offset, ASR, release, and independent-holdout gates remain open for
+that historical FR16ABN result.
+
+FR57 separately completes the current FR50 T102 audit without changing the
+product. Run A chronological, Run B chronological, Run A reverse, and Run B
+reverse complete-context time readings manually establish 3529 correctly
+attributed seconds out of 3612 applicable whole-source seconds for each run,
+approximately 97.70 percent. Every complete 600-second block and every
+canonical speaker remains above 90.0 percent, and every material source-time
+offset is signed. The time gates pass, but FR50's 19 critical residuals and 26
+confidently wrong contributions still fail separate conjunctive gates.
 
 The later FR16ABO full promotion does not replace that baseline. Clean
 transitional commit `f49a8278e0d8` passed the 120/600-second and full A/B
@@ -3446,6 +3459,49 @@ open. See `fr47-real-path-promotion-review-2026-07-19.md`.
   change. See
   `fr56-speaker-producer-boundary-review-2026-07-23.md`.
 
+- **FR57 FR50 speaker-time and source-time-offset audit**: T102 MUST be
+  completed from the exact accepted FR50 Run A and Run B artifacts, their four
+  already completed full-context readings, and the human-listened `test.txt`.
+  No new product audio run, runtime change, TOML change, model change, or
+  candidate comparison is authorized. Existing natural-turn judgments MAY be
+  reused, but a correct turn MUST NOT automatically be treated as fully
+  correct speaker time, and an incorrect turn MUST NOT automatically erase
+  every source-time block it contains.
+
+  The reviewer MUST read and assign each applicable source-time block at
+  `test.txt`'s whole-second precision. Duplicate timestamps, the
+  `ref-0446`/`ref-0447` backward pair, mixed-speaker rows, attribution-affecting
+  source offsets, and intervals crossing a 600-second boundary MUST receive
+  explicit contextual notes. Runtime sub-second evidence MAY explain a
+  boundary but MUST NOT refine the reference into unsupported sub-second
+  truth. No executable or spreadsheet formula may label a block, map duration
+  to correctness, total speaker time, derive a percentage, compare a gate, or
+  issue a verdict.
+
+  Run A chronological and Run B chronological time-block readings MUST be
+  followed by independent Run A reverse and Run B reverse readings. Full-
+  session, every complete 600-second block, and every canonical speaker MUST
+  be manually totalled and then independently totalled again. Every
+  attribution-affecting source-time offset MUST be retained in the signed
+  record even when its natural-turn judgment is accepted. FR57 may sign only
+  the T102 time-based gates; the critical and confident-wrong failures remain
+  separate conjunctive blockers for T084. See
+  `fr57-speaker-time-evidence-design-2026-07-23.md`.
+
+  T258-T262 and T102 are complete. All 556 source contributions, 22 duplicate-
+  timestamp groups, the `ref-0446`/`ref-0447` backward pair, six fixed-boundary
+  crossings, and every attribution-affecting source offset were read and
+  signed. The chronological and reverse manual additions agree for both runs:
+  3529 of 3612 source seconds are correctly attributed, approximately 97.70
+  percent. Complete 600-second blocks range from approximately 92.67 to 99.50
+  percent, and canonical speakers range from approximately 92.66 to 98.86
+  percent. These values and their pass decisions are manually derived from
+  complete context; no executable or formula assigned, totalled, calculated,
+  compared, or judged them. T084 remains open because critical attribution and
+  confident-wrong-zero still fail. No runtime, TOML, model, product artifact,
+  or natural-turn ledger changed. See
+  `fr57-speaker-time-review-2026-07-23.md`.
+
 FR40 passes its frozen gate. Repeated T123 outputs are byte-identical and
 change only Xu Zijing's `184.240-184.320` response. Repeated T111 outputs are
 separately byte-identical and split only Zhu Jie's first reaction from the
@@ -3681,8 +3737,9 @@ accepted T111 handoff structure. The warning-clean build and all 69 CTest
 entries pass as engineering evidence. The manually reconciled frozen candidate
 is `511/556`; the 3000-3600 fixed block advances to `78/87` but still fails.
 Zhu Jie recall, critical attribution, confident-wrong attribution, and
-speaker-time sign-off also remain open. No new real-WebSocket result or closure
-claim is attributed to FR37. See
+speaker-time sign-off also remained open at that checkpoint; FR57 later signs
+the FR50 time gates. No new real-WebSocket result or closure claim is attributed
+to FR37. See
 `bracketed-primary-adjacent-vad-reconstruction-review-2026-07-19.md`.
 
 FR38 corrects the separate T123 `ref-0504` boundary rather than restoring the

@@ -2637,7 +2637,8 @@ Complete forward and reverse contextual semantic review manually records
 512 accepted / 44 incorrect natural contributions for Run A (approximately
 92.09 percent) and 509 accepted / 47 incorrect for Run B (approximately 91.55
 percent). No code assigned a judgment or total. Both runs retain the natural-
-business-turn gate, but all T102 ledger-derived gates remain open. The complete
+business-turn gate, but all T102 ledger-derived gates remained open at this
+historical checkpoint. FR57 later completes T102 for FR50. The complete
 hashes, changed-context reconciliation, error lists, and permitted claim are in
 `direct-end-full-review-2026-07-18.md`.
 
@@ -2671,10 +2672,10 @@ correctness, aggregated the result, ranked the runs, or issued the verdict.
 
 T106 is complete and FR16ABM is retained. T107-T109 subsequently isolate and
 screen the independent forced-alignment/VAD placement defect around
-`ref-0090`, as recorded in Section 8.9. T102 remains open for the manual
-fixed-block, per-speaker, speaker-time, criticality, confidence, and
-source-time-offset breakdowns; therefore T084 and full speaker
-closure remain open. See
+`ref-0090`, as recorded in Section 8.9. T102 remained open at this checkpoint
+for the manual fixed-block, per-speaker, speaker-time, criticality, confidence,
+and source-time-offset breakdowns; FR57 later completes it for FR50. T084 and
+full speaker closure remain open. See
 `native-handoff-full-promotion-review-2026-07-18.md`.
 
 ### 8.9 FR16ABN frozen replay checkpoint (2026-07-18)
@@ -2698,7 +2699,8 @@ At this checkpoint, T110 was defined as the clean transitional experimental
 commit plus 120-second and 600-second direct-end production WebSocket ladder;
 T111 was gated on its mechanical contracts and complete changed-context review.
 Both tasks subsequently completed in Section 8.10. T102 and all remaining
-conjunctive speaker gates remain open.
+conjunctive speaker gates remained open at that checkpoint; FR57 later
+completes T102 for FR50.
 
 ### 8.10 FR16ABN full promotion seal (2026-07-18)
 
@@ -2737,12 +2739,11 @@ runs, or issued the verdict.
 
 T110, T111, and the T135 reconciliation are complete. The standalone 90
 percent full natural-turn and mechanical terminal-latency gates pass for both
-frozen full runs. T102 remains open for
-the manual speaker-time, per-speaker time, and source-time-offset breakdowns
-from the already completed `test.txt` contextual judgments. The 3000-3600 fixed
-block, 朱杰 recall, critical-speaker, and confident-wrong attribution fail;
-consequently T084
-and full speaker closure remain open. See
+frozen full runs. T102 remained open at this checkpoint for the manual speaker-
+time, per-speaker time, and source-time-offset breakdowns from the already
+completed `test.txt` contextual judgments; FR57 later completes T102 for FR50.
+The 3000-3600 fixed block, 朱杰 recall, critical-speaker, and confident-wrong
+attribution fail; consequently T084 and full speaker closure remain open. See
 `speaker-gate-breakdown-review-2026-07-18.md`. The telemetry loop
 also retains an engineering follow-up to schedule samples against absolute
 deadlines rather than accumulating probe latency. See
@@ -4770,9 +4771,64 @@ adjacent to an epoch change; its accepted Tang Yunfeng controls reject moving
 the boundary backward, and the other nine contexts are distinct stable-epoch
 source or producer conflicts. The required second material topology is absent.
 FR56 stops without changing runtime, TOML, model, product output, ledger,
-baseline, or closure status. The next closing activity is the still-open T102
-manual speaker-time, per-speaker-time, and source-time-offset review. See
+baseline, or closure status. FR57 then performs the T102 manual speaker-time,
+per-speaker-time, and source-time-offset review. See
 `fr56-speaker-producer-boundary-review-2026-07-23.md`.
+
+### 8.45 FR57 FR50 speaker-time and source-time-offset audit
+
+Keep the accepted FR50 code, checked-in TOML, streaming v2.1 profile, source
+audio, human reference, exact Run A/B artifacts, and frozen registry sequence
+unchanged. Reuse the four completed FR50 full-context readings; do not run new
+audio or introduce a candidate.
+
+1. Freeze the exact A/B and display-packet hashes, identity map, source hashes,
+   constitutional thresholds, and manual-only evaluation boundary.
+2. Read `test.txt` in source order and establish its whole-second speaker-time
+   blocks manually. Treat each duplicate-timestamp group and the backward
+   `ref-0446`/`ref-0447` pair as an explicit contextual reconciliation rather
+   than an arithmetic repair. Split a block at 600-second boundaries only at
+   the recorded whole-second precision.
+3. For Run A and then independently for Run B, read the complete conversation
+   chronologically. Record the whole-second source blocks on which the final
+   business speaker is usable, every mixed or uncertain block, and every
+   attribution-affecting source-time offset. A natural-turn label does not
+   determine the duration label by itself.
+4. Repeat Run A and Run B independently from the terminal block back to the
+   first. Resolve every changed block judgment in prose before any total is
+   derived.
+5. Manually total full-session, fixed-block, and per-speaker source time for
+   each run. Repeat the arithmetic independently from the reverse record.
+   Record both checks and reconcile discrepancies without code, formulas,
+   queries, or automated aggregation.
+6. Sign or reject only the T102 time-based gates. Preserve the separate FR50
+   critical and confident-wrong failures, so a time-gate pass cannot close
+   T084 or speaker-business acceptance.
+
+The durable method and frozen sources are recorded in
+`fr57-speaker-time-evidence-design-2026-07-23.md`. The resulting manual ledger
+must contain enough prose and source-block detail for another reviewer to
+reproduce the judgment without rerunning the model.
+
+T258-T262 are complete. Run A chronological, Run B chronological, Run A
+reverse, and Run B reverse complete-context readings independently review all
+556 source contributions and every time-sensitive boundary. The reviewer
+manually establishes 3612 applicable whole-source seconds and then manually
+adds each run twice. Both directions record 3529 correctly attributed seconds,
+approximately 97.70 percent. Every complete 600-second block passes, with the
+lowest at approximately 92.67 percent in `3000-3600`; every canonical speaker
+passes, with the lowest at approximately 92.66 percent for Zhu Jie. The 22
+duplicate groups, backward timestamp pair, fixed-boundary crossings, and every
+material source-time offset are signed in
+`fr57-speaker-time-review-2026-07-23.md`.
+
+No code, script, notebook, formula, query, metric, or algorithm assigned a
+judgment, totalled time, calculated a result, compared a threshold, or issued
+the verdict. T102 is complete as an evidence audit. Its time-based gates pass,
+but the separately signed 19 critical residuals and 26 confidently wrong
+natural contributions keep T084 and speaker-business closure open. FR57 makes
+no runtime, TOML, model, product-output, natural-turn-ledger, or baseline
+change.
 
 ### 8.15 FR28 120-second outcome and promotion ladder
 

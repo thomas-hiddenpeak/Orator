@@ -30,8 +30,10 @@ T248-T252 retain exact gallery provenance but stop after four complete readings
 find only one material circular-reference context and no shared safe topology;
 FR56 T253-T257 complete four independent producer-boundary readings and stop
 because only `ref-0499` is epoch-adjacent while its controls reject backfill;
-critical, confident-wrong, time-based, holdout, report, release, T102, and T084
-gates remain open 2026-07-23
+FR57 T258-T262 complete the manual-only FR50 speaker-time and source-time-
+offset audit; both runs pass full-session, every complete fixed-block, and all
+four per-speaker time floors, while critical, confident-wrong, holdout, report,
+release, and T084 gates remain open 2026-07-23
 
 ## Phase 0: Governance
 
@@ -1694,15 +1696,21 @@ gates remain open 2026-07-23
   and the 600-second track hash is
   `a6a7ea95299ea7568977b220715e5b1e6b3ad3c4317cf6c4a8b4d019124aa11b`.
   Exact equality is a mechanical invariant, not a product-accuracy verdict.
-- [ ] T102 Reuse the completed 556-row forward/reverse contextual judgments
+- [x] T102 Reuse the completed 556-row forward/reverse contextual judgments
   against the human-audited `test.txt` reference and manually sign the remaining
   speaker-time, fixed-block, per-speaker, critical-turn, confident-wrong, and
   source-time-offset breakdowns for Run A and Run B independently. Do not demand
   a duplicate audio transcription or invent sub-second reference boundaries.
   The 2026-07-18 breakdown review signs fixed-block and per-speaker turn recall
   as passed, but signs critical-speaker and confident-wrong attribution as
-  failed. Speaker-time, per-speaker time, and source-time-offset totals remain
-  open; see `speaker-gate-breakdown-review-2026-07-18.md`.
+  failed. FR57 completes four independent full-context time readings and two
+  manual additions in each direction. Each FR50 run has 3529 correctly
+  attributed source seconds out of 3612, approximately 97.70 percent; every
+  complete 600-second block and every canonical speaker remains above 90.0
+  percent. All duplicate, backward, crossing, and attribution-affecting source
+  offsets are signed in `fr57-speaker-time-review-2026-07-23.md`. T102 is
+  complete as an evidence audit; its critical and confident-wrong results are
+  failures, so T084 remains open.
 
 ## Phase 10: Critical Handoff Evidence
 
@@ -3396,3 +3404,43 @@ gates remain open 2026-07-23
   distinct stable-epoch producer/source failures. FR50 and its manual ledger
   remain unchanged; see
   `fr56-speaker-producer-boundary-review-2026-07-23.md`.
+- [x] T258 Freeze FR57/T102 to exact FR50 Run A/B, their completed
+  chronological/reverse context readings, the human-listened `test.txt`, and
+  the manual-only speaker-time contract. Record hashes, thresholds, identity
+  mapping, duplicate/backward timestamp handling, and the prohibition on
+  executable duration judgment or aggregation in
+  `fr57-speaker-time-evidence-design-2026-07-23.md`. No new product run or
+  runtime/TOML/model change is authorized.
+- [x] T259 Read all 556 reference contributions in source order and manually
+  establish the applicable whole-second source-time blocks. Write explicit
+  notes for every duplicate-timestamp group, the `ref-0446`/`ref-0447`
+  backward pair, every 600-second crossing, and any source interval that
+  cannot be assigned without inventing finer timing truth. The signed record
+  covers all 22 duplicate groups, the backward pair, all six fixed-boundary
+  crossings, and the 3612-second source denominator.
+- [x] T260 Complete independent Run A chronological and Run B chronological
+  speaker-time readings. For every source block, judge the usable business
+  speaker from complete conversation and record mixed, missing, uncertain, and
+  attribution-affecting source-offset evidence. Do not project natural-turn
+  labels mechanically onto whole intervals. Both chronological readings are
+  complete and independently retain every time-sensitive context in the FR57
+  review record.
+- [x] T261 Repeat the complete Run A and Run B speaker-time readings in reverse
+  block order without importing the chronological duration labels. Reconcile
+  every disagreement in prose against full conversation before totals. Both
+  reverse readings are complete; complete context resolves the apparent
+  `ref-0160`, `ref-0182`, `ref-0249`/`ref-0250`, `ref-0432`, backward-pair,
+  and late source-displacement boundaries without a remaining disagreement.
+- [x] T262 Manually total and independently cross-check full-session,
+  per-600-second-block, and per-canonical-speaker time for Run A and Run B.
+  Sign every source-time offset and then complete or retain T102 according to
+  the conjunctive time gates. No code, script, notebook, formula, query,
+  metric, or algorithm may label, sum, calculate, compare, or issue the
+  verdict. A time-gate pass does not change the separate critical or
+  confident-wrong failures and cannot complete T084 by itself. Each run is
+  manually recorded at 3529/3612 source seconds, approximately 97.70 percent;
+  complete blocks range from approximately 92.67 to 99.50 percent, and
+  canonical speakers range from approximately 92.66 to 98.86 percent. The
+  chronological and reverse manual additions agree. T102 is complete; T084 is
+  still blocked by the 19 critical residuals and 26 confidently wrong natural
+  contributions.
