@@ -4438,7 +4438,17 @@ diagnosis but cannot issue a product verdict.
 
 T232A/T232B engineering validation is complete: the clean build has no
 `warning:` or `error:` diagnostic and all `72/72` CTest entries pass in
-`53.23 s`. T232C remains the only promotion step.
+`53.23 s`. T232C then commits and pushes exact clean transitional revision
+`a6f0d33730326b19a3831019b1aba21fd900f126` and repeats the full ladder. The
+120-second A/B waits are `2.422/2.426 s`; the 600-second run completes at
+`0.997x` with a `1.752 s` wait; full A/B complete at `0.993x` with independent
+`26.013/26.789 s` direct-end waits. Every short and 600-second in-scope
+contribution and every one of the 556 full contributions is read forward and
+in reverse context. The two full runs independently retain the manually
+derived `525/556` FR50 interpretation, with 19 critical residuals and no
+session-wide identity permutation, accumulating drift, or tail-only collapse.
+T232 is complete and FR50 becomes the current real-path speaker baseline; the
+critical-residual and remaining Spec 013 gates keep canonical closure open.
 
 ### 8.15 FR28 120-second outcome and promotion ladder
 

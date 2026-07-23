@@ -1,9 +1,10 @@
 # FR50 real-path gate and terminal remediation
 
 This record covers the first T232 production-WebSocket ladder on clean pushed
-commit `b449dfaa644c400fe1cc37a760e57a6c945c8c2c` and the subsequent T232A
-terminal-path diagnosis. It does not promote FR50 or close the speaker
-business.
+commit `b449dfaa644c400fe1cc37a760e57a6c945c8c2c`, the subsequent T232A/T232B
+terminal-path remediation, and the exact-clean T232C acceptance ladder on
+pushed commit `a6f0d33730326b19a3831019b1aba21fd900f126`. T232C promotes FR50 as
+the current real-path speaker baseline. It does not close the speaker business.
 
 `test/data/reference/test.txt` is the authoritative human-listened reference.
 No compiled code, script, query, formula, notebook, metric, hash, equality
@@ -120,12 +121,65 @@ CTest entries pass in `53.23 s`, including the focused frame-block run
 formation, disabled-path, per-cycle bound, final drain, and cache-reuse
 contracts. These checks establish implementation consistency only.
 
-## Next gate
+## Exact-clean remediation acceptance
 
-T232A and T232B are complete. After commit/push of the exact remediation
-revision, repeat the complete
-120 A/120 B/600/full empty-registry A/restarted frozen-registry B ladder. Every
-output-affecting gate requires the same complete forward and reverse
-contextual-semantic review against `test.txt`. T232 may close only if both full
-runs independently satisfy the unchanged 30-second direct-end limit and the
-complete readings retain the speaker interpretation.
+The remediation is committed and pushed directly on `master` at
+`a6f0d33730326b19a3831019b1aba21fd900f126`. The worktree, checked-in TOML,
+server binary, input audio, frame pacing, and behavioral environment remain
+unchanged within every accepted run. The server binary SHA-256 is
+`0c3f71d6077edc6805c394f82908c3c91a8d746aa853bd004582a9ff66822692`;
+the TOML SHA-256 remains
+`d00150ae376d802af0fcf8c0a89aa3fae1e0abb2bf5d10601c55cefd570a40db`.
+Artifacts are retained under
+`/tmp/orator-spec013/release-a6f0d33-fr50-precompute/`.
+
+| Run | Stream factor | Direct-end wait | Mechanical result |
+|---|---:|---:|---|
+| 120 A, independent empty registry | `0.980x` | `2.422 s` | pass |
+| 120 B, independent empty registry | `0.980x` | `2.426 s` | pass |
+| 600, independent empty registry | `0.997x` | `1.752 s` | pass |
+| Full A, empty registry | `0.993x` | `26.013 s` | pass |
+| Full B, restarted with Run A registry | `0.993x` | `26.789 s` | pass |
+
+All runs use production WebSocket transport, 100 ms PCM frames, `1.0x`
+pacing, direct `end`, required observers, and runtime/device telemetry. Both
+full runs independently satisfy the unchanged `30.0 s` terminal limit. Run A
+and post-Run-B registry SHA-256 values are both
+`66461a77755984a08231d06306da7ce9e1eeac07be1927e91f8a772fc54c7b3f`;
+this establishes storage integrity only.
+
+The two 120-second artifacts each received complete forward and reverse
+contextual reading of 18 contributions. The 600-second artifact received both
+readings for all 93 in-scope contributions. Full A and full B were each read
+against all 556 `test.txt` contributions chronologically and independently in
+reverse fixed-window order.
+
+| Complete full reading | Display packet SHA-256 | Manual result |
+|---|---|---|
+| Remediation Run A chronological | `730506a70dffeeef673051fdc9455fedb7e1e20bddd1f47e23a4beed63e13d69` | retain FR50 interpretation |
+| Remediation Run A reverse windows | `2e716af703b0045fadb43cd3804389be65f117add6fc961d858f5b74fc95adf6` | retain FR50 interpretation |
+| Remediation Run B chronological | `d9a580288aa745aa894e997d1e08911a29ab23b5cb893841b147c725044e17d7` | retain FR50 interpretation |
+| Remediation Run B reverse windows | `bb6fb4fff19e64d630a3bee5245d634bd9bb9c0e999072c0467b7b68a3032a4a` | retain FR50 interpretation |
+
+The four complete full readings independently preserve
+`spk_0 = Zhu Jie`, `spk_1 = Tang Yunfeng`, `spk_2 = Xu Zijing`, and
+`spk_3 = Shi Yi`. Each full run manually retains 525 of 556 reference
+contributions, with 26 confidently wrong, four missing, one uncertain, and 19
+business-critical residuals. The retained share is approximately 94.4% and
+remains above the 90% bottom line. `ref-0327` and `ref-0417` stay repaired.
+There is no whole-session identity permutation, accumulating drift, or
+tail-only collapse; the remaining errors are local handoff, overlap, and
+evidence-boundary failures, including the longer local error at `ref-0503`.
+
+The missing contributions are `ref-0063`, `ref-0341`, `ref-0409`, and
+`ref-0442`; `ref-0506` remains uncertain. The 19 critical residuals are
+`ref-0049`, `ref-0058`, `ref-0066`, `ref-0099`, `ref-0102`, `ref-0118`,
+`ref-0252`, `ref-0313`, `ref-0331`, `ref-0333`, `ref-0354`, `ref-0390`,
+`ref-0426`, `ref-0442`, `ref-0444`, `ref-0461`, `ref-0499`, `ref-0503`, and
+`ref-0505`.
+
+T232A, T232B, T232C, and T232 are complete. FR50 is the current repeatable
+real-path speaker baseline. Canonical speaker-business closure remains open
+because the 19 critical residuals, speaker-time evidence, locked holdout,
+browser/microphone, report review, and release gates are not closed. The
+pre-test business storage is restored and no validation process remains.

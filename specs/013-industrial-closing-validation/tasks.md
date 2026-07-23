@@ -3056,7 +3056,7 @@ gates remain open 2026-07-23
   uncertain, and 19 critical residuals. FR49's real-path ledger remains
   `523/556` until T232. See
   `fr50-right-bounded-short-primary-unit-review-2026-07-23.md`.
-- [ ] T232 Only if T231 manually retains the experiment, commit the exact clean
+- [x] T232 Only if T231 manually retains the experiment, commit the exact clean
   candidate and execute the constitutional 120-second, 600-second, full empty-
   registry A, and restarted frozen-registry B real-WebSocket ladder. Complete
   the required contextual-semantic review at every gate, then synchronize the
@@ -3069,6 +3069,18 @@ gates remain open 2026-07-23
   document in `30.144 s`, above the fixed `30.0 s` direct-end limit. Full B is
   `29.258 s`. T232 therefore remains open without averaging or waiving the
   failed run.
+  Transitional remediation commit
+  `a6f0d33730326b19a3831019b1aba21fd900f126` then completes a new exact-clean
+  ladder. The 120-second A/B runs finish direct-end in `2.422/2.426 s`; the
+  600-second run completes at `0.997x` with a `1.752 s` wait; full empty-
+  registry A and restarted frozen-registry B both complete at `0.993x` with
+  independent `26.013/26.789 s` waits. Every in-scope 120/600 contribution and
+  all 556 full contributions receive complete forward and reverse contextual-
+  semantic reading. The two full runs independently retain the manual
+  `525/556` interpretation, with 26 confident-wrong, four missing, one
+  uncertain, and 19 critical residuals. T232 promotes FR50 as the current
+  real-path speaker baseline; those residuals keep canonical speaker-business
+  closure open.
 - [x] T232A Remove the FR49 `primary_run` acoustic work from the terminal-only
   path without changing final evidence semantics. Queue completed immutable
   Sortformer top-1 local-slot runs in `SpeakerEvidenceStage`, service them on
@@ -3099,10 +3111,16 @@ gates remain open 2026-07-23
   complete through the production WebSocket path with required telemetry and
   exact product-entry equality. See
   `fr50-real-path-terminal-remediation-2026-07-23.md`.
-- [ ] T232C Commit and push the exact clean transitional remediation revision,
+- [x] T232C Commit and push the exact clean transitional remediation revision,
   then repeat the constitutional 120-second, 600-second, full empty-registry A,
   and restarted frozen-registry B ladder. Complete every required independent
   forward/reverse contextual-semantic review against `test.txt`; only those
   readings may retain the speaker result. Close T232 only when both full runs
   also independently satisfy the unchanged 30-second terminal contract and
   all documentation matches the exact revision.
+  Commit `a6f0d33730326b19a3831019b1aba21fd900f126` is pushed on `master`.
+  Its exact-clean ladder and all required independent contextual readings are
+  complete. Both full direct-end waits pass independently at `26.013 s` and
+  `26.789 s`; the Run A registry SHA-256 remains unchanged after Run B, as a
+  storage-integrity observation only. The pre-test business storage is
+  restored and no validation process remains.

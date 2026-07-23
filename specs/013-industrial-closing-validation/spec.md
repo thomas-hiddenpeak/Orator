@@ -3164,6 +3164,21 @@ open. See `fr47-real-path-promotion-review-2026-07-19.md`.
   review under Article VI; no timing, hash, equality check, or executable result
   may promote or accept the candidate.
 
+  T232C now satisfies this remediation gate on exact clean pushed commit
+  `a6f0d33730326b19a3831019b1aba21fd900f126`. The 120-second A/B and
+  600-second production-WebSocket runs complete their full in-scope forward
+  and reverse contextual readings. Full empty-registry A and restarted
+  frozen-registry B each complete all 3,615.120 seconds at `0.993x`; their
+  direct-end waits are independently `26.013 s` and `26.789 s`, below the
+  unchanged `30.0 s` limit. Each full artifact receives complete
+  chronological and reverse fixed-window reading of all 556 reference
+  contributions. Those readings manually retain the FR50 `525/556`
+  interpretation, including the repairs at `ref-0327` and `ref-0417`, with no
+  whole-session permutation, accumulating drift, or tail-only collapse.
+  T232 therefore promotes FR50 as the current real-path speaker baseline. The
+  remaining 19 business-critical residuals and the other Spec 013 gates keep
+  canonical speaker-business closure open.
+
 FR40 passes its frozen gate. Repeated T123 outputs are byte-identical and
 change only Xu Zijing's `184.240-184.320` response. Repeated T111 outputs are
 separately byte-identical and split only Zhu Jie's first reaction from the
