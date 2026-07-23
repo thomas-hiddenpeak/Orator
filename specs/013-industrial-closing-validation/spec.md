@@ -69,9 +69,13 @@ drift; all 20 critical residuals remain; FR50 T229-T231 implement one
 false-default, TOML-enabled right-bounded short-primary aligned-unit policy,
 complete deterministic frozen FR49 A/B replay, and retain `ref-0327` and
 `ref-0417` through four independent complete candidate readings; the manually
-reconciled frozen candidate is `525/556` with 19 critical residuals, but no
-FR50 live run has occurred and FR49 remains the `523/556` real-path baseline;
-critical attribution,
+reconciled frozen candidate is `525/556` with 19 critical residuals; T232's
+exact-clean remediation commit `a6f0d33` completes the restarted 120/600/full
+A/B real-WebSocket ladder, so FR50 is the current `525/556` real-path baseline;
+FR51's four exact-baseline contextual evidence readings identify only
+`ref-0099` as a final-only overwrite, stop that single-context final-fusion
+branch, and open FR52's short-response source-edge provenance gate without a
+runtime change; critical attribution,
 confident-wrong attribution, T102, T084, full canonical closure, release sign-
 off, and industrial readiness remain open
 **Created**: 2026-07-13
@@ -3178,6 +3182,76 @@ open. See `fr47-real-path-promotion-review-2026-07-19.md`.
   T232 therefore promotes FR50 as the current real-path speaker baseline. The
   remaining 19 business-critical residuals and the other Spec 013 gates keep
   canonical speaker-business closure open.
+
+- **FR51 exact-baseline critical-residual evidence gate**: Before another
+  speaker candidate is implemented, the exact FR50 full A/B artifacts from
+  commit `a6f0d33730326b19a3831019b1aba21fd900f126` MUST receive a new
+  evidence-layer audit limited to the 19 manually retained business-critical
+  residuals and their named accepted controls. The immutable scope is stored in
+  `fr51-critical-residual-contexts-2026-07-23.tsv`; it contains only common-
+  clock bounds and reference/control IDs. It MUST NOT contain an expected
+  speaker, correctness label, causal class, candidate, score, rank, or verdict.
+
+  T233 MUST run `diar_evidence_probe` twice against the exact lossless streamed
+  PCM and the current checked-in `orator.toml`, then mechanically verify the
+  current raw four-channel posterior against each FR50 artifact's complete
+  `primary_speaker` producer view. The existing display-only
+  `speaker_residual_evidence_packet.py` MAY then copy the unmodified reference,
+  business, decision-audit, diarization, primary, voiceprint, ASR, VAD,
+  alignment, local-identity-epoch, and posterior evidence into independent A/B
+  worksheet trees. Hash, schema, extent, ordering, producer, and raw-copy checks
+  are mechanical facts only and MUST NOT classify or accept a result.
+
+  T234 MUST read every A context and control chronologically and every B context
+  and control independently in the same direction. T235 MUST repeat both
+  complete readings from the final context to the first and manually reconcile
+  the four passes. Only those contextual readings MAY state the earliest layer
+  at which usable speaker evidence becomes absent, contradictory, displaced, or
+  overwritten. Existing FR49 observations are historical controls, not a
+  substitute for reading the exact FR50 evidence.
+
+  No ASR, VAD, forced-alignment, Sortformer, TitaNet, identity-epoch, fusion,
+  model, or TOML change is authorized by this gate. After T235, SDD MUST record
+  either one explicit low-impact, reference-free topology with abstentions or a
+  stop decision identifying the upstream producer contract that requires a
+  separate phase. No implementation, replay, new audio run, ledger change, or
+  closure claim may precede that decision.
+
+  T233-T235 are complete. Exact A/B packet provenance passes mechanically, and
+  all four complete contextual readings agree that only `ref-0099` loses
+  mutually corroborating correct evidence solely in final fusion. Because the
+  complete accepted short-direct controls still provide only that one material
+  topology, the required decision stops the final-policy branch. FR51 changes
+  no runtime artifact or product result. The signed manual record is
+  `fr51-exact-baseline-critical-residual-review-2026-07-23.md`.
+
+- **FR52 short-response source-edge provenance gate**: The next speaker-only
+  phase MUST investigate the upstream relationship among ASR source boundaries,
+  forced-alignment units, and short Sortformer speaker islands before proposing
+  another fusion rule. Its immutable context list is
+  `fr52-short-response-source-edge-contexts-2026-07-23.tsv` and contains only
+  common-clock bounds plus focus/control IDs.
+
+  T236 MUST arrange the existing exact FR50 A/B source, per-codepoint alignment,
+  VAD, posterior, activity, primary, TitaNet, identity-epoch, decision, and
+  final evidence without changing any value or running new product audio.
+  Automation MAY validate hashes, schemas, ordering, bounds, and raw-copy
+  identity only. It MUST NOT label a source omission, classify an alignment
+  defect, rank evidence, select a candidate, or issue a product judgment.
+
+  T237 MUST read every complete A context and control chronologically and in
+  reverse, then repeat both readings independently for B. Only those four
+  contextual-semantic readings MAY decide whether a response is absent from
+  source text, displaced by alignment, merged across a source edge, or blocked
+  by genuinely contradictory speaker evidence. T238 MUST reconcile those
+  readings manually.
+
+  A producer experiment is authorized only if T238 finds one reference-free
+  contract shared by at least two material contexts and bounded by accepted
+  abstention controls. It MUST preserve existing text and common-clock evidence,
+  MUST NOT invent a missing word or use the reference at runtime, and MUST be
+  specified in SDD before implementation. Until T238, no code, TOML, model,
+  replay, new audio run, ledger, or closure change is authorized.
 
 FR40 passes its frozen gate. Repeated T123 outputs are byte-identical and
 change only Xu Zijing's `184.240-184.320` response. Repeated T111 outputs are

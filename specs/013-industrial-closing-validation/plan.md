@@ -4450,6 +4450,93 @@ session-wide identity permutation, accumulating drift, or tail-only collapse.
 T232 is complete and FR50 becomes the current real-path speaker baseline; the
 critical-residual and remaining Spec 013 gates keep canonical closure open.
 
+### 8.39 FR51 exact-baseline critical-residual audit
+
+Keep the accepted FR50 code, TOML, model, audio, reference, and Run A to Run B
+registry sequence frozen. This phase changes no producer and proposes no
+speaker policy. Its purpose is to determine manually whether the 19 remaining
+critical failures still lose usable evidence upstream or whether the exact
+FR50 comprehensive view fails to consume evidence already present on the
+common time base.
+
+1. Use the manually authored
+   `fr51-critical-residual-contexts-2026-07-23.tsv` as the only focus list. Its
+   bounds and named controls are copied from the already reviewed FR50 context
+   record; it carries no judgment field.
+2. Run the current `diar_evidence_probe` twice over the exact streamed PCM with
+   `ORATOR_CONFIG=orator.toml`. Preserve both raw frame and onset/offset files,
+   logs, source/config/model hashes, and compute metadata. Repetition proves
+   capture stability only.
+3. Export independent worksheet trees from exact full Run A and Run B with the
+   existing display-only packet tool. Require each packet to reproduce the
+   artifact's complete primary producer mechanically and to contain all typed
+   evidence intersecting or source-related to every context. Do not compare A
+   and B to issue a semantic conclusion.
+4. Read A chronologically, B chronologically, A in reverse, and B in reverse.
+   In every pass read the complete reference section, all named controls, final
+   business pieces and decisions, ASR, alignment, VAD, Sortformer activity and
+   primary/posterior, TitaNet evidence, and local identity epochs. Write every
+   causal observation manually from conversational context.
+5. Reconcile the four readings manually. Existing FR49 findings may explain
+   provenance but cannot supply an FR51 observation. Decide whether one or more
+   material contexts share a low-impact topology only after all readings are
+   complete. The decision must state explicit abstentions and upstream
+   dependencies before implementation is authorized.
+
+If correct evidence is already present, prefer a final-fusion/source-
+reconstruction change that preserves all producer values and common-clock
+coordinates. If the evidence is absent or genuinely contradictory, stop the
+final-policy branch and specify the relevant producer phase separately. ASR
+accuracy work remains deferred; using current ASR and alignment as displayed
+speaker evidence does not authorize changing them.
+
+T233-T235 are complete. Two current v2.1 posterior captures and both exact
+FR50 packet trees pass their mechanical provenance checks. A chronological and
+reverse complete-context reading was performed for A and independently for B.
+All four manual readings identify `ref-0099` as the only final-only overwrite.
+`ref-0118` already contains a primary transition inside its aligned response;
+the other focuses lose, displace, or contradict usable evidence before final
+fusion. The complete historical short-direct controls still expose accepted
+repairs and no second material `ref-0099` topology. FR51 therefore stops the
+final-policy branch and changes no code, TOML, model, ledger, or real-path
+baseline. See
+`fr51-exact-baseline-critical-residual-review-2026-07-23.md`.
+
+### 8.40 FR52 short-response source-edge provenance gate
+
+FR51 manually relates six upstream residuals in which a short response is
+zero-duration or displaced, has a surviving speaker island but no separately
+writable source unit, or crosses a primary boundary inside one aligned phrase.
+FR52 investigates the producer contract; it does not start with a repair.
+
+1. Freeze only common-clock bounds and named controls in
+   `fr52-short-response-source-edge-contexts-2026-07-23.tsv`. The table must
+   carry no expected speaker, correctness label, causal class, candidate, or
+   verdict.
+2. Reuse exact FR50 A/B artifacts and their already verified posterior. Arrange
+   complete ASR source boundaries, every aligned codepoint including zero-
+   duration units, VAD, Sortformer posterior/activity/primary, TitaNet, local
+   identity epochs, decision audit, and final pieces for display. No new audio
+   run is justified while the source evidence is frozen and sufficient.
+3. Verify raw-copy hashes, source ordering, monotonic common-clock bounds, and
+   packet completeness mechanically. These checks must not infer that a source
+   unit is missing, choose an evidence family, or evaluate a speaker.
+4. Read A chronologically and in reverse, then repeat both complete readings
+   independently for B. Only complete conversational-semantic reading may
+   distinguish source omission, alignment displacement, source-edge merging,
+   and genuinely conflicting acoustic evidence.
+5. Reconcile the four readings manually. A producer experiment requires at
+   least two material contexts with one reference-free contract and explicit
+   accepted abstentions. It may preserve existing source text and provenance;
+   it must not manufacture a missing word, use `test.txt` at runtime, or move a
+   timestamp outside the common time base.
+
+If no shared contract survives the controls, stop and name the specific ASR-
+source, forced-alignment, or speaker-producer phase. The longer identity
+conflicts, especially `ref-0503`, remain separate and may not be rewritten by
+turn continuity. No implementation, TOML change, frozen replay, or product
+audio run is authorized before T238.
+
 ### 8.15 FR28 120-second outcome and promotion ladder
 
 T117-T121 are complete. The frozen T116 packages replay byte-stably; their

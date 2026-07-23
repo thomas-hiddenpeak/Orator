@@ -17,8 +17,11 @@ critical residuals remain open; FR50 T229-T231 implement the false-default,
 TOML-enabled right-bounded short-primary aligned-unit policy, complete
 deterministic frozen FR49 A/B replay, and retain `ref-0327` and `ref-0417`
 through four independent complete contextual readings; the frozen candidate is
-manually reconciled at `525/556` with 19 critical residuals, while FR49 remains
-the `523/556` real-path baseline until T232;
+manually reconciled at `525/556` with 19 critical residuals; T232 completes the
+exact-clean 120/600/full A/B real-WebSocket ladder on commit `a6f0d33`, making
+FR50 the current real-path baseline; FR51 T233-T235 complete four independent
+exact-baseline contextual evidence readings, stop the single-context final-
+fusion branch, and leave FR52 T236-T238 open at the short-response source edge;
 critical, confident-wrong, time-based, holdout, report, release, T102, and T084
 gates remain open 2026-07-23
 
@@ -3124,3 +3127,60 @@ gates remain open 2026-07-23
   `26.789 s`; the Run A registry SHA-256 remains unchanged after Run B, as a
   storage-integrity observation only. The pre-test business storage is
   restored and no validation process remains.
+- [x] T233 Freeze the FR51 19-critical-residual context table, then run the
+  current `diar_evidence_probe` twice against the exact streamed PCM and
+  checked-in TOML. Generate independent exact-FR50 full A/B display-only
+  worksheet trees with all source-related pipeline evidence. Verify hashes,
+  schemas, extents, ordering, raw-copy preservation, and complete primary-
+  producer reproduction only; no executable result may classify evidence,
+  count causes, rank a repair, select a candidate, or issue a product verdict.
+  Both raw captures have frame SHA-256
+  `79fd2c416ac76a0af477f98bf8d848f6e604b2d94c5c4445e653978afd6c7e41`
+  and segment SHA-256
+  `94a2a758ef9771e1646d27eb56a6257421ae620870e3bf467eb9fed9976264c0`.
+  The A/B packet content manifests have SHA-256
+  `d7c0cf0ad8287b259d3189da94f1ecfa01c5f56faecfbc1a21f6455b685b45a0`
+  and
+  `a80922ef1906cfe52c0c39f8ca8b95c38739bf014a91872b8939cc257b750fca`;
+  every listed payload passes its mechanical hash check. See
+  `fr51-exact-baseline-critical-residual-review-2026-07-23.md`.
+- [x] T234 Read every T233 full A context and accepted control chronologically,
+  then read every full B context and accepted control independently in the same
+  direction. Against complete `test.txt` context, manually record the earliest
+  evidence layer that is absent, contradictory, displaced, or overwritten.
+  Historical FR49 observations are controls only and may not replace either
+  exact-FR50 reading.
+  Both independent chronological readings are complete. They identify
+  `ref-0099` as the sole final-only overwrite and place every other residual at
+  an earlier missing, displaced, or contradictory evidence boundary. This is
+  a manual contextual judgment, not an executable classification.
+- [x] T235 Repeat the complete T234 review from `ref-0505` back to `ref-0049`
+  for A and independently for B. Re-read every accepted control, reconcile all
+  four passes manually, and update SDD with either one explicit reference-free,
+  low-impact topology plus abstentions or a stop decision naming the upstream
+  producer phase. Until then, do not change code, TOML, a model, a ledger, or
+  the accepted FR50 baseline, and do not run new product audio.
+  Both reverse readings confirm the chronological result. Because
+  `ref-0099` remains a single material direct-short topology and historical
+  controls require that branch elsewhere, T235 stops the final-fusion branch.
+  It names short-response source-edge provenance as the next upstream phase;
+  FR50 remains unchanged.
+- [ ] T236 Freeze the manually related short-response source-edge contexts in
+  `fr52-short-response-source-edge-contexts-2026-07-23.tsv`. From the existing
+  exact FR50 A/B packets, arrange a display-only worksheet for each complete
+  ASR source, every aligned codepoint including zero-duration units, VAD
+  boundaries, Sortformer posterior/activity/primary intervals, identity
+  evidence, and final projected pieces. Validate only source hashes, ordering,
+  bounds, and raw-copy identity. Do not run new audio or classify a context.
+- [ ] T237 Read every T236 A context and control chronologically and in reverse,
+  then repeat both readings independently for B. Against complete `test.txt`
+  context, manually distinguish source omission, alignment displacement,
+  source-edge merging, and genuine speaker-evidence conflict. No query,
+  formula, script, or metric may assign those labels or select a repair.
+- [ ] T238 Reconcile the four T237 readings manually. Authorize a producer
+  experiment only if at least two material contexts and their accepted controls
+  establish one reference-free source-edge contract that preserves existing
+  source text and common-clock evidence without inventing a word. Otherwise
+  stop and name the specific ASR-source, forced-alignment, or speaker-producer
+  contract that requires a separate phase. No implementation, TOML change,
+  replay, or product run precedes this decision.
