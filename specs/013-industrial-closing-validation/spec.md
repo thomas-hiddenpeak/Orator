@@ -84,7 +84,11 @@ complete-context readings find no shared safe speech-presence topology and
 stop without a runtime, TOML, model, ledger, or baseline change; FR55 preserves
 exact TitaNet reference provenance and reproduces every frozen A/B identity row,
 but four complete readings find only one material circular-reference context,
-so it also stops without changing the product; critical attribution, confident-
+so it also stops without changing the product; FR56's four independent complete-
+context producer-boundary readings find only `ref-0499` adjacent to an identity
+epoch transition, whose accepted controls reject backfill, while the other nine
+contexts have distinct stable-epoch evidence failures; FR56 therefore stops
+without authorizing a candidate; critical attribution, confident-
 wrong attribution, T102, T084, full canonical closure, release sign-off, and
 industrial readiness remain open
 **Created**: 2026-07-13
@@ -3400,6 +3404,47 @@ open. See `fr47-real-path-promotion-review-2026-07-19.md`.
   second material topology is absent; FR55 therefore stops without a runtime,
   TOML, model, product-run, ledger, baseline, or closure change. See
   `fr55-gallery-independence-review-2026-07-23.md`.
+
+- **FR56 Sortformer local-slot and identity-epoch producer-boundary audit**:
+  The next phase MUST determine whether the already human-reviewed critical
+  residuals with upstream speaker-evidence conflicts share one reusable
+  producer topology. It MUST start from the exact FR50 Run A/B artifacts and
+  the context-only rows in
+  `fr56-speaker-producer-boundary-contexts-2026-07-23.tsv`. No parameter,
+  model, producer, final-fusion, or product output changes are authorized by
+  opening this audit.
+
+  FR56 MUST display the unaltered Sortformer posterior, onset/offset activity,
+  top-1 primary runs, exact capture-order diar deliveries, local-slot identity
+  epochs, retained TitaNet references, source/alignment, VAD, voiceprint, and
+  current comprehensive output on the common time base. If an epoch boundary
+  cannot be explained from existing evidence, FR56 MAY add a deterministic,
+  diagnostic-only identity transition trace. Such a trace MUST preserve exact
+  current decisions, have no runtime consumer or TOML key, and MUST NOT contain
+  a reference speaker, correctness label, causal label, candidate selection,
+  aggregate, or verdict.
+
+  Run A chronological and reverse complete-context readings MUST be repeated
+  independently for Run B. A later producer experiment MAY be specified only
+  when at least two independent material contexts share one reference-free
+  local-slot or identity-epoch topology and every accepted control establishes
+  an explicit abstention. Otherwise FR56 MUST stop at the observed producer
+  boundary without a runtime, TOML, model, product-run, ledger, baseline, or
+  closure change. No new product audio run is authorized before that manual
+  decision.
+
+  T253-T257 are complete. Exact FR50 Run A and Run B packets pass their source-
+  hash and content-manifest checks. Run A chronological, Run B chronological,
+  Run A reverse, and Run B reverse complete-context readings identify only
+  `ref-0499` beside an identity epoch transition. Moving that transition
+  backward would overwrite the accepted preceding Tang Yunfeng control, while
+  the focus has no independent Shi Yi evidence. The other nine contexts are
+  distinct stable-epoch source or producer conflicts and do not establish a
+  second material topology. Existing output is sufficient to make that
+  decision, so no diagnostic transition trace is implemented. FR56 stops
+  without a runtime, TOML, model, product-run, ledger, baseline, or closure
+  change. See
+  `fr56-speaker-producer-boundary-review-2026-07-23.md`.
 
 FR40 passes its frozen gate. Repeated T123 outputs are byte-identical and
 change only Xu Zijing's `184.240-184.320` response. Repeated T111 outputs are

@@ -4726,6 +4726,54 @@ not exist, so T252 stops FR55 without a runtime/TOML/model/product-run/ledger or
 baseline change. See
 `fr55-gallery-independence-review-2026-07-23.md`.
 
+### 8.44 FR56 Sortformer local-slot and identity-epoch producer audit
+
+Keep the accepted FR50 code, checked-in TOML, streaming Sortformer v2.1
+profile, audio, reference, Run A empty-registry state, and Run B frozen-registry
+input fixed. FR56 begins with evidence already captured by FR51 and FR55; it
+does not begin with a policy or a new product run.
+
+1. Freeze the ten manually identified upstream speaker-evidence contexts and
+   named controls in a context-only table. Record source hashes and the exact
+   producer path from raw Sortformer frame block through onset/offset segments,
+   local-slot identity epochs, typed timeline deposit, and comprehensive view.
+2. Read the existing independent A/B evidence first. Inventory every local
+   slot and identity epoch visible in each context, including controls. This is
+   a contextual-semantic activity: no executable filter, score, or rule may
+   classify a context or select a shared pattern.
+3. If existing output cannot explain how an identity epoch formed, extend only
+   the capture-order replay with a typed transition trace. Preserve all current
+   reference selection, embedding, pending-confirmation, split, enrollment,
+   merge, and assignment behavior. Require exact captured/replayed identity
+   rows and deterministic trace output before review.
+4. Arrange complete independent Run A/B packets. Automation verifies source
+   hashes, ordering, bounds, schemas, exact replay, and raw-copy completeness
+   only. It may not add speaker truth, causal classification, candidate
+   ranking, aggregate results, or a verdict.
+5. Complete Run A chronological, Run B chronological, Run A reverse, and Run B
+   reverse readings against the full local `test.txt` conversation. Manually
+   reconcile whether at least two independent material contexts and all
+   controls establish one reference-free producer topology.
+
+Only that manual gate can authorize a separate false-default TOML candidate.
+If the evidence is context-specific or the error is already present in the
+Sortformer channel assignment without independent runtime evidence, stop FR56
+and name the unresolved producer boundary. ASR accuracy, VAD parameters,
+diarization parameters, identity thresholds, final-fusion rules, and the FR50
+ledger remain fixed during this phase. See
+`fr56-speaker-producer-boundary-evidence-design-2026-07-23.md`.
+
+T253-T257 are complete. Existing exact A/B output exposes the final local-slot
+identity epochs needed for the decision, so no transition-trace implementation
+is required. Four independent complete-context readings find only `ref-0499`
+adjacent to an epoch change; its accepted Tang Yunfeng controls reject moving
+the boundary backward, and the other nine contexts are distinct stable-epoch
+source or producer conflicts. The required second material topology is absent.
+FR56 stops without changing runtime, TOML, model, product output, ledger,
+baseline, or closure status. The next closing activity is the still-open T102
+manual speaker-time, per-speaker-time, and source-time-offset review. See
+`fr56-speaker-producer-boundary-review-2026-07-23.md`.
+
 ### 8.15 FR28 120-second outcome and promotion ladder
 
 T117-T121 are complete. The frozen T116 packages replay byte-stably; their

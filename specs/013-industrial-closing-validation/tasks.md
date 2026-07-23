@@ -28,6 +28,8 @@ variants; FR54 T244-T247 retain evidence-only raw VAD capture but stop after
 four complete readings find no shared safe speech-presence topology; FR55
 T248-T252 retain exact gallery provenance but stop after four complete readings
 find only one material circular-reference context and no shared safe topology;
+FR56 T253-T257 complete four independent producer-boundary readings and stop
+because only `ref-0499` is epoch-adjacent while its controls reject backfill;
 critical, confident-wrong, time-based, holdout, report, release, T102, and T084
 gates remain open 2026-07-23
 
@@ -3345,3 +3347,52 @@ gates remain open 2026-07-23
   Sortformer/local-identity conflict. No runtime, TOML, model, product run,
   ledger, baseline, or closure claim changes. See
   `fr55-gallery-independence-review-2026-07-23.md`.
+- [x] T253 Freeze FR56's context-only upstream speaker-evidence scope and
+  evidence design. Record exact FR50 A/B, PCM, TOML, Sortformer v2.1, TitaNet,
+  reference, and registry hashes. Inspect the production path from raw frame
+  blocks through local slots and identity epochs to the comprehensive view.
+  This task may establish observability facts only; it may not infer a product
+  cause or candidate.
+  The ten-row context table is frozen at SHA-256
+  `19c9e53de90a74ccc937b2af821db96f4e929140daf6d24b4d1d2c3f93d5f38c`.
+  `fr56-speaker-producer-boundary-evidence-design-2026-07-23.md` records every
+  source hash and the verified frame-block to comprehensive-view code path.
+  Existing evidence exposes final identity epochs but not every transition
+  trigger, which remains a T254 contextual observability decision.
+- [x] T254 Read the existing FR51/FR55 Run A and Run B producer evidence for
+  every FR56 context and named control. Inventory local-slot activity, primary
+  runs, final identity epochs, retained-reference provenance, and current
+  business output manually from complete conversation. Determine only by this
+  reading whether an epoch transition requires additional diagnostic evidence.
+  Independent A/B chronological readings identify `ref-0499` as the only focus
+  adjacent to an identity epoch. Every other focus is inside a stable epoch and
+  already lacks or contradicts the listener-verified target identity upstream.
+- [x] T255 If T254 exposes an observability gap, implement a diagnostic-only
+  identity transition trace in exact capture-order replay. Preserve all current
+  runtime decisions and add no TOML key or runtime consumer. Require exact A/B
+  captured/replayed identity rows, deterministic output, valid common-clock
+  bounds, and focused contract tests. The trace may display raw decisions but
+  may not label, rank, aggregate, or judge them.
+  No implementation is required. Existing evidence already shows that the
+  exact internal trigger cannot supply missing pre-boundary Shi evidence or
+  distinguish the accepted Tang control. No API, TOML key, runtime consumer,
+  or model behavior changes.
+- [x] T256 Arrange independent complete Run A/B FR56 packets and verify only
+  hashes, ordering, common-clock bounds, schema, exact replay, and raw-copy
+  completeness. Read every packet chronologically and in reverse for Run A,
+  then repeat both complete readings independently for Run B against
+  `test.txt`.
+  A/B content-manifest hashes are `c18c82e05b0583114a61cce672d136e08e3daae0313444741402893c68c093f7`
+  and `43a1797ca14bdd34d2aae79d59d9d2da7c63310378bf714ba40bfadcc8dea6e5`;
+  every listed payload verifies. All four contextual readings are complete.
+- [x] T257 Reconcile the four T256 readings manually. Authorize a separate
+  false-default TOML producer experiment only if at least two independent
+  material contexts share one reference-free local-slot or identity-epoch
+  topology and all accepted controls establish explicit abstentions. Otherwise
+  stop without a runtime, TOML, model, product-run, ledger, baseline, or closure
+  change.
+  T257 stops FR56. Only `ref-0499` is epoch-adjacent, and its accepted controls
+  reject a wider or earlier identity assignment. The other nine contexts have
+  distinct stable-epoch producer/source failures. FR50 and its manual ledger
+  remain unchanged; see
+  `fr56-speaker-producer-boundary-review-2026-07-23.md`.
