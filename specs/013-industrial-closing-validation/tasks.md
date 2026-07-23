@@ -3444,3 +3444,55 @@ release, and T084 gates remain open 2026-07-23
   chronological and reverse manual additions agree. T102 is complete; T084 is
   still blocked by the 19 critical residuals and 26 confidently wrong natural
   contributions.
+- [x] T263 Freeze FR58's auxiliary streaming-context evidence scope in
+  `fr58-auxiliary-streaming-context-evidence-design-2026-07-23.md`. Bind the
+  audit to exact FR50 Run A/B, exact streamed PCM, `test.txt`, current and
+  auxiliary TOML files, Sortformer v2.1 weights, registry provenance, the 19
+  critical contexts, and accepted controls. State explicitly that the
+  high-latency view uses the same model and is correlated auxiliary evidence,
+  not a second model, product candidate, or accuracy oracle. No production or
+  root-TOML change is authorized.
+- [x] T264 Execute two full exact-PCM `diar_evidence_probe` captures under the
+  checked-in v2.1 high-latency TOML. Verify complete common-clock extent,
+  monotonic raw rows, byte repeatability, source hashes, and the existing NeMo
+  numerical fixture/CTest for the exact profile. These are mechanical and
+  numerical checks only; no executable may label or judge speaker output. The
+  captures each preserve 45,189 frames and 772 segments over 3615.120 seconds;
+  frame SHA-256 `504d859c0c20fcf06bff8865abdb4ceeeda7420c4f547637c47b631a68040673`
+  and segment SHA-256
+  `57a01ad7ae1ef9fe34934d4cec2016238da12417893fe81bbdfcd6d239e20508`
+  are byte-identical, and `test_diar_async_stream_v21_high` passes.
+- [x] T265 Arrange independent Run A/B FR58 display packets for all 19 critical
+  contexts and named controls. Preserve the exact FR50 source, alignment, VAD,
+  main posterior, identity epochs, TitaNet evidence, business output, and full
+  intersecting auxiliary posterior/segments. Any auxiliary local-slot identity
+  evidence must expose its reference-free TitaNet inputs and complete raw
+  scores. Automation may copy, order, hash, and validate only. Packet content
+  manifests are
+  `9493274d1a4689a3f184b7957c4d0dd9854acc3a4058db2d2323c1cdfe759711`
+  for Run A and
+  `ffd870ef242e62455e4d1221fa85c472f661ab4d2d524ea5ff78d8c67f49c7ca`
+  for Run B. The auxiliary identity replay exposes all raw query scores and
+  retained references; it also exposes identity fragmentation to seven
+  enrolled IDs rather than hiding it.
+- [x] T266 Read every FR58 focus and control in complete Run A chronological,
+  Run B chronological, Run A reverse, and Run B reverse conversation against
+  `test.txt`. Manually determine whether at least two material residuals share
+  one reference-free auxiliary-evidence topology with explicit abstention from
+  every accepted control. Do not use code, scripts, queries, formulas, metrics,
+  or algorithms to classify, aggregate, rank, select, or issue a verdict. All
+  four readings agree that `ref-0499` is the only genuinely complementary
+  critical activity case. Other useful short islands repeat the accepted
+  producer, while the two different tail identity epochs lack writable source
+  boundaries. No two material residuals satisfy activity, boundary, stable
+  identity, and control abstention together.
+- [x] T267 If and only if T266 passes, specify the false-by-default TOML
+  auxiliary-track candidate, its ingest-owned common-time-base path, typed
+  `ComprehensiveTimeline` contract, independent model/worker ownership,
+  identity reconciliation, fusion abstentions, focused tests, numerical gates,
+  frozen replay, and constitutional WebSocket promotion ladder. Otherwise stop
+  FR58 without production code, root-TOML, model, product-run, ledger,
+  baseline, or closure change. T266 fails the gate, so T267 takes the stop
+  branch. FR58 lands diagnostic tooling and the review record only; no
+  auxiliary worker or fusion candidate is specified. See
+  `fr58-auxiliary-streaming-context-review-2026-07-23.md`.

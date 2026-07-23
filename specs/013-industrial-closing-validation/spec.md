@@ -3502,6 +3502,70 @@ open. See `fr47-real-path-promotion-review-2026-07-19.md`.
   or natural-turn ledger changed. See
   `fr57-speaker-time-review-2026-07-23.md`.
 
+- **FR58 auxiliary streaming-context evidence audit**: The next speaker-only
+  phase MUST test whether a second deployable streaming view of the same
+  Sortformer v2.1 checkpoint preserves useful speaker evidence that is absent
+  or contradicted in the accepted FR50 `340/1/188/188` view. The auxiliary
+  view is not a new model and MUST NOT be described as statistically
+  independent. It uses the checked-in NVIDIA high-latency streaming profile
+  `340/40/40/300` (chunk/right-context/FIFO/update-period) only as a read-only
+  evidence source. The accepted FR50 runtime, root `orator.toml`, model
+  weights, registry sequence, product output, manual ledger, and closure state
+  remain fixed during the audit.
+
+  T263 MUST freeze exact FR50 Run A/B, exact streamed PCM, human reference,
+  v2.1 weights, both TOML files, profile provenance, all 19 critical contexts,
+  and named accepted controls before execution. T264 MUST execute the existing
+  native C++ evidence probe twice over exact PCM using only the auxiliary TOML.
+  The two captures MUST cover the complete common clock, be byte-repeatable,
+  and retain the already registered NeMo numerical-oracle gate for this exact
+  profile. These checks establish model-port and capture integrity only.
+
+  T265 MUST arrange the unmodified auxiliary posterior and onset/offset view
+  beside each exact FR50 A/B packet's source, alignment, VAD, accepted
+  Sortformer posterior, identity epochs, TitaNet evidence, and final business
+  output. Local auxiliary slots MUST remain raw unless a separately displayed,
+  reference-free TitaNet mapping supplies a canonical identity. Automation MAY
+  copy, order, hash, validate schemas and common-clock bounds, and display
+  values. It MUST NOT map a slot from `test.txt`, label correctness, classify a
+  topology, count or aggregate a result, rank the two profiles, select a
+  candidate, or issue a verdict.
+
+  T266 MUST complete four independent contextual-semantic readings against the
+  complete human-listened conversation: Run A chronological, Run B
+  chronological, Run A reverse, and Run B reverse. Every focus and control
+  MUST be read with both streaming views and all other pipeline evidence on
+  the shared clock. A later production experiment MAY be specified only when
+  at least two material residuals expose a reference-free auxiliary-evidence
+  topology and every superficially matching accepted control establishes an
+  explicit abstention. The proposed topology MUST also define how auxiliary
+  local slots become stable global identities without reading another
+  pipeline directly.
+
+  If that gate passes, T267 MAY specify a false-by-default TOML-controlled
+  auxiliary track that runs incrementally, receives the session time base from
+  the ingest owner, deposits its own typed track into
+  `ComprehensiveTimeline`, and is consumed only from that container. It MUST
+  pass the exact v2.1 high-profile NeMo oracle, frozen replay, complete
+  changed-context review, and the constitutional 120/600/full A/B real-
+  WebSocket ladder before retention. If the gate fails, FR58 MUST stop without
+  production code, root-TOML, model, product-run, ledger, baseline, or closure
+  change. See
+  `fr58-auxiliary-streaming-context-evidence-design-2026-07-23.md`.
+
+  T263-T267 are complete. Two exact full captures are byte-repeatable, span the
+  complete common clock, and pass the existing high-profile numerical gate.
+  The four required complete-context readings find that the early short
+  auxiliary islands duplicate evidence already present in the accepted
+  producer. The different tail identity epochs have no corresponding writable
+  source boundary. Only `ref-0499` contains genuinely complementary critical
+  activity, and its auxiliary slot has conflicting global identity and
+  concurrent activity. The required two-material-residual gate therefore
+  fails. T267 takes the specified stop branch; no auxiliary production worker,
+  root-TOML value, fusion rule, product run, ledger, baseline, or closure state
+  changes. See
+  `fr58-auxiliary-streaming-context-review-2026-07-23.md`.
+
 FR40 passes its frozen gate. Repeated T123 outputs are byte-identical and
 change only Xu Zijing's `184.240-184.320` response. Repeated T111 outputs are
 separately byte-identical and split only Zhu Jie's first reaction from the

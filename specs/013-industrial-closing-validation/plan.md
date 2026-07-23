@@ -4830,6 +4830,73 @@ natural contributions keep T084 and speaker-business closure open. FR57 makes
 no runtime, TOML, model, product-output, natural-turn-ledger, or baseline
 change.
 
+### 8.46 FR58 auxiliary v2.1 streaming-context evidence audit
+
+FR51 already inspected every accepted pipeline for all 19 critical residuals,
+so FR58 does not repeat that attribution exercise. FR45 and FR53-FR56 also
+exclude extending the existing alignment-gap, source-free activity,
+gallery-overlap, or local-epoch rules. FR58 instead tests a different producer
+boundary: whether a second deployment-valid streaming context of the same
+v2.1 checkpoint preserves complementary raw speaker evidence.
+
+1. Freeze exact FR50 Run A/B and manifests, exact PCM/WAV, `test.txt`, current
+   root TOML, the checked-in official high-latency TOML, v2.1 weights, current
+   registry fixture, the 19 critical contexts, and accepted controls. Record
+   that the auxiliary view uses the same model weights and therefore is a
+   correlated context view, not an orthogonal model or an accuracy oracle.
+2. Run `diar_evidence_probe` twice against the exact lossless PCM wrapper with
+   `ORATOR_CONFIG` pointing only to
+   `sortformer-v21-high-latency.toml`. Preserve all 45,189 raw 80 ms frames and
+   onset/offset segments. Verify deterministic bytes, complete session extent,
+   monotonic common-clock coordinates, and the existing exact-profile NeMo
+   fixture/CTest. Do not derive a speaker label from the reference.
+3. Build separate Run A and Run B display trees. Each focus directory contains
+   the complete reference conversation, exact FR50 source/alignment/VAD/main-
+   posterior/identity/TitaNet/business evidence, and the full intersecting
+   auxiliary posterior/segments. If TitaNet is used to attach a global identity
+   to an auxiliary slot, emit the raw query intervals and all gallery scores;
+   keep unmapped and conflicting slots visible.
+4. Read all focus and control conversations for Run A chronologically and then
+   Run B chronologically without importing a result from the other run. Repeat
+   both runs in reverse. The review manually records whether the auxiliary
+   context preserves the needed activity, boundary, and identity evidence and
+   whether the same visible topology occurs in accepted controls.
+5. Stop unless at least two material residuals and their controls support one
+   reusable, reference-free contract. A valid contract must operate on typed
+   common-clock evidence, define a pipeline-independent global-identity path,
+   and abstain on disagreement or incomplete evidence. A fact that the old
+   high profile once repaired one reference row is hypothesis provenance only,
+   not authorization.
+6. Only after that manual gate, specify a separate false-default candidate.
+   The auxiliary worker receives the ingest-owned `TimeBase`, owns its model
+   state and audio cursor, and publishes an additive typed evidence track to
+   `ComprehensiveTimeline`. `SpeakerFusionPolicy` may read that track only
+   through its timeline snapshot. All behavior controls live in TOML; no CLI or
+   code constant selects the runtime profile.
+7. A candidate first passes focused concurrency/time-base tests, both v2.1
+   numerical profiles, warning-clean build, and full CTest. It then replays
+   frozen evidence twice and receives complete changed-context review. Only a
+   retained frozen candidate may start 120-second, 600-second, full empty-
+   registry A, and restarted frozen-registry B WebSocket promotion, with the
+   constitutional complete contextual-semantic review at every scope.
+
+The initial FR58 phase changes documentation and generates diagnostic evidence
+only. It does not alter the accepted FR50 code path, root TOML, business
+timeline, manual ledger, or T084 status. The durable boundary is recorded in
+`fr58-auxiliary-streaming-context-evidence-design-2026-07-23.md`.
+
+T263-T267 are complete. Two exact captures retain byte-identical 45,189-frame,
+772-segment auxiliary evidence and pass the registered high-profile numerical
+gate. Independent Run A/B packets include raw auxiliary identity queries and
+retained-reference provenance. Four complete chronological/reverse contextual
+readings find only one critical case, `ref-0499`, with genuinely complementary
+auxiliary activity. Its local slot has conflicting global identity and
+concurrent activity. The early short islands repeat the accepted producer;
+the two tail Zhu identity intervals have no matching writable source unit.
+The manual gate therefore fails and T267 takes the stop branch without a
+runtime candidate. See
+`fr58-auxiliary-streaming-context-review-2026-07-23.md`.
+
 ### 8.15 FR28 120-second outcome and promotion ladder
 
 T117-T121 are complete. The frozen T116 packages replay byte-stably; their

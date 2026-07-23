@@ -22,6 +22,31 @@ SPEC.loader.exec_module(speaker_residual_evidence_packet)
 
 
 class SpeakerResidualEvidencePacketTest(unittest.TestCase):
+    def write_auxiliary_fixture(self, root):
+        posterior_path = root / "aux-frames.csv"
+        with posterior_path.open("w", encoding="utf-8", newline="") as output:
+            writer = csv.writer(output, lineterminator="\n")
+            writer.writerow([
+                "frame", "time_sec", "session", "top1", "top1_prob",
+                "top2", "top2_prob", "margin", "active_count",
+                "spk0", "spk1",
+            ])
+            for frame in range(60):
+                writer.writerow([
+                    frame, f"{frame * 0.1:.6f}", 0, 1, "0.700000", 0,
+                    "0.100000", "0.600000", 1, "0.100000", "0.700000",
+                ])
+
+        segment_path = root / "aux-segments.csv"
+        segment_path.write_text(
+            "start_sec,end_sec,duration_sec,session,local_speaker,"
+            "confidence,mean_margin\n"
+            "0.500000,1.500000,1.000000,0,1,0.700000,0.600000\n"
+            "2.000000,3.000000,1.000000,0,1,0.800000,0.700000\n"
+            "4.200000,5.000000,0.800000,0,0,0.600000,0.500000\n",
+            encoding="utf-8")
+        return posterior_path, segment_path
+
     def write_vad_fixture(self, root):
         window_path = root / "vad-windows.tsv"
         with window_path.open("w", encoding="utf-8", newline="") as output:
@@ -267,6 +292,44 @@ class SpeakerResidualEvidencePacketTest(unittest.TestCase):
             self.assertEqual(
                 (first / "content.sha256").read_text(encoding="utf-8"),
                 (second / "content.sha256").read_text(encoding="utf-8"))
+
+    def test_exports_auxiliary_streaming_context_without_identity_mapping(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            inputs = self.write_fixture(root)
+            posterior_path, segment_path = self.write_auxiliary_fixture(root)
+            out_dir = root / "packet"
+            result = speaker_residual_evidence_packet.export_packet(
+                *inputs[:5], out_dir,
+                auxiliary_posterior_path=posterior_path,
+                auxiliary_segment_path=segment_path)
+
+            context_dir = out_dir / "ref-0002"
+            frame_lines = (
+                context_dir / "aux-sortformer-frames.csv").read_text(
+                    encoding="utf-8").splitlines()
+            segment_lines = (
+                context_dir / "aux-sortformer-segments.csv").read_text(
+                    encoding="utf-8").splitlines()
+            self.assertEqual(frame_lines[1].split(",")[1], "1.000000")
+            self.assertEqual(frame_lines[-1].split(",")[1], "4.400000")
+            self.assertEqual(len(segment_lines), 4)
+            self.assertEqual(
+                result["auxiliary_streaming_context"]["identity_mapping"],
+                "not_assigned_by_packet")
+            self.assertEqual(
+                result["sources"]["auxiliary_sortformer_posterior"]["sha256"],
+                hashlib.sha256(posterior_path.read_bytes()).hexdigest())
+
+    def test_rejects_unpaired_auxiliary_streaming_context(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            inputs = self.write_fixture(root)
+            posterior_path, _ = self.write_auxiliary_fixture(root)
+            with self.assertRaises(ValueError):
+                speaker_residual_evidence_packet.export_packet(
+                    *inputs[:5], root / "packet",
+                    auxiliary_posterior_path=posterior_path)
 
     def test_exports_paired_raw_vad_evidence_without_interpretation(self):
         with tempfile.TemporaryDirectory() as temp:

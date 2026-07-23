@@ -84,6 +84,29 @@ class SpeakerFrozenEvidenceTest(unittest.TestCase):
             ["diarization:0", "diarization:1"])
         self.assertEqual(rows[1]["end_sec"], "4.75")
 
+    def test_diar_query_export_matches_replay_probe_schema(self):
+        entries = [
+            {"start": 1.25, "end": 2.5},
+            {"start": 3.0, "end": 4.75},
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "queries.tsv"
+            speaker_frozen_evidence.write_diar_queries(path, entries)
+            with path.open(encoding="utf-8", newline="") as source:
+                rows = list(csv.DictReader(source, delimiter="\t"))
+        self.assertEqual(
+            list(rows[0]),
+            [
+                "evidence_id", "kind", "text_id", "source_start",
+                "source_end", "start", "end",
+            ])
+        self.assertEqual(rows[0]["evidence_id"], "diarization:0")
+        self.assertEqual(rows[0]["kind"], "diarization")
+        self.assertEqual(rows[0]["text_id"], "-1")
+        self.assertEqual(rows[0]["source_start"], "0")
+        self.assertEqual(rows[0]["source_end"], "0")
+        self.assertEqual(rows[1]["end"], "4.75")
+
     def test_business_span_export_has_stable_evidence_ids(self):
         entries = [
             {"start": 5.5, "end": 7.25, "speaker_id": "spk_1"},

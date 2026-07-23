@@ -2,10 +2,10 @@
 """Arrange frozen cross-pipeline evidence for contextual human review.
 
 This utility copies reference sections, terminal timeline entries, raw
-Sortformer rows, and observed local-to-global identity epochs into independent
-context directories. It performs source and shape checks only. It never
-assigns correctness, groups causes, scores or ranks repairs, selects behavior,
-or issues a product verdict.
+Sortformer rows, optional auxiliary streaming-context rows, and observed
+local-to-global identity epochs into independent context directories. It
+performs source and shape checks only. It never assigns correctness, groups
+causes, scores or ranks repairs, selects behavior, or issues a product verdict.
 """
 
 from __future__ import annotations
@@ -93,6 +93,13 @@ class PosteriorRow:
     session: int
     top1: int
     top1_prob: float
+    line: str
+
+
+@dataclass(frozen=True)
+class SegmentRow:
+    start_sec: float
+    end_sec: float
     line: str
 
 
@@ -511,6 +518,58 @@ def load_posterior(
     return raw_lines[0], rows, frame_period, speaker_columns
 
 
+def verify_posterior_extent(
+    rows: list[PosteriorRow], frame_period: float, audio_sec: float,
+    label: str,
+) -> None:
+    if abs(rows[0].time_sec) > 1e-6:
+        raise ValueError(f"{label} posterior does not start at time zero")
+    posterior_end = rows[-1].time_sec + frame_period
+    if abs(posterior_end - audio_sec) > 1e-3:
+        raise ValueError(f"{label} posterior extent differs from timeline")
+
+
+def load_segments(path: Path, audio_sec: float) -> tuple[str, list[SegmentRow]]:
+    with path.open(encoding="utf-8", newline="") as source:
+        raw_lines = source.read().splitlines()
+    if len(raw_lines) < 2:
+        raise ValueError("auxiliary Sortformer segments are empty")
+    header = next(csv.reader([raw_lines[0]]))
+    required = {
+        "start_sec", "end_sec", "duration_sec", "session",
+        "local_speaker", "confidence", "mean_margin",
+    }
+    missing = sorted(required - set(header))
+    if missing:
+        raise ValueError(
+            "auxiliary Sortformer segment columns missing: " +
+            ",".join(missing))
+    index = {name: position for position, name in enumerate(header)}
+    rows: list[SegmentRow] = []
+    prior_start = -1.0
+    for raw_line in raw_lines[1:]:
+        values = next(csv.reader([raw_line]))
+        if len(values) != len(header):
+            raise ValueError("auxiliary Sortformer segment row width differs")
+        start = float(values[index["start_sec"]])
+        end = float(values[index["end_sec"]])
+        duration = float(values[index["duration_sec"]])
+        session = int(values[index["session"]])
+        local_speaker = int(values[index["local_speaker"]])
+        confidence = float(values[index["confidence"]])
+        mean_margin = float(values[index["mean_margin"]])
+        if not all(math.isfinite(value) for value in (
+                start, end, duration, confidence, mean_margin)):
+            raise ValueError("auxiliary Sortformer segment is not finite")
+        if (start < 0.0 or end <= start or end > audio_sec + 1e-3 or
+                abs((end - start) - duration) > 1e-5 or session < 0 or
+                local_speaker < 0 or start + EPSILON < prior_start):
+            raise ValueError("auxiliary Sortformer segment is invalid")
+        rows.append(SegmentRow(start, end, raw_line))
+        prior_start = start
+    return raw_lines[0], rows
+
+
 def compress_primary_runs(
     rows: list[PosteriorRow],
     frame_period: float,
@@ -571,11 +630,8 @@ def verify_primary_producer(
     if not 0.0 < threshold <= 1.0:
         raise ValueError("resolved primary frame threshold is invalid")
     audio_sec = float(timeline["audio_sec"])
-    if abs(posterior[0].time_sec) > 1e-6:
-        raise ValueError("Sortformer posterior does not start at time zero")
-    posterior_end = posterior[-1].time_sec + frame_period
-    if abs(posterior_end - audio_sec) > 1e-3:
-        raise ValueError("Sortformer posterior extent differs from timeline")
+    verify_posterior_extent(
+        posterior, frame_period, audio_sec, "Sortformer")
 
     compressed = compress_primary_runs(
         posterior, frame_period, len(speaker_columns), threshold)
@@ -745,6 +801,16 @@ def context_posterior(
     ]
 
 
+def context_segments(
+    rows: list[SegmentRow], context: Context,
+) -> list[SegmentRow]:
+    return [
+        row for row in rows
+        if interval_intersects(
+            row.start_sec, row.end_sec, context.start, context.end)
+    ]
+
+
 def context_reference(
     blocks: list[ReferenceBlock], context: Context,
 ) -> list[ReferenceBlock]:
@@ -889,6 +955,13 @@ def write_posterior(
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def write_segments(
+    path: Path, header: str, rows: list[SegmentRow],
+) -> None:
+    lines = [header] + [row.line for row in rows]
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
 def write_raw_tsv(path: Path, evidence: RawTsvEvidence,
                   rows: list[dict[str, str]]) -> None:
     with path.open("w", encoding="utf-8", newline="") as destination:
@@ -978,6 +1051,8 @@ def export_packet(
     vad_state_path: Path | None = None,
     identity_reference_path: Path | None = None,
     gallery_independence_path: Path | None = None,
+    auxiliary_posterior_path: Path | None = None,
+    auxiliary_segment_path: Path | None = None,
 ) -> dict[str, Any]:
     if (vad_window_path is None) != (vad_state_path is None):
         raise ValueError("raw VAD window and state evidence must be paired")
@@ -985,6 +1060,10 @@ def export_packet(
             (gallery_independence_path is None)):
         raise ValueError(
             "identity references and gallery evidence must be paired")
+    if ((auxiliary_posterior_path is None) !=
+            (auxiliary_segment_path is None)):
+        raise ValueError(
+            "auxiliary posterior and segment evidence must be paired")
     contexts = load_contexts(contexts_path)
     package = load_json(artifact_path)
     timeline, tracks = timeline_and_tracks(package)
@@ -1001,6 +1080,22 @@ def export_packet(
         posterior_path)
     producer_check = verify_primary_producer(
         timeline, tracks, posterior, frame_period, speaker_columns)
+    auxiliary_header = None
+    auxiliary_posterior = None
+    auxiliary_frame_period = None
+    auxiliary_speaker_columns = None
+    auxiliary_segment_header = None
+    auxiliary_segments = None
+    if (auxiliary_posterior_path is not None and
+            auxiliary_segment_path is not None):
+        (auxiliary_header, auxiliary_posterior, auxiliary_frame_period,
+         auxiliary_speaker_columns) = load_posterior(
+             auxiliary_posterior_path)
+        verify_posterior_extent(
+            auxiliary_posterior, auxiliary_frame_period, audio_sec,
+            "auxiliary Sortformer")
+        auxiliary_segment_header, auxiliary_segments = load_segments(
+            auxiliary_segment_path, audio_sec)
     vad_windows = None
     vad_states = None
     if vad_window_path is not None and vad_state_path is not None:
@@ -1078,6 +1173,22 @@ def export_packet(
             header,
             context_posterior(posterior, frame_period, context),
         )
+        if (auxiliary_header is not None and
+                auxiliary_posterior is not None and
+                auxiliary_frame_period is not None and
+                auxiliary_segment_header is not None and
+                auxiliary_segments is not None):
+            write_posterior(
+                context_dir / "aux-sortformer-frames.csv",
+                auxiliary_header,
+                context_posterior(
+                    auxiliary_posterior, auxiliary_frame_period, context),
+            )
+            write_segments(
+                context_dir / "aux-sortformer-segments.csv",
+                auxiliary_segment_header,
+                context_segments(auxiliary_segments, context),
+            )
         if vad_windows is not None and vad_states is not None:
             write_raw_tsv(
                 context_dir / "vad-window-probabilities.tsv", vad_windows,
@@ -1161,6 +1272,27 @@ def export_packet(
             "path": str(vad_state_path.resolve()),
             "sha256": sha256_file(vad_state_path),
         }
+    if (auxiliary_posterior_path is not None and
+            auxiliary_segment_path is not None and
+            auxiliary_posterior is not None and
+            auxiliary_frame_period is not None and
+            auxiliary_speaker_columns is not None):
+        packet_manifest["sources"]["auxiliary_sortformer_posterior"] = {
+            "path": str(auxiliary_posterior_path.resolve()),
+            "sha256": sha256_file(auxiliary_posterior_path),
+        }
+        packet_manifest["sources"]["auxiliary_sortformer_segments"] = {
+            "path": str(auxiliary_segment_path.resolve()),
+            "sha256": sha256_file(auxiliary_segment_path),
+        }
+        packet_manifest["auxiliary_streaming_context"] = {
+            "role": "display_only_correlated_model_context",
+            "frame_period_sec": auxiliary_frame_period,
+            "first_frame_sec": auxiliary_posterior[0].time_sec,
+            "last_frame_sec": auxiliary_posterior[-1].time_sec,
+            "speaker_columns": auxiliary_speaker_columns,
+            "identity_mapping": "not_assigned_by_packet",
+        }
     if (identity_reference_path is not None and
             gallery_independence_path is not None):
         packet_manifest["sources"]["identity_retained_references"] = {
@@ -1189,6 +1321,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--vad-endpoint-states")
     parser.add_argument("--identity-retained-references")
     parser.add_argument("--gallery-independence-evidence")
+    parser.add_argument("--aux-sortformer-frames")
+    parser.add_argument("--aux-sortformer-segments")
     return parser.parse_args(argv)
 
 
@@ -1211,6 +1345,12 @@ def main(argv: list[str]) -> int:
         gallery_independence_path=(
             Path(args.gallery_independence_evidence)
             if args.gallery_independence_evidence else None),
+        auxiliary_posterior_path=(
+            Path(args.aux_sortformer_frames)
+            if args.aux_sortformer_frames else None),
+        auxiliary_segment_path=(
+            Path(args.aux_sortformer_segments)
+            if args.aux_sortformer_segments else None),
     )
     print(json.dumps({
         "kind": result["kind"],

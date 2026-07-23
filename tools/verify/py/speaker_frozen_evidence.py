@@ -360,6 +360,27 @@ def write_diar_spans(path, entries):
             ])
 
 
+def write_diar_queries(path, entries):
+    parent = os.path.dirname(os.path.abspath(path))
+    os.makedirs(parent, exist_ok=True)
+    with open(path, "w", encoding="utf-8", newline="") as output:
+        writer = csv.writer(output, delimiter="\t", lineterminator="\n")
+        writer.writerow([
+            "evidence_id", "kind", "text_id", "source_start",
+            "source_end", "start", "end",
+        ])
+        for index, entry in enumerate(entries):
+            start = float(entry["start"])
+            end = float(entry["end"])
+            if end <= start:
+                raise ValueError(
+                    f"invalid diarization query at index {index}")
+            writer.writerow([
+                f"diarization:{index}", "diarization", -1, 0, 0,
+                start, end,
+            ])
+
+
 def write_business_spans(path, entries):
     parent = os.path.dirname(os.path.abspath(path))
     os.makedirs(parent, exist_ok=True)
@@ -398,11 +419,17 @@ def main():
     )
     parser.add_argument("--out")
     parser.add_argument("--export-diar-spans")
+    parser.add_argument("--export-diar-queries")
     parser.add_argument("--export-business-spans")
     args = parser.parse_args()
 
-    if args.export_diar_spans and args.export_business_spans:
-        raise ValueError("select only one span export mode")
+    export_modes = [
+        args.export_diar_spans,
+        args.export_diar_queries,
+        args.export_business_spans,
+    ]
+    if sum(bool(mode) for mode in export_modes) > 1:
+        raise ValueError("select only one export mode")
 
     package = load_json(args.timeline)
     timeline = timeline_from(package)
@@ -421,6 +448,14 @@ def main():
         print(json.dumps({
             "diar_segments": len(diar_entries),
             "out": os.path.abspath(args.export_diar_spans),
+        }, ensure_ascii=False))
+        return
+
+    if args.export_diar_queries:
+        write_diar_queries(args.export_diar_queries, diar_entries)
+        print(json.dumps({
+            "diar_queries": len(diar_entries),
+            "out": os.path.abspath(args.export_diar_queries),
         }, ensure_ascii=False))
         return
 
