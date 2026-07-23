@@ -2,10 +2,12 @@
 """Arrange frozen cross-pipeline evidence for contextual human review.
 
 This utility copies reference sections, terminal timeline entries, raw
-Sortformer rows, optional auxiliary streaming-context rows, and observed
-local-to-global identity epochs into independent context directories. It
-performs source and shape checks only. It never assigns correctness, groups
-causes, scores or ranks repairs, selects behavior, or issues a product verdict.
+Sortformer rows, optional auxiliary streaming-context rows, every raw pairwise
+common-clock intersection with accepted speaker tracks, and observed local-to-
+global identity epochs into independent context directories. It performs
+source and shape checks only. It never assigns correctness, derives an
+identity mapping, groups causes, scores or ranks repairs, selects behavior, or
+issues a product verdict.
 """
 
 from __future__ import annotations
@@ -63,6 +65,15 @@ GALLERY_INDEPENDENCE_COLUMNS = [
     "nonoverlap_robust_gallery_complete", "nonoverlap_session_scores",
     "nonoverlap_robust_scores", "intersecting_reference_ids",
 ]
+AUX_MAIN_INTERSECTION_COLUMNS = [
+    "aux_segment_index", "aux_start_sec", "aux_end_sec", "aux_session",
+    "aux_local_speaker", "aux_confidence", "aux_mean_margin",
+    "main_track", "main_entry_index", "main_start_sec", "main_end_sec",
+    "main_local_speaker", "main_speaker_id", "main_confidence",
+    "intersection_start_sec", "intersection_end_sec",
+    "intersection_duration_sec",
+]
+ACCEPTED_SPEAKER_TRACKS = ("diarization", "primary_speaker")
 REFERENCE_TS_RE = re.compile(r"^(\d{2}):(\d{2}):(\d{2})\s+(.+?)\s*$")
 REFERENCE_ID_RE = re.compile(r"^(?:ref-)?(\d{4})$")
 
@@ -98,9 +109,24 @@ class PosteriorRow:
 
 @dataclass(frozen=True)
 class SegmentRow:
+    source_index: int
     start_sec: float
     end_sec: float
+    session: int
+    local_speaker: int
+    confidence: float
+    mean_margin: float
     line: str
+
+
+@dataclass(frozen=True)
+class MainSpeakerSpan:
+    source_index: int
+    start_sec: float
+    end_sec: float
+    local_speaker: int
+    speaker_id: str
+    confidence: float
 
 
 @dataclass(frozen=True)
@@ -565,7 +591,16 @@ def load_segments(path: Path, audio_sec: float) -> tuple[str, list[SegmentRow]]:
                 abs((end - start) - duration) > 1e-5 or session < 0 or
                 local_speaker < 0 or start + EPSILON < prior_start):
             raise ValueError("auxiliary Sortformer segment is invalid")
-        rows.append(SegmentRow(start, end, raw_line))
+        rows.append(SegmentRow(
+            source_index=len(rows),
+            start_sec=start,
+            end_sec=end,
+            session=session,
+            local_speaker=local_speaker,
+            confidence=confidence,
+            mean_margin=mean_margin,
+            line=raw_line,
+        ))
         prior_start = start
     return raw_lines[0], rows
 
@@ -962,14 +997,125 @@ def write_segments(
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def write_raw_tsv(path: Path, evidence: RawTsvEvidence,
-                  rows: list[dict[str, str]]) -> None:
+def write_dict_tsv(
+    path: Path, columns: list[str] | tuple[str, ...],
+    rows: list[dict[str, str]],
+) -> None:
     with path.open("w", encoding="utf-8", newline="") as destination:
         writer = csv.DictWriter(
-            destination, fieldnames=evidence.columns, delimiter="\t",
+            destination, fieldnames=columns, delimiter="\t",
             lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
+
+
+def write_raw_tsv(path: Path, evidence: RawTsvEvidence,
+                  rows: list[dict[str, str]]) -> None:
+    write_dict_tsv(path, evidence.columns, rows)
+
+
+def load_main_speaker_spans(
+    tracks: dict[str, list[Any]],
+) -> dict[str, list[MainSpeakerSpan]]:
+    parsed: dict[str, list[MainSpeakerSpan]] = {}
+    for track_name in ACCEPTED_SPEAKER_TRACKS:
+        spans: list[MainSpeakerSpan] = []
+        for entry_index, entry in enumerate(tracks[track_name]):
+            if not isinstance(entry, dict):
+                raise ValueError(
+                    f"accepted {track_name} entry is not an object")
+            try:
+                main_start = float(entry.get("start", 0.0))
+                main_end = float(entry.get("end", main_start))
+                main_confidence = float(entry.get("confidence", 0.0))
+            except (TypeError, ValueError) as error:
+                raise ValueError(
+                    f"accepted {track_name} entry is invalid") from error
+            raw_local_speaker = entry.get("speaker", -1)
+            main_speaker_id = entry.get("speaker_id", "")
+            if (not isinstance(raw_local_speaker, int) or
+                    isinstance(raw_local_speaker, bool)):
+                raise ValueError(f"accepted {track_name} entry is invalid")
+            if (not all(math.isfinite(value) for value in (
+                    main_start, main_end, main_confidence)) or
+                    main_start < 0.0 or main_end <= main_start or
+                    raw_local_speaker < 0 or
+                    not isinstance(main_speaker_id, str)):
+                raise ValueError(f"accepted {track_name} entry is invalid")
+            spans.append(MainSpeakerSpan(
+                source_index=entry_index,
+                start_sec=main_start,
+                end_sec=main_end,
+                local_speaker=raw_local_speaker,
+                speaker_id=main_speaker_id,
+                confidence=main_confidence,
+            ))
+        parsed[track_name] = spans
+    return parsed
+
+
+def main_speaker_row(
+    segment: SegmentRow, track_name: str, span: MainSpeakerSpan | None,
+) -> dict[str, str]:
+    row = {
+        "aux_segment_index": str(segment.source_index),
+        "aux_start_sec": f"{segment.start_sec:.9f}",
+        "aux_end_sec": f"{segment.end_sec:.9f}",
+        "aux_session": str(segment.session),
+        "aux_local_speaker": str(segment.local_speaker),
+        "aux_confidence": f"{segment.confidence:.9f}",
+        "aux_mean_margin": f"{segment.mean_margin:.9f}",
+        "main_track": track_name,
+        "main_entry_index": "",
+        "main_start_sec": "",
+        "main_end_sec": "",
+        "main_local_speaker": "",
+        "main_speaker_id": "",
+        "main_confidence": "",
+        "intersection_start_sec": "",
+        "intersection_end_sec": "",
+        "intersection_duration_sec": "",
+    }
+    if span is None:
+        return row
+
+    intersection_start = max(segment.start_sec, span.start_sec)
+    intersection_end = min(segment.end_sec, span.end_sec)
+    if intersection_end - intersection_start <= EPSILON:
+        raise ValueError("non-intersecting accepted row was selected")
+    row.update({
+        "main_entry_index": str(span.source_index),
+        "main_start_sec": f"{span.start_sec:.9f}",
+        "main_end_sec": f"{span.end_sec:.9f}",
+        "main_local_speaker": str(span.local_speaker),
+        "main_speaker_id": span.speaker_id,
+        "main_confidence": f"{span.confidence:.9f}",
+        "intersection_start_sec": f"{intersection_start:.9f}",
+        "intersection_end_sec": f"{intersection_end:.9f}",
+        "intersection_duration_sec": (
+            f"{intersection_end - intersection_start:.9f}"),
+    })
+    return row
+
+
+def auxiliary_main_intersections(
+    segments: list[SegmentRow],
+    main_spans: dict[str, list[MainSpeakerSpan]],
+) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    for segment in segments:
+        for track_name in ACCEPTED_SPEAKER_TRACKS:
+            matched = False
+            for span in main_spans[track_name]:
+                if not interval_intersects(
+                        segment.start_sec, segment.end_sec,
+                        span.start_sec, span.end_sec):
+                    continue
+                rows.append(main_speaker_row(segment, track_name, span))
+                matched = True
+            if not matched:
+                rows.append(main_speaker_row(segment, track_name, None))
+    return rows
 
 
 def context_vad_windows(
@@ -1086,6 +1232,7 @@ def export_packet(
     auxiliary_speaker_columns = None
     auxiliary_segment_header = None
     auxiliary_segments = None
+    main_speaker_spans = None
     if (auxiliary_posterior_path is not None and
             auxiliary_segment_path is not None):
         (auxiliary_header, auxiliary_posterior, auxiliary_frame_period,
@@ -1096,6 +1243,7 @@ def export_packet(
             "auxiliary Sortformer")
         auxiliary_segment_header, auxiliary_segments = load_segments(
             auxiliary_segment_path, audio_sec)
+        main_speaker_spans = load_main_speaker_spans(tracks)
     vad_windows = None
     vad_states = None
     if vad_window_path is not None and vad_state_path is not None:
@@ -1123,6 +1271,13 @@ def export_packet(
 
     out_dir.mkdir(parents=True, exist_ok=False)
     write_epochs(out_dir / "local-identity-epochs.tsv", epochs)
+    if auxiliary_segments is not None and main_speaker_spans is not None:
+        write_dict_tsv(
+            out_dir / "aux-main-common-clock-intersections.tsv",
+            AUX_MAIN_INTERSECTION_COLUMNS,
+            auxiliary_main_intersections(
+                auxiliary_segments, main_speaker_spans),
+        )
     if identity_references is not None:
         write_raw_tsv(
             out_dir / "identity-retained-references.tsv",
@@ -1177,7 +1332,8 @@ def export_packet(
                 auxiliary_posterior is not None and
                 auxiliary_frame_period is not None and
                 auxiliary_segment_header is not None and
-                auxiliary_segments is not None):
+                auxiliary_segments is not None and
+                main_speaker_spans is not None):
             write_posterior(
                 context_dir / "aux-sortformer-frames.csv",
                 auxiliary_header,
@@ -1188,6 +1344,13 @@ def export_packet(
                 context_dir / "aux-sortformer-segments.csv",
                 auxiliary_segment_header,
                 context_segments(auxiliary_segments, context),
+            )
+            write_dict_tsv(
+                context_dir / "aux-main-common-clock-intersections.tsv",
+                AUX_MAIN_INTERSECTION_COLUMNS,
+                auxiliary_main_intersections(
+                    context_segments(auxiliary_segments, context),
+                    main_speaker_spans),
             )
         if vad_windows is not None and vad_states is not None:
             write_raw_tsv(
@@ -1292,6 +1455,8 @@ def export_packet(
             "last_frame_sec": auxiliary_posterior[-1].time_sec,
             "speaker_columns": auxiliary_speaker_columns,
             "identity_mapping": "not_assigned_by_packet",
+            "common_clock_intersections": (
+                "all_pairwise_rows_with_explicit_track_absence"),
         }
     if (identity_reference_path is not None and
             gallery_independence_path is not None):

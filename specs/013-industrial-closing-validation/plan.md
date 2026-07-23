@@ -4939,6 +4939,48 @@ identity, and control-abstention contract. T271 therefore takes the stop
 branch without a runtime candidate. See
 `fr59-auxiliary-residual-ceiling-review-2026-07-23.md`.
 
+### 8.48 FR60 cross-view identity-bridge evidence audit
+
+FR60 reuses exact FR50 A/B and FR58 auxiliary A/B evidence. It tests whether
+the comprehensive timeline's shared time base can provide a causal global-
+identity bridge for the two complementary activity islands without reading
+pipelines directly or assuming stable auxiliary slot numbers.
+
+1. Freeze six gap-free fixed blocks covering `0.000-3615.120 s`. Every block
+   retains the complete human conversation and all four auxiliary local slots.
+2. Extend the existing residual packet utility to emit every raw pairwise
+   intersection between each auxiliary segment and accepted diarization and
+   primary-speaker rows. Preserve explicit no-intersection rows. Do not
+   aggregate, map, rank, select, label, or judge.
+3. Add focused mechanical tests for schema, source indexes, exact interval
+   arithmetic, deterministic ordering, multi-overlap, no-overlap, and forbidden
+   decision fields.
+4. Build independent Run A/B packets from frozen artifacts. Read A
+   chronological, B chronological, A reverse, and B reverse against every
+   reference contribution and final business output.
+5. Require both `ref-0239` and `ref-0499` to have a bounded local continuity
+   span with noncontradictory accepted global-identity anchors available through
+   the comprehensive timeline. Full-session slot mapping is forbidden.
+6. Require one reference-free timeline rule and explicit abstention for every
+   matching accepted control. Empty-registry and restarted-registry evidence
+   must expose the same contract.
+7. Only a passing four-read gate may authorize a later false-default candidate
+   specification. A failed gate changes no runtime, TOML, model, product
+   artifact, ledger, baseline, or closure state.
+
+The frozen scope and exact stop conditions are recorded in
+`fr60-cross-view-identity-bridge-evidence-design-2026-07-23.md`.
+
+T272-T275 are complete. Separate Run A/B packet trees preserve all raw source
+rows and common-clock intersections across the six gap-free blocks. Four
+complete chronological/reverse contextual readings find that the
+`ref-0239` auxiliary island intersects accepted Tang identities and that the
+`ref-0499` island intersects accepted Zhu/Tang identities. The later Xu and
+Shi anchors are separate events, and matching controls reject local-slot or
+nearest-anchor propagation. The conjunctive gate therefore fails and T275
+takes the stop branch without a runtime candidate. See
+`fr60-cross-view-identity-bridge-review-2026-07-23.md`.
+
 ### 8.15 FR28 120-second outcome and promotion ladder
 
 T117-T121 are complete. The frozen T116 packages replay byte-stably; their

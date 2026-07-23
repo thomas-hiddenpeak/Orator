@@ -3524,3 +3524,39 @@ release, and T084 gates remain open 2026-07-23
   remains overlapped and globally unresolved. T271 therefore takes the stop
   branch. See
   `fr59-auxiliary-residual-ceiling-review-2026-07-23.md`.
+- [x] T272 Freeze FR60's full-session cross-view identity-bridge evidence scope
+  in `fr60-cross-view-identity-bridge-evidence-design-2026-07-23.md` and
+  `fr60-cross-view-identity-bridge-contexts-2026-07-23.tsv`. Reuse the exact
+  FR50 A/B and FR58 auxiliary A/B artifacts without rerunning audio or a model.
+  Require six gap-free fixed blocks, all auxiliary slots, raw pairwise common-
+  clock intersections, and a causal timeline-only bridge for both `ref-0239`
+  and `ref-0499`.
+- [x] T273 Extend `speaker_residual_evidence_packet.py` with display-only
+  `aux-main-common-clock-intersections.tsv` evidence. Emit every pairwise
+  intersection with accepted diarization and primary-speaker rows plus explicit
+  no-intersection rows. Add focused tests for multi-overlap, no-overlap,
+  ordering, source provenance, schema validation, and absence of mapping,
+  aggregate, ranking, expected-name, or verdict fields. The utility now
+  validates every accepted source row before intersection, preserves original
+  source indexes, and emits only raw pairwise rows. Its 14 focused tests and
+  registered CTest target pass.
+- [x] T274 Generate independent Run A/B FR60 packet trees and read all six full-
+  session blocks in Run A chronological, Run B chronological, Run A reverse,
+  and Run B reverse order. Manually determine whether both complementary
+  islands have a timeline-causal local continuity bridge and whether every
+  superficially matching accepted control has a structural abstention. Four
+  independent complete-context readings find no causal Xu bridge at
+  `ref-0239` and no causal Shi bridge at `ref-0499`; accepted global tracks
+  identify other speakers at both focus spans, while the later expected-
+  identity anchors belong to separate events.
+- [x] T275 If and only if T274 passes every conjunctive clause, freeze one
+  false-by-default candidate architecture with a typed auxiliary timeline
+  track, derived-pipeline-only reconciliation, delayed revision semantics,
+  resource limits, numerical gates, focused tests, and the complete real-
+  WebSocket promotion ladder before implementation. Otherwise stop FR60
+  without product code, root-TOML/model/product-run/ledger/baseline/closure
+  change. T274 fails the conjunctive gate: neither focus has a
+  noncontradictory timeline-causal identity bridge, no single reference-free
+  rule expresses both, and matching controls do not abstain structurally.
+  T275 therefore takes the stop branch. See
+  `fr60-cross-view-identity-bridge-review-2026-07-23.md`.

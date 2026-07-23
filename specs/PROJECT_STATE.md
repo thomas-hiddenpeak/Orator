@@ -14,9 +14,8 @@ work is specified under [specs/](.).
 > pass is the consistency proof. Status lines advance to `Implemented` in the
 > same change that lands the code, with the commit reference.
 
-- **Last updated**: 2026-07-23 (FR59 completes its reuse-only residual-ceiling
-  evidence audit and stops without a candidate; canonical closure remains
-  open)
+- **Last updated**: 2026-07-23 (FR60 completes its reuse-only cross-view
+  identity-bridge audit on the stop branch; canonical closure remains open)
 - **Branch**: `master`
 - **Constitution**: v1.7.0
 - **Speaker-business closure**: **CURRENT REAL-PATH BASELINE `525/556`;
@@ -142,6 +141,21 @@ work is specified under [specs/](.).
   identity, and control-abstention contract. No runtime, TOML, model, output,
   ledger, baseline, or closure state changes. See
   [fr59-auxiliary-residual-ceiling-review-2026-07-23.md](013-industrial-closing-validation/fr59-auxiliary-residual-ceiling-review-2026-07-23.md).
+  FR60 then tests the remaining identity question without another model or
+  audio run. T272 freezes six gap-free full-session blocks and T273 extends
+  the display-only packet utility with mechanically validated raw
+  pairwise intersections between every auxiliary segment and accepted
+  globally identified diarization/primary rows. The packet tool may display
+  all intersections and explicit absences but may not derive a mapping,
+  aggregate evidence, or issue a product judgment. Fourteen focused tests and
+  its registered CTest target pass. Four independent complete-context readings
+  find that `ref-0239` intersects accepted Tang identities rather than a
+  same-continuity Xu anchor, while `ref-0499` intersects accepted Zhu and Tang
+  identities rather than Shi. The later Xu and Shi anchors belong to separate
+  events, and matching controls reject local-slot or nearest-anchor
+  propagation. T275 takes the stop branch without a candidate. No runtime,
+  TOML, model, product output, ledger, baseline, or closure state changes. See
+  [fr60-cross-view-identity-bridge-review-2026-07-23.md](013-industrial-closing-validation/fr60-cross-view-identity-bridge-review-2026-07-23.md).
   Transitional experimental commit `6b1cb79fa4f5` completed
   warning-clean build, `68/68` CTest, 120-second, 600-second, and full-length
   FR16ABN real-WebSocket promotion. Full Run A used an empty registry and the

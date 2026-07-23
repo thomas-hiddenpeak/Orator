@@ -3603,6 +3603,45 @@ open. See `fr47-real-path-promotion-review-2026-07-19.md`.
   root-TOML, model, product run, ledger, baseline, or closure state changes.
   See `fr59-auxiliary-residual-ceiling-review-2026-07-23.md`.
 
+- **FR60 cross-view identity-bridge evidence audit**: The next speaker-only
+  phase MUST reuse the exact FR50 A/B and FR58 auxiliary A/B artifacts without
+  rerunning audio or either model. It MUST test whether common-clock
+  intersections with accepted globally identified producer tracks can provide
+  a causal identity bridge for both `ref-0239` and `ref-0499`.
+
+  T272 MUST freeze six fixed blocks covering the full session without a gap,
+  all auxiliary local slots, both accepted speaker producer tracks, the exact
+  source hashes, candidate focuses, counterexamples, and controls. The final
+  FR50 registry, human names, reference timestamps, source text, hardcoded
+  focus times, and full-session slot mapping MUST NOT establish identity.
+
+  T273 MUST arrange every raw pairwise common-clock intersection and explicit
+  no-intersection row. Automation MAY validate exact interval arithmetic,
+  source indexes, schemas, hashes, and ordering only. It MUST NOT aggregate by
+  identity, derive an epoch or mapping, hide a conflict, rank evidence, select
+  a candidate, assign correctness, or issue a verdict.
+
+  T274 MUST complete Run A chronological, Run B chronological, Run A reverse,
+  and Run B reverse contextual-semantic readings of every fixed block. A later
+  candidate MAY advance only if both complementary islands have bounded,
+  noncontradictory, timeline-available global-identity anchors under one
+  reference-free rule, every matching accepted control abstains structurally,
+  and empty/frozen-registry evidence agrees. If any clause fails, T275 MUST stop
+  without product code, root-TOML, model, product run, ledger, baseline, or
+  closure change. See
+  `fr60-cross-view-identity-bridge-evidence-design-2026-07-23.md`.
+
+  T272-T275 are complete. Independent Run A/B packet trees preserve all six
+  gap-free blocks and every raw pairwise intersection. Run A chronological,
+  Run B chronological, Run A reverse, and Run B reverse complete-context
+  readings agree that `ref-0239` intersects accepted Tang identities rather
+  than a same-continuity Xu anchor, while `ref-0499` intersects accepted Zhu
+  and Tang identities rather than Shi. The later Xu and Shi anchors are
+  separate events. Matching controls also reject local-slot and nearest-anchor
+  propagation. T275 takes the stop branch; no candidate, product code,
+  root-TOML, model, product run, ledger, baseline, or closure state changes.
+  See `fr60-cross-view-identity-bridge-review-2026-07-23.md`.
+
 FR40 passes its frozen gate. Repeated T123 outputs are byte-identical and
 change only Xu Zijing's `184.240-184.320` response. Repeated T111 outputs are
 separately byte-identical and split only Zhu Jie's first reaction from the

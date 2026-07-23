@@ -132,6 +132,8 @@ class SpeakerResidualEvidencePacketTest(unittest.TestCase):
             {"kind": "diarization", "entries": [
                 {"start": 0.5, "end": 1.5, "speaker": 0,
                  "speaker_id": "spk_a", "confidence": 0.8},
+                {"start": 1.0, "end": 1.4, "speaker": 1,
+                 "speaker_id": "spk_b", "confidence": 0.9},
                 {"start": 2.0, "end": 3.0, "speaker": 1,
                  "speaker_id": "spk_b", "confidence": 0.7},
                 {"start": 3.5, "end": 4.2, "speaker": 0,
@@ -320,6 +322,73 @@ class SpeakerResidualEvidencePacketTest(unittest.TestCase):
             self.assertEqual(
                 result["sources"]["auxiliary_sortformer_posterior"]["sha256"],
                 hashlib.sha256(posterior_path.read_bytes()).hexdigest())
+
+    def test_exports_all_raw_auxiliary_main_intersections_without_mapping(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            inputs = self.write_fixture(root)
+            posterior_path, segment_path = self.write_auxiliary_fixture(root)
+            out_dir = root / "packet"
+            speaker_residual_evidence_packet.export_packet(
+                *inputs[:5], out_dir,
+                auxiliary_posterior_path=posterior_path,
+                auxiliary_segment_path=segment_path)
+
+            root_path = (
+                out_dir / "aux-main-common-clock-intersections.tsv")
+            context_path = (
+                out_dir / "ref-0002" /
+                "aux-main-common-clock-intersections.tsv")
+            with root_path.open(encoding="utf-8", newline="") as source:
+                rows = list(csv.DictReader(source, delimiter="\t"))
+            with root_path.open(encoding="utf-8", newline="") as source:
+                reader = csv.DictReader(source, delimiter="\t")
+                self.assertEqual(
+                    reader.fieldnames,
+                    speaker_residual_evidence_packet
+                    .AUX_MAIN_INTERSECTION_COLUMNS)
+            self.assertEqual(len(rows), 7)
+            self.assertEqual(
+                [(row["aux_segment_index"], row["main_track"],
+                  row["main_entry_index"]) for row in rows],
+                [
+                    ("0", "diarization", "0"),
+                    ("0", "diarization", "1"),
+                    ("0", "primary_speaker", "0"),
+                    ("1", "diarization", "2"),
+                    ("1", "primary_speaker", ""),
+                    ("2", "diarization", ""),
+                    ("2", "primary_speaker", ""),
+                ])
+            self.assertEqual(rows[1]["main_speaker_id"], "spk_b")
+            self.assertEqual(
+                rows[1]["intersection_duration_sec"], "0.400000000")
+            self.assertEqual(rows[-1]["main_start_sec"], "")
+            self.assertEqual(rows[-1]["intersection_start_sec"], "")
+            self.assertEqual(
+                context_path.read_text(encoding="utf-8"),
+                root_path.read_text(encoding="utf-8"))
+            forbidden = {
+                "correct", "expected_identity", "identity_mapping",
+                "selected_identity", "winner", "rank", "aggregate",
+                "verdict", "bridge_status",
+            }
+            self.assertTrue(
+                forbidden.isdisjoint(
+                    speaker_residual_evidence_packet
+                    .AUX_MAIN_INTERSECTION_COLUMNS))
+
+    def test_rejects_invalid_main_entry_even_without_an_intersection(self):
+        tracks = {
+            "diarization": [],
+            "primary_speaker": [{
+                "start": float("nan"), "end": 2.0, "speaker": 0,
+                "speaker_id": "spk_a", "confidence": 0.8,
+            }],
+        }
+        with self.assertRaisesRegex(
+                ValueError, "accepted primary_speaker entry is invalid"):
+            speaker_residual_evidence_packet.load_main_speaker_spans(tracks)
 
     def test_rejects_unpaired_auxiliary_streaming_context(self):
         with tempfile.TemporaryDirectory() as temp:
