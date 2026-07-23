@@ -3566,6 +3566,43 @@ open. See `fr47-real-path-promotion-review-2026-07-19.md`.
   changes. See
   `fr58-auxiliary-streaming-context-review-2026-07-23.md`.
 
+- **FR59 auxiliary residual-ceiling evidence audit**: The next speaker-only
+  phase MUST reuse the exact FR58 auxiliary capture without rerunning audio.
+  It MUST test whether `ref-0499`'s one genuinely complementary activity case
+  has a second independent occurrence among the remaining manually signed
+  noncritical confidently wrong, missing, and uncertain contributions.
+
+  T268 MUST freeze the exact 13-context scope, accepted Run A/B artifacts,
+  reference, auxiliary capture hashes, registry provenance, and named controls
+  before packet generation. T269 MUST arrange separate unjudged Run A/B packet
+  trees with all accepted typed evidence, auxiliary posterior/segments, raw
+  identity query scores, and retained-reference provenance.
+
+  T270 MUST complete Run A chronological, Run B chronological, Run A reverse,
+  and Run B reverse contextual-semantic readings. No executable, script,
+  query, formula, metric, or algorithm MAY assign correctness, classify or
+  count a topology, rank evidence, select a candidate, or issue a verdict.
+
+  A candidate MAY advance only if one additional independent material residual
+  joins `ref-0499` with auxiliary activity absent from the accepted producer, a
+  writable common-clock business boundary, a causal global identity for both
+  empty-registry Run A and restarted frozen-registry Run B, and explicit
+  abstention for every superficially matching accepted control. The final
+  frozen registry is future state for Run A and MUST NOT satisfy identity by
+  itself. If the gate fails, T271 MUST stop without product code, root-TOML,
+  model, product-run, ledger, baseline, or closure change. See
+  `fr59-auxiliary-residual-ceiling-evidence-design-2026-07-23.md`.
+
+  T268-T271 are complete. Separate Run A/B evidence packets preserve the exact
+  frozen sources. All four required contextual-semantic readings find one new
+  noncritical activity boundary at `ref-0239`, but it has no causal Xu identity
+  and the adjacent `ref-0241` conversation rejects local-slot mapping.
+  `ref-0499` remains the only critical complement, with concurrent activity
+  and unresolved Shi identity. The required second complete topology does not
+  exist in the frozen scope. T271 takes the stop branch; no product code,
+  root-TOML, model, product run, ledger, baseline, or closure state changes.
+  See `fr59-auxiliary-residual-ceiling-review-2026-07-23.md`.
+
 FR40 passes its frozen gate. Repeated T123 outputs are byte-identical and
 change only Xu Zijing's `184.240-184.320` response. Repeated T111 outputs are
 separately byte-identical and split only Zhu Jie's first reaction from the

@@ -14,9 +14,9 @@ work is specified under [specs/](.).
 > pass is the consistency proof. Status lines advance to `Implemented` in the
 > same change that lands the code, with the commit reference.
 
-- **Last updated**: 2026-07-23 (FR58 auxiliary v2.1 evidence audit stops at
-  its manual gate; FR57 time gates remain passed, while critical and
-  confident-wrong gates keep canonical closure open)
+- **Last updated**: 2026-07-23 (FR59 completes its reuse-only residual-ceiling
+  evidence audit and stops without a candidate; canonical closure remains
+  open)
 - **Branch**: `master`
 - **Constitution**: v1.7.0
 - **Speaker-business closure**: **CURRENT REAL-PATH BASELINE `525/556`;
@@ -130,6 +130,18 @@ work is specified under [specs/](.).
   auxiliary worker, fusion candidate, root-TOML/model/product-run/ledger/
   baseline/closure change. See
   [fr58-auxiliary-streaming-context-review-2026-07-23.md](013-industrial-closing-validation/fr58-auxiliary-streaming-context-review-2026-07-23.md).
+  FR59 then freezes the exact remaining noncritical wrong, previously
+  unaudited missing, uncertain, and `ref-0499` anchor contexts. It reuses the
+  byte-frozen FR58 output without rerunning audio. Separate Run A/B packets are
+  read completely in chronological and reverse order. `ref-0239` is the only
+  new noncritical activity complement, but its short segment has no causal Xu
+  identity and adjacent `ref-0241` defeats local-slot mapping. `ref-0499`
+  remains the only critical complement, with concurrent activity and
+  unresolved Shi identity. T271 therefore takes the stop branch because no
+  second residual satisfies the complete activity, writable-boundary, causal-
+  identity, and control-abstention contract. No runtime, TOML, model, output,
+  ledger, baseline, or closure state changes. See
+  [fr59-auxiliary-residual-ceiling-review-2026-07-23.md](013-industrial-closing-validation/fr59-auxiliary-residual-ceiling-review-2026-07-23.md).
   Transitional experimental commit `6b1cb79fa4f5` completed
   warning-clean build, `68/68` CTest, 120-second, 600-second, and full-length
   FR16ABN real-WebSocket promotion. Full Run A used an empty registry and the

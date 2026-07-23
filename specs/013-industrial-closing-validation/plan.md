@@ -4897,6 +4897,48 @@ The manual gate therefore fails and T267 takes the stop branch without a
 runtime candidate. See
 `fr58-auxiliary-streaming-context-review-2026-07-23.md`.
 
+### 8.47 FR59 auxiliary residual-ceiling evidence audit
+
+FR58's exact high-context output is frozen and must not be rerun. FR59 reuses
+it to test whether `ref-0499`'s genuinely complementary activity has a second
+independent occurrence among the remaining manually signed noncritical wrong,
+missing, and uncertain contributions.
+
+1. Freeze the 13-context table before packet generation. It contains the
+   `ref-0499` anchor, eight noncritical confidently wrong contributions, three
+   previously unaudited missing contributions, `ref-0506`, and unchanged
+   named controls from the full-residual review.
+2. Build separate Run A/B packet trees with exact FR50 typed evidence, exact
+   FR58 auxiliary posterior/segments, raw auxiliary identity query scores, and
+   retained-reference provenance. No source is recalculated or judged.
+3. Read Run A chronological, Run B chronological, Run A reverse, and Run B
+   reverse. Every pass relates the complete conversation to activity,
+   boundary, identity, and final business output on the common clock.
+4. Stop unless one additional independent residual joins `ref-0499` with
+   genuinely absent-in-main auxiliary activity, a writable boundary, causal
+   global identity, and explicit accepted-control abstention.
+5. The FR58 frozen-final-registry replay is not a valid empty-registry Run A
+   identity contract. A later design must establish identity from state
+   available at the decision time in both A and B, without direct pipeline
+   reads or reference-derived mapping.
+6. Only a passing four-read manual gate may authorize a later false-default
+   candidate specification. A failed gate changes no runtime, TOML, model,
+   product artifact, ledger, baseline, or closure state.
+
+The durable scope and stop conditions are recorded in
+`fr59-auxiliary-residual-ceiling-evidence-design-2026-07-23.md`.
+
+T268-T271 are complete. Separate Run A/B packets preserve the exact accepted
+and auxiliary evidence. Four complete chronological/reverse contextual
+readings find one new noncritical activity boundary at `ref-0239`, but its
+short segment has no causal Xu identity and the neighboring `ref-0241`
+conversation defeats cross-profile slot mapping. `ref-0499` remains the only
+critical complement, with concurrent activity and unresolved Shi identity.
+No second residual satisfies the full activity, writable-boundary, causal-
+identity, and control-abstention contract. T271 therefore takes the stop
+branch without a runtime candidate. See
+`fr59-auxiliary-residual-ceiling-review-2026-07-23.md`.
+
 ### 8.15 FR28 120-second outcome and promotion ladder
 
 T117-T121 are complete. The frozen T116 packages replay byte-stably; their

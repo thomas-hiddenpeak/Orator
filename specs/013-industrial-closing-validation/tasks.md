@@ -3496,3 +3496,31 @@ release, and T084 gates remain open 2026-07-23
   branch. FR58 lands diagnostic tooling and the review record only; no
   auxiliary worker or fusion candidate is specified. See
   `fr58-auxiliary-streaming-context-review-2026-07-23.md`.
+- [x] T268 Freeze FR59's residual-ceiling evidence scope in
+  `fr59-auxiliary-residual-ceiling-evidence-design-2026-07-23.md` and
+  `fr59-auxiliary-residual-ceiling-contexts-2026-07-23.tsv`. Reuse the exact
+  FR58 capture without rerunning audio. Bind the audit to the eight remaining
+  noncritical confidently wrong contributions, three previously unaudited
+  missing contributions, `ref-0506`, the `ref-0499` anchor, and all named
+  controls. Require a causal empty/frozen-registry identity path; the final
+  frozen registry is diagnostic evidence only.
+- [x] T269 Arrange independent Run A/B FR59 display packets. Preserve every
+  accepted and auxiliary source value, raw auxiliary identity query score,
+  retained-reference span, hash, and common-clock coordinate. Automation may
+  copy, validate, and display only; it may not label, classify, count, rank,
+  select, or judge any product result.
+- [x] T270 Read all 13 FR59 focus/control conversations in Run A chronological,
+  Run B chronological, Run A reverse, and Run B reverse order against the
+  complete `test.txt` context. Manually decide whether a second independent
+  material residual joins `ref-0499` with genuinely new activity, a writable
+  boundary, causal global identity, and explicit control abstention.
+- [x] T271 If and only if T270 passes, update SDD for one false-by-default
+  candidate and its focused engineering, numerical, frozen-replay, and real-
+  WebSocket promotion gates before implementation. Otherwise stop FR59
+  without product code, root-TOML/model/product-run/ledger/baseline/closure
+  change. T270 fails the complete gate: only `ref-0239` adds a new
+  noncritical activity boundary, but it has no causal Xu identity and the
+  neighboring `ref-0241` context defeats local-slot mapping. `ref-0499`
+  remains overlapped and globally unresolved. T271 therefore takes the stop
+  branch. See
+  `fr59-auxiliary-residual-ceiling-review-2026-07-23.md`.
