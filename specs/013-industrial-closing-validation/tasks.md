@@ -25,7 +25,9 @@ fusion branch; FR52 T236-T238 complete four independent short-response source-
 edge readings and authorize only FR53's false-default, text-free primary-
 activity experiment; FR53 T239-T243 reject and remove all three candidate
 variants; FR54 T244-T247 retain evidence-only raw VAD capture but stop after
-four complete readings find no shared safe speech-presence topology;
+four complete readings find no shared safe speech-presence topology; FR55
+T248-T252 retain exact gallery provenance but stop after four complete readings
+find only one material circular-reference context and no shared safe topology;
 critical, confident-wrong, time-based, holdout, report, release, T102, and T084
 gates remain open 2026-07-23
 
@@ -3295,3 +3297,51 @@ gates remain open 2026-07-23
   material example and nearby controls prove that speech presence does not
   establish identity. No shared topology, threshold, union rule, runtime/TOML
   change, product rerun, or ledger change is authorized. FR50 remains baseline.
+- [x] T248 Freeze FR55's context-only scope in
+  `fr55-gallery-independence-contexts-2026-07-23.tsv` and inspect the production
+  identity path. Record the exact A/B artifact/event, PCM, config, model, and
+  registry sequence. Confirm only the code-level observability fact that
+  retained gallery references lack time provenance and may overlap a final
+  query; do not infer a product cause or speaker judgment.
+  Frozen hashes and the evidence-only design are recorded in
+  `fr55-gallery-independence-evidence-design-2026-07-23.md`.
+- [x] T249 Implement evidence-only reference provenance and exact capture-order
+  identity replay. Preserve current reference selection, sorting, caps,
+  centroids, epoch decisions, and default runtime behavior. Export original and
+  embedded reference bounds plus raw inclusive and overlap-excluded query views.
+  Add focused contract tests and require exact captured/replayed A/B identity
+  rows before using the evidence.
+  The typed private reference record now preserves exact source and embedded
+  sample bounds, including the original span used by a repeated pending
+  confirmation. Diagnostic APIs have no runtime consumer or TOML key. Run A
+  reproduces all `1,254,063` captured identity rows and Run B all `1,253,630`;
+  final identity, retained-reference, and query-evidence outputs are
+  byte-identical between A/B and unchanged by the provenance correction.
+- [x] T250 Arrange independent Run A/B FR55 packets containing complete
+  reference context, Sortformer posterior/activity/primary tracks, identity
+  epochs, retained TitaNet references, inclusive and overlap-excluded raw
+  scores, source/alignment, VAD, and current business output. Automation may
+  validate and display raw evidence only.
+  Both independent packet content manifests verify every payload. The packets
+  contain all 38 retained references and all four frozen focus/control
+  contexts without an automated speaker or correctness field.
+- [x] T251 Read every retained reference span and every focus/control context
+  chronologically and in reverse for Run A, then repeat both readings
+  independently for Run B against complete `test.txt` context. Only these four
+  contextual-semantic readings may determine reference identity, dependence,
+  complementarity, or a reusable topology.
+  Run A chronological, Run B chronological, Run A reverse, and Run B reverse
+  readings are complete. They independently identify one materially wrong
+  retained reference inside `ref-0503`; the other focus contexts have no
+  retained-reference intersection.
+- [x] T252 Reconcile T251 manually. A false-default, TOML-controlled
+  leave-overlap-out gallery experiment requires at least two material contexts
+  with one shared runtime topology and explicit abstentions from every control.
+  Otherwise stop at the producer boundary. No candidate replay, product run,
+  ledger change, or closure claim precedes this decision.
+  T252 stops FR55. Only `ref-0503` has the material circular-reference topology,
+  while coherent controls demonstrate legitimate overlap. Excluding that one
+  reference weakens raw robust evidence but does not resolve the upstream
+  Sortformer/local-identity conflict. No runtime, TOML, model, product run,
+  ledger, baseline, or closure claim changes. See
+  `fr55-gallery-independence-review-2026-07-23.md`.

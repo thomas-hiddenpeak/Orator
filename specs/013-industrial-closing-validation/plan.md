@@ -4667,6 +4667,65 @@ share one topology, T247 stops FR54. No threshold, disjunctive special-case
 rule, runtime/TOML change, replay, product run, or ledger update is authorized.
 See `fr54-short-primary-speech-presence-review-2026-07-23.md`.
 
+### 8.43 FR55 TitaNet gallery-independence provenance audit
+
+FR55 tests whether the apparent agreement between Sortformer and TitaNet is
+independent evidence or can be caused by a query overlapping a
+Sortformer-labelled reference already retained in the TitaNet gallery.
+
+1. Freeze `ref-0102`, `ref-0354`, `ref-0499`, and `ref-0503` plus their FR51
+   controls as common-clock context only. Reuse exact FR50 A/B artifacts,
+   event order, PCM, configuration, model identities, and registry sequence.
+2. Export every captured diar delivery as a snapshot TSV without changing row
+   order or values. Replay those snapshots through the production
+   `SpeakerIdentityStage`; Run A starts empty and Run B starts from Run A's
+   frozen registry. Exact captured/replayed global IDs are a mandatory
+   producer-contract check.
+3. Replace the retained reference's anonymous `(quality, embedding)` pair with
+   an equivalent typed record that also preserves original diar bounds and the
+   actual edge-trimmed/window-capped embedding bounds. Keep the existing
+   quality comparator, `max_ref_segs` cap, centroid construction, drift logic,
+   and identity output unchanged. Expose the records only through diagnostic
+   replay output.
+4. For each immutable terminal voiceprint query in the frozen contexts, emit
+   its existing inclusive session/robust scores and a second raw view formed
+   from the same retained references after excluding only references whose
+   embedding window intersects the query interval. Also list each included or
+   intersecting reference row. This output is evidence, not a candidate and
+   not a speaker decision.
+5. Mechanically verify hashes, schemas, time-base bounds, deterministic output,
+   exact identity replay, and equality of the inclusive view with the frozen
+   current evidence at serialization tolerance. No executable may classify a
+   circular reference, infer the correct identity, aggregate an outcome, rank
+   a rule, or select behavior.
+6. Read every retained gallery reference and every complete focus/control
+   context for Run A chronologically and in reverse. Repeat both readings
+   independently for Run B. The human/AI semantic record alone determines
+   whether overlap contamination exists and whether non-overlapping evidence
+   establishes a reusable contract.
+7. Authorize a false-default runtime experiment only when at least two material
+   contexts share one reference-free topology and every accepted control gives
+   an explicit abstention. Any later runtime behavior change must be controlled
+   in TOML and complete a fresh frozen replay plus constitutional real-WebSocket
+   ladder. Otherwise stop FR55 without changing FR50.
+
+The static code finding only authorizes evidence capture. It does not establish
+that any current speaker result is caused by circular gallery evidence. No new
+product audio is needed before the FR55 manual gate.
+
+T248-T252 are complete. The production stage now preserves exact retained-
+reference provenance for diagnostic replay, while its identity output remains
+unchanged. Frozen Run A and Run B reproduce every captured identity row; their
+final identity, reference, and query-evidence files are byte-identical. Every
+retained reference and focus/control context was then read in Run A
+chronological, Run B chronological, Run A reverse, and Run B reverse order.
+Only `ref-0503` contains a material self-overlapping wrong reference. The other
+focus contexts have no reference intersection, and accepted controls show that
+direct overlap may be legitimate. The required second material topology does
+not exist, so T252 stops FR55 without a runtime/TOML/model/product-run/ledger or
+baseline change. See
+`fr55-gallery-independence-review-2026-07-23.md`.
+
 ### 8.15 FR28 120-second outcome and promotion ladder
 
 T117-T121 are complete. The frozen T116 packages replay byte-stably; their

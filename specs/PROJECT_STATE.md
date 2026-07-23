@@ -14,9 +14,9 @@ work is specified under [specs/](.).
 > pass is the consistency proof. Status lines advance to `Implemented` in the
 > same change that lands the code, with the commit reference.
 
-- **Last updated**: 2026-07-23 (FR54 raw VAD evidence capture and four
-  independent complete-context readings finish; no shared safe topology exists,
-  so the branch stops and FR50 remains the real-path baseline)
+- **Last updated**: 2026-07-23 (FR55 preserves exact TitaNet gallery provenance
+  but stops after four complete readings find only one material circular-
+  reference context; FR50 remains the real-path baseline)
 - **Branch**: `master`
 - **Constitution**: v1.7.0
 - **Speaker-business closure**: **CURRENT REAL-PATH BASELINE `525/556`;
@@ -78,6 +78,18 @@ work is specified under [specs/](.).
   without a threshold, runtime/TOML/model change, product rerun, or ledger
   change. The evidence tooling remains, and focused VAD/packet tests pass. See
   [fr54-short-primary-speech-presence-review-2026-07-23.md](013-industrial-closing-validation/fr54-short-primary-speech-presence-review-2026-07-23.md).
+  FR55 then preserves exact retained-reference source and embedding bounds and
+  adds diagnostic overlap-excluded raw evidence without a runtime consumer or
+  TOML key. Frozen capture-order replay reproduces every Run A and Run B
+  identity row, and final A/B identity, retained-reference, and query-evidence
+  files are byte-identical. Every retained reference and focus/control context
+  is read in Run A chronological, Run B chronological, Run A reverse, and Run B
+  reverse order. Only `ref-0503` contains a materially wrong reference drawn
+  from its own query audio. The other focus contexts have no such intersection,
+  and coherent controls show direct overlap can be legitimate. T252 therefore
+  stops FR55 without a runtime/TOML/model/product-run/ledger/baseline change.
+  See
+  [fr55-gallery-independence-review-2026-07-23.md](013-industrial-closing-validation/fr55-gallery-independence-review-2026-07-23.md).
   Transitional experimental commit `6b1cb79fa4f5` completed
   warning-clean build, `68/68` CTest, 120-second, 600-second, and full-length
   FR16ABN real-WebSocket promotion. Full Run A used an empty registry and the
@@ -1002,6 +1014,8 @@ Findings:
 - [specs/012-evidence-fusion-timeline/spec.md](012-evidence-fusion-timeline/spec.md) — **Runtime candidate validated (2026-07-08); tail evidence reviewed and support diagnostics added (2026-07-09)**: evidence-first comprehensive timeline fusion plus TOML-gated runtime adoption. `tools/verify/py/fusion_audit.py` and `speaker_business_review_packet.py` read frozen `ws_unified_test.py` JSON packages, audit ASR/diar/VAD/align consistency, and emit candidate/business-turn views without mutating captured tracks. After the 2026-07-07 context review showed forced alignment alone did not recover speaker-business accuracy, 2026-07-08 fixes added local-speaker drift/competing-identity split and backfill, per-entry comprehensive `speaker_id`, and `[timeline]` align-run split parameters. Full-length real WS run `/tmp/orator_timelinefusion_full_20260708.json`: 3615.0 s audio, 3618.74 s wall, stream RT 0.999x, diar 773, ASR 288, align 288/288. Fusion audit `/tmp/orator_timelinefusion_full_20260708_fusion_bt_timeline.json`: business_turns=728, unknown 171.860 s (4.75%), no mechanical audit issues. Complete contextual review [drift-epoch-review-2026-07-08.md](012-evidence-fusion-timeline/drift-epoch-review-2026-07-08.md) follows [speaker-business-method.md](012-evidence-fusion-timeline/speaker-business-method.md). Follow-up candidate decisions are historical context-review records. All code-derived percentages and evidence scores in Spec 012 are mechanical records only; they may not evaluate accuracy, rank/select a candidate, or issue a product verdict under Constitution 1.7.0.
 - [specs/013-industrial-closing-validation/spec.md](013-industrial-closing-validation/spec.md) - **FR50 remains the current real-path speaker baseline; FR53 is rejected and removed; FR54 evidence audit is complete and canonical closure remains open**. Earlier FR16ABO, FR28, FR29, FR30, and FR31 promotions remain rejected; FR32-FR47 are retained bounded historical repairs and FR46 is evidence-only. FR49's clean ladder manually retains `523/556`. FR50's current-config v2.1 evidence audit authorizes a false-default TOML topology for `ref-0327` and `ref-0417`; frozen replay manually retains `525/556`. After the first clean `b449dfa` ladder fails full A's terminal limit, pushed transitional remediation commit `a6f0d33` moves acoustic-only primary-run preparation into the low-priority live worker without changing a numeric TOML value or final scoring. Its exact-clean 120 A/B, 600, and full empty/frozen-registry A/B ladder passes. Full A/B run at `0.993x` and independently return terminal timelines in `26.013/26.789 s`. Both full artifacts are read completely in chronological and reverse fixed-window context, and all four readings manually retain `525/556`, with 26 confidently wrong, four missing, one uncertain, and 19 critical residuals. FR51's four independent contextual evidence readings identify `ref-0099` as the only final-only overwrite, but the accepted controls provide no second material topology, so that final-fusion branch stops without a runtime change. FR53's primary-only activity variants fail contextual controls and are fully removed. FR54 captures raw VAD evidence and completes four independent context readings, but the two material contexts require different evidence paths; T247 stops without a threshold or runtime change. See [fr50-real-path-terminal-remediation-2026-07-23.md](013-industrial-closing-validation/fr50-real-path-terminal-remediation-2026-07-23.md) and [fr54-short-primary-speech-presence-review-2026-07-23.md](013-industrial-closing-validation/fr54-short-primary-speech-presence-review-2026-07-23.md). No code evaluates correctness, calculates the ledger, or produces the product verdict. Checked-in `vad.threshold` is `0.5`. Critical residual, speaker-time, per-speaker time, source-time-offset, ASR, browser/microphone, locked holdout, report-review, and release-tag gates remain open.
 
+- [specs/013-industrial-closing-validation/fr55-gallery-independence-review-2026-07-23.md](013-industrial-closing-validation/fr55-gallery-independence-review-2026-07-23.md) - **FR55 complete; evidence tooling retained; product experiment rejected**. Exact A/B replay preserves every captured identity row, reference/query outputs are byte-identical, and all packet hashes pass. Four independent complete-context readings find one materially wrong self-overlapping reference at `ref-0503`, but no second material topology; coherent controls show overlap can also be legitimate. T252 stops without changing runtime, TOML, model, product output, ledger, or FR50.
+
 ## 7. Immediate next step
 
 Keep exact clean commit `a6f0d33`, streaming v2.1 `340/1/188/188`, the FR50
@@ -1018,17 +1032,20 @@ counterexamples, and FR54 captures raw VAD evidence but finds no shared safe
 speech-presence topology for `ref-0066` and `ref-0331`. The FR50 result and
 runtime remain unchanged.
 
-The next SDD phase must remain upstream of final fusion and reuse the exact
-FR50 A/B evidence before another product run. It must inspect the manually
-identified raw speaker-producer and identity conflicts at `ref-0102`,
-`ref-0354`, `ref-0499`, and `ref-0503`, together with their accepted controls.
-The first question is whether Sortformer v2.1 posterior/activity/primary
-evidence and TitaNet identity evidence provide a reusable complementary
-contract, or whether the required identity is absent or contradictory before
-fusion. Run A chronological/reverse and independent Run B
-chronological/reverse complete-context readings must precede any producer
-experiment. At least two material contexts must share one reference-free
-topology with explicit abstentions; otherwise that branch stops.
+FR55 is complete. Exact retained-reference provenance and frozen A/B identity
+replay pass their mechanical contracts. Four complete semantic readings find
+one material circular reference at `ref-0503`, but no second context with the
+same topology; controls also show that direct overlap can be legitimate. T252
+therefore authorizes no leave-overlap-out product experiment. FR50 remains
+unchanged.
+
+The next speaker phase must return to the producer boundary under a new SDD
+scope. First inventory the already human-reviewed critical residuals for a
+shared Sortformer local-slot or identity-epoch transition pattern, using exact
+common-clock evidence and at least two independent material contexts plus
+explicit controls. Freeze that scope and evidence design before adding a
+candidate. Do not infer a repair from `ref-0503` alone or start a new product
+run before the contextual gate authorizes one.
 
 Do not start an ASR-accuracy closing phase or change VAD, alignment, identity,
 or diarization parameters before this speaker-producer audit. Such changes can

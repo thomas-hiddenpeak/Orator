@@ -185,6 +185,17 @@ int main() {
   // Final phrase queries reuse the mature session and robust galleries but do
   // not make an identity decision inside the identity stage.
   {
+    const auto references = stage.RetainedReferences();
+    Check(references.size() == 2,
+          "retained reference provenance should expose both gallery rows");
+    Check(references[0].evidence_id == "identity_ref:0:0:0" &&
+              references[0].source_start_sec == 1.0 &&
+              references[0].source_end_sec == 4.0 &&
+              references[0].embedding_start_sample == 20800 &&
+              references[0].embedding_end_sample == 59200 &&
+              references[0].speaker_id == "spk_0",
+          "retained reference provenance must preserve exact source bounds");
+
     const auto evidence = stage.EvaluateSpan(
         1.0, 2.0, {"spk_0", "spk_1"}, 0.4, 0.0, 3.0);
     Check(evidence.embedding_available,
@@ -197,6 +208,32 @@ int main() {
           "phrase evidence exposes every active identity score");
     Check(stage.IdentityAt(0, 2.0) == "spk_0",
           "common-clock local identity lookup resolves the active epoch");
+
+    const auto excluded = stage.EvaluateSpanWithoutOverlappingReferences(
+        1.0, 2.0, {"spk_0", "spk_1"}, 0.4, 0.0, 3.0);
+    Check(excluded.query_embedding_start_sample == 16000 &&
+              excluded.query_embedding_end_sample == 32000,
+          "diagnostic query must preserve exact embedded sample bounds");
+    Check(excluded.intersecting_reference_ids ==
+              std::vector<std::string>{"identity_ref:0:0:0"},
+          "diagnostic query must list only positive sample intersections");
+    Check(excluded.evidence.embedding_available &&
+              !excluded.evidence.session_gallery_complete &&
+              !excluded.evidence.robust_gallery_complete &&
+              excluded.evidence.session_scores.size() == 1 &&
+              excluded.evidence.session_scores[0].speaker_id == "spk_1" &&
+              excluded.evidence.robust_scores.size() == 1 &&
+              excluded.evidence.robust_scores[0].speaker_id == "spk_1",
+          "overlap exclusion must retain raw scores only for remaining refs");
+
+    const auto independent = stage.EvaluateSpanWithoutOverlappingReferences(
+        6.0, 7.0, {"spk_0", "spk_1"}, 0.4, 0.0, 3.0);
+    Check(independent.intersecting_reference_ids.empty() &&
+              independent.evidence.session_gallery_complete &&
+              independent.evidence.robust_gallery_complete &&
+              independent.evidence.session_scores.size() == 2 &&
+              independent.evidence.robust_scores.size() == 2,
+          "non-overlapping query must retain both complete gallery views");
   }
 
   // Delivery 2: a NEW SESSION's local slot (4 = session 1, speakers_per_session
@@ -540,6 +577,25 @@ int main() {
           "second matching candidate must backfill the confirmed epoch");
     Check(repeated_second.back().speaker_id == "spk_1",
           "second matching candidate must bind to the competing identity");
+    const auto repeated_references = stage7.RetainedReferences();
+    bool found_first_candidate_reference = false;
+    bool found_confirming_reference = false;
+    bool found_extended_reference = false;
+    for (const auto& reference : repeated_references) {
+      if (reference.local_speaker != 0) continue;
+      found_first_candidate_reference |=
+          reference.source_start_sec == 45.0 &&
+          reference.source_end_sec == 48.0 &&
+          reference.embedding_start_sample == 724800 &&
+          reference.embedding_end_sample == 763200;
+      found_confirming_reference |= reference.source_start_sec == 51.0 &&
+                                    reference.source_end_sec == 54.0;
+      found_extended_reference |= reference.source_start_sec == 45.0 &&
+                                  reference.source_end_sec == 54.0;
+    }
+    Check(found_first_candidate_reference && found_confirming_reference &&
+              !found_extended_reference,
+          "repeated confirmation provenance must preserve each embedded span");
 
     auto strong_return = repeated_second;
     strong_return.push_back(Seg(0, 57.0, 63.0, 0.9f));

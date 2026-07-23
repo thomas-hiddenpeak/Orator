@@ -17,6 +17,16 @@
 
 namespace orator {
 namespace pipeline {
+namespace {
+
+std::string ReferenceEvidenceId(int local_speaker, std::size_t epoch_index,
+                                std::size_t reference_index) {
+  return "identity_ref:" + std::to_string(local_speaker) + ":" +
+         std::to_string(epoch_index) + ":" +
+         std::to_string(reference_index);
+}
+
+}  // namespace
 
 SpeakerIdentityStage::SpeakerIdentityStage(core::ISpeakerEmbedder* embedder,
                                            model::SpeakerDatabase* db,
@@ -171,6 +181,23 @@ std::pair<double, double> SpeakerIdentityStage::EmbeddingWindow(
   return {a, b};
 }
 
+std::pair<double, double> SpeakerIdentityStage::EmbeddingWindow(
+    double start_sec, double end_sec, double edge_margin_sec,
+    double max_window_sec) const {
+  double a = start_sec;
+  double b = end_sec;
+  if ((b - a) > 2 * edge_margin_sec + 0.5) {
+    a += edge_margin_sec;
+    b -= edge_margin_sec;
+  }
+  if (max_window_sec > 0.0 && b - a > max_window_sec) {
+    const double mid = 0.5 * (a + b);
+    a = mid - 0.5 * max_window_sec;
+    b = mid + 0.5 * max_window_sec;
+  }
+  return {a, b};
+}
+
 std::set<std::string> SpeakerIdentityStage::OverlappingGlobalIds(
     const core::DiarSegment& s, const std::vector<core::DiarSegment>& all,
     int local) const {
@@ -247,6 +274,8 @@ bool SpeakerIdentityStage::RecordPendingCompeting(
   pending.start_sec = backfill_start;
   pending.clean_start_sec = s.start_sec;
   pending.end_sec = s.end_sec;
+  pending.reference_start_sec = s.start_sec;
+  pending.reference_end_sec = s.end_sec;
   pending.quality = quality;
   pending.global_id = global_id;
   pending.own_score = own_score;
@@ -262,19 +291,33 @@ bool SpeakerIdentityStage::RecordPendingCompeting(
 }
 
 void SpeakerIdentityStage::AddReference(LocalEpoch* epoch, double quality,
+                                        double source_start_sec,
+                                        double source_end_sec,
                                         const std::vector<float>& emb) {
   if (epoch == nullptr) return;
   auto& refs = epoch->refs;
-  refs.emplace_back(quality, emb);
+  const auto window = EmbeddingWindow(
+      source_start_sec, source_end_sec, config_.edge_margin_sec,
+      config_.max_embed_window_sec);
+  LocalReference reference;
+  reference.quality = quality;
+  reference.source_start_sec = source_start_sec;
+  reference.source_end_sec = source_end_sec;
+  reference.embedding_start_sample = tb_.SampleAt(window.first);
+  reference.embedding_end_sample = tb_.SampleAt(window.second);
+  reference.embedding = emb;
+  refs.push_back(std::move(reference));
   // Keep the best `max_ref_segs` spans by quality (confidence x duration).
   std::sort(refs.begin(), refs.end(),
-            [](const auto& a, const auto& b) { return a.first > b.first; });
+            [](const auto& a, const auto& b) {
+              return a.quality > b.quality;
+            });
   if (static_cast<int>(refs.size()) > config_.max_ref_segs)
     refs.resize(config_.max_ref_segs);
   // Centroid = L2-normalized mean of the kept reference embeddings.
   std::vector<float> c(config_.embedding_dim, 0.0f);
   for (const auto& r : refs)
-    for (int i = 0; i < config_.embedding_dim; ++i) c[i] += r.second[i];
+    for (int i = 0; i < config_.embedding_dim; ++i) c[i] += r.embedding[i];
   double nrm = 0.0;
   for (float v : c) nrm += static_cast<double>(v) * v;
   nrm = std::sqrt(nrm) + 1e-12;
@@ -360,7 +403,7 @@ void SpeakerIdentityStage::RefreshGlobalCentroids() {
   // (across sessions). The more clean evidence a speaker accumulates, the more
   // robust its voiceprint, so the speaker reliably re-matches next session
   // instead of fragmenting into a duplicate id.
-  std::map<std::string, std::vector<std::pair<double, std::vector<float>>>> g;
+  std::map<std::string, std::vector<LocalReference>> g;
   for (const auto& kv : local_epochs_) {
     for (const auto& epoch : kv.second) {
       if (epoch.global_id.empty()) continue;
@@ -372,12 +415,14 @@ void SpeakerIdentityStage::RefreshGlobalCentroids() {
   for (auto& kv : g) {
     auto& refs = kv.second;
     std::sort(refs.begin(), refs.end(),
-              [](const auto& a, const auto& b) { return a.first > b.first; });
+              [](const auto& a, const auto& b) {
+                return a.quality > b.quality;
+              });
     if (static_cast<int>(refs.size()) > config_.max_ref_segs)
       refs.resize(config_.max_ref_segs);
     std::vector<float> c(config_.embedding_dim, 0.0f);
     for (const auto& r : refs)
-      for (int i = 0; i < config_.embedding_dim; ++i) c[i] += r.second[i];
+      for (int i = 0; i < config_.embedding_dim; ++i) c[i] += r.embedding[i];
     double nrm = 0.0;
     for (float v : c) nrm += static_cast<double>(v) * v;
     nrm = std::sqrt(nrm) + 1e-12;
@@ -464,17 +509,10 @@ std::vector<float> SpeakerIdentityStage::EmbedSpan(double start_sec,
                                                    double end_sec,
                                                    double edge_margin_sec,
                                                    double max_window_sec) {
-  double a = start_sec;
-  double b = end_sec;
-  if (b - a > 2.0 * edge_margin_sec + 0.5) {
-    a += edge_margin_sec;
-    b -= edge_margin_sec;
-  }
-  if (max_window_sec > 0.0 && b - a > max_window_sec) {
-    const double middle = 0.5 * (a + b);
-    a = middle - 0.5 * max_window_sec;
-    b = middle + 0.5 * max_window_sec;
-  }
+  const auto window =
+      EmbeddingWindow(start_sec, end_sec, edge_margin_sec, max_window_sec);
+  const double a = window.first;
+  const double b = window.second;
   if (b <= a) return {};
   const long start_sample = tb_.SampleAt(a);
   const long end_sample = tb_.SampleAt(b);
@@ -535,7 +573,7 @@ SpeakerIdentityStage::SpanEvidence SpeakerIdentityStage::EvaluateSpan(
       if (epoch.global_id.empty()) continue;
       auto& scores = robust_by_identity[epoch.global_id];
       for (const auto& reference : epoch.refs) {
-        scores.push_back(Cosine(embedding, reference.second));
+        scores.push_back(Cosine(embedding, reference.embedding));
       }
     }
   }
@@ -577,6 +615,149 @@ SpeakerIdentityStage::SpanEvidence SpeakerIdentityStage::EvaluateSpan(
   std::sort(evidence.robust_scores.begin(), evidence.robust_scores.end(),
             by_id);
   return evidence;
+}
+
+std::vector<SpeakerIdentityStage::RetainedReferenceEvidence>
+SpeakerIdentityStage::RetainedReferences() const {
+  std::vector<RetainedReferenceEvidence> output;
+  for (const auto& [local_speaker, epochs] : local_epochs_) {
+    for (std::size_t epoch_index = 0; epoch_index < epochs.size();
+         ++epoch_index) {
+      const auto& epoch = epochs[epoch_index];
+      for (std::size_t reference_index = 0;
+           reference_index < epoch.refs.size(); ++reference_index) {
+        const auto& reference = epoch.refs[reference_index];
+        RetainedReferenceEvidence evidence;
+        evidence.evidence_id = ReferenceEvidenceId(
+            local_speaker, epoch_index, reference_index);
+        evidence.local_speaker = local_speaker;
+        evidence.epoch_start_sec = epoch.start_sec;
+        evidence.speaker_id = epoch.global_id;
+        evidence.source_start_sec = reference.source_start_sec;
+        evidence.source_end_sec = reference.source_end_sec;
+        evidence.embedding_start_sample = reference.embedding_start_sample;
+        evidence.embedding_end_sample = reference.embedding_end_sample;
+        evidence.embedding_start_sec =
+            tb_.SecondsAt(reference.embedding_start_sample);
+        evidence.embedding_end_sec =
+            tb_.SecondsAt(reference.embedding_end_sample);
+        evidence.quality = reference.quality;
+        output.push_back(std::move(evidence));
+      }
+    }
+  }
+  return output;
+}
+
+SpeakerIdentityStage::OverlapExcludedSpanEvidence
+SpeakerIdentityStage::EvaluateSpanWithoutOverlappingReferences(
+    double start_sec, double end_sec,
+    const std::vector<std::string>& active_ids, double min_duration_sec,
+    double edge_margin_sec, double max_window_sec) {
+  OverlapExcludedSpanEvidence output;
+  if (embedder_ == nullptr || db_ == nullptr || active_ids.empty() ||
+      end_sec - start_sec + 1e-9 < min_duration_sec) {
+    return output;
+  }
+
+  const auto query_window =
+      EmbeddingWindow(start_sec, end_sec, edge_margin_sec, max_window_sec);
+  output.query_embedding_start_sample = tb_.SampleAt(query_window.first);
+  output.query_embedding_end_sample = tb_.SampleAt(query_window.second);
+  if (output.query_embedding_end_sample <=
+      output.query_embedding_start_sample) {
+    return output;
+  }
+
+  const std::vector<float> embedding =
+      EmbedSpan(start_sec, end_sec, edge_margin_sec, max_window_sec);
+  if (embedding.empty()) return output;
+  output.evidence.embedding_available = true;
+  output.evidence.session_gallery_complete = true;
+  output.evidence.robust_gallery_complete = true;
+
+  std::map<std::string, std::vector<const LocalReference*>> references;
+  for (const auto& [local_speaker, epochs] : local_epochs_) {
+    for (std::size_t epoch_index = 0; epoch_index < epochs.size();
+         ++epoch_index) {
+      const auto& epoch = epochs[epoch_index];
+      if (epoch.global_id.empty()) continue;
+      for (std::size_t reference_index = 0;
+           reference_index < epoch.refs.size(); ++reference_index) {
+        const auto& reference = epoch.refs[reference_index];
+        const long overlap_start = std::max(
+            output.query_embedding_start_sample,
+            reference.embedding_start_sample);
+        const long overlap_end = std::min(
+            output.query_embedding_end_sample, reference.embedding_end_sample);
+        if (overlap_end > overlap_start) {
+          output.intersecting_reference_ids.push_back(ReferenceEvidenceId(
+              local_speaker, epoch_index, reference_index));
+          continue;
+        }
+        references[epoch.global_id].push_back(&reference);
+      }
+    }
+  }
+
+  for (const auto& speaker_id : active_ids) {
+    const auto found = references.find(speaker_id);
+    if (found == references.end() || found->second.empty()) {
+      output.evidence.session_gallery_complete = false;
+      output.evidence.robust_gallery_complete = false;
+      continue;
+    }
+
+    std::vector<const LocalReference*> session_refs = found->second;
+    std::sort(session_refs.begin(), session_refs.end(),
+              [](const auto* left, const auto* right) {
+                return left->quality > right->quality;
+              });
+    if (static_cast<int>(session_refs.size()) > config_.max_ref_segs) {
+      session_refs.resize(config_.max_ref_segs);
+    }
+    std::vector<float> centroid(config_.embedding_dim, 0.0f);
+    for (const auto* reference : session_refs) {
+      for (int index = 0; index < config_.embedding_dim; ++index) {
+        centroid[index] += reference->embedding[index];
+      }
+    }
+    double norm = 0.0;
+    for (float value : centroid) {
+      norm += static_cast<double>(value) * value;
+    }
+    norm = std::sqrt(norm) + 1e-12;
+    for (float& value : centroid) {
+      value = static_cast<float>(value / norm);
+    }
+    output.evidence.session_scores.push_back(
+        {speaker_id, Cosine(embedding, centroid)});
+
+    std::vector<float> robust_scores;
+    robust_scores.reserve(found->second.size());
+    for (const auto* reference : found->second) {
+      robust_scores.push_back(Cosine(embedding, reference->embedding));
+    }
+    std::sort(robust_scores.begin(), robust_scores.end(),
+              [](float left, float right) { return left > right; });
+    const std::size_t retained = (robust_scores.size() + 1) / 2;
+    double total = 0.0;
+    for (std::size_t index = 0; index < retained; ++index) {
+      total += robust_scores[index];
+    }
+    output.evidence.robust_scores.push_back(
+        {speaker_id, static_cast<float>(total / retained)});
+  }
+
+  const auto by_id = [](const VoiceprintScore& left,
+                        const VoiceprintScore& right) {
+    return left.speaker_id < right.speaker_id;
+  };
+  std::sort(output.evidence.session_scores.begin(),
+            output.evidence.session_scores.end(), by_id);
+  std::sort(output.evidence.robust_scores.begin(),
+            output.evidence.robust_scores.end(), by_id);
+  return output;
 }
 
 std::string SpeakerIdentityStage::IdentityAt(int local_speaker,
@@ -704,12 +885,15 @@ void SpeakerIdentityStage::Process(std::vector<core::DiarSegment>& segs) {
                           /*allow_same_session_match=*/true);
       epoch->global_id = competing_id;
       if (use_pending) {
-        AddReference(epoch, pending_it->second.quality, pending_it->second.emb);
+        AddReference(epoch, pending_it->second.quality,
+                     pending_it->second.reference_start_sec,
+                     pending_it->second.reference_end_sec,
+                     pending_it->second.emb);
         epoch->last_embedded_end = pending_it->second.end_sec;
       }
       pending_competing_.erase(local);
     }
-    AddReference(epoch, best_q[local], emb);
+    AddReference(epoch, best_q[local], s.start_sec, s.end_sec, emb);
     epoch->last_embedded_end = std::max(epoch->last_embedded_end, s.end_sec);
     ResolveGlobal(local, epoch);
   }

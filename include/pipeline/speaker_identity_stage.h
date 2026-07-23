@@ -118,6 +118,27 @@ class SpeakerIdentityStage {
     std::vector<VoiceprintScore> robust_scores;
   };
 
+  struct RetainedReferenceEvidence {
+    std::string evidence_id;
+    int local_speaker = -1;
+    double epoch_start_sec = 0.0;
+    std::string speaker_id;
+    double source_start_sec = 0.0;
+    double source_end_sec = 0.0;
+    long embedding_start_sample = 0;
+    long embedding_end_sample = 0;
+    double embedding_start_sec = 0.0;
+    double embedding_end_sec = 0.0;
+    double quality = 0.0;
+  };
+
+  struct OverlapExcludedSpanEvidence {
+    SpanEvidence evidence;
+    long query_embedding_start_sample = 0;
+    long query_embedding_end_sample = 0;
+    std::vector<std::string> intersecting_reference_ids;
+  };
+
   SpeakerIdentityStage(core::ISpeakerEmbedder* embedder,
                        model::SpeakerDatabase* db, core::TimeBase tb,
                        SpeakerIdConfig config);
@@ -137,6 +158,18 @@ class SpeakerIdentityStage {
                             double min_duration_sec,
                             double edge_margin_sec,
                             double max_window_sec);
+
+  // Diagnostic-only view of the same query after removing retained gallery
+  // references that contain any of the query's embedded samples. It returns
+  // raw model evidence and never changes identity or runtime state.
+  OverlapExcludedSpanEvidence EvaluateSpanWithoutOverlappingReferences(
+      double start_sec, double end_sec,
+      const std::vector<std::string>& active_ids, double min_duration_sec,
+      double edge_margin_sec, double max_window_sec);
+
+  // Final retained gallery provenance for evidence replay. Reference contents
+  // remain private; this exposes only immutable source and embedding bounds.
+  std::vector<RetainedReferenceEvidence> RetainedReferences() const;
 
   // Cache acoustic-only evidence without consulting either speaker gallery.
   // Final EvaluateSpan calls still score against the then-current galleries.
@@ -158,10 +191,18 @@ class SpeakerIdentityStage {
                const std::vector<core::DiarSegment>& all) const;
   // Add a high-quality span's embedding to a local speaker's reference set
   // (keeps the best `max_ref_segs` by quality) and recompute the centroid.
+  struct LocalReference {
+    double quality = 0.0;
+    double source_start_sec = 0.0;
+    double source_end_sec = 0.0;
+    long embedding_start_sample = 0;
+    long embedding_end_sample = 0;
+    std::vector<float> embedding;
+  };
   struct LocalEpoch {
     double start_sec = 0.0;
     std::string global_id;
-    std::vector<std::pair<double, std::vector<float>>> refs;
+    std::vector<LocalReference> refs;
     std::vector<float> centroid;
     double last_embedded_end = 0.0;
     bool allow_same_session_match = false;
@@ -171,6 +212,8 @@ class SpeakerIdentityStage {
     double start_sec = 0.0;
     double clean_start_sec = 0.0;
     double end_sec = 0.0;
+    double reference_start_sec = 0.0;
+    double reference_end_sec = 0.0;
     double quality = 0.0;
     std::string global_id;
     float own_score = 0.0f;
@@ -184,7 +227,8 @@ class SpeakerIdentityStage {
                          bool allow_same_session_match);
   LocalEpoch* ActiveEpoch(int local, double at_sec);
   const LocalEpoch* ActiveEpoch(int local, double at_sec) const;
-  void AddReference(LocalEpoch* epoch, double quality,
+  void AddReference(LocalEpoch* epoch, double quality, double source_start_sec,
+                    double source_end_sec,
                     const std::vector<float>& emb);
   float Cosine(const std::vector<float>& a, const std::vector<float>& b) const;
   bool ShouldSplitEpoch(const LocalEpoch& epoch, double start_sec,
@@ -195,6 +239,9 @@ class SpeakerIdentityStage {
                                int local) const;
   std::pair<double, double> EmbeddingWindow(double start_sec,
                                             double end_sec) const;
+  std::pair<double, double> EmbeddingWindow(double start_sec, double end_sec,
+                                            double edge_margin_sec,
+                                            double max_window_sec) const;
   std::set<std::string> OverlappingGlobalIds(
       const core::DiarSegment& s, const std::vector<core::DiarSegment>& all,
       int local) const;

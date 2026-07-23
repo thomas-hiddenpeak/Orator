@@ -81,9 +81,12 @@ the shared `ref-0066`/`ref-0331` contract and retain explicit alias/source
 abstentions; FR53's broad, alignment-gap, and source-wide variants are rejected
 and fully removed; FR54's raw VAD evidence capture and four independent
 complete-context readings find no shared safe speech-presence topology and
-stop without a runtime, TOML, model, ledger, or baseline change; critical attribution,
-confident-wrong attribution, T102, T084, full canonical closure, release sign-
-off, and industrial readiness remain open
+stop without a runtime, TOML, model, ledger, or baseline change; FR55 preserves
+exact TitaNet reference provenance and reproduces every frozen A/B identity row,
+but four complete readings find only one material circular-reference context,
+so it also stops without changing the product; critical attribution, confident-
+wrong attribution, T102, T084, full canonical closure, release sign-off, and
+industrial readiness remain open
 **Created**: 2026-07-13
 **Scope**: Re-establish a truthful product baseline, recover full-session business
 accuracy, and define the evidence required before Orator may be declared closed.
@@ -3348,6 +3351,55 @@ open. See `fr47-real-path-promotion-review-2026-07-19.md`.
   product-run, ledger, or baseline change. The evidence-only tooling is
   retained; see
   `fr54-short-primary-speech-presence-review-2026-07-23.md`.
+
+- **FR55 TitaNet gallery-independence provenance audit**: Code inspection
+  establishes a mechanical observability gap, not a product judgment:
+  `SpeakerIdentityStage::EvaluateSpan` scores a query against session and robust
+  galleries built from all retained Sortformer-labelled reference embeddings,
+  including references whose audio may overlap the query, while retained
+  references do not preserve source or embedding-window bounds. FR55 MUST make
+  that dependency auditable before treating Sortformer and TitaNet as
+  independent corroboration.
+
+  FR55 MUST freeze exact FR50 Run A/B artifacts, diar delivery events, PCM,
+  config, Sortformer v2.1 and TitaNet weights, Run A empty-registry state, Run B
+  frozen-registry input, and the context-only `ref-0102`, `ref-0354`,
+  `ref-0499`, and `ref-0503` scope with named accepted controls. It MAY extend
+  evidence-only replay so each retained identity reference records its original
+  diar span, actual embedding window, local slot, identity epoch, assigned
+  global ID, and existing quality value. It MAY display raw current-gallery and
+  overlap-excluded gallery scores for the same immutable query. It MUST preserve
+  the existing reference ordering, cap, centroid arithmetic, identity decisions,
+  and default runtime output.
+
+  Frozen diar-event snapshots MUST replay through the production identity stage
+  in capture order. Mechanical verification MUST require exact captured/replayed
+  identity equality, source hashes, valid common-clock bounds, unchanged current-
+  gallery evidence, and deterministic evidence output. Those checks MUST NOT
+  label a reference span, judge a speaker, compare product correctness, select a
+  repair, or issue a verdict.
+
+  Every retained reference span and every frozen focus/control context MUST then
+  receive complete Run A chronological and reverse contextual-semantic reading,
+  repeated independently for Run B. A leave-overlap-out gallery experiment MAY
+  be specified only if at least two material contexts show the same circular-
+  reference topology, non-overlapping runtime evidence supplies one reusable
+  identity contract, and all accepted controls establish explicit abstentions.
+  Otherwise FR55 MUST stop at the proven producer boundary. No runtime flag,
+  TOML change, model change, candidate replay, product audio run, ledger change,
+  or closure claim is authorized before that manual decision.
+
+  T248-T252 are complete. Exact capture-order replay reproduces every frozen
+  Run A and Run B identity row, and final A/B identity, retained-reference, and
+  query-evidence outputs are byte-identical. Four independent complete-context
+  readings identify one materially wrong retained reference drawn from
+  `ref-0503` itself. `ref-0102`, `ref-0354`, and `ref-0499` have no focus-query
+  reference intersection, while coherent controls show that overlap can be
+  legitimate. Removing the bad reference weakens raw robust evidence but does
+  not repair the upstream Sortformer/local-identity conflict. The required
+  second material topology is absent; FR55 therefore stops without a runtime,
+  TOML, model, product-run, ledger, baseline, or closure change. See
+  `fr55-gallery-independence-review-2026-07-23.md`.
 
 FR40 passes its frozen gate. Repeated T123 outputs are byte-identical and
 change only Xu Zijing's `184.240-184.320` response. Repeated T111 outputs are

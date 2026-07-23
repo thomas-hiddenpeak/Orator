@@ -132,7 +132,9 @@ std::vector<EvidenceQuery> ReadEvidenceQueries(const std::string& path) {
     query.start_sec = std::stod(columns[5]);
     query.end_sec = std::stod(columns[6]);
     if (query.evidence_id.empty() || query.kind.empty() ||
-        query.source_end <= query.source_start ||
+        (query.text_id >= 0 && query.source_end <= query.source_start) ||
+        (query.text_id < 0 &&
+         (query.source_start != 0 || query.source_end != 0)) ||
         query.end_sec <= query.start_sec) {
       throw std::runtime_error("invalid query interval");
     }
@@ -153,13 +155,23 @@ void WriteScores(
 void WriteEvidenceQueries(const std::string& path, SpeakerIdentityStage* stage,
                           const std::vector<EvidenceQuery>& queries,
                           const std::vector<std::string>& active_ids,
-                          const AuditoryStream::Config& config) {
+                          const AuditoryStream::Config& config,
+                          bool include_independence_evidence) {
   if (stage == nullptr) return;
   std::ofstream output(path);
   if (!output) throw std::runtime_error("cannot write evidence TSV: " + path);
   output << "evidence_id\tkind\ttext_id\tsource_start\tsource_end\tstart\tend\t"
             "embedding_available\tsession_gallery_complete\t"
-            "robust_gallery_complete\tsession_scores\trobust_scores\n";
+            "robust_gallery_complete\tsession_scores\trobust_scores";
+  if (include_independence_evidence) {
+    output << "\tquery_embedding_start_sample\tquery_embedding_end_sample\t"
+              "nonoverlap_embedding_available\t"
+              "nonoverlap_session_gallery_complete\t"
+              "nonoverlap_robust_gallery_complete\t"
+              "nonoverlap_session_scores\tnonoverlap_robust_scores\t"
+              "intersecting_reference_ids";
+  }
+  output << '\n';
   output << std::fixed << std::setprecision(9);
   for (const auto& query : queries) {
     const auto evidence =
@@ -176,7 +188,52 @@ void WriteEvidenceQueries(const std::string& path, SpeakerIdentityStage* stage,
     WriteScores(output, evidence.session_scores);
     output << '\t';
     WriteScores(output, evidence.robust_scores);
+    if (include_independence_evidence) {
+      const auto nonoverlap =
+          stage->EvaluateSpanWithoutOverlappingReferences(
+              query.start_sec, query.end_sec, active_ids,
+              config.speaker_fusion_min_embed_sec,
+              config.speaker_fusion_edge_margin_sec,
+              config.speaker_fusion_max_embed_window_sec);
+      output << '\t' << nonoverlap.query_embedding_start_sample << '\t'
+             << nonoverlap.query_embedding_end_sample << '\t'
+             << (nonoverlap.evidence.embedding_available ? 1 : 0) << '\t'
+             << (nonoverlap.evidence.session_gallery_complete ? 1 : 0)
+             << '\t'
+             << (nonoverlap.evidence.robust_gallery_complete ? 1 : 0) << '\t';
+      WriteScores(output, nonoverlap.evidence.session_scores);
+      output << '\t';
+      WriteScores(output, nonoverlap.evidence.robust_scores);
+      output << '\t';
+      for (std::size_t index = 0;
+           index < nonoverlap.intersecting_reference_ids.size(); ++index) {
+        if (index > 0) output << ',';
+        output << nonoverlap.intersecting_reference_ids[index];
+      }
+    }
     output << '\n';
+  }
+}
+
+void WriteRetainedReferences(const std::string& path,
+                             const SpeakerIdentityStage& stage) {
+  std::ofstream output(path);
+  if (!output) {
+    throw std::runtime_error("cannot write retained reference TSV: " + path);
+  }
+  output << "evidence_id\tlocal_speaker\tepoch_start_sec\tspeaker_id\t"
+            "source_start_sec\tsource_end_sec\tembedding_start_sample\t"
+            "embedding_end_sample\tembedding_start_sec\tembedding_end_sec\t"
+            "quality\n";
+  output << std::fixed << std::setprecision(9);
+  for (const auto& reference : stage.RetainedReferences()) {
+    output << reference.evidence_id << '\t' << reference.local_speaker << '\t'
+           << reference.epoch_start_sec << '\t' << reference.speaker_id << '\t'
+           << reference.source_start_sec << '\t' << reference.source_end_sec
+           << '\t' << reference.embedding_start_sample << '\t'
+           << reference.embedding_end_sample << '\t'
+           << reference.embedding_start_sec << '\t'
+           << reference.embedding_end_sec << '\t' << reference.quality << '\n';
   }
 }
 
@@ -272,12 +329,12 @@ void AppendAllAudio(SpeakerIdentityStage* stage,
 }  // namespace
 
 int main(int argc, char** argv) {
-  if (argc != 7 && argc != 9) {
+  if (argc != 7 && argc != 9 && argc != 10) {
     std::fprintf(stderr,
                  "usage: %s <audio.mp3/wav> <titanet.safetensors> "
                  "<registry-before|-> <segments.csv|snapshots.tsv> <out.tsv> "
                  "<config.toml> "
-                 "[queries.tsv evidence.tsv]\n",
+                 "[queries.tsv evidence.tsv [retained_references.tsv]]\n",
                  argv[0]);
     return 2;
   }
@@ -288,8 +345,9 @@ int main(int argc, char** argv) {
     const std::string segments_path = argv[4];
     const std::string output_path = argv[5];
     const std::string config_path = argv[6];
-    const std::string query_path = argc == 9 ? argv[7] : std::string();
-    const std::string evidence_path = argc == 9 ? argv[8] : std::string();
+    const std::string query_path = argc >= 9 ? argv[7] : std::string();
+    const std::string evidence_path = argc >= 9 ? argv[8] : std::string();
+    const std::string reference_path = argc == 10 ? argv[9] : std::string();
 
     AuditoryStream::Config config;
     if (!orator::io::ApplyTomlConfig(config_path, config)) {
@@ -374,21 +432,38 @@ int main(int argc, char** argv) {
       }
       const std::vector<std::string> active_ids(active_set.begin(),
                                                 active_set.end());
-      WriteEvidenceQueries(evidence_path, &stage, queries, active_ids, config);
+      WriteEvidenceQueries(evidence_path, &stage, queries, active_ids, config,
+                           !reference_path.empty());
+    }
+    if (!reference_path.empty()) {
+      WriteRetainedReferences(reference_path, stage);
     }
     const char* registry_description =
         registry_path == "-" ? "(empty)" : registry_path.c_str();
     if (snapshot_mode) {
-      std::printf(
-          "mode=snapshots snapshots=%zu segments=%zu audio_sec=%.3f "
-          "registry_before=%s enrolled_after=%d captured_rows=%zu "
-          "identity_equal_rows=%zu identity_different_rows=%zu out=%s "
-          "evidence=%s\n",
-          processed_snapshots, segments.size(), audio.DurationSec(),
-          registry_description, stage.enrolled_count(),
-          comparison.captured_rows, comparison.equal_rows,
-          comparison.different_rows, output_path.c_str(),
-          evidence_path.empty() ? "(none)" : evidence_path.c_str());
+      if (reference_path.empty()) {
+        std::printf(
+            "mode=snapshots snapshots=%zu segments=%zu audio_sec=%.3f "
+            "registry_before=%s enrolled_after=%d captured_rows=%zu "
+            "identity_equal_rows=%zu identity_different_rows=%zu out=%s "
+            "evidence=%s\n",
+            processed_snapshots, segments.size(), audio.DurationSec(),
+            registry_description, stage.enrolled_count(),
+            comparison.captured_rows, comparison.equal_rows,
+            comparison.different_rows, output_path.c_str(),
+            evidence_path.empty() ? "(none)" : evidence_path.c_str());
+      } else {
+        std::printf(
+            "mode=snapshots snapshots=%zu segments=%zu audio_sec=%.3f "
+            "registry_before=%s enrolled_after=%d captured_rows=%zu "
+            "identity_equal_rows=%zu identity_different_rows=%zu out=%s "
+            "evidence=%s references=%s\n",
+            processed_snapshots, segments.size(), audio.DurationSec(),
+            registry_description, stage.enrolled_count(),
+            comparison.captured_rows, comparison.equal_rows,
+            comparison.different_rows, output_path.c_str(),
+            evidence_path.c_str(), reference_path.c_str());
+      }
       if (comparison.first_different_snapshot >= 0) {
         std::printf(
             "first_identity_difference snapshot=%ld row=%zu captured=%s "

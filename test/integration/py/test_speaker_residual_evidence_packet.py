@@ -51,6 +51,44 @@ class SpeakerResidualEvidencePacketTest(unittest.TestCase):
                 ])
         return window_path, state_path
 
+    def write_gallery_fixture(self, root):
+        reference_path = root / "identity-references.tsv"
+        with reference_path.open("w", encoding="utf-8", newline="") as output:
+            writer = csv.writer(output, delimiter="\t", lineterminator="\n")
+            writer.writerow(
+                speaker_residual_evidence_packet.IDENTITY_REFERENCE_COLUMNS)
+            writer.writerow([
+                "identity_ref:0:0:0", 0, "0.000000000", "spk_a",
+                "1.200000000", "3.200000000", 24000, 40000,
+                "1.500000000", "2.500000000", "1.800000000",
+            ])
+            writer.writerow([
+                "identity_ref:1:0:0", 1, "0.000000000", "spk_b",
+                "5.000000000", "5.800000000", 81600, 91200,
+                "5.100000000", "5.700000000", "0.700000000",
+            ])
+
+        evidence_path = root / "gallery-evidence.tsv"
+        with evidence_path.open("w", encoding="utf-8", newline="") as output:
+            writer = csv.writer(output, delimiter="\t", lineterminator="\n")
+            writer.writerow(
+                speaker_residual_evidence_packet.GALLERY_INDEPENDENCE_COLUMNS)
+            writer.writerow([
+                "query:0", "phrase", 7, 0, 2, "1.200000000",
+                "2.000000000", 1, 1, 1, "spk_a:0.700000000",
+                "spk_a:0.600000000", 19200, 32000, 1, 0, 0,
+                "spk_b:0.200000000", "spk_b:0.100000000",
+                "identity_ref:0:0:0",
+            ])
+            writer.writerow([
+                "query:1", "phrase", 8, 0, 2, "5.000000000",
+                "5.500000000", 1, 1, 1, "spk_b:0.800000000",
+                "spk_b:0.700000000", 80000, 88000, 1, 0, 0,
+                "spk_a:0.100000000", "spk_a:0.050000000",
+                "identity_ref:1:0:0",
+            ])
+        return reference_path, evidence_path
+
     def write_fixture(self, root):
         reference_path = root / "reference.txt"
         reference_path.write_text(
@@ -282,6 +320,66 @@ class SpeakerResidualEvidencePacketTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 speaker_residual_evidence_packet.export_packet(
                     *inputs[:5], root / "packet", window_path, state_path)
+
+    def test_exports_gallery_provenance_without_interpretation(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            inputs = self.write_fixture(root)
+            reference_path, evidence_path = self.write_gallery_fixture(root)
+            out_dir = root / "packet"
+            result = speaker_residual_evidence_packet.export_packet(
+                *inputs[:5], out_dir,
+                identity_reference_path=reference_path,
+                gallery_independence_path=evidence_path)
+
+            with (out_dir / "identity-retained-references.tsv").open(
+                    encoding="utf-8", newline="") as source:
+                all_references = list(csv.DictReader(source, delimiter="\t"))
+            context_dir = out_dir / "ref-0002"
+            with (context_dir / "identity-retained-references.tsv").open(
+                    encoding="utf-8", newline="") as source:
+                context_references = list(
+                    csv.DictReader(source, delimiter="\t"))
+            with (context_dir / "gallery-independence-evidence.tsv").open(
+                    encoding="utf-8", newline="") as source:
+                context_evidence = list(csv.DictReader(source, delimiter="\t"))
+            self.assertEqual(len(all_references), 2)
+            self.assertEqual(
+                [row["evidence_id"] for row in context_references],
+                ["identity_ref:0:0:0"])
+            self.assertEqual(
+                [row["evidence_id"] for row in context_evidence], ["query:0"])
+            self.assertEqual(
+                result["sources"]["identity_retained_references"]["sha256"],
+                hashlib.sha256(reference_path.read_bytes()).hexdigest())
+            retained_context = (
+                out_dir / "retained-reference-contexts" /
+                "identity_ref_0_0_0" / "reference-sections.md")
+            self.assertIn(
+                "Assigned global identity: `spk_a`",
+                retained_context.read_text(encoding="utf-8"))
+            chronological = (
+                out_dir / "retained-references-chronological.md").read_text(
+                    encoding="utf-8")
+            reverse = (
+                out_dir / "retained-references-reverse.md").read_text(
+                    encoding="utf-8")
+            self.assertLess(
+                chronological.index("identity_ref:0:0:0"),
+                chronological.index("identity_ref:1:0:0"))
+            self.assertLess(
+                reverse.index("identity_ref:1:0:0"),
+                reverse.index("identity_ref:0:0:0"))
+
+    def test_rejects_unpaired_gallery_provenance(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            inputs = self.write_fixture(root)
+            reference_path, _ = self.write_gallery_fixture(root)
+            with self.assertRaises(ValueError):
+                speaker_residual_evidence_packet.export_packet(
+                    *inputs[:5], root / "packet",
+                    identity_reference_path=reference_path)
 
     def test_rejects_context_columns_that_could_carry_judgments(self):
         with tempfile.TemporaryDirectory() as temp:

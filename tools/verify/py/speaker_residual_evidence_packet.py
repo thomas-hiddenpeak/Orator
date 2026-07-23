@@ -47,6 +47,22 @@ VAD_STATE_COLUMNS = [
     "active_stable_until_sample", "active_stable_until_sec",
     "silence_stable_until_sample", "silence_stable_until_sec",
 ]
+IDENTITY_REFERENCE_COLUMNS = [
+    "evidence_id", "local_speaker", "epoch_start_sec", "speaker_id",
+    "source_start_sec", "source_end_sec", "embedding_start_sample",
+    "embedding_end_sample", "embedding_start_sec", "embedding_end_sec",
+    "quality",
+]
+GALLERY_INDEPENDENCE_COLUMNS = [
+    "evidence_id", "kind", "text_id", "source_start", "source_end",
+    "start", "end", "embedding_available", "session_gallery_complete",
+    "robust_gallery_complete", "session_scores", "robust_scores",
+    "query_embedding_start_sample", "query_embedding_end_sample",
+    "nonoverlap_embedding_available",
+    "nonoverlap_session_gallery_complete",
+    "nonoverlap_robust_gallery_complete", "nonoverlap_session_scores",
+    "nonoverlap_robust_scores", "intersecting_reference_ids",
+]
 REFERENCE_TS_RE = re.compile(r"^(\d{2}):(\d{2}):(\d{2})\s+(.+?)\s*$")
 REFERENCE_ID_RE = re.compile(r"^(?:ref-)?(\d{4})$")
 
@@ -171,6 +187,129 @@ def verify_vad_state_evidence(
             if frontier < -1 or abs(frontier_sec - expected_sec) > 1e-9:
                 raise ValueError("VAD state time differs from sample frontier")
         prior_observed = observed
+
+
+def parse_evidence_bool(value: str, field: str) -> bool:
+    if value not in ("0", "1"):
+        raise ValueError(f"{field} is not a zero/one boolean")
+    return value == "1"
+
+
+def parse_evidence_scores(value: str, field: str) -> None:
+    seen = set()
+    if not value:
+        return
+    for item in value.split(","):
+        speaker_id, separator, raw_score = item.rpartition(":")
+        score = float(raw_score)
+        if (not separator or not speaker_id or speaker_id in seen or
+                not math.isfinite(score)):
+            raise ValueError(f"{field} contains an invalid score")
+        seen.add(speaker_id)
+
+
+def verify_identity_references(
+    evidence: RawTsvEvidence, sample_rate: int,
+) -> dict[str, tuple[int, int]]:
+    references = {}
+    prior_key = None
+    for row in evidence.rows:
+        match = re.fullmatch(r"identity_ref:(\d+):(\d+):(\d+)",
+                             row["evidence_id"])
+        if match is None or row["evidence_id"] in references:
+            raise ValueError("identity reference ID is invalid or duplicated")
+        key = tuple(int(value) for value in match.groups())
+        if prior_key is not None and key <= prior_key:
+            raise ValueError("identity references are not ordered")
+        local_speaker = int(row["local_speaker"])
+        if local_speaker != key[0] or not row["speaker_id"]:
+            raise ValueError("identity reference owner is invalid")
+        epoch_start = float(row["epoch_start_sec"])
+        source_start = float(row["source_start_sec"])
+        source_end = float(row["source_end_sec"])
+        embed_start = int(row["embedding_start_sample"])
+        embed_end = int(row["embedding_end_sample"])
+        embed_start_sec = float(row["embedding_start_sec"])
+        embed_end_sec = float(row["embedding_end_sec"])
+        quality = float(row["quality"])
+        values = (
+            epoch_start, source_start, source_end, embed_start_sec,
+            embed_end_sec, quality,
+        )
+        if not all(math.isfinite(value) for value in values):
+            raise ValueError("identity reference contains a non-finite value")
+        if (epoch_start < 0.0 or source_start < epoch_start - 1e-6 or
+                source_end <= source_start or embed_start < 0 or
+                embed_end <= embed_start or quality < 0.0):
+            raise ValueError("identity reference bounds are invalid")
+        if (abs(embed_start_sec - embed_start / sample_rate) > 1e-9 or
+                abs(embed_end_sec - embed_end / sample_rate) > 1e-9):
+            raise ValueError("identity reference sample/time bounds differ")
+        if (embed_start_sec < source_start - 1e-6 or
+                embed_end_sec > source_end + 1e-6):
+            raise ValueError("identity embedding lies outside its source")
+        references[row["evidence_id"]] = (embed_start, embed_end)
+        prior_key = key
+    return references
+
+
+def verify_gallery_independence_evidence(
+    evidence: RawTsvEvidence,
+    references: dict[str, tuple[int, int]],
+) -> None:
+    seen = set()
+    for row in evidence.rows:
+        evidence_id = row["evidence_id"]
+        if not evidence_id or evidence_id in seen or not row["kind"]:
+            raise ValueError("gallery query ID is invalid or duplicated")
+        seen.add(evidence_id)
+        start = float(row["start"])
+        end = float(row["end"])
+        if (not math.isfinite(start) or not math.isfinite(end) or
+                start < 0.0 or end <= start):
+            raise ValueError("gallery query bounds are invalid")
+        embedding_available = parse_evidence_bool(
+            row["embedding_available"], "embedding_available")
+        parse_evidence_bool(
+            row["session_gallery_complete"],
+            "session_gallery_complete")
+        parse_evidence_bool(
+            row["robust_gallery_complete"], "robust_gallery_complete")
+        nonoverlap_available = parse_evidence_bool(
+            row["nonoverlap_embedding_available"],
+            "nonoverlap_embedding_available")
+        parse_evidence_bool(
+            row["nonoverlap_session_gallery_complete"],
+            "nonoverlap_session_gallery_complete")
+        parse_evidence_bool(
+            row["nonoverlap_robust_gallery_complete"],
+            "nonoverlap_robust_gallery_complete")
+        if embedding_available != nonoverlap_available:
+            raise ValueError("inclusive/nonoverlap embedding availability differs")
+        for field in (
+                "session_scores", "robust_scores",
+                "nonoverlap_session_scores", "nonoverlap_robust_scores"):
+            parse_evidence_scores(row[field], field)
+        query_start = int(row["query_embedding_start_sample"])
+        query_end = int(row["query_embedding_end_sample"])
+        if embedding_available:
+            if query_start < 0 or query_end <= query_start:
+                raise ValueError("gallery query sample bounds are invalid")
+        elif query_start != 0 or query_end != 0:
+            raise ValueError("unavailable gallery query has sample bounds")
+        listed = tuple(
+            item for item in row["intersecting_reference_ids"].split(",")
+            if item)
+        if len(set(listed)) != len(listed):
+            raise ValueError("gallery query repeats an intersecting reference")
+        expected = []
+        if embedding_available:
+            for reference_id, (reference_start, reference_end) in references.items():
+                if min(query_end, reference_end) > max(
+                        query_start, reference_start):
+                    expected.append(reference_id)
+        if listed != tuple(expected):
+            raise ValueError("gallery query/reference intersections differ")
 
 
 def write_json(path: Path, value: Any) -> None:
@@ -653,6 +792,83 @@ def render_reference(
     return "\n".join(lines)
 
 
+def retained_reference_blocks(
+    blocks: list[ReferenceBlock], row: dict[str, str],
+) -> list[ReferenceBlock]:
+    start = float(row["source_start_sec"])
+    end = float(row["source_end_sec"])
+    selected = [
+        index for index, block in enumerate(blocks)
+        if (interval_intersects(start, end, block.start, block.end) or
+            start - EPSILON <= block.start <= end + EPSILON)
+    ]
+    if not selected:
+        following = [
+            index for index, block in enumerate(blocks)
+            if block.start > end + EPSILON
+        ]
+        anchor = following[0] if following else len(blocks) - 1
+        selected = [anchor]
+    first = max(0, selected[0] - 1)
+    last = min(len(blocks), selected[-1] + 2)
+    return blocks[first:last]
+
+
+def render_retained_reference(
+    row: dict[str, str], blocks: list[ReferenceBlock],
+) -> str:
+    lines = [
+        "# Retained Identity Reference Context",
+        "",
+        f"- Evidence: `{row['evidence_id']}`",
+        f"- Local speaker: `{row['local_speaker']}`",
+        f"- Identity epoch start: `{row['epoch_start_sec']}`",
+        f"- Assigned global identity: `{row['speaker_id']}`",
+        "- Source bounds: "
+        f"`{row['source_start_sec']}-{row['source_end_sec']}`",
+        "- Embedded bounds: "
+        f"`{row['embedding_start_sec']}-{row['embedding_end_sec']}`",
+        f"- Existing selection quality: `{row['quality']}`",
+        "- Purpose: raw provenance display for contextual review only.",
+        "",
+    ]
+    for block in blocks:
+        issue = f" ({block.interval_issue})" if block.interval_issue else ""
+        lines.extend([
+            f"## {block.reference_id}",
+            "",
+            f"- Source interval: `{block.start:.3f}-{block.end:.3f}`{issue}",
+            f"- Reference speaker: `{block.speaker}`",
+            f"- Reference text: {block.text}",
+            "",
+        ])
+    return "\n".join(lines)
+
+
+def render_retained_reference_sequence(
+    rows: list[dict[str, str]], blocks: list[ReferenceBlock], reverse: bool,
+) -> str:
+    ordered = sorted(rows, key=lambda row: (
+        float(row["source_start_sec"]), float(row["source_end_sec"]),
+        row["evidence_id"]), reverse=reverse)
+    direction = "Reverse" if reverse else "Chronological"
+    sections = [
+        f"# Retained Identity References: {direction}",
+        "",
+        "This file orders raw retained-reference provenance for contextual "
+        "review only. It contains no automated speaker judgment.",
+    ]
+    for row in ordered:
+        sections.extend([
+            "",
+            "---",
+            "",
+            render_retained_reference(
+                row, retained_reference_blocks(blocks, row)),
+        ])
+    return "\n".join(sections)
+
+
 def write_context_tsv(path: Path, context: Context) -> None:
     with path.open("w", encoding="utf-8", newline="") as destination:
         writer = csv.writer(destination, delimiter="\t", lineterminator="\n")
@@ -717,6 +933,28 @@ def context_vad_states(
     return [evidence.rows[index] for index in sorted(selected)]
 
 
+def context_gallery_evidence(
+    evidence: RawTsvEvidence, context: Context,
+) -> list[dict[str, str]]:
+    return [
+        row for row in evidence.rows
+        if interval_intersects(
+            float(row["start"]), float(row["end"]),
+            context.start, context.end)
+    ]
+
+
+def context_identity_references(
+    evidence: RawTsvEvidence, context: Context,
+) -> list[dict[str, str]]:
+    return [
+        row for row in evidence.rows
+        if interval_intersects(
+            float(row["source_start_sec"]),
+            float(row["source_end_sec"]), context.start, context.end)
+    ]
+
+
 def write_content_manifest(root: Path) -> Path:
     manifest_path = root / "content.sha256"
     rows = []
@@ -738,9 +976,15 @@ def export_packet(
     out_dir: Path,
     vad_window_path: Path | None = None,
     vad_state_path: Path | None = None,
+    identity_reference_path: Path | None = None,
+    gallery_independence_path: Path | None = None,
 ) -> dict[str, Any]:
     if (vad_window_path is None) != (vad_state_path is None):
         raise ValueError("raw VAD window and state evidence must be paired")
+    if ((identity_reference_path is None) !=
+            (gallery_independence_path is None)):
+        raise ValueError(
+            "identity references and gallery evidence must be paired")
     contexts = load_contexts(contexts_path)
     package = load_json(artifact_path)
     timeline, tracks = timeline_and_tracks(package)
@@ -749,6 +993,9 @@ def export_packet(
     audio_sec = float(timeline.get("audio_sec", 0.0))
     if audio_sec <= 0.0:
         raise ValueError("timeline audio_sec is invalid")
+    sample_rate = int(timeline.get("sample_rate", 0))
+    if sample_rate <= 0:
+        raise ValueError("timeline sample rate is invalid")
     blocks = load_reference(reference_path, audio_sec)
     header, posterior, frame_period, speaker_columns = load_posterior(
         posterior_path)
@@ -759,11 +1006,20 @@ def export_packet(
     if vad_window_path is not None and vad_state_path is not None:
         vad_windows = load_raw_tsv(vad_window_path, VAD_WINDOW_COLUMNS)
         vad_states = load_raw_tsv(vad_state_path, VAD_STATE_COLUMNS)
-        sample_rate = int(timeline.get("sample_rate", 0))
-        if sample_rate <= 0:
-            raise ValueError("timeline sample rate is invalid")
         verify_vad_window_evidence(vad_windows, sample_rate)
         verify_vad_state_evidence(vad_states, sample_rate)
+    identity_references = None
+    gallery_independence = None
+    if (identity_reference_path is not None and
+            gallery_independence_path is not None):
+        identity_references = load_raw_tsv(
+            identity_reference_path, IDENTITY_REFERENCE_COLUMNS)
+        gallery_independence = load_raw_tsv(
+            gallery_independence_path, GALLERY_INDEPENDENCE_COLUMNS)
+        reference_bounds = verify_identity_references(
+            identity_references, sample_rate)
+        verify_gallery_independence_evidence(
+            gallery_independence, reference_bounds)
     epochs = derive_identity_epochs(tracks["diarization"], audio_sec)
     reference_by_context = {
         context.context_id: context_reference(blocks, context)
@@ -772,6 +1028,32 @@ def export_packet(
 
     out_dir.mkdir(parents=True, exist_ok=False)
     write_epochs(out_dir / "local-identity-epochs.tsv", epochs)
+    if identity_references is not None:
+        write_raw_tsv(
+            out_dir / "identity-retained-references.tsv",
+            identity_references, list(identity_references.rows))
+        reference_context_root = out_dir / "retained-reference-contexts"
+        reference_context_root.mkdir()
+        for row in identity_references.rows:
+            reference_dir = reference_context_root / row["evidence_id"].replace(
+                ":", "_")
+            reference_dir.mkdir()
+            write_raw_tsv(
+                reference_dir / "identity-reference.tsv",
+                identity_references, [row])
+            (reference_dir / "reference-sections.md").write_text(
+                render_retained_reference(
+                    row, retained_reference_blocks(blocks, row)),
+                encoding="utf-8")
+        reference_rows = list(identity_references.rows)
+        (out_dir / "retained-references-chronological.md").write_text(
+            render_retained_reference_sequence(
+                reference_rows, blocks, reverse=False),
+            encoding="utf-8")
+        (out_dir / "retained-references-reverse.md").write_text(
+            render_retained_reference_sequence(
+                reference_rows, blocks, reverse=True),
+            encoding="utf-8")
     for context in contexts:
         context_dir = out_dir / context.context_id
         context_dir.mkdir()
@@ -803,6 +1085,16 @@ def export_packet(
             write_raw_tsv(
                 context_dir / "vad-endpoint-states.tsv", vad_states,
                 context_vad_states(vad_states, context))
+        if (identity_references is not None and
+                gallery_independence is not None):
+            write_raw_tsv(
+                context_dir / "identity-retained-references.tsv",
+                identity_references,
+                context_identity_references(identity_references, context))
+            write_raw_tsv(
+                context_dir / "gallery-independence-evidence.tsv",
+                gallery_independence,
+                context_gallery_evidence(gallery_independence, context))
 
     packet_manifest = {
         "schema_version": 1,
@@ -869,6 +1161,16 @@ def export_packet(
             "path": str(vad_state_path.resolve()),
             "sha256": sha256_file(vad_state_path),
         }
+    if (identity_reference_path is not None and
+            gallery_independence_path is not None):
+        packet_manifest["sources"]["identity_retained_references"] = {
+            "path": str(identity_reference_path.resolve()),
+            "sha256": sha256_file(identity_reference_path),
+        }
+        packet_manifest["sources"]["gallery_independence_evidence"] = {
+            "path": str(gallery_independence_path.resolve()),
+            "sha256": sha256_file(gallery_independence_path),
+        }
     write_json(out_dir / "packet-manifest.json", packet_manifest)
     content_manifest = write_content_manifest(out_dir)
     packet_manifest["content_manifest_sha256"] = sha256_file(content_manifest)
@@ -885,6 +1187,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--out-dir", required=True)
     parser.add_argument("--vad-window-probabilities")
     parser.add_argument("--vad-endpoint-states")
+    parser.add_argument("--identity-retained-references")
+    parser.add_argument("--gallery-independence-evidence")
     return parser.parse_args(argv)
 
 
@@ -901,6 +1205,12 @@ def main(argv: list[str]) -> int:
                          if args.vad_window_probabilities else None),
         vad_state_path=(Path(args.vad_endpoint_states)
                         if args.vad_endpoint_states else None),
+        identity_reference_path=(
+            Path(args.identity_retained_references)
+            if args.identity_retained_references else None),
+        gallery_independence_path=(
+            Path(args.gallery_independence_evidence)
+            if args.gallery_independence_evidence else None),
     )
     print(json.dumps({
         "kind": result["kind"],
