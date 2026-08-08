@@ -1,8 +1,8 @@
 # Spec 014: ASR, VAD Endpoint, and Live Transcript Closing
 
 - **Feature**: `014-asr-vad-closing`
-- **Status**: Phase 1 current-commit seal complete (2026-08-09); Phase 2
-  silence and full baseline authorized
+- **Status**: Phase 1 and Phase 2 digital-silence gate complete (2026-08-09);
+  full current-config baseline next
 - **Owner**: project owner
 - **Constitution**: v1.7.0
 - **Depends on**: Spec 003 (streaming ASR), Spec 004 (typed comprehensive
@@ -56,6 +56,11 @@ The following facts define the start of this work:
    ASR meaning failures and duplicate unchanged Live partial delivery. See
    `current-commit-seal-2026-08-09.md`. No product gate is advanced by that
    bounded seal.
+7. Three independent 30-second digital-silence sessions at clean commit
+   `f1d0e05` pass their mechanical contracts and direct event-by-event review.
+   Each output makes no speech assertion and contains no substantive live or
+   final transcript. See `digital-silence-review-2026-08-09.md`. Physical
+   microphone room tone and background-noise behavior remain open.
 
 ## 3. Objective and Claim Boundary
 

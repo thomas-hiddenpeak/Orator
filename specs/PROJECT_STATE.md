@@ -14,24 +14,30 @@ work is specified under [specs/](.).
 > pass is the consistency proof. Status lines advance to `Implemented` in the
 > same change that lands the code, with the commit reference.
 
-- **Last updated**: 2026-08-09 (Spec 014 Phase 1 current-commit seal complete;
-  Phase 2 silence and full baseline authorized; no runtime behavior or product
-  gate changed)
+- **Last updated**: 2026-08-09 (Spec 014 current-commit seal and three-run
+  digital-silence gate complete; full current-config baseline next; no runtime
+  behavior changed)
 - **Branch**: `master`
 - **Constitution**: v1.7.0
-- **Active focused work**: **Spec 014 Phase 1 is complete and Phase 2 is
-  authorized.** The runtime starts at clean `1417334`; the seal was captured at
-  docs-only commit `41c8999`, with speaker behavior frozen at FR50 `a6f0d33`.
+- **Active focused work**: **Spec 014 Phase 1 and the Phase 2 digital-silence
+  gate are complete.** The runtime starts at clean `1417334`; the seal was
+  captured at docs-only commit `41c8999`, with speaker behavior frozen at FR50
+  `a6f0d33`.
   A warning-clean build, all `74/74` tests, and two independent 120-second
   real-WebSocket runs pass their engineering/mechanical contracts. Complete
   chronological and reverse contextual readings preserve the FR50 speaker
   boundary while exposing critical ASR negation/relationship failures and a
   duplicate unchanged-partial Live delivery defect. Historical FR50 raw A/B
-  JSON remains unavailable, so Phase 2 now captures three silence sessions and
-  one persistent full current-config baseline under `artifacts/spec014/` before
-  selecting a correction. No ASR, VAD, TOML, speaker, or Web UI behavior has
-  changed at this checkpoint. See
-  [current-commit-seal-2026-08-09.md](014-asr-vad-closing/current-commit-seal-2026-08-09.md).
+  JSON remains unavailable. At clean commit `f1d0e05`, three independent
+  30-second digital-silence runs each received direct review of every event and
+  terminal track; none asserts speech or contains substantive live/final text.
+  This closes the generated-silence gate only; microphone room tone remains
+  open. Phase 2 now captures one persistent full current-config baseline under
+  `artifacts/spec014/` before selecting a correction. No ASR, VAD, TOML,
+  speaker, or Web UI behavior has changed at this checkpoint. See
+  [current-commit-seal-2026-08-09.md](014-asr-vad-closing/current-commit-seal-2026-08-09.md)
+  and
+  [digital-silence-review-2026-08-09.md](014-asr-vad-closing/digital-silence-review-2026-08-09.md).
 - **Speaker-business closure**: **CURRENT REAL-PATH BASELINE `525/556`;
   SPEAKER-TIME GATES PASS; 19 CRITICAL RESIDUALS REMAIN; FULL CANONICAL
   CLOSURE OPEN**. FR49's
@@ -1105,7 +1111,7 @@ Findings:
 - [specs/013-industrial-closing-validation/fr56-speaker-producer-boundary-review-2026-07-23.md](013-industrial-closing-validation/fr56-speaker-producer-boundary-review-2026-07-23.md) - **FR56 complete; producer experiment rejected**. Four independent complete-context readings find only `ref-0499` adjacent to an identity epoch change. Its accepted controls reject moving the boundary backward, while the other nine contexts are distinct stable-epoch source or producer conflicts. T257 stops without a diagnostic trace, runtime/TOML/model/product-run/ledger/baseline change, or closure claim.
 - [specs/013-industrial-closing-validation/fr57-speaker-time-review-2026-07-23.md](013-industrial-closing-validation/fr57-speaker-time-review-2026-07-23.md) - **FR57 and T102 complete; time gates pass; canonical closure remains open**. Four independent complete-context readings and independently repeated manual additions sign each FR50 run at 3529/3612 source seconds, approximately 97.70 percent. Every complete 600-second block and canonical speaker passes the 90.0 percent floor. The 19 critical residuals and 26 confidently wrong natural contributions remain separate failures.
 - [specs/013-industrial-closing-validation/fr58-auxiliary-streaming-context-review-2026-07-23.md](013-industrial-closing-validation/fr58-auxiliary-streaming-context-review-2026-07-23.md) - **FR58 complete; auxiliary production experiment rejected**. Two exact high-context captures are byte-repeatable and pass the registered numerical gate. Four independent complete-context readings find only `ref-0499` with genuinely complementary critical activity, but its global identity is unresolved and concurrent activity remains. Other short islands duplicate the accepted producer or lack writable source boundaries. T267 stops without runtime, TOML, model, product-run, ledger, baseline, or closure change.
-- [specs/014-asr-vad-closing/spec.md](014-asr-vad-closing/spec.md) - **Phase 1 current-commit seal complete; Phase 2 authorized (2026-08-09)**. This focused spec freezes FR50 speaker behavior while establishing silence, full contextual ASR, VAD endpoint, Live/Final, microphone, and browser evidence. Its warning-clean build, `74/74` tests, repeated 120-second real-WebSocket runs, and complete forward/reverse contextual review are recorded in [current-commit-seal-2026-08-09.md](014-asr-vad-closing/current-commit-seal-2026-08-09.md). The seal exposes critical ASR meaning and duplicate-partial Live defects but changes no behavior and closes no product gate. New raw artifacts remain under gitignored `artifacts/spec014/`; every candidate value stays TOML-owned and every product judgment remains context-only.
+- [specs/014-asr-vad-closing/spec.md](014-asr-vad-closing/spec.md) - **Current-commit seal and three-run digital-silence gate complete; full baseline next (2026-08-09)**. This focused spec freezes FR50 speaker behavior while establishing full contextual ASR, VAD endpoint, Live/Final, microphone, and browser evidence. The warning-clean build, `74/74` tests, repeated 120-second real-WebSocket runs, and complete forward/reverse contextual review are recorded in [current-commit-seal-2026-08-09.md](014-asr-vad-closing/current-commit-seal-2026-08-09.md). Three independent digital-silence sessions are directly reviewed in [digital-silence-review-2026-08-09.md](014-asr-vad-closing/digital-silence-review-2026-08-09.md); none contains a speech assertion or substantive transcript. The generated-silence gate does not cover microphone room tone. No behavior changed; new raw artifacts remain under gitignored `artifacts/spec014/`, every candidate value stays TOML-owned, and every product judgment remains context-only.
 
 ## 7. Immediate next step
 
@@ -1153,14 +1159,16 @@ Sortformer/TitaNet/VAD/alignment evidence line has therefore reached its
 documented speaker ceiling. Speaker behavior stays frozen at FR50 until new
 business data or an independently useful deployable signal exists.
 
-The immediate execution priority is Spec 014 Phase 2. Phase 1 is sealed at
+The immediate execution priority is the Spec 014 full current-config baseline.
+Phase 1 is sealed at
 docs-only commit `41c8999`: the warning-clean build, all `74/74` tests, and two
 independent 120-second real-WebSocket runs pass engineering/mechanical
 contracts, while complete forward/reverse contextual readings preserve the
 FR50 speaker boundary and expose unresolved critical ASR meaning plus duplicate
-unchanged Live partial delivery. Run three independent digital-silence sessions
-next, then capture one complete current-config `test.mp3` baseline under
-gitignored `artifacts/spec014/`. Read all 556 contributions chronologically and
+unchanged Live partial delivery. Three independent digital-silence sessions
+subsequently pass direct event-by-event contextual review at `f1d0e05`; room
+tone remains a later microphone gate. Capture one complete current-config
+`test.mp3` baseline under gitignored `artifacts/spec014/` next. Read all 556 contributions chronologically and
 in reverse fixed windows before selecting any correction. Keep speaker/diarizer
 values unchanged; all candidate behavior is TOML-owned, and every accepted full
 ASR candidate receives a complete final-speaker regression review. T084 remains

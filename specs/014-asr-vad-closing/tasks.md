@@ -46,12 +46,15 @@ its named evidence exists. Mechanical checks never assign product correctness.
 
 ## Phase 2: Silence and Full Baseline
 
-- [ ] **T020** Run three independent 30-second digital-silence sessions through
+- [x] **T020** Run three independent 30-second digital-silence sessions through
   the production WebSocket and preserve all raw events, tracks, logs, manifests,
-  and telemetry.
-- [ ] **T021** Review every silence event and terminal document directly; record
+  and telemetry. Runs A/B/C use separate clean processes, isolated storage and
+  registries, `1.0x` pacing, observers, direct `end`, and persistent artifacts.
+- [x] **T021** Review every silence event and terminal document directly; record
   the hallucination conclusion without using an automated label, count, or
-  verdict.
+  verdict. All three independent readings find no speech assertion or
+  substantive live/final transcript. See
+  `digital-silence-review-2026-08-09.md`; microphone room tone remains open.
 - [ ] **T022** Run one clean full-length `test.mp3` baseline at `1.0x`, direct
   `end`, empty isolated registry, and required telemetry; retain it under
   `artifacts/spec014/baseline-1417334/full-a/`.
