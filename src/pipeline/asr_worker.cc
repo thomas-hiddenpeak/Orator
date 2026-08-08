@@ -383,21 +383,24 @@ void AsrWorker::EmitIncrementalChunk(const float* samples, int n,
           VadSupportsLiveText(tb_.SecondsAt(inc_seg_start_sample_),
                               tb_.SecondsAt(inc_seg_end_sample_), vad);
     }
-    if (expose_partial && text_sink_ && inc_live_text_ != inc_delivered_text_) {
-      text_sink_(inc_text_id_, tb_.SecondsAt(inc_seg_start_sample_),
-                 tb_.SecondsAt(inc_seg_end_sample_), inc_live_text_,
-                 /*is_final=*/false);
+    const bool partial_changed = inc_live_text_ != inc_delivered_text_;
+    if (expose_partial && partial_changed) {
+      if (text_sink_) {
+        text_sink_(inc_text_id_, tb_.SecondsAt(inc_seg_start_sample_),
+                   tb_.SecondsAt(inc_seg_end_sample_), inc_live_text_,
+                   /*is_final=*/false);
+      }
+      if (emit_ && !inc_live_text_.empty()) {
+        char buf[192];
+        std::snprintf(buf, sizeof(buf),
+                      "{\"type\":\"asr_partial\",\"source\":\"qwen3_asr\","
+                      "\"text_id\":%ld,\"start\":%.9f,\"end\":%.9f,"
+                      "\"text\":\"",
+                      inc_text_id_, tb_.SecondsAt(inc_seg_start_sample_),
+                      tb_.SecondsAt(inc_seg_end_sample_));
+        emit_(std::string(buf) + JsonEscape(inc_live_text_) + "\"}");
+      }
       inc_delivered_text_ = inc_live_text_;
-    }
-    if (expose_partial && emit_ && !inc_live_text_.empty()) {
-      char buf[192];
-      std::snprintf(buf, sizeof(buf),
-                    "{\"type\":\"asr_partial\",\"source\":\"qwen3_asr\","
-                    "\"text_id\":%ld,\"start\":%.9f,\"end\":%.9f,"
-                    "\"text\":\"",
-                    inc_text_id_, tb_.SecondsAt(inc_seg_start_sample_),
-                    tb_.SecondsAt(inc_seg_end_sample_));
-      emit_(std::string(buf) + JsonEscape(inc_live_text_) + "\"}");
     }
   }
 }

@@ -79,21 +79,36 @@ its named evidence exists. Mechanical checks never assign product correctness.
 
 ## Phase 3: Evidence-Driven ASR/VAD Corrections
 
-- [ ] **T030** Trace the selected defect through publication, typed VAD
+- [x] **T030** Trace the selected defect through publication, typed VAD
   frontiers, admitted PCM samples, decoder-session boundaries, forced alignment,
-  business projection, and Web UI state on the common sample clock.
-- [ ] **T031** Specify one reference-free correction and its abstention/control
+  business projection, and Web UI state on the common sample clock. The direct
+  `emit_` path sits outside the existing `inc_delivered_text_` state-change
+  guard; typed partials already suppress the unchanged decoder text.
+- [x] **T031** Specify one reference-free correction and its abstention/control
   boundary. Choose code correction or one-variable isolated TOML candidate; do
-  not change speaker/diarizer behavior.
-- [ ] **T032** Add or strengthen focused engineering tests for the root cause.
+  not change speaker/diarizer behavior. One direct partial event is permitted
+  per distinct non-empty text state for the active `text_id`; final and retract
+  publication remain independent. This is a code defect and needs no TOML
+  parameter.
+- [x] **T032** Add or strengthen focused engineering tests for the root cause.
   If model values can change, run and record the trusted numerical oracle.
-- [ ] **T033** Implement the smallest correction. Keep all tunable behavior in
-  typed TOML and leave the checked-in TOML unchanged until promotion.
-- [ ] **T034** Pass warning-clean build, complete CTest, and applicable UI tests.
-- [ ] **T035** Pass three independent silence sessions by direct contextual
-  review.
-- [ ] **T036** Pass two 120-second real-WebSocket captures and complete
-  forward/reverse contextual review.
+  `test_asr_worker` covers unchanged typed/direct publication, direct-only
+  publication, changed-text order, final IDs, VAD order, silence, gaps, and
+  terminal drain. No model value changed, so no numerical oracle applies.
+- [x] **T033** Implement the smallest correction. Keep all tunable behavior in
+  typed TOML and leave the checked-in TOML unchanged until promotion. Typed and
+  direct partial sinks now share one `partial_changed` branch; no parameter or
+  final/retract/model/endpoint path changed.
+- [x] **T034** Pass warning-clean build, complete CTest, and applicable UI tests.
+  The complete build is warning-clean and all `74/74` tests pass, including the
+  registered JavaScript and real-WebSocket tests.
+- [x] **T035** Pass three independent silence sessions by direct contextual
+  review. Each complete event stream and terminal document contains no speech
+  assertion or substantive live/final transcript.
+- [x] **T036** Pass two 120-second real-WebSocket captures and complete
+  forward/reverse contextual review. Both remove unchanged Live repeats, retain
+  exact canonical final product tracks, and preserve all prior ASR and speaker
+  judgments. See `live-partial-publication-review-2026-08-09.md`.
 - [ ] **T037** Pass one 360-second real-WebSocket capture and complete
   forward/reverse contextual review.
 - [ ] **T038** Pass one 600-second real-WebSocket capture and complete

@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <numeric>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "core/stages.h"
@@ -30,11 +31,19 @@ class FakeAsr final : public orator::core::IAsr {
   std::string StreamChunk(const float* pcm, int n, cudaStream_t) override {
     chunk_sizes.push_back(n);
     fed_samples.insert(fed_samples.end(), pcm, pcm + n);
+    if (stream_output_pos_ < stream_outputs_.size()) {
+      current_ = stream_outputs_[stream_output_pos_++];
+    }
     return current_;
   }
   std::string StreamFinalize(cudaStream_t) override { return current_; }
   int stream_audio_tokens() const override { return 1; }
   std::string name() const override { return "fake_asr"; }
+
+  void SetStreamOutputs(std::vector<std::string> outputs) {
+    stream_outputs_ = std::move(outputs);
+    stream_output_pos_ = 0;
+  }
 
   std::vector<long> reset_positions;
   std::vector<int> chunk_sizes;
@@ -42,6 +51,8 @@ class FakeAsr final : public orator::core::IAsr {
 
  private:
   std::string current_;
+  std::vector<std::string> stream_outputs_;
+  size_t stream_output_pos_ = 0;
 };
 
 struct FinalRecord {
@@ -61,6 +72,46 @@ struct GateTrace {
   std::vector<FinalRecord> finals;
   size_t events_before_evidence = 0;
 };
+
+struct PartialTrace {
+  int typed_partial_count = 0;
+  std::vector<std::string> direct_partials;
+};
+
+PartialTrace RunPartialPublication(std::vector<std::string> decoder_texts,
+                                   bool with_typed_sink) {
+  FakeAsr asr;
+  asr.SetStreamOutputs(std::move(decoder_texts));
+  orator::pipeline::AsrWorker::Params params;
+  params.sample_rate = 100;
+  params.segment_sec = 0.0;
+  params.asr_vad_gate = false;
+
+  PartialTrace trace;
+  std::vector<std::string> events;
+  orator::pipeline::AsrWorker worker(
+      &asr, params,
+      [&events](const std::string& event) { events.push_back(event); },
+      orator::core::TimeBase(100));
+  if (with_typed_sink) {
+    worker.set_text_sink([&trace](long, double, double, const std::string&,
+                                  bool final) {
+      if (!final) ++trace.typed_partial_count;
+    });
+  }
+
+  const std::vector<float> audio(20, 0.25f);
+  worker.ProcessSpan(audio.data(), 10);
+  worker.ProcessSpan(audio.data() + 10, 10);
+  worker.Finalize();
+
+  for (const auto& event : events) {
+    if (event.find("\"type\":\"asr_partial\"") != std::string::npos) {
+      trace.direct_partials.push_back(event);
+    }
+  }
+  return trace;
+}
 
 GateTrace RunPublicationSchedule(int schedule) {
   FakeAsr asr;
@@ -221,6 +272,29 @@ int main() {
   }
   CHECK(final_zero, "first final event reuses sink ID zero");
   CHECK(final_one, "second final event reuses sink ID one");
+
+  const PartialTrace repeated =
+      RunPartialPublication({"speech", "speech"}, /*with_typed_sink=*/true);
+  CHECK(repeated.typed_partial_count == 1,
+        "unchanged decoder text reaches the typed partial sink once");
+  CHECK(repeated.direct_partials.size() == 1,
+        "unchanged decoder text emits one direct partial event");
+
+  const PartialTrace direct_only =
+      RunPartialPublication({"speech", "speech"}, /*with_typed_sink=*/false);
+  CHECK(direct_only.direct_partials.size() == 1,
+        "direct-only publication also suppresses unchanged partial text");
+
+  const PartialTrace changing =
+      RunPartialPublication({"first", "second"}, /*with_typed_sink=*/true);
+  CHECK(changing.typed_partial_count == 2,
+        "two changed decoder texts reach the typed partial sink");
+  CHECK(changing.direct_partials.size() == 2 &&
+            changing.direct_partials[0].find("\"text\":\"first\"") !=
+                std::string::npos &&
+            changing.direct_partials[1].find("\"text\":\"second\"") !=
+                std::string::npos,
+        "changed decoder texts each emit once in publication order");
 
   {
     FakeAsr silent_asr;

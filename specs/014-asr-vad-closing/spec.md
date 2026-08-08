@@ -1,8 +1,9 @@
 # Spec 014: ASR, VAD Endpoint, and Live Transcript Closing
 
 - **Feature**: `014-asr-vad-closing`
-- **Status**: Phase 1 and Phase 2 full current-config baseline complete
-  (2026-08-09); bounded Live publication correction next
+- **Status**: Phase 1 and Phase 2 complete; bounded Live publication candidate
+  passes engineering, three-run silence, and repeated 120-second gates
+  (2026-08-09); 360-second gate next
 - **Owner**: project owner
 - **Constitution**: v1.7.0
 - **Depends on**: Spec 003 (streaming ASR), Spec 004 (typed comprehensive

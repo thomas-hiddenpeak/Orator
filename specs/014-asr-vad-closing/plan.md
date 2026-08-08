@@ -259,7 +259,33 @@ When full A/B pass:
 - create a release tag only after independent report review and every required
   Spec 013 gate is closed.
 
-## 13. Risks and Controls
+## 13. First Bounded Correction: Partial Publication
+
+The signed full baseline freezes publication correctness as the first defect
+class. `AsrWorker::EmitIncrementalChunk` already suppresses an unchanged typed
+partial by comparing `inc_live_text_` with `inc_delivered_text_`, but its direct
+WebSocket `emit_` call currently sits outside that state-change branch. As each
+new audio quantum advances the provisional end time, the same non-empty text is
+therefore emitted again even though the accepted partial state did not change.
+
+The correction is deliberately below all model and endpoint policy:
+
+1. derive one `partial_changed` decision from the active `text_id`'s text;
+2. when exposed and changed, mirror the same new partial to the typed sink and
+   direct WebSocket emitter, then record it as delivered even if one sink is
+   absent;
+3. when exposed and unchanged, publish nothing; and
+4. leave final, retract, VAD, decoder, alignment, speaker, time-base, and TOML
+   behavior unchanged.
+
+A focused `AsrWorker` test must feed two decoder quanta that return identical
+text and prove that the typed sink and direct event stream each receive one
+partial before the final. Existing changing-text, final-ID, VAD-order, silence,
+short-gap, long-gap, and terminal-drain cases remain controls. The real
+WebSocket gate then verifies that repeated unchanged Live events are absent
+without using that mechanical observation to judge transcript correctness.
+
+## 14. Risks and Controls
 
 | Risk | Control |
 |---|---|
@@ -271,7 +297,7 @@ When full A/B pass:
 | UI appears correct while terminal state differs | Compare event, typed, terminal, persisted, exported, and rendered states by stable `text_id` |
 | Temporary artifacts disappear | Store raw evidence under persistent gitignored project artifacts, cite hashes in committed reports |
 
-## 14. Constitution Check
+## 15. Constitution Check
 
 This plan preserves zero runtime dependencies, one common time base, independent
 typed pipelines, production-WebSocket validation, TOML-owned behavior, trusted

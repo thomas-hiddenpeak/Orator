@@ -14,9 +14,9 @@ work is specified under [specs/](.).
 > pass is the consistency proof. Status lines advance to `Implemented` in the
 > same change that lands the code, with the commit reference.
 
-- **Last updated**: 2026-08-09 (Spec 014 full current-config baseline and
-  complete bidirectional contextual review signed; bounded Live publication
-  correction next; no runtime behavior changed)
+- **Last updated**: 2026-08-09 (Spec 014 Live partial publication correction
+  passes engineering, three-run silence, and repeated 120-second gates;
+  360-second gate next; ASR accuracy remains unchanged)
 - **Branch**: `master`
 - **Constitution**: v1.7.0
 - **Active focused work**: **Spec 014 Phase 1 and Phase 2 are complete.** The
@@ -41,13 +41,25 @@ work is specified under [specs/](.).
   ASR semantic fidelity in the 70-79% band; every complete 600-second block and
   the critical-meaning gate fail. Main speaker behavior remains within the
   frozen conditional FR50 boundary, while known speaker residuals remain. The
-  first frozen correction is duplicate unchanged Live partial publication;
-  ASR meaning follows independently. No ASR, VAD, TOML, speaker, or Web UI
-  behavior has changed at this checkpoint. See
+  first frozen correction is duplicate unchanged Live partial publication.
+  The bounded candidate places typed and direct partial publication under one
+  text-state transition guard. A warning-clean build and all `74/74` tests
+  pass. Three independent digital-silence sessions are each read directly and
+  remain free of speech assertions. Two independent 120-second real-WebSocket
+  runs contain 96 actual partial text transitions each and no unchanged
+  adjacent publication, versus 983 events and 887 unchanged repetitions in the
+  unmodified seal. Both candidate terminal product views are exactly identical
+  to the seal after volatile runtime fields are removed. All 18 reference
+  contributions are read chronologically and in reverse for each run; prior
+  ASR failures and the FR50 speaker boundary remain unchanged. The candidate is
+  authorized for 360 seconds, not promoted as an ASR or endpoint improvement.
+  No TOML, model, VAD, endpoint, diarizer, speaker, or final-text behavior has
+  changed. See
   [current-commit-seal-2026-08-09.md](014-asr-vad-closing/current-commit-seal-2026-08-09.md),
   [digital-silence-review-2026-08-09.md](014-asr-vad-closing/digital-silence-review-2026-08-09.md),
+  [full-baseline-context-review-2026-08-09.md](014-asr-vad-closing/full-baseline-context-review-2026-08-09.md),
   and
-  [full-baseline-context-review-2026-08-09.md](014-asr-vad-closing/full-baseline-context-review-2026-08-09.md).
+  [live-partial-publication-review-2026-08-09.md](014-asr-vad-closing/live-partial-publication-review-2026-08-09.md).
 - **Speaker-business closure**: **CURRENT REAL-PATH BASELINE `525/556`;
   SPEAKER-TIME GATES PASS; 19 CRITICAL RESIDUALS REMAIN; FULL CANONICAL
   CLOSURE OPEN**. FR49's

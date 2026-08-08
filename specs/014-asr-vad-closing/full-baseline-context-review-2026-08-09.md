@@ -186,9 +186,11 @@ digital-silence reviews remain free of substantive speech assertions.
 The first correction is limited to duplicate unchanged partial publication.
 Its contract is reference-free:
 
-1. one newly accepted partial state may produce one WebSocket partial event;
-2. polling the same `text_id`, text, and interval again produces no additional
-   external partial event;
+1. one newly accepted non-empty text state may produce one WebSocket partial
+   event;
+2. feeding more audio while the same `text_id` retains the same text produces
+   no additional external partial event; the final event supplies the terminal
+   interval;
 3. a changed partial, retract, or final remains externally visible exactly
    once in publication order; and
 4. typed ASR records, final text, forced alignment, speaker policy, source
