@@ -1,8 +1,8 @@
 # Spec 014: ASR, VAD Endpoint, and Live Transcript Closing
 
 - **Feature**: `014-asr-vad-closing`
-- **Status**: Approved and in progress (2026-08-09); baseline sealing not yet
-  complete
+- **Status**: Phase 1 current-commit seal complete (2026-08-09); Phase 2
+  silence and full baseline authorized
 - **Owner**: project owner
 - **Constitution**: v1.7.0
 - **Depends on**: Spec 003 (streaming ASR), Spec 004 (typed comprehensive
@@ -49,6 +49,13 @@ The following facts define the start of this work:
 5. Qwen3-ASR mel, encoder, and decoder numerical gates have prior evidence. They
    establish implementation parity only; no full contextual ASR product result
    is currently signed.
+6. The clean current-commit seal at documentation commit `41c8999` passes a
+   warning-clean build, all `74/74` registered tests, and two independent
+   120-second real-WebSocket captures. Complete forward/reverse contextual
+   review preserves the FR50 speaker-policy boundary but identifies critical
+   ASR meaning failures and duplicate unchanged Live partial delivery. See
+   `current-commit-seal-2026-08-09.md`. No product gate is advanced by that
+   bounded seal.
 
 ## 3. Objective and Claim Boundary
 

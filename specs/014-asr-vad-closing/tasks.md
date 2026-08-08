@@ -19,20 +19,30 @@ its named evidence exists. Mechanical checks never assign product correctness.
 
 ## Phase 1: Current-Commit Seal
 
-- [ ] **T010** Configure and build current `master`; retain the complete build
-  log and confirm no new `warning:` or `error:` diagnostics.
-- [ ] **T011** Run the complete registered CTest suite and retain its output.
-- [ ] **T012** Run the existing JavaScript/Web UI checks and retain their output.
-- [ ] **T013** Create `artifacts/spec014/baseline-1417334/` and record source,
-  input, config, model, binary, device, and registry provenance.
-- [ ] **T014** Run two independent 120-second, `1.0x`, 100 ms frame,
+- [x] **T010** Configure and build current `master`; retain the complete build
+  log and confirm no new `warning:` or `error:` diagnostics. Clean build at
+  `41c8999` has no warning/error diagnostic.
+- [x] **T011** Run the complete registered CTest suite and retain its output.
+  All `74/74` tests pass in `53.08 s`.
+- [x] **T012** Run the existing JavaScript/Web UI checks and retain their output.
+  Registered `test_web_model` passes as part of the complete suite.
+- [x] **T013** Create `artifacts/spec014/baseline-1417334/` and record source,
+  input, config, model, binary, device, and registry provenance. Persistent
+  manifests bind every required input and the clean worktree.
+- [x] **T014** Run two independent 120-second, `1.0x`, 100 ms frame,
   real-WebSocket captures with required observers and telemetry using only the
-  checked-in TOML.
-- [ ] **T015** Read every in-scope `test.txt` contribution and complete runtime
+  checked-in TOML. Private copies differ only in ports and isolated paths; both
+  runs pass mechanical contracts and have byte-identical normalized product
+  tracks.
+- [x] **T015** Read every in-scope `test.txt` contribution and complete runtime
   evidence for both 120-second runs chronologically and in reverse context.
   Reconcile all ASR, endpoint, Live/Final, and speaker observations manually.
-- [ ] **T016** Write the current-commit seal report. Stop if current HEAD cannot
-  preserve the documented FR50 behavior boundary.
+  The readings preserve the FR50 speaker boundary, expose two critical
+  negation/relationship failures, and confirm duplicate unchanged Live partials.
+- [x] **T016** Write the current-commit seal report. Stop if current HEAD cannot
+  preserve the documented FR50 behavior boundary. See
+  `current-commit-seal-2026-08-09.md`; Phase 2 is authorized without advancing
+  an ASR or speaker product gate.
 
 ## Phase 2: Silence and Full Baseline
 
