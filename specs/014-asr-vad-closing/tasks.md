@@ -1,0 +1,125 @@
+# Spec 014: Ordered Tasks
+
+`[ ]` pending, `[~]` in progress, `[x]` complete. A task is complete only when
+its named evidence exists. Mechanical checks never assign product correctness.
+
+## Phase 0: Governance and Evidence Inventory
+
+- [x] **T001** Read Constitution v1.7.0, the test-review protocol, the
+  model-validation skill, Spec 013 gates, and current `PROJECT_STATE.md`.
+- [x] **T002** Record owner approval on 2026-08-09 to freeze speaker behavior and
+  proceed with ASR/VAD, endpoint, microphone, and Web UI closing work.
+- [x] **T003** Verify clean `master` at `1417334`, synchronized with
+  `origin/master`; identify FR50 `a6f0d33` as the frozen speaker behavior.
+- [x] **T004** Search for the historical FR50 raw A/B artifacts. Record that the
+  documented `/tmp/orator-spec013/release-a6f0d33-fr50-precompute/` tree is no
+  longer present and no alternate raw full JSON was found under `/home/rm01`.
+- [x] **T005** Create and review `spec.md`, `plan.md`, and `tasks.md`; cross-link
+  Spec 013 and synchronize `PROJECT_STATE.md` without advancing a product gate.
+
+## Phase 1: Current-Commit Seal
+
+- [ ] **T010** Configure and build current `master`; retain the complete build
+  log and confirm no new `warning:` or `error:` diagnostics.
+- [ ] **T011** Run the complete registered CTest suite and retain its output.
+- [ ] **T012** Run the existing JavaScript/Web UI checks and retain their output.
+- [ ] **T013** Create `artifacts/spec014/baseline-1417334/` and record source,
+  input, config, model, binary, device, and registry provenance.
+- [ ] **T014** Run two independent 120-second, `1.0x`, 100 ms frame,
+  real-WebSocket captures with required observers and telemetry using only the
+  checked-in TOML.
+- [ ] **T015** Read every in-scope `test.txt` contribution and complete runtime
+  evidence for both 120-second runs chronologically and in reverse context.
+  Reconcile all ASR, endpoint, Live/Final, and speaker observations manually.
+- [ ] **T016** Write the current-commit seal report. Stop if current HEAD cannot
+  preserve the documented FR50 behavior boundary.
+
+## Phase 2: Silence and Full Baseline
+
+- [ ] **T020** Run three independent 30-second digital-silence sessions through
+  the production WebSocket and preserve all raw events, tracks, logs, manifests,
+  and telemetry.
+- [ ] **T021** Review every silence event and terminal document directly; record
+  the hallucination conclusion without using an automated label, count, or
+  verdict.
+- [ ] **T022** Run one clean full-length `test.mp3` baseline at `1.0x`, direct
+  `end`, empty isolated registry, and required telemetry; retain it under
+  `artifacts/spec014/baseline-1417334/full-a/`.
+- [ ] **T023** Verify only mechanical contracts: hashes, resolved config,
+  transport completion, exact sample extents, typed IDs, alignment coverage,
+  observer convergence, terminal timing, telemetry coverage, and stability.
+- [ ] **T024** Complete the full chronological contextual review of all 556
+  `test.txt` contributions against raw ASR, VAD, align, business, and event
+  evidence.
+- [ ] **T025** Repeat the complete review in reverse fixed-window order,
+  reconcile every disagreement, and manually derive/check the ASR semantic,
+  critical-meaning, endpoint, hallucination, repetition, omission, and speaker
+  conclusions.
+- [ ] **T026** Write the signed baseline report and freeze the exact first defect
+  class plus accepted control contexts before any behavior change.
+
+## Phase 3: Evidence-Driven ASR/VAD Corrections
+
+- [ ] **T030** Trace the selected defect through publication, typed VAD
+  frontiers, admitted PCM samples, decoder-session boundaries, forced alignment,
+  business projection, and Web UI state on the common sample clock.
+- [ ] **T031** Specify one reference-free correction and its abstention/control
+  boundary. Choose code correction or one-variable isolated TOML candidate; do
+  not change speaker/diarizer behavior.
+- [ ] **T032** Add or strengthen focused engineering tests for the root cause.
+  If model values can change, run and record the trusted numerical oracle.
+- [ ] **T033** Implement the smallest correction. Keep all tunable behavior in
+  typed TOML and leave the checked-in TOML unchanged until promotion.
+- [ ] **T034** Pass warning-clean build, complete CTest, and applicable UI tests.
+- [ ] **T035** Pass three independent silence sessions by direct contextual
+  review.
+- [ ] **T036** Pass two 120-second real-WebSocket captures and complete
+  forward/reverse contextual review.
+- [ ] **T037** Pass one 360-second real-WebSocket capture and complete
+  forward/reverse contextual review.
+- [ ] **T038** Pass one 600-second real-WebSocket capture and complete
+  forward/reverse contextual review.
+- [ ] **T039** Remove or explicitly archive a rejected candidate before starting
+  another hypothesis. After three failed implementations, restore the accepted
+  baseline and revise the root-cause analysis.
+
+## Phase 4: Web UI and Physical Microphone
+
+- [ ] **T040** Validate file-input Live partial/retract/final replacement,
+  terminal convergence, reconnect, persistence, reload, and export in real
+  desktop and mobile Chromium using Playwright screenshots and DOM evidence.
+- [ ] **T041** Review the Live-region segmentation and final comprehensive view
+  in conversational context; automation must not decide endpoint correctness.
+- [ ] **T042** Run physical-microphone sessions covering silence, room tone,
+  short speech, continuous speech, pauses, interruption, overlap, and ordinary
+  background noise.
+- [ ] **T043** Complete contextual review of microphone ASR, VAD endpoint,
+  hallucination, speaker, and Live/Final behavior; record hardware/browser
+  provenance.
+- [ ] **T044** Record Firefox and Safari/WebKit behavior when available; document
+  an explicit environment limitation when unavailable.
+
+## Phase 5: Full Candidate Acceptance
+
+- [ ] **T050** Freeze the candidate commit and checked-in TOML only after Phase 3
+  and Phase 4 pass; record all immutable hashes.
+- [ ] **T051** Run full A with an empty isolated registry at `1.0x`, direct
+  `end`, observers, continuous `tegrastats`, and required telemetry.
+- [ ] **T052** Complete all 556 contributions chronologically and in reverse
+  windows for ASR meaning, endpointing, and final speaker ownership; manually
+  reconcile and verify all reported results.
+- [ ] **T053** Restart the process and run full B with only Run A's frozen
+  registry, then repeat the complete dual review independently.
+- [ ] **T054** Verify the Spec 014 acceptance table and applicable Spec 013 gates
+  manually, while recording mechanical and numerical evidence separately.
+- [ ] **T055** Execute the locked holdout only after its provenance and reference
+  construction are frozen; report it separately from `test.mp3`.
+- [ ] **T056** Write the final Spec 014 report, update Spec 013 T084-T086 and
+  `PROJECT_STATE.md`, obtain report review, and create a release tag only when
+  every applicable Spec 013 gate is closed.
+
+## Deferred Speaker Reopening Condition
+
+- [ ] **T060** Reopen speaker optimization only when new independently useful
+  business data or a deployable orthogonal signal such as MOSS/TSE exists. That
+  work requires a separate SDD package and cannot be mixed into Spec 014.

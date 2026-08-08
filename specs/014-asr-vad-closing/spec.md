@@ -1,0 +1,263 @@
+# Spec 014: ASR, VAD Endpoint, and Live Transcript Closing
+
+- **Feature**: `014-asr-vad-closing`
+- **Status**: Approved and in progress (2026-08-09); baseline sealing not yet
+  complete
+- **Owner**: project owner
+- **Constitution**: v1.7.0
+- **Depends on**: Spec 003 (streaming ASR), Spec 004 (typed comprehensive
+  timeline), Spec 006 (Web UI), Spec 009 (forced alignment), and Spec 013
+  (conjunctive industrial closing gates)
+
+> This document defines WHAT must be established and WHY. Implementation and
+> validation design are in `plan.md`; ordered work is in `tasks.md`.
+
+---
+
+## 1. Summary
+
+Orator has a repeatable speaker-business baseline, but the combined product is
+not closed. The native Qwen3-ASR implementation has numerical oracle evidence,
+while full-session contextual semantic accuracy, silence hallucination,
+endpoint behavior, live/final convergence, physical-microphone behavior, and
+the corresponding Web UI evidence remain open.
+
+Speaker optimization has reached the evidence available from the current
+Sortformer v2.1, TitaNet, voice activity detection (VAD), and forced-alignment
+tracks. Further speaker work is deferred until a new independent signal or new
+business data exists. This spec therefore freezes the accepted speaker behavior
+and advances ASR, VAD endpointing, and transcript presentation without weakening
+any Spec 013 gate.
+
+## 2. Verified Starting State
+
+The following facts define the start of this work:
+
+1. The clean repository and implementation starting point is `master` commit
+   `1417334` (FR60). FR51-FR60 contain evidence audits and diagnostic support;
+   they did not promote a new speaker product policy.
+2. The frozen speaker product behavior is FR50 at commit `a6f0d33`, with
+   streaming Sortformer v2.1 profile `340/1/188/188`, the checked-in TOML
+   behavior, and the empty-registry A / frozen-registry B sequence.
+3. FR50's complete contextual review remains the speaker reference result. Its
+   speaker-time gates pass, but critical and confidently wrong attribution gates
+   remain open. This is a conditional baseline, not canonical speaker closure.
+4. The original FR50 raw full-session JSON files were recorded under `/tmp` and
+   are no longer present on 2026-08-09. Reports and hashes remain, but they are
+   not a substitute for raw ASR evidence. A current baseline capture is required
+   unless an immutable byte-identical copy is recovered before execution.
+5. Qwen3-ASR mel, encoder, and decoder numerical gates have prior evidence. They
+   establish implementation parity only; no full contextual ASR product result
+   is currently signed.
+
+## 3. Objective and Claim Boundary
+
+This spec must produce a configuration and exact implementation for which:
+
+- final ASR text preserves conversational meaning over the complete canonical
+  `test.mp3` session;
+- critical numbers, negations, names, decisions, and commitments are preserved;
+- silence and room-tone inputs do not produce substantive transcripts;
+- VAD endpoint decisions do not truncate, duplicate, or incorrectly join
+  speech in a way that changes business meaning;
+- incremental partial, retract, final, typed-track, business-view, persisted,
+  exported, and Web UI representations converge;
+- changes to ASR or VAD do not silently regress the frozen FR50 speaker-business
+  behavior in the final comprehensive view; and
+- the accepted path is validated through incremental production WebSocket input
+  on the session common time base.
+
+Completion of this spec supplies the ASR, silence, endpoint, live/final, browser,
+and microphone evidence required by Spec 013. It cannot close Spec 013 while its
+speaker, holdout, report-review, or release gates remain open.
+
+## 4. Definitions
+
+- **Final ASR record**: one immutable typed ASR record with a stable `text_id`,
+  absolute common-clock interval, and finalized transcript text.
+- **Partial transcript**: a revisable live ASR event for the current `text_id`.
+- **Retract event**: removal of a previously exposed partial whose finalized VAD
+  evidence does not support publication.
+- **Endpoint**: the source-clock boundary at which one decoder session is
+  finalized because VAD evidence, the configured trailing interval, the segment
+  cap, or end-of-stream permits closure.
+- **Substantive hallucination**: transcript content that asserts speech meaning
+  when the reviewed input contains no speech. Correctness is decided only by
+  contextual review, never by an automated text or count rule.
+- **Critical ASR meaning**: a number, percentage, negation, proper name,
+  decision, commitment, owner, responsibility, or other content whose change
+  alters the business interpretation.
+- **Speaker regression guard**: the requirement that an ASR/VAD candidate retain
+  the frozen speaker policy and receive complete contextual review of the final
+  business view before promotion.
+
+## 5. Functional Requirements
+
+### FR1 - Immutable baseline and provenance
+
+Every baseline or candidate capture MUST record the Git commit, worktree state,
+input hash, `orator.toml` hash, model hashes, server-binary hash, resolved
+configuration, registry provenance, frame size, pacing, device conditions, and
+terminal command timing. Acceptance artifacts MUST be retained under the
+gitignored repository `artifacts/spec014/` tree rather than temporary storage.
+
+### FR2 - Current-commit seal
+
+Before ASR behavior changes, commit `1417334` MUST pass a warning-clean build,
+the complete registered CTest suite, applicable JavaScript checks, and a
+120-second real-WebSocket run with required telemetry and observer behavior.
+The 120-second output MUST receive complete chronological and reverse-context
+review against every in-scope `test.txt` contribution. Any unexpected speaker
+or product difference stops ASR work until reconciled.
+
+### FR3 - Silence and non-speech behavior
+
+The exact candidate MUST be exercised by three independent real-WebSocket runs
+of generated digital silence. A later physical-microphone gate MUST include
+reviewed room tone. Automation may capture raw events, tracks, audio extents,
+and hashes; only contextual review may decide whether any emitted content is a
+substantive hallucination. The Spec 013 gate remains zero substantive final
+transcripts in each accepted silence run.
+
+### FR4 - Canonical full-session ASR baseline
+
+The canonical baseline MUST use `test/data/audio/test.mp3` streamed
+incrementally through the production WebSocket at `1.0x` with the checked-in
+TOML. Because the prior raw FR50 artifacts are unavailable, at least one new
+clean full baseline capture is required before selecting a fix. The reviewer
+MUST read every reference contribution and all corresponding raw and final
+system evidence in complete conversation, then repeat the review in reverse
+fixed-window order and reconcile every disagreement.
+
+The review MUST separately record semantic preservation, critical meaning,
+omission, insertion, repetition, cross-speaker joining, endpoint truncation,
+and live/final presentation defects. No code may label a row, map correctness,
+calculate accuracy, rank a defect, choose a parameter, or issue a verdict.
+
+### FR5 - Endpoint correctness
+
+Finalized ASR intervals MUST remain on the common time base and within received
+audio. A candidate MUST preserve speech across short pauses when the context is
+one utterance, and MUST finalize across a confirmed endpoint when continued
+decoder context would merge independent contributions. Endpoint behavior is
+accepted only by full contextual semantic review. Mechanical tests may verify
+sample bounds, monotonicity, frontier ordering, and deterministic feed quanta.
+
+### FR6 - Live/final convergence
+
+For each `text_id`, WebSocket partial/retract/final events, typed ASR records,
+forced-alignment groups, business-speaker revisions, terminal JSON, persisted
+session replay, exported JSON, and Web UI state MUST converge without a stale
+partial or duplicate final. Exact ID/schema/state equality is a mechanical
+contract. Whether the resulting cut is semantically appropriate remains a
+contextual judgment.
+
+### FR7 - Speaker-business preservation
+
+ASR/VAD work MUST NOT change Sortformer, TitaNet, speaker registry, speaker
+fusion, or speaker-model parameters during this spec. A code defect that makes
+such a change unavoidable requires a separately reviewed amendment to this
+spec. Because ASR boundaries feed forced alignment and the derived business
+view, every full candidate MUST receive complete contextual speaker review in
+addition to raw ASR review. A candidate with a new critical or material speaker
+regression is rejected.
+
+### FR8 - Configuration ownership
+
+Every tunable runtime behavior MUST be represented by a typed field resolved in
+the order defaults, `orator.toml`, environment, then command line. Candidate
+values MUST live in isolated TOML files during screening. Only an accepted
+candidate may update the checked-in `orator.toml`. Behavioral values MUST NOT be
+hardcoded in commands, source, scripts, or reference-specific rules.
+
+### FR9 - Promotion ladder
+
+Each behavior-changing candidate MUST pass, in order:
+
+1. focused unit and numerical-oracle gates applicable to the changed stage;
+2. warning-clean build and complete CTest;
+3. three independent silence runs;
+4. repeated 120-second real-WebSocket runs;
+5. one 360-second real-WebSocket run;
+6. one 600-second real-WebSocket run; and
+7. full empty-registry A and restarted frozen-registry B runs.
+
+Each product-output gate receives the required complete contextual review before
+the next duration is authorized. A rejected candidate is removed or left only
+as explicitly inactive evidence; its TOML does not become the baseline.
+
+### FR10 - Physical microphone and browser evidence
+
+The accepted candidate MUST be tested with a physical microphone for silence,
+room tone, short responses, continuous speech, pauses, interruption, overlap,
+and ordinary background noise. A real browser MUST verify microphone capture,
+Live-region replacement, retract/final behavior, end-of-stream convergence,
+reconnect, session persistence, reload, and exact export. Desktop and mobile
+Chromium evidence is mandatory; Firefox and Safari/WebKit evidence is recorded
+when supported by the target environment.
+
+### FR11 - Industrial-readiness handoff
+
+After canonical configuration freeze, the locked holdout defined by Spec 013
+MUST be executed before any general industrial-readiness claim. Holdout evidence
+is reported separately and never replaces `test.mp3`.
+
+### FR12 - Documentation and release handoff
+
+The accepted commit, configuration, artifacts, hashes, complete manual review,
+known limitations, microphone/browser evidence, and holdout status MUST be
+recorded in this spec, its tasks, `PROJECT_STATE.md`, and the Spec 013 final
+report. No release tag is created until all applicable Spec 013 gates are signed.
+
+## 6. Acceptance Gates
+
+The following are inherited from Spec 013 and are conjunctive:
+
+| Area | Required result |
+|---|---|
+| Full ASR semantics | At least 90.0% by complete contextual semantic review |
+| Fixed 600-second blocks | At least 90.0% ASR semantic preservation in every complete block; final 15.12 seconds reported separately |
+| Critical ASR meaning | 100% preservation of critical numbers, negations, names, decisions, and commitments |
+| Silence hallucination | Zero substantive final transcripts in each of three independent silence runs |
+| Forced alignment | Every final ASR ID represented exactly once; units monotonic, in bounds, and text-reconstructing |
+| Common time base | All active tracks reconcile to the exact input sample extent |
+| Live/final convergence | Exact ID and content convergence across runtime events, typed tracks, business revisions, persistence, export, and Web UI |
+| Real-time behavior | Full stream speed at least `0.98x` at `1.0x` pacing; terminal timeline within 30 seconds after direct `end` |
+| Stability | No crash, out-of-memory condition, CUDA error, data race finding, or unbounded backlog |
+| Telemetry | Continuous `tegrastats`; required GPU, memory, and power fields in at least 95% of load samples |
+| Speaker guard | Frozen speaker policy and no newly accepted contextual regression in the final business view |
+| Engineering | Warning-clean build and all registered tests pass |
+| Repeatability | Full A and B independently pass every applicable gate |
+
+All semantic percentages, totals, labels, comparisons, and verdicts are derived
+and checked manually from complete context. Executable output may report only
+mechanical and numerical facts.
+
+## 7. Non-Goals
+
+- Improving or retuning Sortformer, TitaNet, speaker fusion, or registry policy.
+- Introducing MOSS, UniSE, another diarizer, or another runtime model.
+- Character error rate, word error rate, edit distance, lexical matching, or an
+  automated endpoint score as a product acceptance method.
+- Reference-specific words, timestamps, speaker names, or rules in runtime code.
+- Quantization, performance tuning unrelated to a verified correctness blocker,
+  or a broad Web UI redesign unrelated to transcript operation.
+- Claiming industrial readiness from `test.mp3` alone.
+
+## 8. Constitution Check
+
+- **Article I**: no new runtime dependency is introduced. Offline capture and
+  evidence-display tools remain under `tools/`.
+- **Article II**: accuracy has priority; any model-stage change requires its
+  trusted numerical oracle before product review.
+- **Article III**: VAD, ASR, alignment, and business projection communicate only
+  through typed `ComprehensiveTimeline` records on one session time base.
+- **Article IV**: every product result comes from incremental production
+  WebSocket input and the terminal comprehensive document.
+- **Article VI**: only complete contextual semantic review evaluates ASR,
+  endpoint, hallucination, speaker attribution, or the final view. Automation
+  stops at capture, display, hashes, schemas, timing, and numerical contracts.
+- **Article IX**: all tunable behavior is TOML-owned and resolved through the
+  required precedence.
+- **Articles X-XI**: spec, plan, tasks, code, tests, state, and evidence status
+  advance together.

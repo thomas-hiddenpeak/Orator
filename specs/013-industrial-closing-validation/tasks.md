@@ -1595,6 +1595,10 @@ release, and T084 gates remain open 2026-07-23
   turn gate under complete contextual semantic review. Speaker-time, fixed
   blocks, per-speaker recall, criticality, confidence, and source-time offsets
   remain unsigned.
+  The active ASR, VAD endpoint, silence, Live/Final, microphone, and browser
+  evidence needed by this task is now executed under Spec 014. That focused spec
+  does not advance T084 until its complete contextual reviews and this task's
+  remaining speaker gates are independently signed.
 - [ ] T085 Execute the supplemental locked holdout suite after the Constitution
   amendment if an industrial-readiness claim is requested.
 - [ ] T086 Write the final closing report with manifests, hashes, complete

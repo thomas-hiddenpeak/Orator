@@ -99,6 +99,13 @@ canonical closure, release sign-off, and industrial readiness remain open
 accuracy, and define the evidence required before Orator may be declared closed.
 **Constitution**: v1.7.0
 
+**Focused execution note (2026-08-09):** Spec 014 now owns the active ASR, VAD
+endpoint, silence-hallucination, Live/Final, physical-microphone, and associated
+Web UI closing work. It starts from current code commit `1417334`, freezes FR50
+speaker behavior at `a6f0d33`, and supplies evidence back to this spec's
+conjunctive gates. Spec 014 cannot weaken or replace any speaker, holdout,
+report-review, or release requirement below.
+
 ## 1. Objective
 
 Orator's v2.1 speaker-business pipeline has repeatable full-session evidence,

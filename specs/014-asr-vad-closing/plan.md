@@ -1,0 +1,279 @@
+# Spec 014: Implementation and Validation Plan
+
+> This document defines HOW Spec 014 is executed. Requirements and acceptance
+> gates are in `spec.md`; ordered work is in `tasks.md`.
+
+## 1. Execution Strategy
+
+The work is divided into two independent controls:
+
+1. **Frozen speaker control**: keep the FR50 speaker model, configuration,
+   registry sequence, and fusion behavior unchanged. Speaker output remains a
+   mandatory regression view because ASR boundaries affect forced alignment and
+   derived business entries.
+2. **ASR/VAD candidate line**: establish the current behavior from raw evidence,
+   isolate one defect class at a time, and promote only candidates that pass the
+   duration ladder and complete contextual review.
+
+No ASR parameter is changed before the current-commit seal and baseline review
+identify an actual defect and its source boundary.
+
+## 2. Baseline Anchors
+
+| Anchor | Value |
+|---|---|
+| Code start | `1417334` on clean `master` |
+| Speaker behavior | FR50 implementation `a6f0d33` |
+| Diarizer | streaming Sortformer v2.1, `340/1/188/188` |
+| Canonical audio | `test/data/audio/test.mp3`, 16 kHz mono source |
+| Canonical reference | human-listened `test/data/reference/test.txt` |
+| Runtime config | checked-in `orator.toml` until a candidate is accepted |
+| Transport | production WebSocket, 100 ms PCM frames, `1.0x` pacing |
+| Registry order | empty isolated A, process restart, frozen A registry for B |
+
+The historical FR50 reports and hashes remain valid records, but the missing
+raw `/tmp` JSON means they cannot supply a new ASR review. The first current
+full capture becomes the raw baseline for this spec; it does not retroactively
+replace FR50's speaker acceptance result.
+
+## 3. Artifact Layout and Provenance
+
+All new artifacts are retained under the gitignored persistent tree:
+
+```text
+artifacts/spec014/
+  baseline-1417334/
+    build/
+    silence-a/
+    silence-b/
+    silence-c/
+    ws-120-a/
+    ws-120-b/
+    full-a/
+    review/
+  candidates/<candidate-id>/
+    config/
+    oracle/
+    silence/
+    ws-120/
+    ws-360/
+    ws-600/
+    full-a/
+    full-b/
+    review/
+  browser/
+  microphone/
+  holdout/
+```
+
+Each run directory contains raw unified-client JSON, terminal timeline,
+manifest, registry copy when applicable, server log, continuous `tegrastats`,
+and a text record of the exact command. Review records cite hashes of immutable
+inputs and output files. Large runtime artifacts remain ignored by Git; signed
+review documents are committed.
+
+## 4. Current-Commit Seal
+
+The seal establishes that documentation and code agree before behavior changes:
+
+1. configure and build the existing `build/` tree with warnings enabled;
+2. run the complete registered CTest suite;
+3. run the Web UI JavaScript checks already registered by the project;
+4. start `orator_ws` from the checked-in TOML with no behavioral override;
+5. stream the first 120 seconds through `ws_unified_test.py` at `1.0x`, with
+   observer and required telemetry capture;
+6. perform complete forward and reverse contextual review of every in-scope
+   reference contribution and the final comprehensive view; and
+7. record whether current HEAD preserves the FR50 behavior boundary.
+
+Build/test code may establish engineering contracts only. The reviewer, not a
+test, decides transcript and speaker correctness.
+
+## 5. Silence Baseline
+
+The existing registered integration driver creates a 30-second 16 kHz PCM
+digital-silence fixture and sends it through the unified WebSocket client. Run
+three independent server sessions with isolated storage. Preserve every partial,
+retract, final, VAD state, typed track, and terminal document.
+
+The reviewer reads all emitted content and decides whether it asserts
+substantive speech. A zero-entry count can be recorded as a mechanical fact but
+cannot by itself issue the hallucination verdict. Later microphone testing adds
+room tone and ambient noise without replacing these three digital-silence runs.
+
+## 6. Canonical ASR Baseline Capture
+
+If no immutable FR50 full JSON is recovered, run one new clean full baseline:
+
+```text
+test.mp3 -> 100 ms PCM frames -> production WebSocket -> AuditoryStream
+         -> VAD typed evidence -> AsrWorker -> ASR typed records
+         -> forced alignment -> business speaker revisions
+         -> terminal comprehensive timeline
+```
+
+The unified client records transport, terminal, telemetry, source, binary, and
+config evidence. The run does not evaluate accuracy.
+
+### 6.1 Review presentation
+
+Evidence may be displayed in fixed windows `0-600`, `600-1200`, `1200-1800`,
+`1800-2400`, `2400-3000`, `3000-3600`, and `3600-3615.12`. Within each window,
+preserve source order and show:
+
+- complete `test.txt` context;
+- raw finalized ASR records and their `text_id`/time spans;
+- partial/retract/final event history;
+- VAD segments and endpoint state;
+- forced-alignment units;
+- final business-speaker entries; and
+- relevant warnings and terminal state.
+
+An evidence-display tool may copy and order these fields but may not align a
+reference row to an output by a correctness rule, label it, calculate a metric,
+rank defects, or select a configuration.
+
+### 6.2 Required manual passes
+
+1. Read all seven windows chronologically.
+2. Read the same complete evidence from the final window back to the first.
+3. Reconcile every disagreement directly from conversational context.
+4. Manually record semantic, critical-meaning, hallucination, endpoint,
+   repetition, omission, and cross-speaker-join conclusions.
+5. Independently verify every manually derived total and percentage without a
+   formula or executable aggregation.
+
+The baseline report identifies the first defect class to investigate. It does
+not authorize a fix solely because a parameter appears correlated with an
+error.
+
+## 7. Root-Cause and Candidate Method
+
+Defects are investigated in the following order because each later layer
+depends on the earlier one:
+
+1. **Publication correctness**: stale partials, missing retracts, duplicate
+   finals, inconsistent IDs, or terminal/UI divergence.
+2. **Silence admission**: VAD/frontier state permits unsupported audio to reach
+   the decoder or permits unsupported final publication.
+3. **Endpoint construction**: lead, stable feed quantum, trailing interval,
+   segment cap, or terminal finalization cuts or joins source audio incorrectly.
+4. **Decoder behavior**: repetition, omitted meaning, or hallucinated meaning
+   remains when admitted audio and endpoint bounds are contextually correct.
+5. **Presentation segmentation**: runtime output is correct but the business
+   timeline or Live region displays incoherent boundaries.
+
+For each defect class:
+
+- freeze the exact contexts and accepted controls before implementation;
+- trace typed evidence on the common sample clock;
+- specify one reference-free runtime contract shared by more than one material
+  context when possible;
+- implement the smallest code correction or isolated TOML candidate;
+- run numerical oracles when model values can change; and
+- execute the promotion ladder, stopping at the first contextual regression.
+
+After three failed implementations for the same hypothesis, return to the last
+accepted baseline and revise the root-cause model before another candidate.
+
+## 8. Configuration Method
+
+The checked-in TOML remains unchanged during diagnosis. Candidate TOMLs are
+complete copies stored under the ignored artifact tree, with one intentional
+behavioral difference recorded per experiment. The server is started by
+selecting that config file; commands do not override individual ASR, VAD,
+speaker, aligner, or timeline values.
+
+Potentially relevant existing typed fields include:
+
+- `[asr].vad_gate`, `vad_lead_ms`, `vad_gate_chunk_ms`, `vad_trail_sec`,
+  `vad_min_overlap_sec`, `segment_sec`, `max_audio_tokens`, `max_new_tokens`,
+  `ban_steps`, and `decode_batch`;
+- `[vad].threshold`, `min_speech_ms`, `min_silence_ms`, and `speech_pad_ms`;
+- `[align]` and `[timeline]` fields only when evidence proves the defect lies in
+  those owners.
+
+This list is diagnostic scope, not authorization to tune all fields. Speaker and
+diarizer fields remain frozen.
+
+## 9. Promotion Ladder
+
+### 9.1 Engineering gate
+
+- warning-clean build;
+- complete CTest;
+- applicable JavaScript checks;
+- model-stage numerical oracle when applicable;
+- deterministic IDs, sample extents, and typed publication order.
+
+### 9.2 Product gates
+
+1. Three independent 30-second silence runs.
+2. Two independent 120-second runs and complete forward/reverse review.
+3. One 360-second run and complete forward/reverse review.
+4. One 600-second run and complete forward/reverse review.
+5. Full A with empty registry and complete chronological/reverse review.
+6. Process restart, frozen-registry full B, and the same complete review.
+
+Each duration is authorized only after the previous result is reviewed. Code
+may verify transport and structural contracts, never the product verdict.
+
+## 10. Speaker Regression Boundary
+
+The speaker policy, Sortformer/TitaNet configuration, and registry procedure are
+held constant. Raw diarization and voiceprint tracks should therefore remain
+unchanged for equivalent input and scheduling conditions, but that mechanical
+fact is insufficient: changed ASR boundaries alter forced alignment and may
+change business-speaker projection.
+
+Every full ASR candidate is reviewed against all 556 contributions for both ASR
+meaning and final speaker ownership. The FR50 manually signed speaker result is
+the comparison boundary. No script compares, labels, counts, or ranks the
+speaker result.
+
+## 11. Web UI and Microphone Validation
+
+After a runtime candidate passes the 600-second gate:
+
+1. start the local UI served by `orator_ws`;
+2. use Playwright for deterministic file-input, reconnect, persistence, export,
+   desktop, and mobile mechanical checks;
+3. inspect screenshots and DOM state for overlap, clipping, stale partials, and
+   incoherent Live/Final replacement;
+4. execute physical microphone sessions with explicit browser permission;
+5. review silence, room tone, short speech, pause, interruption, overlap, and
+   background-noise contexts; and
+6. verify that terminal/load/export rebuilds the same accepted transcript.
+
+Browser automation verifies mechanics. Contextual transcript and endpoint
+correctness remain reviewer judgments.
+
+## 12. Final Acceptance and Handoff
+
+When full A/B pass:
+
+- freeze the accepted commit, checked-in TOML, model hashes, and registry;
+- execute the locked holdout only after its provenance is finalized;
+- write the Spec 014 final report with complete evidence and limitations;
+- update Spec 013 T084/T085/T086 evidence status and `PROJECT_STATE.md`; and
+- create a release tag only after independent report review and every required
+  Spec 013 gate is closed.
+
+## 13. Risks and Controls
+
+| Risk | Control |
+|---|---|
+| Missing historical raw artifacts | Recapture a current clean baseline and retain it under `artifacts/spec014/` |
+| ASR change regresses speaker business view | Freeze speaker configuration and perform complete dual-purpose full review |
+| VAD tuning repairs one phrase but loses another | One-variable TOML candidate, staged duration gates, complete context and controls |
+| Script-derived accuracy enters the process | Tools are limited to capture, hashes, schema checks, and unjudged evidence display |
+| Repeated full runs consume time without a supported hypothesis | Full run only after silence, 120, 360, and 600 gates pass |
+| UI appears correct while terminal state differs | Compare event, typed, terminal, persisted, exported, and rendered states by stable `text_id` |
+| Temporary artifacts disappear | Store raw evidence under persistent gitignored project artifacts, cite hashes in committed reports |
+
+## 14. Constitution Check
+
+This plan preserves zero runtime dependencies, one common time base, independent
+typed pipelines, production-WebSocket validation, TOML-owned behavior, trusted
+model oracles, complete contextual result review, and synchronized SDD/state
+documentation. No constitutional exception is required.

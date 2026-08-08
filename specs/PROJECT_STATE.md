@@ -14,10 +14,17 @@ work is specified under [specs/](.).
 > pass is the consistency proof. Status lines advance to `Implemented` in the
 > same change that lands the code, with the commit reference.
 
-- **Last updated**: 2026-07-23 (FR60 completes its reuse-only cross-view
-  identity-bridge audit on the stop branch; canonical closure remains open)
+- **Last updated**: 2026-08-09 (Spec 014 approved for ASR/VAD endpoint and Live
+  transcript closing; no runtime behavior or product gate changed yet)
 - **Branch**: `master`
 - **Constitution**: v1.7.0
+- **Active focused work**: **Spec 014 is approved and in progress.** Current code
+  starts at clean `1417334`; speaker product behavior remains frozen at FR50
+  `a6f0d33`. Historical FR50 raw A/B JSON was stored under `/tmp` and is no
+  longer present, so Spec 014 must capture a current immutable ASR baseline
+  before selecting a correction. New artifacts use gitignored
+  `artifacts/spec014/`. No ASR, VAD, TOML, speaker, or Web UI behavior has
+  changed at this documentation checkpoint.
 - **Speaker-business closure**: **CURRENT REAL-PATH BASELINE `525/556`;
   SPEAKER-TIME GATES PASS; 19 CRITICAL RESIDUALS REMAIN; FULL CANONICAL
   CLOSURE OPEN**. FR49's
@@ -571,10 +578,13 @@ absolute time base.
 
 ## 2. Current phase
 
-**Spec 013 is the active approved closing-validation work.** It does not replace the
-implemented feature contracts in Specs 001-012; it defines the architecture
-corrections, complete reference review, and conjunctive evidence required before
-the combined product can be accepted. Spec 004 remains the feature specification
+**Spec 013 remains the umbrella industrial closing specification, and Spec 014
+is the active focused execution for ASR, VAD endpoint, silence, Live/Final,
+physical-microphone, and associated Web UI gates.** Spec 014 cannot weaken the
+speaker, holdout, report-review, or release requirements in Spec 013. These
+closing specs do not replace the implemented feature contracts in Specs 001-012;
+they define the complete evidence required before the combined product can be
+accepted. Spec 004 remains the feature specification
 for time base, comprehensive timeline, and protocol behavior, but its claimed
 completion is under a code-compliance review because the current production path
 does not satisfy all Article III details.
@@ -913,7 +923,7 @@ finds no FR28 natural-turn speaker regression. FR28 is retained for the
 |---|---|---|
 | Streaming diarization (Sortformer) | v2.1 is the sole closing baseline; acceptance open | Compile-time defaults and the checked-in TOML select streaming v2.1 under the inherited async `340/1/188/188` profile (chunk/right/FIFO/update). Its exact clean 935-entry, 3615.12 s 1x real-WebSocket artifact passed mechanical, common-time-base, and telemetry contracts. Complete chronological and reverse-block manual written-context review records 443 correct / 112 incorrect / 1 ambiguous natural contributions (`79.6763%`); the historical 413 / 142 / 1 result belongs to a different 936-entry artifact and used a cut-oriented diagnostic rubric. NVIDIA's official high `340/40/40/300` and low `6/7/188/144` profiles pass separate 1502-frame NeMo/C++ numerical gates; their historical full native-diar contextual diagnostics record 385 / 170 / 1 (`69.2446%`) and 377 / 178 / 1 (`67.8058%`). Neither official profile advances to a real-WebSocket acceptance run. The v2 checkpoint and obsolete gate are removed; no result is an exact speaker-time acceptance score. |
 | Multi-scale TitaNet fusion screening | Frozen experiment complete; runtime integration rejected | A reference-free TOML policy pairs native 3 s and 5 s TitaNet windows by absolute centre time, restricts ranking to active session identities, requires independent score/margin agreement, and permits candidate-strength rewrites only at forced-alignment pauses. From 7,224 spans it retained 1,166 points and 239 runs, changing nine of 936 business entries. Manual contextual review of all 11 affected reference rows found five repairs and no regression, raising the frozen result to 418 / 137 / 1 (`75.1799%`). This fails the 93 percent implementation gate, so policy tuning stops and no runtime/real-WebSocket claim follows. See [speaker-sliding-v21-2026-07-15.md](013-industrial-closing-validation/speaker-sliding-v21-2026-07-15.md). |
-| Native Qwen3-ASR engine | Numerical oracle verified; semantic closure open | Stored stage fixtures report mel 3.9e-3, encoder 1.3e-3, and decoder argmax parity. These numerical gates do not establish the Spec 013 full contextual semantic or silence-hallucination gates. Pure bf16 compute. |
+| Native Qwen3-ASR engine | Numerical oracle verified; Spec 014 semantic closure in progress | Stored stage fixtures report mel 3.9e-3, encoder 1.3e-3, and decoder argmax parity. These numerical gates do not establish full contextual semantic, endpoint, Live/Final, or silence-hallucination acceptance. Spec 014 starts from clean `1417334`, freezes FR50 speaker behavior, and requires a new raw full baseline because the historical `/tmp` FR50 JSON is unavailable. Pure bf16 compute. |
 | Forced alignment (Qwen3-ForcedAligner-0.6B, Spec 009) | Implemented; numerical and prior WS evidence recorded | The registered `AlignWorker` consumes typed finalized ASR records from `ComprehensiveTimeline`, reads the matching retained audio span, deposits a typed alignment group, then mirrors `align/units` to protocol and WebSocket. Partials are never aligned. Stage-level torch-oracle checks and the 2026-06-30 60-minute real-WebSocket run reported 119/119 segment coverage, 13,594 units, no bounds/monotonicity failures, and no crash after the CUDA grid-stride fix. These historical results establish the aligner implementation, not current Spec 013 product closure; repeatable full-session acceptance remains open. |
 | WhisperMel / BPE tokenizer / sharded safetensors loader | ✅ Verified | Unit-tested. |
 | Decoupling (interfaces + registry) | Contract corrected; product acceptance open | Model interfaces and registry construction are in place. VAD→ASR, ASR→forced-align, and raw evidence→business speaker now flow only through typed `ComprehensiveTimeline` reads/subscriptions. The registered `business_speaker` pipeline owns fusion policy and writes its own track; protocol topics mirror committed records for persistence and transport. Full product validation remains open under Spec 013. |
@@ -1088,6 +1098,7 @@ Findings:
 - [specs/013-industrial-closing-validation/fr56-speaker-producer-boundary-review-2026-07-23.md](013-industrial-closing-validation/fr56-speaker-producer-boundary-review-2026-07-23.md) - **FR56 complete; producer experiment rejected**. Four independent complete-context readings find only `ref-0499` adjacent to an identity epoch change. Its accepted controls reject moving the boundary backward, while the other nine contexts are distinct stable-epoch source or producer conflicts. T257 stops without a diagnostic trace, runtime/TOML/model/product-run/ledger/baseline change, or closure claim.
 - [specs/013-industrial-closing-validation/fr57-speaker-time-review-2026-07-23.md](013-industrial-closing-validation/fr57-speaker-time-review-2026-07-23.md) - **FR57 and T102 complete; time gates pass; canonical closure remains open**. Four independent complete-context readings and independently repeated manual additions sign each FR50 run at 3529/3612 source seconds, approximately 97.70 percent. Every complete 600-second block and canonical speaker passes the 90.0 percent floor. The 19 critical residuals and 26 confidently wrong natural contributions remain separate failures.
 - [specs/013-industrial-closing-validation/fr58-auxiliary-streaming-context-review-2026-07-23.md](013-industrial-closing-validation/fr58-auxiliary-streaming-context-review-2026-07-23.md) - **FR58 complete; auxiliary production experiment rejected**. Two exact high-context captures are byte-repeatable and pass the registered numerical gate. Four independent complete-context readings find only `ref-0499` with genuinely complementary critical activity, but its global identity is unresolved and concurrent activity remains. Other short islands duplicate the accepted producer or lack writable source boundaries. T267 stops without runtime, TOML, model, product-run, ledger, baseline, or closure change.
+- [specs/014-asr-vad-closing/spec.md](014-asr-vad-closing/spec.md) - **Approved and in progress (2026-08-09); baseline seal pending**. This focused spec freezes FR50 speaker behavior while establishing current-commit, silence, full contextual ASR, VAD endpoint, Live/Final, microphone, and browser evidence. It uses only the unified real-WebSocket path, stores new raw artifacts under gitignored `artifacts/spec014/`, keeps candidate values in TOML, and prohibits every code-based product judgment. Its results feed Spec 013 T084-T086 and cannot independently close the remaining speaker or holdout gates.
 
 ## 7. Immediate next step
 
@@ -1127,25 +1138,24 @@ stable deployable identity, while all other promising short islands either
 duplicate the accepted producer or have no writable source boundary. No
 auxiliary worker or fusion candidate is authorized.
 
-The next highest-priority speaker activity is the remaining critical and
-confident-wrong evidence ceiling, not ASR-accuracy closure. Keep the FR50 code,
-TOML, v2.1 model, audio, A/B artifacts, identity map, and natural-turn ledger
-fixed. Before any new runtime implementation, freeze a new evidence-only scope
-for the remaining manually signed noncritical wrong, missing, and uncertain
-contributions and their accepted controls. Reuse the exact FR58 auxiliary
-capture without rerunning audio. Complete contextual-semantic reading must
-decide whether `ref-0499`'s genuinely complementary auxiliary activity has a
-second independent material occurrence and a causal empty/frozen-registry
-identity path. No executable may classify, total, rank, select, or judge it.
+FR59 and FR60 complete the remaining reuse-only auxiliary residual and identity-
+bridge reviews. Neither authorizes a runtime candidate: the only genuinely new
+critical activity still lacks a causal global identity, and the accepted
+controls reject local-slot or nearest-anchor propagation. The current
+Sortformer/TitaNet/VAD/alignment evidence line has therefore reached its
+documented speaker ceiling. Speaker behavior stays frozen at FR50 until new
+business data or an independently useful deployable signal exists.
 
-Any later product experiment must be reference-free at runtime, share one
-explicit evidence topology across at least two independent material residuals,
-and have accepted controls that establish its abstention boundary. Otherwise
-stop at the evidence ceiling. Do not change VAD, alignment, identity,
-diarization, fusion parameters, models, or product output before that review;
-doing so would spend another full constitutional A/B review without an
-established multi-context contract. T084 remains open because all 19 critical
-residuals and the confident-wrong-zero gate are conjunctive requirements.
+The immediate execution priority is Spec 014. Start from clean current code
+`1417334`, seal it with build, full CTest, UI checks, and repeated 120-second
+real-WebSocket evidence, then establish silence and full-session ASR/VAD
+behavior under complete contextual semantic review. The historical FR50 raw
+A/B JSON under `/tmp` is unavailable, so a current full baseline must be
+captured and retained under gitignored `artifacts/spec014/` before selecting a
+fix. Keep speaker/diarizer values unchanged; all candidate behavior is TOML-
+owned, and every accepted full ASR candidate receives a complete final-speaker
+regression review. T084 remains open because ASR and the 19 critical speaker
+residuals are conjunctive requirements.
 
 T110-T116 and T135 are complete. `test.txt` is the human-
 listened reference; T116 used it for complete 556-row chronological and tail-
