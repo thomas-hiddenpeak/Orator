@@ -55,21 +55,27 @@ its named evidence exists. Mechanical checks never assign product correctness.
   verdict. All three independent readings find no speech assertion or
   substantive live/final transcript. See
   `digital-silence-review-2026-08-09.md`; microphone room tone remains open.
-- [ ] **T022** Run one clean full-length `test.mp3` baseline at `1.0x`, direct
+- [x] **T022** Run one clean full-length `test.mp3` baseline at `1.0x`, direct
   `end`, empty isolated registry, and required telemetry; retain it under
-  `artifacts/spec014/baseline-1417334/full-a/`.
-- [ ] **T023** Verify only mechanical contracts: hashes, resolved config,
+  `artifacts/spec014/baseline-1417334/full-a/`. The 3615.120-second run at
+  clean `96b8347` completed at `0.993x` with 26.310-second direct-end latency.
+- [x] **T023** Verify only mechanical contracts: hashes, resolved config,
   transport completion, exact sample extents, typed IDs, alignment coverage,
   observer convergence, terminal timing, telemetry coverage, and stability.
-- [ ] **T024** Complete the full chronological contextual review of all 556
+  All named contracts pass; this does not assign product correctness.
+- [x] **T024** Complete the full chronological contextual review of all 556
   `test.txt` contributions against raw ASR, VAD, align, business, and event
-  evidence.
-- [ ] **T025** Repeat the complete review in reverse fixed-window order,
+  evidence. The complete source-ordered worksheet and reviewer notes are
+  retained with the immutable run.
+- [x] **T025** Repeat the complete review in reverse fixed-window order,
   reconcile every disagreement, and manually derive/check the ASR semantic,
   critical-meaning, endpoint, hallucination, repetition, omission, and speaker
-  conclusions.
-- [ ] **T026** Write the signed baseline report and freeze the exact first defect
-  class plus accepted control contexts before any behavior change.
+  conclusions. Every one of the 556 contributions was reread; no executable
+  result supplied a label, total, percentage, comparison, or verdict.
+- [x] **T026** Write the signed baseline report and freeze the exact first defect
+  class plus accepted control contexts before any behavior change. See
+  `full-baseline-context-review-2026-08-09.md`; unchanged partial WebSocket
+  publication is first, and final ASR meaning follows as an independent class.
 
 ## Phase 3: Evidence-Driven ASR/VAD Corrections
 

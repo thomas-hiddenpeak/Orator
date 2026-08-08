@@ -14,13 +14,13 @@ work is specified under [specs/](.).
 > pass is the consistency proof. Status lines advance to `Implemented` in the
 > same change that lands the code, with the commit reference.
 
-- **Last updated**: 2026-08-09 (Spec 014 current-commit seal and three-run
-  digital-silence gate complete; full current-config baseline next; no runtime
-  behavior changed)
+- **Last updated**: 2026-08-09 (Spec 014 full current-config baseline and
+  complete bidirectional contextual review signed; bounded Live publication
+  correction next; no runtime behavior changed)
 - **Branch**: `master`
 - **Constitution**: v1.7.0
-- **Active focused work**: **Spec 014 Phase 1 and the Phase 2 digital-silence
-  gate are complete.** The runtime starts at clean `1417334`; the seal was
+- **Active focused work**: **Spec 014 Phase 1 and Phase 2 are complete.** The
+  runtime starts at clean `1417334`; the seal was
   captured at docs-only commit `41c8999`, with speaker behavior frozen at FR50
   `a6f0d33`.
   A warning-clean build, all `74/74` tests, and two independent 120-second
@@ -32,12 +32,22 @@ work is specified under [specs/](.).
   30-second digital-silence runs each received direct review of every event and
   terminal track; none asserts speech or contains substantive live/final text.
   This closes the generated-silence gate only; microphone room tone remains
-  open. Phase 2 now captures one persistent full current-config baseline under
-  `artifacts/spec014/` before selecting a correction. No ASR, VAD, TOML,
-  speaker, or Web UI behavior has changed at this checkpoint. See
-  [current-commit-seal-2026-08-09.md](014-asr-vad-closing/current-commit-seal-2026-08-09.md)
+  open. One persistent full current-config run at clean `96b8347` then streams
+  all 3615.120 seconds through the real WebSocket at `0.993x` and returns its
+  terminal timeline 26.310 seconds after direct `end`. All mechanical source,
+  time, observer, alignment, telemetry, and stability contracts pass. The
+  reviewer reads all 556 `test.txt` contributions chronologically and again in
+  reverse fixed-window order. That complete contextual review manually places
+  ASR semantic fidelity in the 70-79% band; every complete 600-second block and
+  the critical-meaning gate fail. Main speaker behavior remains within the
+  frozen conditional FR50 boundary, while known speaker residuals remain. The
+  first frozen correction is duplicate unchanged Live partial publication;
+  ASR meaning follows independently. No ASR, VAD, TOML, speaker, or Web UI
+  behavior has changed at this checkpoint. See
+  [current-commit-seal-2026-08-09.md](014-asr-vad-closing/current-commit-seal-2026-08-09.md),
+  [digital-silence-review-2026-08-09.md](014-asr-vad-closing/digital-silence-review-2026-08-09.md),
   and
-  [digital-silence-review-2026-08-09.md](014-asr-vad-closing/digital-silence-review-2026-08-09.md).
+  [full-baseline-context-review-2026-08-09.md](014-asr-vad-closing/full-baseline-context-review-2026-08-09.md).
 - **Speaker-business closure**: **CURRENT REAL-PATH BASELINE `525/556`;
   SPEAKER-TIME GATES PASS; 19 CRITICAL RESIDUALS REMAIN; FULL CANONICAL
   CLOSURE OPEN**. FR49's

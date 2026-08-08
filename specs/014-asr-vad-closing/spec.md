@@ -1,8 +1,8 @@
 # Spec 014: ASR, VAD Endpoint, and Live Transcript Closing
 
 - **Feature**: `014-asr-vad-closing`
-- **Status**: Phase 1 and Phase 2 digital-silence gate complete (2026-08-09);
-  full current-config baseline next
+- **Status**: Phase 1 and Phase 2 full current-config baseline complete
+  (2026-08-09); bounded Live publication correction next
 - **Owner**: project owner
 - **Constitution**: v1.7.0
 - **Depends on**: Spec 003 (streaming ASR), Spec 004 (typed comprehensive
@@ -61,6 +61,15 @@ The following facts define the start of this work:
    Each output makes no speech assertion and contains no substantive live or
    final transcript. See `digital-silence-review-2026-08-09.md`. Physical
    microphone room tone and background-noise behavior remain open.
+8. One persistent 3615.120-second current-config baseline at clean commit
+   `96b8347` passes its real-WebSocket, common-time-base, observer, telemetry,
+   forced-alignment, stability, and direct-end mechanical contracts. Complete
+   chronological and reverse-window review of all 556 reference contributions
+   manually judges ASR semantics in the 70-79% band, below every complete
+   600-second block gate, with multiple unrecovered critical-meaning failures.
+   The same review preserves the conditional FR50 speaker boundary and finds
+   unchanged Live partials repeatedly published over WebSocket. See
+   `full-baseline-context-review-2026-08-09.md`.
 
 ## 3. Objective and Claim Boundary
 
