@@ -909,18 +909,22 @@ void AuditoryStream::EmitTimeline(bool finalize) {
 // Serialize/SerializeRevision/SerializeGpuTelemetry in serialize.cc.
 
 void AuditoryStream::Reset() {
+  const long session_samples = total_samples_.load();
   const bool was_running = running_;
   StopWorkers();
   if (was_running) ReconcileFinalExtents();
-  if (session_store_ && session_store_->enabled()) {
+  if (session_samples > 0 && session_store_ && session_store_->enabled()) {
     std::string timeline_json = Serialize();
     const auto now = std::chrono::system_clock::now();
-    double wall_sec =
-        std::chrono::duration<double>(now.time_since_epoch()).count();
+    const auto wall_us = std::chrono::duration_cast<std::chrono::microseconds>(
+                             now.time_since_epoch())
+                             .count();
+    const unsigned long long sequence =
+        session_save_sequence_.fetch_add(1, std::memory_order_relaxed);
     char session_id_buf[64];
-    std::snprintf(session_id_buf, sizeof(session_id_buf), "%08x%08x",
-                  static_cast<unsigned>(static_cast<long long>(wall_sec)),
-                  static_cast<unsigned>(::getpid()));
+    std::snprintf(session_id_buf, sizeof(session_id_buf), "%016llx%08x%08llx",
+                  static_cast<unsigned long long>(wall_us),
+                  static_cast<unsigned>(::getpid()), sequence);
     session_store_->Save(session_id_buf, timeline_json);
   }
   if (diar_audio_) diar_audio_->Reset();

@@ -3,7 +3,8 @@
 - **Feature**: `014-asr-vad-closing`
 - **Status**: Phase 1 and Phase 2 complete; bounded Live publication candidate
   passes engineering, three-run silence, repeated 120-second, 360-second, and
-  600-second gates (2026-08-09); browser and physical-microphone validation next
+  600-second gates; Phase 4 browser validation found and corrected a session-
+  persistence collision, with exact clean-commit repetition next
 - **Owner**: project owner
 - **Constitution**: v1.7.0
 - **Depends on**: Spec 003 (streaming ASR), Spec 004 (typed comprehensive

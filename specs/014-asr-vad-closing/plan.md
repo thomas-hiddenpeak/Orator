@@ -248,6 +248,31 @@ After a runtime candidate passes the 600-second gate:
 Browser automation verifies mechanics. Contextual transcript and endpoint
 correctness remain reviewer judgments.
 
+### 11.1 Session-persistence correction boundary
+
+The first clean Chromium file-input run reaches terminal convergence, exact
+download, screenshots, and a visible persisted-session row, but `End` followed
+by `Clear` cannot reload that row. The retained files show the root cause below
+the Web UI: `AuditoryStream::Reset()` saves even when the fresh session has
+received no samples, while the generated session ID has only second-level time
+resolution plus the process ID. A same-second empty reset can therefore replace
+the just-finalized non-empty document.
+
+The bounded correction is a storage-lifecycle contract, not a model or endpoint
+candidate:
+
+1. snapshot the current session sample extent before stopping workers;
+2. persist on reset only when that extent is nonzero;
+3. generate an opaque ID from microsecond wall time, process ID, and a
+   monotonically increasing per-process sequence; and
+4. retain the existing atomic file write, timeline schema, load RPC, browser
+   state, TOML, and all ASR/VAD/diarization/speaker behavior.
+
+Focused tests must prove that an empty reset creates no saved row, two rapid
+non-empty resets create distinct loadable rows, and a non-empty row remains
+unchanged after a subsequent empty reset. The complete real Chromium flow is
+then repeated from a fresh isolated storage tree before microphone work starts.
+
 ## 12. Final Acceptance and Handoff
 
 When full A/B pass:

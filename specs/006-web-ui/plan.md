@@ -461,3 +461,10 @@ microphone start/stop, and desktop/mobile screenshots. The file-stream test also
 found and fixed whole-backing-buffer retransmission, and the session test found
 and fixed `audio_sec` metadata parsing. Physical microphone and Firefox/Safari
 evidence remain open.
+
+On 2026-08-09, Spec 014 repeated the real-browser flow and exposed a narrower
+reset-lifecycle defect: a same-second empty `Clear` could overwrite the terminal
+session saved by `End`. The bounded correction skips persistence for zero-sample
+sessions and uses microsecond/PID/sequence IDs. Focused and full CTest pass, and
+the corrected Chromium flow reloads the terminal document exactly. An exact
+clean-commit repeat remains part of Spec 014 T040.

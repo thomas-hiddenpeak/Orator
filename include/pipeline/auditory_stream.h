@@ -441,9 +441,10 @@ class AuditoryStream {
   std::unique_ptr<protocol::PipelineHandle> business_speaker_handle_;
   long comp_asr_subscription_id_ = 0;
 
-  // Spec 004 Phase 13: session persistence store. Saves timeline JSON on
-  // Reset(). Null when persistence is disabled (empty storage_disk_path).
+  // Spec 004 Phase 13: session persistence store. Saves non-empty timeline
+  // JSON on Reset(). Null when persistence is disabled.
   std::unique_ptr<protocol::SessionStore> session_store_;
+  std::atomic<unsigned long long> session_save_sequence_{0};
 
   // Wall-clock anchor is set by the first audio sample, so connection setup,
   // optional commands, and idle time before ingest are excluded.

@@ -124,11 +124,22 @@ its named evidence exists. Mechanical checks never assign product correctness.
 
 ## Phase 4: Web UI and Physical Microphone
 
-- [ ] **T040** Validate file-input Live partial/retract/final replacement,
+- [~] **T040** Validate file-input Live partial/retract/final replacement,
   terminal convergence, reconnect, persistence, reload, and export in real
   desktop and mobile Chromium using Playwright screenshots and DOM evidence.
-- [ ] **T041** Review the Live-region segmentation and final comprehensive view
+  The first clean 12-second run passes Live population, terminal convergence,
+  exact export, and screenshots, then fails persisted reload. Evidence proves
+  an empty `Clear` reset can overwrite the just-finalized document because
+  resets save empty sessions and IDs have only second-level time resolution.
+  Apply the bounded persistence correction in `plan.md` and repeat from empty
+  isolated storage before completing this task.
+- [~] **T041** Review the Live-region segmentation and final comprehensive view
   in conversational context; automation must not decide endpoint correctness.
+  The directly read 12-second opening preserves its reference meaning in two
+  readable final rows without a stale draft or duplicate final. The known FR50
+  cold-start speaker split remains visible. Repeat with a longer clean-commit
+  browser stream before completing this task. See
+  `browser-persistence-review-2026-08-09.md`.
 - [ ] **T042** Run physical-microphone sessions covering silence, room tone,
   short speech, continuous speech, pauses, interruption, overlap, and ordinary
   background noise.

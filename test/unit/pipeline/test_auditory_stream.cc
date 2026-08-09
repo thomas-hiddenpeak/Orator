@@ -1,4 +1,6 @@
 #include <cstdio>
+#include <cstdlib>
+#include <filesystem>
 #include <memory>
 #include <string>
 #include <vector>
@@ -10,6 +12,7 @@
 #include "core/types.h"
 #include "pipeline/auditory_stream.h"
 #include "protocol/protocol_timeline.h"
+#include "protocol/session_store.h"
 
 using orator::core::AsrConfig;
 using orator::core::AudioChunk;
@@ -128,9 +131,19 @@ static AuditoryStream::Config MakeTestConfig() {
   cfg.asr_model_dir = "";     // disable ASR pipeline
   cfg.vad_model = "";         // disable VAD model path
   cfg.vad_stream = false;     // disable VAD stream thread
-  cfg.storage_disk_path = "/tmp/orator_test/";
+  cfg.storage_disk_path = "";
   cfg.gpu_telemetry_interval_sec = 0.0;
   return cfg;
+}
+
+static std::string CreateTempDir() {
+  char path[] = "/tmp/orator_auditory_stream_XXXXXX";
+  char* result = ::mkdtemp(path);
+  if (result == nullptr) {
+    std::printf("FAIL: mkdtemp failed\n");
+    std::abort();
+  }
+  return result;
 }
 
 // ============================================================================
@@ -197,9 +210,6 @@ int main() {
     CHECK(vad.reset_count == 1, "TestVad Reset increments count");
     std::printf("\n");
   }
-
-  // Create temp directory for the storage backend.
-  mkdir("/tmp/orator_test/", 0755);
 
   // ------------------------------------------------------------------
   // Test 1: Lifecycle test
@@ -344,9 +354,62 @@ int main() {
     std::printf("\n");
   }
 
-  // Cleanup temp files created by the storage backend.
-  std::remove("/tmp/orator_test/session_0.000000.dat");
-  std::remove("/tmp/orator_test/");
+  // ------------------------------------------------------------------
+  // Test 6: Session persistence survives a following empty reset
+  //   Empty Reset -> audio Reset -> empty Reset -> audio Reset
+  //   Verifies empty sessions are not saved and rapid non-empty sessions use
+  //   distinct IDs without overwriting earlier timeline documents.
+  // ------------------------------------------------------------------
+  {
+    std::printf("--- Test 6: Session persistence lifecycle ---\n");
+    const std::string temp_dir = CreateTempDir();
+    AuditoryStream::Config config = MakeTestConfig();
+    config.session_dir = temp_dir;
+    AuditoryStream stream(config, [](const std::string&) {});
+    stream.Start();
+    auto* store = stream.session_store();
+    CHECK(store != nullptr && store->enabled(),
+          "session persistence is enabled for the isolated directory");
+
+    stream.Reset();
+    CHECK(store->List().empty(), "empty reset does not persist a session");
+
+    std::vector<float> silence(160, 0.0f);
+    stream.PushAudio(silence.data(), static_cast<int>(silence.size()));
+    stream.Reset();
+    const auto first_list = store->List();
+    CHECK(first_list.size() == 1, "first non-empty reset persists one session");
+    const std::string first_id =
+        first_list.empty() ? std::string() : first_list.front().session_id;
+    const std::string first_json = store->Load(first_id);
+    CHECK(first_json.find("\"audio_sec\":0.010000000") != std::string::npos,
+          "persisted session retains the non-empty audio extent");
+
+    stream.Reset();
+    CHECK(store->List().size() == 1,
+          "following empty reset does not overwrite or add a session");
+    CHECK(store->Load(first_id) == first_json,
+          "following empty reset leaves the prior document unchanged");
+
+    stream.PushAudio(silence.data(), static_cast<int>(silence.size()));
+    stream.Reset();
+    const auto second_list = store->List();
+    CHECK(second_list.size() == 2,
+          "second rapid non-empty reset persists another session");
+    bool first_found = false;
+    bool distinct_found = false;
+    for (const auto& session : second_list) {
+      first_found = first_found || session.session_id == first_id;
+      distinct_found = distinct_found || session.session_id != first_id;
+      CHECK(!store->Load(session.session_id).empty(),
+            "each rapid session ID loads a timeline document");
+    }
+    CHECK(first_found, "first rapid session ID remains listed");
+    CHECK(distinct_found, "rapid non-empty sessions receive distinct IDs");
+
+    std::filesystem::remove_all(temp_dir);
+    std::printf("\n");
+  }
 
   if (g_fail == 0) {
     std::printf("AuditoryStream test PASSED\n");

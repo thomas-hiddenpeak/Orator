@@ -414,4 +414,7 @@ validate through the real `rate=1` WS path.
 - [x] **W13** Add and register dependency-free JavaScript contract tests.
 - [~] **W14** Real Chromium passed real WebSocket file audio, reconnect, exact
   session load/export, and fake-device microphone capture. Physical microphone
-  input and non-Chromium browsers remain acceptance work.
+  input and non-Chromium browsers remain acceptance work. Spec 014's 2026-08-09
+  repetition found and corrected a same-second empty-reset overwrite; focused
+  and full tests plus one corrected Chromium run pass, with the clean-commit
+  repeat tracked by Spec 014 T040.
