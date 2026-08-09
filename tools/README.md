@@ -5,7 +5,7 @@ capture, and historical diagnostics. Tools do not evaluate product results.
 
 ## Result-Evaluation Prohibition
 
-Under Constitution 1.7.0 Article VI, no tool in this directory may assign
+Under Constitution 1.8.0 Article VI, no tool in this directory may assign
 correctness, calculate or estimate product accuracy, rank/select candidates, or
 issue pass/fail or promotion decisions. This includes compiled tools, Python,
 shell and JavaScript scripts, notebooks, formulas, queries, and algorithms.
@@ -13,6 +13,10 @@ Tools may verify numerical-oracle parity and mechanical contracts, or capture,
 index, and display unjudged evidence. Product evaluation is performed only by a
 reviewer reading every item in complete conversational context and manually
 deriving and checking the result.
+No tool may convert a shortened or focused run into a product verdict or global
+accuracy statement. Those decisions require complete `test.mp3` evidence and a
+reviewer-owned chronological and reverse reading of every `test.txt`
+contribution.
 
 ## Directory Structure
 

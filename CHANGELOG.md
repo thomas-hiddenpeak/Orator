@@ -11,6 +11,14 @@ Dates in `YYYY-MM-DD` format.
 
 ## [Unreleased]
 
+### Changed
+- Evaluation governance is upgraded to Constitution 1.8.0. Shortened and
+  focused runs are diagnostic only; product acceptance/rejection, candidate
+  ranking, global accuracy, and overall semantic claims require complete
+  `test.mp3` plus chronological and reverse contextual review of every
+  `test.txt` contribution. The former 102-second Phase 3H product rejection is
+  superseded pending full-length re-evaluation.
+
 ### Added
 - Web UI timeline redesign (Spec 006): the horizontally-scrolling canvas is
   replaced by a wrapping, row-based timeline. The session is split into fixed

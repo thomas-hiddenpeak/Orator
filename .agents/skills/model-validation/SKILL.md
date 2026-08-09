@@ -54,11 +54,14 @@ Validation criteria:
 
 ### Step 4 — End-to-end contextual semantic review
 
-Capture the exact real-WebSocket terminal artifact and arrange its unjudged
-evidence beside `test.txt`. Then read every in-scope item with its surrounding
-conversation, assign the semantic/speaker judgment directly, complete the
-required reverse-order second pass, reconcile disagreements, and manually
-derive/check every reported result.
+For a product decision, capture the exact candidate over the complete
+`test.mp3` through the real-WebSocket path and arrange its unjudged evidence
+beside `test.txt`. Then read every reference contribution and every relevant
+system record with surrounding conversation, assign the semantic/speaker
+judgment directly, complete the reverse-context second pass, reconcile
+disagreements, and manually derive/check every reported result. A shortened or
+focused capture is diagnostic only and cannot accept/reject or rank a candidate,
+assign global accuracy, claim an overall change, or stop this full review.
 
 No code, script, test, notebook, formula, query, metric, or algorithm may assign
 correctness, calculate accuracy, rank/select a candidate, or issue a product
@@ -69,8 +72,8 @@ embedding scores are not product-evaluation methods.
 
 - Record validated tolerances in the relevant `spec.md` acceptance criteria
 - If tolerance drifts: investigate root cause before proceeding. Do NOT adjust tolerance to pass.
-- If the contextual semantic review shows degradation, the change is rejected
-  by default (Art. II). Exception requires explicit approval.
+- If the complete full-length contextual semantic review shows degradation, the
+  change is rejected by default (Art. II). Exception requires explicit approval.
 
 ---
 
@@ -79,6 +82,8 @@ embedding scores are not product-evaluation methods.
 - **Skipping oracle comparison** — "looks reasonable" is not validation (Art. II §4)
 - **Adjusting tolerances post-hoc** — tolerances are set by oracle measurement, not by what passes
 - **Whole-file shortcut for streaming accuracy** — must validate through streaming path (Art. IV)
+- **Focused-context product verdict** — local evidence may diagnose a defect but
+  never substitutes for complete `test.mp3` product review
 - **Using GPU results as self-reference** — CPU oracle or PyTorch reference required
 - **Code-based product evaluation** — numerical tests validate implementation
   parity only; they never label, total, rank, select, or accept business results

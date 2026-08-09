@@ -111,6 +111,11 @@ pipeline and net, not as an outermost layer above them.
   accuracy result, rank/select a candidate, or issue an acceptance verdict.
   Only complete contextual semantic review may evaluate ASR, diarization,
   speaker attribution, endpoint, hallucination, or comprehensive-view results.
+- **Focused product verdicts** — shortened or focused runs are diagnostic only.
+  They cannot accept/reject or rank a candidate, assign global accuracy, claim
+  overall improvement/regression, or stop full evaluation. Every product
+  verdict requires the complete `test.mp3`, every `test.txt` contribution,
+  and complete chronological plus reverse contextual review.
 
 ---
 
@@ -169,6 +174,10 @@ This project follows **Spec-Driven Development (SDD)** adapted from spec-kit. Th
   validate mechanical contracts, and display raw evidence only; every product
   accuracy label, total, comparison, and verdict is manually derived from
   complete conversational context, never from code
+- **Full-length product decisions** (Art. VI) — shorter runs are diagnostic
+  only; acceptance, rejection, ranking, global accuracy, and overall semantic
+  claims require full `test.mp3` and complete forward/reverse review of every
+  `test.txt` contribution
 - **Common time base + independent pipelines** (Art. III)
 - **Streaming validation through real WebSocket** (Art. IV)
 - **Engineering quality mandatory** (Art. V) — readability, RAII, race-free, small functions

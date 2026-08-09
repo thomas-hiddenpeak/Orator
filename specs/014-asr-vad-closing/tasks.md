@@ -2,6 +2,10 @@
 
 `[ ]` pending, `[~]` in progress, `[x]` complete. A task is complete only when
 its named evidence exists. Mechanical checks never assign product correctness.
+Under Constitution 1.8.0, every historical shortened-run "accept" or "reject"
+entry in this task log is retained only as a diagnostic record. It has no
+current product-decision authority unless a complete canonical run and full
+chronological/reverse contextual review also support it.
 
 ## Phase 0: Governance and Evidence Inventory
 
@@ -371,19 +375,50 @@ its named evidence exists. Mechanical checks never assign product correctness.
   at `0.987x`, returns terminal state in 1.330 seconds, closes all seven extents
   at 1,632,000 samples, matches both observers, and passes telemetry coverage.
 - [x] **T087** Read every Live, Final, and comprehensive contribution in complete
-  chronological and reverse context against `test.txt`. Reject and restore the
-  control on any critical regression or failure of the focused contexts; only a
-  complete contextual pass may authorize T048 and longer gates. All 81 Live,
-  eight Final, and 28 comprehensive entries are read in both directions. The
+  chronological and reverse context against `test.txt`. All 81 Live, eight
+  Final, and 28 comprehensive entries were read in both directions. The
   candidate repairs no focused critical context and retains the unsupported
-  investment Live, so it is rejected. Restore `kv_append`, dormant 2000 ms,
-  and `ban_steps = 3`; no longer gate or decoder sweep is authorized. See
-  `official-greedy-termination-review-2026-08-10.md`.
+  investment Live. Under Constitution 1.8.0 these are local diagnostic findings
+  only; the former product rejection and longer-gate prohibition are
+  superseded. See `official-greedy-termination-review-2026-08-10.md`.
 - [x] **T088** Under the restored control, pass focused configuration, complete
   CTest, warning review, and process cleanup; update state documentation and
-  commit/push the rejection before any new hypothesis. Focused `test_config`
+  commit/push the historical diagnostic record. Focused `test_config`
   passes, complete CTest passes `75/75` in `52.86` seconds, compilation emits no
   warning or error, and no server, client, or `tegrastats` process remains.
+
+### Phase 3I: Full-Length Phase 3H Re-evaluation
+
+- [x] **T089** Amend evaluation governance to Constitution 1.8.0 and classify
+  every shortened or focused run as diagnostic only. Product verdicts, global
+  accuracy statements, candidate ranking, and decisions to stop evaluation
+  require complete `test.mp3` plus all 556 `test.txt` contributions reviewed
+  chronologically and in reverse context. Amendment commit `d07b7af` is pushed.
+- [ ] **T090** Reactivate the exact Phase 3H candidate in `orator.toml`:
+  `accumulated_redecode`, 1000 ms, `ban_steps = 0`, trace false. Keep every
+  other output-affecting value fixed, update exact configuration assertions,
+  pass focused configuration tests, complete CTest, and a warning-clean build,
+  then commit and push the candidate before capture.
+- [ ] **T091** Run all 3615.120 seconds of `test.mp3` at 1.0x/100 ms through
+  the production WebSocket with an empty isolated registry, early and late
+  observers, direct `end`, continuous runtime telemetry, continuous
+  `tegrastats`, immutable provenance, and exact common-time-base
+  reconciliation. Retain all raw evidence; automation performs mechanical
+  validation only.
+- [ ] **T092** Read every one of the 556 `test.txt` contributions and all
+  relevant Live, Final, diarization, forced-alignment, speaker, and
+  comprehensive records in chronological context. Assign every semantic and
+  speaker judgment directly without executable evaluation or aggregation.
+- [ ] **T093** Repeat the complete review in reverse fixed contextual windows,
+  reconcile every disagreement manually, and independently recheck every
+  manually derived total and band.
+- [ ] **T094** Manually record the full ASR semantic band, all six complete
+  600-second bands, final 15.120-second context, critical meanings, Live/Final
+  effect, endpoint observations, and frozen-speaker guard. Only this complete
+  review may accept/reject the candidate or state an overall change.
+- [ ] **T095** Retain or restore the TOML candidate strictly from T092-T094,
+  rerun focused configuration, complete CTest, warning review, and process
+  cleanup, then update the report and project state and commit/push the result.
 
 ## Phase 4: Web UI and Physical Microphone
 

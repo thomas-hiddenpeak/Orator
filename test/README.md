@@ -54,11 +54,14 @@ ctest --test-dir build -R test_web_model --output-on-failure
 ```
 
 部分模型测试需要 CUDA、GPU 和本地模型/参考文件。准确率与产品收官评估必须
-按 Constitution 1.7.0、`.specify/test-review-protocol.md` 和 Spec 013 走真实
+按 Constitution 1.8.0、`.specify/test-review-protocol.md` 和 Spec 013 走真实
 WebSocket、全长音频与全量上下文语义审核。任何 C++/CUDA 测试、Python/ shell /
 JavaScript 脚本、Notebook、公式、查询、自动指标或算法，都不得判定正确性、
 汇总准确率、排名/选择候选或输出产品通过/失败结论。CTest 和 oracle 仅验证
 工程合同及数值一致性；自动化只能采集和展示未判定证据。
+120/360/600 秒及任何定向片段只可用于工程和因果诊断，不能接受或拒绝候选、
+给出全局准确率、声明整体升降或停止全长评估。产品结论必须完整运行
+`test.mp3`，并对全部 `test.txt` 条目完成正向和反向上下文语义审核。
 
 当前收官基线是流式 Sortformer v2.1 `340/1/188/188`。v2 权重及其旧
 `test_diar_stream` 已删除；当前模型门禁由 `test_diar_async_stream` 及

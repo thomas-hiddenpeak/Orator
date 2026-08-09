@@ -4,8 +4,16 @@
 - **Candidate commit**: `a9ebea78508ab0240c331094f12c5e026cdfbaa0`
 - **Candidate**: `accumulated_redecode`, 1000 ms, `ban_steps = 0`
 - **Human reference**: `test/data/reference/test.txt`, lines 445-463
-- **Decision**: rejected; restore `kv_append`, dormant 2000 ms, and
-  `ban_steps = 3`
+- **Classification**: focused diagnostic only; no product verdict
+- **Superseded decision**: the former rejection and decision to stop longer
+  evaluation are invalid under Constitution 1.8.0
+
+This report covers only 102 seconds of a 3615.120-second source. Its local
+semantic observations remain valid causal evidence, but they cannot establish
+global accuracy, overall improvement/regression, candidate acceptance or
+rejection, or whether full evaluation should proceed. Phase 3I therefore
+requires the exact candidate to receive a full real-WebSocket run and complete
+chronological/reverse review before any product decision.
 
 No code, script, query, formula, metric, or algorithm evaluated transcript
 correctness, compared transcript candidates, assigned an accuracy result, or
@@ -133,7 +141,7 @@ equity term, or numeric unit. The comprehensive view therefore cannot repair
 this candidate after ASR Final publication. Its speaker fragmentation remains
 inside the frozen conditional FR50 boundary and is not promoted by this run.
 
-## Decision
+## Historical Decision (Superseded)
 
 The candidate was authorized because native decoding suppressed EOS during its
 first three argmax positions while the pinned official vLLM sampler did not.
@@ -142,10 +150,18 @@ accumulated state, VAD, prompt, segment, model, alignment, speaker, time-base, o
 publication values. Complete contextual review shows no repair in any focused
 critical control and retains the same material Live hallucination.
 
-Phase 3H is therefore rejected. No 360-second, 600-second, or full-length
-candidate gate is authorized. Checked-in behavior returns to `kv_append`, the
-dormant accumulated cadence returns to 2000 ms, and `ban_steps` returns to 3.
-This also ends the accumulated decoder-parameter branch: no EOS, cadence,
-rollback, unfixed-prefix, or token-budget sweep is authorized from this
-evidence. Further ASR work requires a new independently evidenced model or
-decoder hypothesis written into SDD before another product candidate exists.
+The original review used these local findings to reject Phase 3H, stop the
+longer gates, restore `kv_append`, and close the accumulated decoder branch.
+That product decision exceeded the evidence scope and is superseded by
+Constitution 1.8.0. The restoration remains a historical engineering action,
+not a valid semantic verdict.
+
+## Current Decision Boundary
+
+There is no product result for this candidate yet. The exact Phase 3H candidate
+must process complete `test.mp3`; all 556 `test.txt` contributions and all
+relevant raw system evidence must then be read chronologically and in reverse
+context. Only that reconciled full review may assign its semantic band, compare
+its overall business meaning with the full baseline, or retain/reject it. The
+local failures above remain required controls within, but cannot predetermine,
+that full review.

@@ -1,34 +1,18 @@
 # Spec 014: ASR, VAD Endpoint, and Live Transcript Closing
 
 - **Feature**: `014-asr-vad-closing`
-- **Status**: Phase 1 and Phase 2 complete; bounded Live publication candidate
-  passes engineering, three-run silence, repeated 120-second, 360-second, and
-  600-second gates; Phase 4 Chromium file input and physical-endpoint room tone
-  pass their bounded reviews, but active physical-microphone scenarios remain
-  blocked by unavailable effective capture hardware; Phase 3B causal review
-  traces one prompt-conditioned decoder factor and rejects/removes the first
-  empty-system-prompt candidate; Phase 3C is revalidating the native streaming
-  encoder and decoder boundaries against the official implementation; the
-  resulting TOML-owned full-context Final candidate passes its engineering gate
-  but fails complete focused contextual review and is disabled; Phase 3D now
-  exposes a typed TOML acoustic window, passes its engineering and exact
-  eight-second numerical gates under the restored 100-frame control; complete
-  forward/reverse review rejects the isolated 800-frame candidate and restores
-  that control; Phase 3E adds the official accumulated-audio state transition
-  behind a typed TOML mode and passes its control-side engineering gate; complete
-  forward/reverse review rejects the two-second accumulated candidate and
-  restores `kv_append`; Phase 3F also rejects the bounded one-second accumulated
-  cadence after complete forward/reverse review and restores the control;
-  Phase 3G adds a default-off raw decoder-state trace, passes its engineering
-  gate, and completes an exact 91-row forward/reverse root-cause review; the
-  accumulated state transition matches the pinned official source, while one
-  concrete initial-token EOS-suppression mismatch authorizes a single Phase 3H
-  candidate; that candidate passes engineering and mechanical gates but fails
-  complete forward/reverse contextual review, so `kv_append`, dormant 2000 ms,
-  and `ban_steps = 3` are restored; ASR semantic closing and full-candidate
-  acceptance remain open
+- **Status**: Phase 1 and Phase 2 are complete; the bounded Live publication,
+  silence, Chromium file-input, and physical-endpoint room-tone evidence is
+  retained. Phase 3B through Phase 3G provide diagnostic and numerical evidence
+  for native ASR state behavior. Phase 3H's exact 102-second run identifies
+  local semantic defects but, under Constitution 1.8.0, cannot reject the
+  candidate or close the accumulated decoder branch. Phase 3I reopens the exact
+  `accumulated_redecode`, 1000 ms, `ban_steps = 0` candidate for a complete
+  3615.120-second real-WebSocket run and full chronological/reverse contextual
+  review. ASR semantic closing, active physical-microphone coverage, and full
+  candidate acceptance remain open.
 - **Owner**: project owner
-- **Constitution**: v1.7.0
+- **Constitution**: v1.8.0
 - **Depends on**: Spec 003 (streaming ASR), Spec 004 (typed comprehensive
   timeline), Spec 006 (Web UI), Spec 009 (forced alignment), and Spec 013
   (conjunctive industrial closing gates)
@@ -401,28 +385,42 @@ tokens, and the same VAD, prompt, segment cap, model, alignment, Sortformer
 v2.1, FR50 fusion, time base, and publication policy. Trace MUST remain disabled
 for the product run.
 
-The candidate MUST pass focused configuration tests, complete CTest, and a
-warning-clean build before it is committed and pushed. It then MUST stream the
-identical 102-second source through the real WebSocket. Every Live, Final, and
-comprehensive contribution MUST be read in chronological and reverse context
-against the complete human reference. Mechanical tools may verify only source,
-configuration, timing, time-base, observer, persistence, telemetry, and schema
-contracts.
-
-Any new critical assertion, loss of a preserved commitment, unusable endpoint
-behavior, or failure to repair the focused critical contexts rejects the
-candidate and restores `kv_append`, dormant 2000 ms, and `ban_steps = 3`. It
-MUST NOT authorize a second decoder parameter. Only a complete contextual pass
-may authorize 360-second, 600-second, or full evidence gates.
-
-The exact Phase 3H run passes source, real-time, time-base, observer, telemetry,
-and engineering contracts. Complete reading of all 81 Live events, eight Final
-records, and 28 comprehensive contributions in both directions rejects it. The
-correct Live negation is still overwritten, the exclusive-signing term remains
-absent, legal/name/unit substitutions remain, and the unsupported investment
-Live remains visible. The restored control is required, and this accumulated
-decoder-parameter branch is closed. See
+The candidate passed focused configuration tests, complete CTest, and a
+warning-clean build before its exact 102-second real-WebSocket diagnostic.
+Every local Live, Final, and comprehensive contribution was read in
+chronological and reverse context. That reading identifies an overwritten
+negation, an absent exclusive-signing term, legal/name/unit substitutions, and
+an unsupported investment Live assertion. These remain valid local diagnostic
+facts. The former product rejection and decision to stop longer evaluation are
+superseded by Constitution 1.8.0 because focused evidence has no global
+decision authority. See
 `official-greedy-termination-review-2026-08-10.md`.
+
+### FR18 - Full-length Phase 3H product evaluation
+
+The exact Phase 3H candidate MUST be reactivated without changing any other
+output-affecting value. It MUST pass configuration tests, complete CTest, and a
+warning-clean build, then be committed and pushed before product evidence is
+captured.
+
+The committed candidate MUST process all 3615.120 seconds of canonical
+`test.mp3` through the production WebSocket at 1.0x pacing with direct
+`end`, early and late observers, an empty isolated speaker registry,
+continuous runtime telemetry, continuous `tegrastats`, immutable provenance,
+and exact common-time-base reconciliation.
+
+The reviewer MUST read every one of the 556 human-listened `test.txt`
+contributions and all relevant Live, Final, diarization, forced-alignment,
+speaker, and comprehensive-timeline evidence in chronological order and again
+in reverse fixed contextual windows. The two complete readings MUST be
+reconciled manually. Automation may capture, hash, validate mechanical
+contracts, and display unjudged evidence only.
+
+Only this complete review may assign the candidate's full-session ASR semantic
+band, the six complete 600-second context bands, critical-meaning result,
+Live/Final business effect, speaker guard result, overall improvement or
+regression, and accept/reject verdict. The earlier 102-second observations are
+diagnostic controls inside this full review; they cannot predetermine it.
 
 ## 6. Acceptance Gates
 
@@ -472,6 +470,8 @@ mechanical and numerical facts.
 - **Article VI**: only complete contextual semantic review evaluates ASR,
   endpoint, hallucination, speaker attribution, or the final view. Automation
   stops at capture, display, hashes, schemas, timing, and numerical contracts.
+  Product verdicts use complete `test.mp3` and every `test.txt` contribution;
+  shorter runs remain diagnostic only.
 - **Article IX**: all tunable behavior is TOML-owned and resolved through the
   required precedence.
 - **Articles X-XI**: spec, plan, tasks, code, tests, state, and evidence status

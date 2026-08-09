@@ -40,6 +40,33 @@ aggregation. CER, DER, lexical matching, timestamp overlap, duration mapping,
 embedding scores, and similar mechanical values are diagnostics only and may
 not be converted into an accuracy conclusion.
 
+## Full-Length Product Decision Boundary
+
+Shortened inputs, including 120-second, 360-second, 600-second, fixed-window,
+and focused excerpts, are diagnostic and engineering evidence only. They may
+locate a defect, preserve a causal control, or prove that the system is ready
+to attempt a longer capture. They may not:
+
+- accept or reject a product candidate;
+- rank candidates or select a configuration;
+- assign or estimate global accuracy;
+- claim an overall semantic improvement or regression;
+- stop the required full-length semantic evaluation; or
+- close an ASR, diarization, speaker, endpoint, hallucination, or comprehensive-
+  timeline accuracy requirement.
+
+Every product-result decision requires the exact candidate to process the
+complete canonical `test.mp3`. The reviewer then reads every `test.txt`
+contribution and all relevant Live, Final, diarization, alignment, speaker, and
+comprehensive-timeline evidence in chronological order and again in reverse
+contextual windows. Only the reconciled complete readings may produce a global
+accuracy statement or candidate verdict. A focused defect remains a valid
+diagnostic observation but has no independent global decision authority.
+
+A mechanically invalid run may stop because of a crash, out-of-memory
+condition, transport failure, corrupt artifact, or equivalent capture failure.
+That stop records only the mechanical failure and never a semantic result.
+
 ## 1. Required Review Inputs
 
 Each review MUST read:
@@ -206,5 +233,5 @@ ranking, or acceptance flag is invalid even when its inputs are manual labels.
 
 Starting from this document's adoption, every result evaluation with known
 reference text uses this protocol. It cannot be overridden by a feature spec,
-tool, test, report template, or command-line option because Constitution 1.7.0
+tool, test, report template, or command-line option because Constitution 1.8.0
 Article VI is authoritative.

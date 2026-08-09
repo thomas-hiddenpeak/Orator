@@ -49,6 +49,11 @@ rework. Enforce these every session:
   aggregate accuracy, rank/select a candidate, or issue a product verdict.
   Automation may capture and display unjudged evidence and verify mechanical or
   numerical contracts only.
+- Shortened and focused runs are diagnostic only. They cannot accept/reject or
+  rank a candidate, assign global accuracy, claim an overall semantic change,
+  or stop full evaluation. A product decision requires full `test.mp3` and
+  complete chronological plus reverse contextual review of every `test.txt`
+  contribution.
 - Dual pipeline model: diarization and ASR are independent pipelines sharing only input audio and one absolute time base.
 - Streaming validation: validate through the real WebSocket streaming path, not whole-file shortcut runs.
 - Engineering quality is mandatory: readability, layering, RAII, race-free concurrency, small focused functions.
@@ -75,6 +80,9 @@ rework. Enforce these every session:
   reference in surrounding conversational context, perform the required second
   pass, and manually derive/check the result. Do not use code-generated labels,
   totals, percentages, rankings, or pass/fail decisions.
+- For any product verdict or global accuracy statement: use the exact candidate
+  on the complete canonical `test.mp3`; do not substitute a 120/360/600-second
+  or focused excerpt, even when it exposes a critical local defect.
 - Output contract compatibility is preserved unless the spec explicitly changes it.
 - State docs match the code: `PROJECT_STATE.md` and the affected spec/tasks status lines are updated to reality with commit references (Constitution Article VIII).
 

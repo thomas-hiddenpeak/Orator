@@ -12,8 +12,10 @@ The work is divided into two independent controls:
    mandatory regression view because ASR boundaries affect forced alignment and
    derived business entries.
 2. **ASR/VAD candidate line**: establish the current behavior from raw evidence,
-   isolate one defect class at a time, and promote only candidates that pass the
-   duration ladder and complete contextual review.
+   isolate one defect class at a time, and use shorter duration levels only for
+   engineering and causal diagnosis. Candidate acceptance, rejection, ranking,
+   and global semantic conclusions require a full canonical run and complete
+   contextual review.
 
 No ASR parameter is changed before the current-commit seal and baseline review
 identify an actual defect and its source boundary.
@@ -624,11 +626,10 @@ other TOML values remain fixed and trace remains false. This directly tests the
 official decoder-termination contract while preserving the exact state machine
 whose transitions T083 audited.
 
-First update and push SDD while the restored control is still checked in. Then
-activate the candidate in TOML, update only exact configuration assertions, run
-focused and complete engineering gates, and commit/push the clean candidate
-before capturing output. The evidence run reuses the exact 102-second WAV,
-real-WebSocket pacing, observers, direct `end`, and telemetry procedure.
+The candidate was first activated in TOML, passed focused and complete
+engineering gates, and was committed before the exact 102-second diagnostic
+capture. The diagnostic reused the same real-WebSocket pacing, observers,
+direct `end`, and telemetry procedure.
 
 The reviewer reads every Live event, Final record, and comprehensive-view item
 chronologically and in reverse context. Particular attention goes to the
@@ -636,17 +637,47 @@ correct negation overwritten in segment 0, absent exclusive-signing term in
 segment 2, legal/name/unit substitutions in segments 3-4, preserved no-equity
 commitment in segment 5, short Final addition in segment 6, and temporary
 investment assertion in segment 7. These are context controls, not a script
-scorecard. Any critical regression or failure of the focused causal contexts
-restores the control immediately and ends this decoder branch. Only a clean
-contextual pass can return to the duration ladder in T048.
+scorecard.
 
-The exact candidate run completes its mechanical gates, but complete forward
-and reverse reading rejects it. Removing EOS suppression does not repair the
+The exact candidate run completes its mechanical gates. Complete forward and
+reverse reading shows that removing EOS suppression does not repair the
 correct Live negation overwritten at Final, the absent exclusive-signing term,
 the legal/name/unit substitutions, or the visible investment hallucination.
-The comprehensive view preserves the same Final errors. Restore `kv_append`,
-dormant 2000 ms, and `ban_steps = 3`; do not run a longer gate or another
-decoder parameter from this branch.
+The comprehensive view preserves the same Final errors. These are local causal
+diagnostics only. Constitution 1.8.0 supersedes the former rejection, control-
+restoration verdict, and prohibition on a longer run.
+
+## 15.9 Phase 3I: Full-Length Phase 3H Re-evaluation
+
+Reproduce the exact Phase 3H state in checked-in `orator.toml`:
+`stream_mode = "accumulated_redecode"`, `stream_chunk_ms = 1000`,
+`ban_steps = 0`, and `stream_state_trace = false`. Keep VAD, prompt,
+segment, model, alignment, Sortformer v2.1, FR50 speaker fusion, time-base, and
+publication values unchanged. Update only exact configuration assertions.
+
+Run the focused configuration tests, complete CTest, and a warning-clean build.
+Commit and push that clean candidate before capture. Create an isolated artifact
+configuration that differs only in ports and artifact-local registry, storage,
+and session paths.
+
+Stream the complete 3615.120-second `test.mp3` once through the production
+WebSocket at 1.0x in 100 ms frames. Use an empty isolated registry, early and
+late observers, direct `end`, continuous runtime telemetry, continuous
+`tegrastats`, and a terminal wait of up to 600 seconds. Retain the raw run,
+manifest, resolved configuration, server log, and hashes. Mechanical checks
+may validate only capture integrity, time base, observers, telemetry, transport,
+schema, and stability.
+
+Review all 556 `test.txt` contributions and every relevant raw Live, Final,
+diarization, forced-alignment, speaker, and comprehensive record first in
+chronological order and then in reverse fixed contextual windows. Reconcile the
+two complete readings manually. Manually derive and independently recheck the
+full ASR semantic band, every complete 600-second band, critical meanings,
+Live/Final effect, endpoint observations, and frozen-speaker guard. Do not use a
+script, query, formula, metric, or partial-context verdict.
+
+Only that full review decides whether to retain the candidate or restore the
+control. A second decoder parameter remains outside this phase.
 
 ## 16. Risks and Controls
 
@@ -656,7 +687,7 @@ decoder parameter from this branch.
 | ASR change regresses speaker business view | Freeze speaker configuration and perform complete dual-purpose full review |
 | VAD tuning repairs one phrase but loses another | One-variable TOML candidate, staged duration gates, complete context and controls |
 | Script-derived accuracy enters the process | Tools are limited to capture, hashes, schema checks, and unjudged evidence display |
-| Repeated full runs consume time without a supported hypothesis | Full run only after silence, 120, 360, and 600 gates pass |
+| Repeated full runs consume time without a supported hypothesis | Authorize only a separately specified candidate; never use a shortened semantic result to replace its required full review |
 | UI appears correct while terminal state differs | Compare event, typed, terminal, persisted, exported, and rendered states by stable `text_id` |
 | Enumerated audio source has no working transducer | Preserve direct and controlled-playback probes, leave voiced microphone gates open, and never substitute fake-device evidence |
 | Temporary artifacts disappear | Store raw evidence under persistent gitignored project artifacts, cite hashes in committed reports |
@@ -667,5 +698,5 @@ decoder parameter from this branch.
 
 This plan preserves zero runtime dependencies, one common time base, independent
 typed pipelines, production-WebSocket validation, TOML-owned behavior, trusted
-model oracles, complete contextual result review, and synchronized SDD/state
-documentation. No constitutional exception is required.
+model oracles, full-length complete contextual product review, and synchronized
+SDD/state documentation. No constitutional exception is required.
