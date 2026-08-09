@@ -4,14 +4,16 @@
 - **Status**: Phase 1 and Phase 2 are complete; the bounded Live publication,
   silence, Chromium file-input, and physical-endpoint room-tone evidence is
   retained. Phase 3B through Phase 3G provide diagnostic and numerical evidence
-  for native ASR state behavior. Phase 3H's exact 102-second run identifies
-  local semantic defects but, under Constitution 1.8.0, cannot reject the
-  candidate or close the accumulated decoder branch. Phase 3I now activates the
-  exact `accumulated_redecode`, 1000 ms, `ban_steps = 0` candidate after its
-  engineering gates; the complete 3615.120-second real-WebSocket run and full
-  chronological/reverse contextual review are next. ASR semantic closing,
-  active physical-microphone coverage, and full candidate acceptance remain
-  open.
+  for native ASR state behavior. Phase 3I completes the required full-length
+  evaluation of Phase 3H's exact `accumulated_redecode`, 1000 ms,
+  `ban_steps = 0` candidate. All 556 reference contributions and all 2,664
+  Live events received separate complete chronological and reverse
+  fixed-window contextual review. The candidate remains in the 70-79% semantic
+  band, fails every complete
+  600-second block and the Live/critical-meaning gates, and is rejected. The
+  checked-in runtime restores the `kv_append`, dormant 2000 ms accumulated,
+  `ban_steps = 3` control. ASR semantic closing and active physical-microphone
+  coverage remain open.
 - **Owner**: project owner
 - **Constitution**: v1.8.0
 - **Depends on**: Spec 003 (streaming ASR), Spec 004 (typed comprehensive
@@ -422,6 +424,16 @@ band, the six complete 600-second context bands, critical-meaning result,
 Live/Final business effect, speaker guard result, overall improvement or
 regression, and accept/reject verdict. The earlier 102-second observations are
 diagnostic controls inside this full review; they cannot predetermine it.
+
+Phase 3I satisfies this requirement at clean commit `5f98db1`. The complete
+3615.120-second run passes all mechanical and real-time gates. Complete forward
+and reverse review of all 556 reference contributions, plus complete
+chronological and reverse review of all 2,664 Live events, manually places the
+candidate in the 70-79% full-session band. Every complete 600-second block
+remains below 90 percent; unrepaired critical errors and user-visible Live
+hallucinations occur across the session.
+The candidate is not an overall improvement and is rejected. See
+`official-greedy-full-context-review-2026-08-10.md`.
 
 ## 6. Acceptance Gates
 

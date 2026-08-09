@@ -7,6 +7,9 @@
 - **Classification**: focused diagnostic only; no product verdict
 - **Superseded decision**: the former rejection and decision to stop longer
   evaluation are invalid under Constitution 1.8.0
+- **Full-length resolution**: Phase 3I later rejects the exact candidate after
+  complete 3615.120-second contextual review; see
+  `official-greedy-full-context-review-2026-08-10.md`
 
 This report covers only 102 seconds of a 3615.120-second source. Its local
 semantic observations remain valid causal evidence, but they cannot establish
@@ -156,12 +159,13 @@ That product decision exceeded the evidence scope and is superseded by
 Constitution 1.8.0. The restoration remains a historical engineering action,
 not a valid semantic verdict.
 
-## Current Decision Boundary
+## Full-Length Resolution
 
-There is no product result for this candidate yet. The exact Phase 3H candidate
-must process complete `test.mp3`; all 556 `test.txt` contributions and all
-relevant raw system evidence must then be read chronologically and in reverse
-context. Only that reconciled full review may assign its semantic band, compare
-its overall business meaning with the full baseline, or retain/reject it. The
-local failures above remain required controls within, but cannot predetermine,
-that full review.
+This report itself remains diagnostic only. Phase 3I subsequently runs the
+exact candidate through complete `test.mp3` and reads all 556 `test.txt`
+contributions and all 2,664 Live events chronologically and again in reverse
+fixed windows. That independent full-length review manually places the
+candidate in the 70-79% semantic band, finds every complete 600-second block
+below closure, and rejects it. The local findings above are confirmed as part
+of the broader session-wide pattern; they did not independently produce that
+verdict.

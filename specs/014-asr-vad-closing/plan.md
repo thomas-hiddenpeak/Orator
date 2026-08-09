@@ -679,6 +679,17 @@ script, query, formula, metric, or partial-context verdict.
 Only that full review decides whether to retain the candidate or restore the
 control. A second decoder parameter remains outside this phase.
 
+Phase 3I completes on the full artifact at candidate commit `5f98db1`. The run
+passes source, common-clock, observer, telemetry, transport, stability, and
+direct-end contracts. The reviewer reads all 556 reference contributions
+chronologically and in reverse fixed windows and separately reads all 2,664
+Live partial events chronologically and in reverse fixed windows. The manually
+reconciled result remains 70-79 percent overall; all six complete blocks,
+critical meaning, and Live presentation fail.
+The candidate does not improve the full baseline and the plan restores the
+`kv_append`, dormant 2000 ms accumulated, `ban_steps = 3` control. No second
+decoder parameter is authorized by this result.
+
 ## 16. Risks and Controls
 
 | Risk | Control |

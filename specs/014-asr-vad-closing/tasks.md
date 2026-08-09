@@ -402,26 +402,45 @@ chronological/reverse contextual review also support it.
   test passes, the complete suite passes `75/75` in `51.93` seconds, and the
   clean build emits no warning or error diagnostic. Commit/push completes
   before T091 starts.
-- [ ] **T091** Run all 3615.120 seconds of `test.mp3` at 1.0x/100 ms through
+- [x] **T091** Run all 3615.120 seconds of `test.mp3` at 1.0x/100 ms through
   the production WebSocket with an empty isolated registry, early and late
   observers, direct `end`, continuous runtime telemetry, continuous
   `tegrastats`, immutable provenance, and exact common-time-base
   reconciliation. Retain all raw evidence; automation performs mechanical
-  validation only.
-- [ ] **T092** Read every one of the 556 `test.txt` contributions and all
+  validation only. Candidate commit `5f98db1` completes the run at `0.992x`,
+  returns the terminal document after `27.883 s`, reconciles all seven tracks
+  at 57,841,920 samples, and retains raw evidence under
+  `artifacts/spec014/candidates/asr-official-greedy-no-eos-ban/full-a/`.
+- [x] **T092** Read every one of the 556 `test.txt` contributions and all
   relevant Live, Final, diarization, forced-alignment, speaker, and
   comprehensive records in chronological context. Assign every semantic and
-  speaker judgment directly without executable evaluation or aggregation.
-- [ ] **T093** Repeat the complete review in reverse fixed contextual windows,
+  speaker judgment directly without executable evaluation or aggregation. All
+  556 Final/comprehensive contexts and all 2,664 Live events are read directly
+  from start to terminal time.
+- [x] **T093** Repeat the complete review in reverse fixed contextual windows,
   reconcile every disagreement manually, and independently recheck every
-  manually derived total and band.
-- [ ] **T094** Manually record the full ASR semantic band, all six complete
+  manually derived total and band. All 556 reference contexts and all 2,664
+  Live events are reread from terminal time to zero in fixed windows; the
+  reverse pass does not change the full-session disposition. The forward and
+  reverse unjudged reference worksheets retain SHA-256
+  `28f346d3...0646` and `dd4f1a40...6355` respectively.
+- [x] **T094** Manually record the full ASR semantic band, all six complete
   600-second bands, final 15.120-second context, critical meanings, Live/Final
   effect, endpoint observations, and frozen-speaker guard. Only this complete
-  review may accept/reject the candidate or state an overall change.
-- [ ] **T095** Retain or restore the TOML candidate strictly from T092-T094,
+  review may accept/reject the candidate or state an overall change. The
+  complete review places the run in the 70-79% band, all six complete blocks
+  below 90%, final 15.120 seconds at 80-89%, and the speaker view inside the
+  conditional FR50 boundary. Critical meaning and Live presentation fail; the
+  candidate is not an overall improvement and is rejected. See
+  `official-greedy-full-context-review-2026-08-10.md`.
+- [x] **T095** Retain or restore the TOML candidate strictly from T092-T094,
   rerun focused configuration, complete CTest, warning review, and process
   cleanup, then update the report and project state and commit/push the result.
+  The full review rejects the candidate and restores `kv_append`, dormant
+  2000 ms accumulated cadence, and `ban_steps = 3`. The rebuilt exact
+  configuration test passes, the clean build emits no warning or error, and
+  complete CTest passes `75/75` in `52.93` seconds. Documentation and clean
+  process-state verification complete in the same transition.
 
 ## Phase 4: Web UI and Physical Microphone
 

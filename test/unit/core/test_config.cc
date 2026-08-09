@@ -84,10 +84,10 @@ int main() {
           "checked-in ASR VAD gate chunk is frozen at 100 ms");
     CHECK(!checked_in.asr_final_full_context_decode,
           "checked-in ASR Final disables rejected full-context candidate");
-    CHECK(checked_in.asr_stream_mode == "accumulated_redecode",
-          "checked-in ASR stream mode activates the Phase 3I candidate");
-    CHECK(checked_in.asr_stream_chunk_ms == 1000,
-          "checked-in ASR accumulated cadence reproduces Phase 3F");
+    CHECK(checked_in.asr_stream_mode == "kv_append",
+          "checked-in ASR stream mode restores the frozen control");
+    CHECK(checked_in.asr_stream_chunk_ms == 2000,
+          "checked-in ASR accumulated cadence restores the dormant 2000 ms");
     CHECK(checked_in.asr_stream_unfixed_chunks == 2,
           "checked-in ASR unfixed chunk count is official");
     CHECK(checked_in.asr_stream_unfixed_tokens == 5,
@@ -105,8 +105,8 @@ int main() {
               "你是一个专业的中文普通话语音识别系统，"
               "请准确识别并转录所有语音内容。",
           "checked-in ASR restores the pre-candidate system prompt control");
-    CHECK(checked_in.asr_ban_steps == 0,
-          "checked-in ASR uses the official greedy EOS contract");
+    CHECK(checked_in.asr_ban_steps == 3,
+          "checked-in ASR restores the pre-candidate EOS guard");
     const std::string removed_v2_path =
         std::string(ORATOR_TEST_SOURCE_DIR) +
         "/models/sortformer_4spk_v2.safetensors";

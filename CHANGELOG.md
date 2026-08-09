@@ -16,8 +16,13 @@ Dates in `YYYY-MM-DD` format.
   focused runs are diagnostic only; product acceptance/rejection, candidate
   ranking, global accuracy, and overall semantic claims require complete
   `test.mp3` plus chronological and reverse contextual review of every
-  `test.txt` contribution. The former 102-second Phase 3H product rejection is
-  superseded pending full-length re-evaluation.
+  `test.txt` contribution. Phase 3I now completes that full-length review for
+  the exact official-greedy accumulated candidate. All 556 reference contexts
+  and all 2,664 Live events are read chronologically and again in reverse fixed
+  windows; the manually reconciled result remains 70-79%, all six complete
+  blocks and Live/critical-meaning gates fail, and the candidate is rejected.
+  The checked-in runtime restores the `kv_append`, dormant 2000 ms accumulated,
+  `ban_steps = 3` control.
 
 ### Added
 - Web UI timeline redesign (Spec 006): the horizontally-scrolling canvas is
