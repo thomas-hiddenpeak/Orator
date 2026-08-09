@@ -468,3 +468,9 @@ session saved by `End`. The bounded correction skips persistence for zero-sample
 sessions and uses microsecond/PID/sequence IDs. Focused and full CTest pass, and
 the corrected Chromium flow reloads the terminal document exactly. An exact
 clean-commit repeat remains part of Spec 014 T040.
+
+That clean 120-second repeat then showed `wall_clock_ok=false`: repeated
+relative 60 ms browser timers accumulated event-loop delay. The bounded
+follow-up keeps the same frames but schedules them against absolute source-time
+deadlines. Its pure JavaScript pacing contract and full CTest pass; Spec 014
+retains ownership of the exact clean-browser repeat.

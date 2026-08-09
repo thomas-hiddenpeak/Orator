@@ -131,14 +131,20 @@ its named evidence exists. Mechanical checks never assign product correctness.
   exact export, and screenshots, then fails persisted reload. Evidence proves
   an empty `Clear` reset can overwrite the just-finalized document because
   resets save empty sessions and IDs have only second-level time resolution.
-  Apply the bounded persistence correction in `plan.md` and repeat from empty
-  isolated storage before completing this task.
+  Clean commit `b0eadbe` then passes terminal/load/export/reconnect mechanics
+  at 120 seconds, but the terminal `wall_clock_ok=false`: relative 60 ms browser
+  timers accumulate event-loop delay and make the path approximately 123.121
+  seconds. The absolute-deadline candidate retains 60 ms frames; all nine Web
+  model tests and `74/74` CTest entries pass. Repeat from the exact clean commit
+  and empty isolated storage before completing this task.
 - [~] **T041** Review the Live-region segmentation and final comprehensive view
   in conversational context; automation must not decide endpoint correctness.
   The directly read 12-second opening preserves its reference meaning in two
   readable final rows without a stale draft or duplicate final. The known FR50
-  cold-start speaker split remains visible. Repeat with a longer clean-commit
-  browser stream before completing this task. See
+  cold-start speaker split remains visible. The clean 120-second forward and
+  reverse readings preserve the previously signed 18-contribution result and
+  expose no browser-only cut or attribution change, but the pacing candidate
+  must repeat mechanically before completing this task. See
   `browser-persistence-review-2026-08-09.md`.
 - [ ] **T042** Run physical-microphone sessions covering silence, room tone,
   short speech, continuous speech, pauses, interruption, overlap, and ordinary

@@ -417,4 +417,6 @@ validate through the real `rate=1` WS path.
   input and non-Chromium browsers remain acceptance work. Spec 014's 2026-08-09
   repetition found and corrected a same-second empty-reset overwrite; focused
   and full tests plus one corrected Chromium run pass, with the clean-commit
-  repeat tracked by Spec 014 T040.
+  repeat tracked by Spec 014 T040. The first clean 120-second repeat then found
+  relative-timer pacing drift; the absolute-deadline candidate passes its Web
+  contract and full CTest, with browser promotion still owned by T040.

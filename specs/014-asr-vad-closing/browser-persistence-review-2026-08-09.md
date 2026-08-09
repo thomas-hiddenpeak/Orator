@@ -100,3 +100,56 @@ repaired nor worsened by this storage correction.
   before T040 is signed complete.
 - A longer browser Live reading, physical microphone evidence, and
   non-Chromium availability record remain open.
+
+## Exact clean-commit 120-second repeat
+
+Commit `b0eadbe09e2d100a03b2721980ce91cfffa050c8` was clean and synchronized
+with `origin/master` before the longer run. The run used a fresh storage tree,
+empty registry, and a complete TOML copy differing only in port and isolated
+paths.
+
+| Artifact | SHA-256 |
+|---|---|
+| 120-second PCM input | `102edda3ffead0057f000872b56c54f40b51d2cfd193c3bd7edcfe19517b3c48` |
+| TOML copy | `553dd5530059d0c59b6c28262dcbeb44863586160e40931b76fc00d0070790d2` |
+| Browser log | `f16617d9cd319ca5fb669a457687b1d6e7957763c45b8545917d00a42782924c` |
+| Persisted terminal JSON | `d56850ab103c3520730fb42d2397815d0cc3c6bb8d4a5948ebe37abc38a091fd` |
+| Desktop screenshot | `547df89aa4e9aae14089dc0bddfe196ad7fab540bcfdb08de20c1f57d0ce14c7` |
+| Mobile screenshot | `bf312675b3aa4efd8257e914f494e13ceda3fd594c0348038223719b5e5b5c58` |
+
+The browser reaches 120 seconds, 11 final ASR records, matching 11 alignment
+groups, 34 final business entries, exact export, exact persisted reload, clean
+server-restart reconnection, and fake-device microphone start/stop. Every track
+closes at 1,920,000 samples with no extent gap. Desktop and mobile screenshots
+remain readable without page-level overflow or incoherent overlap.
+
+The reviewer reads all 18 in-scope contributions chronologically and then from
+`ref-0018` back to `ref-0001`. The main opening, `15`, `40%`, `5%`, `3.14`,
+decision, interruption, and audible final continuation remain readable. The
+existing `RM1 -> M一`, malformed Hangzhou/Chengdu relation, false negation before
+`当你最前面说的话为准`, and inherited rapid-handoff speaker edges remain.
+No Live row introduces a new omission, duplicate final, stale draft, semantic
+cut, or speaker-policy change. This is the same bounded product interpretation
+as the earlier signed 120-second gate; no executable result produced it.
+
+The run nevertheless stops T040 because `wall_clock_ok=false`. Its first-sample
+wall time is 22:30:09.433 and the stored terminal file time is 22:32:12.554,
+bounding the path to approximately 123.121 seconds. Source inspection shows
+that browser file streaming uses a new relative 60 ms timeout after every
+frame, so event-loop delay accumulates across the session. Spec 014 therefore
+authorizes one browser-only absolute-deadline pacing correction. No model,
+TOML, endpoint, speaker, or final-text change is authorized.
+
+## File-pacing engineering candidate
+
+The browser sender now calculates the next delay from stream start time and the
+exact number of PCM bytes already sent. It retains the 60 ms frame size and
+exact byte coverage. A late callback therefore waits zero milliseconds to
+return to the source clock instead of adding another full relative interval to
+all later frames.
+
+The dependency-free Web model suite adds a pure deadline test and passes all
+nine cases. The complete warning-enabled build has no `warning:` or `error:`
+diagnostic, and all `74/74` CTest entries pass in `52.71 s`. This engineering
+result authorizes an exact clean-commit 120-second browser repeat; it does not
+complete T040 or establish any product-accuracy result.

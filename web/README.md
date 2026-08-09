@@ -6,6 +6,7 @@ browser APIs, and no runtime frontend dependency or build step.
 ## Current Surface
 
 - microphone capture and browser-side audio-file decoding to mono int16LE 16 kHz;
+- source-clock file pacing with fixed PCM frames and absolute wall deadlines;
 - live ASR partial/final rows, speaker revisions, diarization, VAD, and alignment;
 - terminal and loaded-session reconciliation by stable `text_id`;
 - per-pipeline RTF, scheduling, backlog, GPU usage, VRAM, and power telemetry;

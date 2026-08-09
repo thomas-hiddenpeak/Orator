@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { Model } from "../../web/js/model.js";
-import { copyPcmFrame } from "../../web/js/audio.js";
+import {
+  copyPcmFrame,
+  nextPacedDelayMs,
+} from "../../web/js/audio.js";
 import { fmtWallTime } from "../../web/js/format.js";
 import { OratorWs, unwrapEnvelope } from "../../web/js/ws.js";
 
@@ -43,6 +46,17 @@ test("file-stream frames cover the PCM buffer exactly once", () => {
   assert.equal(frames.reduce((total, frame) => total + frame.byteLength, 0),
                pcm.byteLength);
   assert.equal(new Int16Array(frames[1])[0], 960);
+});
+
+test("file-stream pacing uses absolute audio deadlines", () => {
+  const bytesPerSecond = 32000;
+  const startMs = 1000;
+
+  assert.equal(nextPacedDelayMs(1920, bytesPerSecond, startMs, 1000), 60);
+  assert.equal(nextPacedDelayMs(32000, bytesPerSecond, startMs, 1940), 60);
+  assert.equal(nextPacedDelayMs(32000, bytesPerSecond, startMs, 2007), 0);
+  assert.equal(nextPacedDelayMs(64000, bytesPerSecond, startMs, 2940), 60);
+  assert.equal(nextPacedDelayMs(64000, bytesPerSecond, startMs, 3014), 0);
 });
 
 test("saved-session wall clocks render as calendar timestamps", () => {

@@ -37,6 +37,16 @@ export function copyPcmFrame(int16, offsetBytes, maxBytes) {
   };
 }
 
+export function nextPacedDelayMs(sentBytes, bytesPerSecond, startMs, nowMs) {
+  if (!Number.isFinite(sentBytes) || !Number.isFinite(bytesPerSecond) ||
+      !Number.isFinite(startMs) || !Number.isFinite(nowMs) ||
+      bytesPerSecond <= 0) {
+    return 0;
+  }
+  const deadlineMs = startMs + (sentBytes / bytesPerSecond) * 1000;
+  return Math.max(0, deadlineMs - nowMs);
+}
+
 export class MicCapture {
   constructor(sendBinary, targetRate) {
     this.send = sendBinary;
@@ -99,6 +109,8 @@ export async function streamFile(file, sendBinary, targetRate, onProgress, onDon
 
   const durationSec = int16.length / targetRate;
   const bytesPerChunk = Math.floor(targetRate * 0.06 * 2);
+  const bytesPerSecond = targetRate * 2;
+  const streamStartMs = performance.now();
   let offset = 0;
   let cancelled = false;
 
@@ -108,8 +120,13 @@ export async function streamFile(file, sendBinary, targetRate, onProgress, onDon
     sendBinary(frame.data);
     offset = frame.nextOffset;
     if (onProgress) onProgress(offset / int16.byteLength, durationSec);
-    if (offset < int16.byteLength) setTimeout(sendChunk, 60);
-    else if (onDone) onDone();
+    if (offset < int16.byteLength) {
+      const delayMs = nextPacedDelayMs(
+        offset, bytesPerSecond, streamStartMs, performance.now());
+      setTimeout(sendChunk, delayMs);
+    } else if (onDone) {
+      onDone();
+    }
   }
   sendChunk();
   return { cancel() { cancelled = true; } };

@@ -273,6 +273,30 @@ non-empty resets create distinct loadable rows, and a non-empty row remains
 unchanged after a subsequent empty reset. The complete real Chromium flow is
 then repeated from a fresh isolated storage tree before microphone work starts.
 
+### 11.2 Browser file-pacing correction boundary
+
+The exact clean-commit 120-second repeat passes terminal/load/export/reconnect
+mechanics and complete contextual reading, but its terminal document records
+`wall_clock_ok=false`. The first-sample wall clock and persisted-file time bound
+the path to approximately 123.121 seconds. The existing file sender schedules
+every 60 ms chunk with another relative 60 ms timeout; event-loop delay is
+therefore accumulated over the whole file and consumes the narrow allowance
+left after normal terminal processing.
+
+The browser transport correction must:
+
+1. retain the exact 60 ms PCM frames and byte coverage;
+2. schedule each next frame against an absolute deadline derived from the
+   stream start and bytes already sent;
+3. expose the pure delay calculation for dependency-free JavaScript tests;
+4. use no runtime dependency and change no backend or model behavior; and
+5. repeat the clean 120-second browser flow, including the terminal wall-clock
+   gate and complete forward/reverse contextual reading.
+
+The pure test verifies that per-callback lateness is not added to every future
+deadline and that a late callback requests immediate catch-up rather than a new
+full-frame delay. Browser mechanics remain distinct from product accuracy.
+
 ## 12. Final Acceptance and Handoff
 
 When full A/B pass:
