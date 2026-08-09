@@ -3,9 +3,8 @@
 - **Feature**: `014-asr-vad-closing`
 - **Status**: Phase 1 and Phase 2 complete; bounded Live publication candidate
   passes engineering, three-run silence, repeated 120-second, 360-second, and
-  600-second gates; Phase 4 corrected session persistence and now isolates
-  accumulated browser file-pacing drift with an engineering-tested candidate;
-  exact clean browser repetition precedes microphone validation
+  600-second gates; Phase 4 Chromium file input, Live/Final, persistence,
+  export, reconnect, and desktop/mobile gates pass; physical microphone next
 - **Owner**: project owner
 - **Constitution**: v1.7.0
 - **Depends on**: Spec 003 (streaming ASR), Spec 004 (typed comprehensive

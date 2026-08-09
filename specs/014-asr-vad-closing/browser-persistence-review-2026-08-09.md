@@ -153,3 +153,46 @@ nine cases. The complete warning-enabled build has no `warning:` or `error:`
 diagnostic, and all `74/74` CTest entries pass in `52.71 s`. This engineering
 result authorizes an exact clean-commit 120-second browser repeat; it does not
 complete T040 or establish any product-accuracy result.
+
+## Accepted clean browser repeat
+
+Exact clean commit `d09b13b6fa7da74baeaef957703e4f6f5e02d8bc` repeats the
+complete 120-second Chromium flow from empty storage and registry state.
+
+| Artifact | SHA-256 |
+|---|---|
+| TOML copy | `f9aaba018495eed53014e15fbd16a4f080a482073a6116741b4f5ff4fbe4d1e0` |
+| 120-second PCM input | `102edda3ffead0057f000872b56c54f40b51d2cfd193c3bd7edcfe19517b3c48` |
+| Browser log | `78b28b7ac134467ebab7d8a2071f8521572736c8fd064fe096d9a7cb77f243ce` |
+| Persisted terminal JSON | `db70ba66bdc693a7f37748941b26723c3210cbf7d5f091102bf2e00ab7923530` |
+| Desktop screenshot | `654df6cd02737ca289f14b7f8a8686b5c2a416012a80c1bda9fb956b1dca3667` |
+| Mobile screenshot | `cd6e79dfd72ad803f3a4ae40b73db67ede69620b8ced66009b5df6ba40f90db3` |
+| Independent pacing log | `51c95d8aaea4413cf336b3c3b110c473fea89691e01c4bd1efca864b88acfc09` |
+
+The exact clean run again completes browser decode, Live population, 120-second
+source extent, 11 ASR finals, 11 alignments, 34 business entries, terminal
+reconciliation, exact download, one collision-safe persisted session, exact
+reload after Clear, server-restart reconnection, and fake-device microphone
+start/stop. Both screenshots have coherent desktop and 390 px mobile layout;
+the mobile Live and JSON panels scroll internally without covering later
+sections.
+
+The terminal still records `wall_clock_ok=false`. A separate clean browser run
+resolves why: selection through decode and source completion takes 120.322
+seconds, automatic nonterminal Flush takes 0.477 seconds, and Flush through
+terminal End takes 2.165 seconds, with no browser error. `wall_clock_ok` measures
+from the first sample through final End and is specified for the direct-end
+production path. The browser intentionally inserts a Flush before the user End,
+so using the combined field to reject browser source pacing would compare a
+different control sequence. Spec 014 records all three mechanical stages and
+does not tune audio faster to force that unrelated field true.
+
+The reviewer again reads `ref-0001` through `ref-0018` chronologically and then
+in reverse. Text and final speaker-business evidence are unchanged from the
+preceding clean run. The same `RM1`, relation, false-negation, and rapid-handoff
+residuals remain, while no browser-only omission, duplication, stale partial,
+endpoint cut, or speaker-policy change appears. This contextual conclusion is
+manual and not produced by the pacing measurements.
+
+T040 and T041 are complete. Physical microphone and non-Chromium evidence remain
+open; no ASR, endpoint, or speaker accuracy promotion follows.

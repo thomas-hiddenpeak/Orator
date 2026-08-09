@@ -419,4 +419,5 @@ validate through the real `rate=1` WS path.
   and full tests plus one corrected Chromium run pass, with the clean-commit
   repeat tracked by Spec 014 T040. The first clean 120-second repeat then found
   relative-timer pacing drift; the absolute-deadline candidate passes its Web
-  contract and full CTest, with browser promotion still owned by T040.
+  contract, full CTest, and exact clean 120-second Chromium repeat. T040/T041
+  are complete; physical microphone and non-Chromium work keep W14 open.

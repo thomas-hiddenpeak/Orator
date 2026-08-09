@@ -290,12 +290,17 @@ The browser transport correction must:
    stream start and bytes already sent;
 3. expose the pure delay calculation for dependency-free JavaScript tests;
 4. use no runtime dependency and change no backend or model behavior; and
-5. repeat the clean 120-second browser flow, including the terminal wall-clock
-   gate and complete forward/reverse contextual reading.
+5. repeat the clean 120-second browser flow, record source streaming, automatic
+   Flush, and terminal End separately, and complete forward/reverse contextual
+   reading.
 
 The pure test verifies that per-callback lateness is not added to every future
 deadline and that a late callback requests immediate catch-up rather than a new
-full-frame delay. Browser mechanics remain distinct from product accuracy.
+full-frame delay. The terminal `wall_clock_ok` field is a direct-end production
+gate: an interactive file flow deliberately performs a nonterminal Flush before
+the user sends End, so that combined field is retained as evidence but cannot
+judge browser source pacing. Browser mechanics remain distinct from product
+accuracy.
 
 ## 12. Final Acceptance and Handoff
 

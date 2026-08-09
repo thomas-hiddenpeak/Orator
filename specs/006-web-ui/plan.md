@@ -473,4 +473,7 @@ That clean 120-second repeat then showed `wall_clock_ok=false`: repeated
 relative 60 ms browser timers accumulated event-loop delay. The bounded
 follow-up keeps the same frames but schedules them against absolute source-time
 deadlines. Its pure JavaScript pacing contract and full CTest pass; Spec 014
-retains ownership of the exact clean-browser repeat.
+clean commit `d09b13b` passes the exact 120-second browser repeat. Independent
+timing separates source completion from the intentional automatic Flush and
+terminal End; the direct-end-only `wall_clock_ok` field is not used to reject
+this different interactive control sequence.

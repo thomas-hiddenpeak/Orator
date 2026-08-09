@@ -15,9 +15,9 @@ work is specified under [specs/](.).
 > same change that lands the code, with the commit reference.
 
 - **Last updated**: 2026-08-09 (Spec 014 Live partial publication correction
-  passes through 600 seconds; Phase 4 corrected session persistence and now
-  has an engineering-tested absolute-deadline browser pacing candidate; exact
-  clean-browser repeat next; ASR unchanged)
+  passes through 600 seconds; Phase 4 Chromium file-input and contextual gates
+  pass after persistence and source-clock pacing corrections; microphone next;
+  ASR unchanged)
 - **Branch**: `master`
 - **Constitution**: v1.7.0
 - **Active focused work**: **Spec 014 Phase 1 and Phase 2 are complete.** The
@@ -78,8 +78,13 @@ work is specified under [specs/](.).
   path takes approximately 123.121 seconds because relative 60 ms browser
   timers accumulate event-loop delay. An absolute-deadline browser pacing fix
   is now implemented without changing frame size. All nine Web model tests and
-  `74/74` CTest entries pass; an exact clean-browser repeat remains required.
-  This is not a model, endpoint, speaker, or accuracy finding.
+  `74/74` CTest entries pass. Exact clean `d09b13b` completes the 120-second
+  browser path, exact export/load, reconnect, fake-device control, and
+  desktop/mobile review. Independent timing records 120.322-second selection-
+  through-source completion, then the intentional 0.477-second Flush and
+  2.165-second terminal End separately. Complete forward/reverse contextual
+  review finds no browser-only semantic or speaker change. T040/T041 are
+  complete; this is not a model, endpoint, speaker, or accuracy promotion.
   See
   [browser-persistence-review-2026-08-09.md](014-asr-vad-closing/browser-persistence-review-2026-08-09.md).
   No TOML, model, VAD, endpoint, diarizer, speaker, or final-text behavior has
@@ -1010,7 +1015,7 @@ finds no FR28 natural-turn speaker regression. FR28 is retained for the
 | VAD model path | ✅ Migrated | `models/asr/silero_vad.safetensors` → `models/vad/`. Updated 6 file references across test, include, and tools. |
 | Web UI (Spec 006) | Contract-hardened; graphical timeline and final acceptance open | Static serving, modular state/router, exact PCM file framing, microphone capture, live transcript/evidence, telemetry, developer status, speaker naming, saved sessions, reconnect, authoritative terminal/load rebuild, and exact JSON export are implemented. Node tests and a real Chromium run verify the short path. The main timeline is currently formatted JSON, not the previously documented four-lane Canvas; graphical time-axis controls, physical microphone evidence, and Firefox/Safari evidence remain open. |
 | Configuration consistency | ✅ Typed runtime boundary and resolved capture | Startup applies defaults, TOML, environment, then CLI. Only `ws_main.cc` reads `ORATOR_*` and resolves them into `AuditoryStream::Config`; model, GPU, and transport layers receive typed values. Legacy GEMM A/B environment switches were removed. Every terminal timeline includes the complete canonical `resolved_config`, and `ws_unified_test.py` writes its SHA-256 into a sibling run manifest. |
-| Session persistence UI (Spec 004 T135) | Implemented; reset lifecycle corrected and clean-browser verified | `SessionStore`, sessions/load RPCs, and the Web UI history panel are active. Metadata parsing handles current `audio_sec` plus legacy `audio_duration`. The 2026-08-09 Chromium gate exposed same-second empty-reset overwrite after `End -> Clear`; the correction skips zero-sample persistence and uses microsecond/PID/sequence IDs. Clean commit `b0eadbe` completes a 120-second browser flow with exact terminal persistence and reload. That run separately exposes browser file-pacing drift, whose absolute-deadline candidate still awaits its own clean repeat. |
+| Session persistence UI (Spec 004 T135) | Implemented; reset lifecycle and source-clock file pacing clean-browser verified | `SessionStore`, sessions/load RPCs, and the Web UI history panel are active. Metadata parsing handles current `audio_sec` plus legacy `audio_duration`. The 2026-08-09 Chromium gate exposed same-second empty-reset overwrite after `End -> Clear`; the correction skips zero-sample persistence and uses microsecond/PID/sequence IDs. Clean commit `d09b13b` also replaces accumulated relative file timers with absolute source-clock deadlines and passes the complete 120-second Chromium export/load/reconnect and desktop/mobile gate. |
 | ISpeakerEmbedder (core/stages.h) | ✅ Active in Spec 010 | Interface declares a fixed-dimension speaker embedding extractor. Runtime implementation: `model::TitaNetEmbedder`, wired into the diarization pipeline by `SpeakerIdentityStage` when `[speaker].enable=true` and `model_dir` is set. |
 | ISpeakerRegistry (core/stages.h) | ✅ Active in Spec 010 | Interface declares a persistent enrolled-speaker registry with 1:N matching. Runtime implementation: `model::SpeakerDatabase`, loaded/saved through `[speaker].registry_path` and used by `SpeakerIdentityStage` for global speaker ids. |
 | ISink (core/stages.h) | 🔒 Retained, partially active | Interface for terminal timeline consumers. The runtime uses `Emit` callbacks (std::function) instead for primary flow, but a concrete implementation `JsonSink` exists in `include/io/json_sink.h` and `src/io/json_sink.cc` for JSON serialization to streams. Retained as a contract option for non-callback consumers. |
