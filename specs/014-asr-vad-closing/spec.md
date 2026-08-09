@@ -10,8 +10,10 @@
   empty-system-prompt candidate; Phase 3C is revalidating the native streaming
   encoder and decoder boundaries against the official implementation; the
   resulting TOML-owned full-context Final candidate passes its engineering gate
-  and awaits focused contextual review; ASR semantic closing and full-candidate
-  acceptance remain open
+  but fails complete focused contextual review and is disabled; Phase 3D now
+  isolates the model's trained eight-second encoder window before authorizing
+  another product candidate; ASR semantic closing and full-candidate acceptance
+  remain open
 - **Owner**: project owner
 - **Constitution**: v1.7.0
 - **Depends on**: Spec 003 (streaming ASR), Spec 004 (typed comprehensive
@@ -287,6 +289,15 @@ transcript meaning, calculate product accuracy, rank candidate output, or issue
 an acceptance verdict. Any runtime correction must be reference-free, expose
 its tunable value through `orator.toml`, preserve the frozen FR50 speaker line,
 and pass FR9 before full-session acceptance.
+
+The first correction, complete-segment full-context Final replacement, is
+rejected after complete chronological and reverse review of its focused
+context. It removes some provisional prompt-conditioned text but introduces new
+critical business assertions. It therefore remains only as explicitly disabled
+evidence. The next authorized step is a single-variable causal control using
+the model's 800-mel-frame trained attention window while restoring the accepted
+streaming Final policy. That control is diagnostic and cannot be promoted until
+its own complete contextual review passes.
 
 ## 6. Acceptance Gates
 

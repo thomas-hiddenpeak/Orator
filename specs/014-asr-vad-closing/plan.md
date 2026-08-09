@@ -450,6 +450,31 @@ model path. `[asr].final_full_context_decode` owns activation and
 `[asr].final_max_new_tokens` owns its independent decode budget. See
 `streaming-encoder-boundary-review-2026-08-09.md`.
 
+Complete forward and reverse review rejects that first correction. It repairs
+parts of the option-pool discussion and removes the provisional prompt phrase
+and late unsupported money assertion from Final, but it also creates new
+critical statements about a named participant and the type of signed business
+agreement. The checked-in switch therefore returns to false; the implementation
+is retained only as inactive evidence and no silence or duration ladder is
+authorized.
+
+Phase 3D isolates the demonstrated boundary before adding another compound
+design. The runtime will expose the acoustic append window through typed TOML,
+with 100 mel frames as the restored control and the model-defined 800 mel frames
+as the only candidate value. Everything else, including decoder rollback and
+Final behavior, remains fixed. The same 102-second context is sufficient for
+the causal review because it contains the repaired and regressed neighboring
+business statements. Only a complete chronological and reverse reading can
+decide whether the trained window contributes useful product evidence.
+
+An eight-second Live update cadence is not an acceptable final UI design by
+itself. If, and only if, the isolated control improves Final meaning without a
+critical regression, the next implementation will preserve the accepted
+one-second provisional Live path and replay the exact bounded PCM through the
+trained-window streaming path at Final. This sequencing separates model-window
+evidence from presentation latency and avoids selecting between transcripts by
+code.
+
 ## 16. Risks and Controls
 
 | Risk | Control |

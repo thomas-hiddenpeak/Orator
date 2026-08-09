@@ -187,10 +187,39 @@ its named evidence exists. Mechanical checks never assign product correctness.
   enabled and disabled paths, exact PCM, Final replacement, and empty-Final
   retraction. The full build is warning-clean and all `75/75` CTest entries pass
   in `53.95` seconds.
-- [ ] **T064** Run one focused real-WebSocket context plus explicit neighboring
+- [x] **T064** Run one focused real-WebSocket context plus explicit neighboring
   controls and complete chronological and reverse semantic review against the
   human-listened reference. Reject and remove the candidate on a new critical
-  regression; otherwise return to T048 and the duration ladder.
+  regression; otherwise return to T048 and the duration ladder. Clean commit
+  `5b6ba51` captures the exact 102-second context at `0.979x`, with an unchanged
+  clean worktree and complete provenance. Direct review finds useful repairs,
+  but also changes “雷总也不说话了” into “雷总也是出汗了” and “签了独家吗”
+  into “签了总项目”. Reverse review confirms both are new critical assertions.
+  The candidate is rejected before silence or duration gates, its TOML switch
+  is restored to false, and its implementation remains evidence-only. See
+  `streaming-encoder-boundary-review-2026-08-09.md`.
+
+### Phase 3D: Trained-Window Causal Control
+
+- [ ] **T065** Restore the accepted streaming Final as the exact control and
+  expose one TOML-owned acoustic append window without changing Live publication
+  code, VAD, prompt, decoder rollback, alignment, Sortformer v2.1, FR50 fusion,
+  or the common time base. The candidate value is the model-defined 800 mel
+  frames (eight seconds); the current 100-frame value is the control.
+- [ ] **T066** Prove mechanically that the configured 800-frame path uses the
+  already accepted complete-window numerical contract, then pass focused tests,
+  warning-clean build, and complete CTest. Neither tensors nor tests may assign
+  transcript correctness.
+- [ ] **T067** Capture the same complete 102-second real-WebSocket context under
+  the isolated 800-frame candidate and read every Live and Final state in
+  chronological and reverse conversational context against `test.txt`. Reject
+  on any new critical meaning or unusable Live behavior; do not start a duration
+  ladder from mechanical evidence.
+- [ ] **T068** Only if T067 demonstrates a semantic advantage without a control
+  regression, specify a second candidate that retains the accepted one-second
+  provisional Live view and replays the model-defined trained-window stream only
+  for Final. Repeat engineering and focused contextual gates before returning to
+  T048. Otherwise restore the 100-frame control and revise the causal analysis.
 
 ## Phase 4: Web UI and Physical Microphone
 

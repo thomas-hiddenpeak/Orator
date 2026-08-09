@@ -1,16 +1,17 @@
 # Streaming Encoder Boundary Review (2026-08-09)
 
-- **Scope**: Spec 014 T061-T063, native ASR integration only
-- **Product evaluation**: none
+- **Scope**: Spec 014 T061-T064, native ASR integration and focused review
+- **Product evaluation**: complete direct contextual semantic review only
 - **Runtime baseline**: clean `master` at `04c564d`
 - **Official source**: Qwen3-ASR commit
   `7c6daf77a2421100f5fb066495372c00129d39ff`
 - **Canonical input SHA-256**:
   `b7c25d1c349b02d654b6a406bc29039749e4240a4109dda4fcc905285b14b18b`
 
-This report records numerical tensors and source-contract inspection. It does
-not compare transcript meaning, calculate accuracy, rank output, or issue a
-product verdict.
+The first sections record numerical tensors and source-contract inspection and
+make no product claim. The final section records a separate complete human
+contextual review. No code compares transcript meaning, calculates accuracy,
+ranks output, or issues a product verdict.
 
 ## Oracle Repair and Provenance
 
@@ -148,3 +149,98 @@ CTest log SHA-256:
 After those gates, one focused real-WebSocket context and neighboring controls
 receive complete chronological and reverse contextual semantic review. Only
 that review may decide whether this correction returns to T048.
+
+## Focused Real-WebSocket Capture
+
+The clean candidate commit is
+`5b6ba51efbdf01698bb9177637366ff1ebbc4dd6`. The exact continuous source span is
+1536-1638 seconds of `test.mp3`, stored as `ref-0223-0231.wav`. It contains the
+complete surrounding discussion used for the earlier empty-prompt control.
+
+- audio duration: `102.000` seconds, `1,632,000` mono 16 kHz samples;
+- WAV SHA-256:
+  `5c806e0e3dd6839cf9657804b639381f07abe8a4f3c5a5befee9d565d88f0cdc`;
+- streamed PCM SHA-256:
+  `49b86debff7b300281886d0680e112d300a3cf8b287f5fe6039fe11620b23d10`;
+- run SHA-256:
+  `154c13dc8097e1b867613b825c46bbfdb1425b956effbf6df20ce0c7d400e222`;
+- isolated TOML SHA-256:
+  `f23f8fd71768f8636eaf098ce17e19d65ca753b8cd38402f31a26eeafb147c27`;
+- server binary SHA-256:
+  `0bbe367299fe662c742a5b858487d3e0fd7c46979ee8a0aa36cd0f6eb466bdf0`;
+- pacing: `1.0x`, 100 ms frames, total wall `104.214` seconds, reported stream
+  factor `0.979x`, and direct terminal wait `2.214` seconds; and
+- terminal tracks: 22 diarization segments, eight Final ASR segments, and eight
+  alignment groups, with no captured transport or terminal contract issue.
+
+The focused run is below the full-session `0.98x` pacing threshold by `0.001x`.
+It is not a duration-gate artifact, and no performance acceptance follows.
+Raw evidence is retained under
+`artifacts/spec014/candidates/asr-final-full-context-decode/focused-legal-context/`.
+
+## Complete Contextual Semantic Review
+
+The reviewer read all eight Final segments and every intervening Live state in
+chronological order against the complete human-listened passage in `test.txt`,
+then reread the same material from the last contribution to the first. The
+following judgments are manually derived from that complete conversation.
+
+1. The opening retains “扯鸡巴蛋” and the name “雷总”, but changes the human
+   context “雷总也不说话了” to “雷总也是出汗了”. This loses the negation and
+   invents a different action. It is a new critical assertion.
+2. “他过完年之后再没找过我” is preserved.
+3. The human question “他是知道我们签了独家吗” becomes “是知道我们签了总项目”.
+   The agreement type and question structure are changed. This is a new critical
+   business assertion; the following “没跟他说” is also degraded to “没他说”.
+4. The candidate removes the literal system-prompt phrase from Final and recovers
+   “百分之十出来放期权里” plus the following ten/fifteen discussion. However,
+   “一致行动的人” remains “一致性”, the entity name remains incorrect, and
+   “有限合伙人直接持” becomes “优先股我直接吃”. The legal meaning is still
+   unusable even though parts of the option-pool passage improve.
+5. Repeated “十够了” is recovered, but the opening fifteen discussion is partly
+   replaced by “不要”, “员工的期权” remains “员工的资源”, and “3万4” remains
+   “三二四”. These unresolved terms continue to alter the business meaning.
+6. “才值得给” is repaired and the rest of the contribution remains coherent;
+   omission of the final acknowledgment does not change its main meaning.
+7. The previously exact “故事就是这么个故事” changes to “故事就是这么多故事”.
+   This is a smaller but new semantic regression.
+8. Final removes the unsupported Live statement about asking a labor-service
+   entity to invest and preserves the main sentence about the holding ratio.
+   Its first short clause remains imperfect, but this Final is materially better
+   than the provisional state and the earlier control.
+
+The reverse reading confirms that the late Final correction does not compensate
+for the new agreement-type error or the invented action attributed to “雷总”. It
+also confirms that the useful repairs are localized rather than a consistent
+improvement across the passage.
+
+Live remains provisionally unsafe in this candidate. It still displays the
+literal configured phrase “语音识别” throughout the legal discussion and later
+displays the unsupported labor-service investment statement until Final
+replacement. Full-context Final removes both, but users can observe them for a
+material interval in the Live region.
+
+## Decision and Next Control
+
+T064 requires rejection on any new critical regression. The two independently
+confirmed critical assertions above satisfy that stop condition, so
+`asr-final-full-context-decode` does not return to T048. No silence, 120-second,
+360-second, 600-second, or full-session candidate gate is authorized.
+
+The checked-in TOML switch is restored to false. The code remains explicitly
+inactive as evidence that complete-segment full-context replacement is not a
+uniformly safe correction. VAD, alignment, Sortformer v2.1, FR50 speaker policy,
+and the common time base were unchanged, so no speaker baseline promotion or
+regression claim is made from this isolated cold-start clip.
+
+The restored configuration passes a warning-clean complete build and all
+`75/75` registered tests in `53.18` seconds. The build-log SHA-256 is
+`526c9d765cca4cf9a80066d886489fc8265ed44b948765323215891f3346f548`; the
+CTest-log SHA-256 is
+`e84ea77c74e3d4c9512ea9b7f9d3aac776c1699781a42e4875c25bd9a44a3c06`.
+
+The next causal control changes only the acoustic append window from the current
+100 mel frames to the model-defined 800 mel frames already covered by the exact
+numerical locality control. It keeps the accepted streaming decoder and Final
+policy. The same complete context will be reviewed before considering a
+low-latency Live plus trained-window Final replay design.

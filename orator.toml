@@ -57,9 +57,9 @@ max_audio_tokens = 1500
 # Max decode tokens per provisional Live step
 max_new_tokens = 32
 
-# Re-decode finalized VAD-bounded segments from their complete admitted PCM.
-# Live remains incremental; only Final uses this full-context path.
-final_full_context_decode = true
+# Evidence-only rejected candidate: re-decode finalized VAD-bounded segments
+# from their complete admitted PCM. Keep disabled in the accepted runtime.
+final_full_context_decode = false
 
 # Independent decode budget for the bounded full-context Final path.
 final_max_new_tokens = 384

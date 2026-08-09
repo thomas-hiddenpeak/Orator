@@ -82,8 +82,8 @@ int main() {
           "checked-in v2.1 cache update period is 188");
     CHECK(checked_in.asr_vad_gate_chunk_ms == 100,
           "checked-in ASR VAD gate chunk is frozen at 100 ms");
-    CHECK(checked_in.asr_final_full_context_decode,
-          "checked-in ASR Final uses complete admitted segment context");
+    CHECK(!checked_in.asr_final_full_context_decode,
+          "checked-in ASR Final disables rejected full-context candidate");
     CHECK(checked_in.asr_final_max_new_tokens == 384,
           "checked-in ASR Final has an independent token budget");
     CHECK(checked_in.asr_system_prompt ==
