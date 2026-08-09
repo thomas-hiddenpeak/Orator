@@ -91,6 +91,8 @@ class AuditoryStream {
     double asr_vad_min_overlap_sec = 0.12;
     int asr_max_audio_tokens = 1500;
     int asr_max_new_tokens = 32;
+    int asr_final_max_new_tokens = 384;
+    bool asr_final_full_context_decode = false;
     double asr_segment_sec = 24.0;
     std::string asr_language = "Chinese";
     std::string asr_system_prompt =
@@ -137,7 +139,7 @@ class AuditoryStream {
     int diar_chunk_left_context = 1;        // left context chunks
     int diar_chunk_right_context = 1;       // right context chunks
     int diar_spkcache_sil_frames = 3;  // mean-silence cache slots per speaker
-    int diar_fifo_len = 188;  // async FIFO length; 0 selects sync mode
+    int diar_fifo_len = 188;           // async FIFO length; 0 selects sync mode
     // Onset/offset post-processing (NeMo-style double threshold)
     double diar_onset = 0.45;  // probability to START a segment
     double diar_offset =

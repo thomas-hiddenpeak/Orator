@@ -41,6 +41,7 @@ class AsrWorker {
         1.5;  // trailing window (sec) after VAD silence before commit
     double asr_vad_min_overlap_sec =
         0.12;  // minimum confirmed VAD speech overlap to keep an ASR final
+    bool final_full_context_decode = false;
   };
 
   using Emit = std::function<void(const std::string&)>;
@@ -70,6 +71,7 @@ class AsrWorker {
  private:
   void ProcessIncremental(const float* samples, int n, bool finalize);
   void EmitIncrementalChunk(const float* samples, int n, bool finalize);
+  std::string FinalizeDecoderSegment();
 
   // The VAD gate buffers audio ahead of the typed decision frontier, then
   // consumes stable speech in deterministic TOML-sized quanta. It never waits
@@ -103,6 +105,7 @@ class AsrWorker {
   long inc_seg_end_sample_ = 0;
   long inc_seg_samples_ = 0;
   std::string inc_live_text_;
+  std::vector<float> inc_segment_audio_;
   long inc_text_id_ = 0;
   std::string inc_delivered_text_;
   bool finalizing_ = false;

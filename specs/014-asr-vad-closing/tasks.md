@@ -157,6 +157,41 @@ its named evidence exists. Mechanical checks never assign product correctness.
   ASR meaning, endpoint behavior, and final speaker ownership. Do not authorize
   a full run or Phase 5 from mechanical evidence.
 
+### Phase 3C: Native Streaming Boundary Revalidation
+
+- [x] **T061** Pin the official Qwen3-ASR reference revision and repair the
+  offline oracle's stale repository, model, audio, and artifact paths. Add
+  mechanical tests for path resolution and provenance. The oracle may emit raw
+  tensors, token IDs, and transcripts for reviewer inspection; it may not score,
+  compare, rank, or label transcript correctness. The repaired check resolves
+  official commit `7c6daf7`, the project model, canonical audio, and TOML; its
+  new standard-library contract test passes. A new official GPU forward remains
+  unavailable because both local Python tool environments contain CPU Torch.
+- [x] **T062** Extend and run the encoder locality probe with an eight-second
+  known control and the production one-second append unit, both sliced from the
+  same full mel and full windowed encode. Record numerical tensor evidence and
+  inspect prompt, rollback, decode, and tail behavior against the pinned
+  official source. This task may identify an implementation mismatch but may
+  not make a product-accuracy claim. The 800-frame control matches exactly;
+  every tested 100-frame slice differs from the same full encode, with maximum
+  absolute difference `0.1759`. Source inspection identifies accumulated-audio
+  re-encoding versus frozen one-second appends as the demonstrated mismatch.
+  See `streaming-encoder-boundary-review-2026-08-09.md`.
+- [x] **T063** If T062 demonstrates a concrete mismatch, specify and implement
+  one reference-free, TOML-owned correction while freezing VAD, prompt,
+  alignment, Sortformer v2.1, FR50 fusion, and the common time base. Pass the
+  applicable numerical oracle, warning-clean build, and complete CTest before
+  producing product output. Candidate `asr-final-full-context-decode` retains
+  exact segment PCM, leaves one-second Live provisional, and makes a TOML-owned
+  complete-context decode authoritative only at Final. Focused tests prove the
+  enabled and disabled paths, exact PCM, Final replacement, and empty-Final
+  retraction. The full build is warning-clean and all `75/75` CTest entries pass
+  in `53.95` seconds.
+- [ ] **T064** Run one focused real-WebSocket context plus explicit neighboring
+  controls and complete chronological and reverse semantic review against the
+  human-listened reference. Reject and remove the candidate on a new critical
+  regression; otherwise return to T048 and the duration ladder.
+
 ## Phase 4: Web UI and Physical Microphone
 
 - [x] **T040** Validate file-input Live partial/retract/final replacement,

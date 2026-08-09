@@ -92,6 +92,7 @@ struct AsrConfig {
       "你是一个专业的中文普通话语音识别系统，请准确识别并转录所有语音内容。";
   int eos_ban_steps = 3;
   int decode_batch = 4;
+  int final_max_new_tokens = 384;
   bool profile = false;
   bool encoder_windowed_attention = false;
   bool cuda_graph_enabled = true;
@@ -126,6 +127,10 @@ class IAsr {
                                   cudaStream_t stream) = 0;
   // Flush residual tail; returns the final transcript for the segment.
   virtual std::string StreamFinalize(cudaStream_t stream) = 0;
+  // Decode one complete, already-bounded segment from its exact PCM. This is a
+  // finalization primitive, independent of provisional streaming state.
+  virtual std::string TranscribeFinal(const float* pcm, int n,
+                                      cudaStream_t stream) = 0;
   // Total accumulated audio tokens in the current segment.
   virtual int stream_audio_tokens() const = 0;
 

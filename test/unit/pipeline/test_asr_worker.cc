@@ -1,6 +1,7 @@
 // Verifies stable ASR text IDs across partial events, final events, and the
 // typed text sink without loading a model.
 
+#include <algorithm>
 #include <cstdio>
 #include <numeric>
 #include <string>
@@ -37,6 +38,11 @@ class FakeAsr final : public orator::core::IAsr {
     return current_;
   }
   std::string StreamFinalize(cudaStream_t) override { return current_; }
+  std::string TranscribeFinal(const float* pcm, int n, cudaStream_t) override {
+    final_samples.assign(pcm, pcm + n);
+    ++final_decode_count;
+    return final_output_;
+  }
   int stream_audio_tokens() const override { return 1; }
   std::string name() const override { return "fake_asr"; }
 
@@ -44,14 +50,18 @@ class FakeAsr final : public orator::core::IAsr {
     stream_outputs_ = std::move(outputs);
     stream_output_pos_ = 0;
   }
+  void SetFinalOutput(std::string output) { final_output_ = std::move(output); }
 
   std::vector<long> reset_positions;
   std::vector<int> chunk_sizes;
   std::vector<float> fed_samples;
+  std::vector<float> final_samples;
+  int final_decode_count = 0;
 
  private:
   std::string current_;
   std::vector<std::string> stream_outputs_;
+  std::string final_output_;
   size_t stream_output_pos_ = 0;
 };
 
@@ -94,10 +104,10 @@ PartialTrace RunPartialPublication(std::vector<std::string> decoder_texts,
       [&events](const std::string& event) { events.push_back(event); },
       orator::core::TimeBase(100));
   if (with_typed_sink) {
-    worker.set_text_sink([&trace](long, double, double, const std::string&,
-                                  bool final) {
-      if (!final) ++trace.typed_partial_count;
-    });
+    worker.set_text_sink(
+        [&trace](long, double, double, const std::string&, bool final) {
+          if (!final) ++trace.typed_partial_count;
+        });
   }
 
   const std::vector<float> audio(20, 0.25f);
@@ -295,6 +305,70 @@ int main() {
             changing.direct_partials[1].find("\"text\":\"second\"") !=
                 std::string::npos,
         "changed decoder texts each emit once in publication order");
+
+  {
+    FakeAsr final_asr;
+    final_asr.SetStreamOutputs({"provisional"});
+    final_asr.SetFinalOutput("full context");
+    orator::pipeline::AsrWorker::Params final_params;
+    final_params.sample_rate = 100;
+    final_params.segment_sec = 0.0;
+    final_params.asr_vad_gate = false;
+    final_params.final_full_context_decode = true;
+    std::vector<FinalRecord> finals;
+    orator::pipeline::AsrWorker final_worker(
+        &final_asr, final_params, [](const std::string&) {},
+        orator::core::TimeBase(100));
+    final_worker.set_text_sink([&finals](long id, double start, double end,
+                                         const std::string& text, bool final) {
+      if (final) finals.push_back({id, start, end, text});
+    });
+    std::vector<float> final_audio(20);
+    std::iota(final_audio.begin(), final_audio.end(), 0.0f);
+    final_worker.ProcessSpan(final_audio.data(), 10);
+    final_worker.ProcessSpan(final_audio.data() + 10, 10);
+    final_worker.Finalize();
+    CHECK(final_asr.final_decode_count == 1,
+          "full-context Final runs once at the segment endpoint");
+    CHECK(final_asr.final_samples == final_audio,
+          "full-context Final receives exact admitted segment PCM");
+    CHECK(finals.size() == 1 && finals[0].text == "full context",
+          "full-context result replaces provisional text at Final");
+  }
+
+  {
+    FakeAsr empty_final_asr;
+    empty_final_asr.SetStreamOutputs({"provisional"});
+    empty_final_asr.SetFinalOutput("");
+    orator::pipeline::AsrWorker::Params final_params;
+    final_params.sample_rate = 100;
+    final_params.segment_sec = 0.0;
+    final_params.asr_vad_gate = false;
+    final_params.final_full_context_decode = true;
+    std::vector<std::string> final_events;
+    int final_count = 0;
+    orator::pipeline::AsrWorker final_worker(
+        &empty_final_asr, final_params,
+        [&final_events](const std::string& event) {
+          final_events.push_back(event);
+        },
+        orator::core::TimeBase(100));
+    final_worker.set_text_sink(
+        [&final_count](long, double, double, const std::string&, bool final) {
+          if (final) ++final_count;
+        });
+    const std::vector<float> final_audio(10, 0.25f);
+    final_worker.ProcessSpan(final_audio.data(),
+                             static_cast<int>(final_audio.size()));
+    final_worker.Finalize();
+    const bool retracted = std::any_of(
+        final_events.begin(), final_events.end(), [](const std::string& event) {
+          return event.find("\"type\":\"asr_retract\"") != std::string::npos;
+        });
+    CHECK(retracted, "empty full-context Final retracts exposed Live text");
+    CHECK(final_count == 0,
+          "empty full-context Final deposits no finalized transcript");
+  }
 
   {
     FakeAsr silent_asr;

@@ -84,6 +84,8 @@ class Qwen3Asr final : public core::IAsr {
   // Flush the residual (< 8 s) tail: encode it, append, decode once, and return
   // the final transcript for the segment. Ends the session.
   std::string StreamFinalize(cudaStream_t stream = 0) override;
+  std::string TranscribeFinal(const float* pcm, int n,
+                              cudaStream_t stream = 0) override;
 
   // Streaming knobs (mirror the official unfixed_chunk_num /
   // unfixed_token_num).
@@ -109,8 +111,11 @@ class Qwen3Asr final : public core::IAsr {
 
  private:
   std::string BuildAndRun(const std::vector<float>& encoder_out, int n_tokens,
-                          const std::string& prefix_text,
+                          const std::string& prefix_text, int max_new_tokens,
                           cudaStream_t stream = 0);
+  std::string TranscribeTextWithLimit(const float* samples, int num_samples,
+                                      int max_new_tokens,
+                                      cudaStream_t stream = 0);
 
   // One incremental streaming decode step: rollback the unfixed tail, build +
   // prefill the suffix after the cached audio block, greedily decode the

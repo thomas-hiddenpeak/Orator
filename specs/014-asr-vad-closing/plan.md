@@ -405,7 +405,52 @@ start. The next hypothesis must account for the fact that system conditioning
 changes ambiguous decoding but neither the historical instruction nor an empty
 instruction reliably preserves domain terms.
 
-## 15. Risks and Controls
+## 15. Streaming Encoder Equivalence Diagnosis
+
+The next phase returns to model-integration evidence before another transcript
+candidate. The historical T011 probe establishes that an independently encoded
+eight-second attention window matches the corresponding slice of a full
+windowed encode. Production later reduced `kStreamWindowMel` from 800 to 100 for
+Live latency, but no retained numerical artifact extends T011's equivalence
+claim to that one-second block. Since `n_window_infer=800`, a full trained
+attention window contains eight 100-frame convolution chunks.
+
+The diagnosis proceeds without evaluating product output:
+
+1. pin and record the official Qwen3-ASR source revision used by the oracle;
+2. repair `tools/reference/asr_oracle.py` so its repository, model, input, and
+   output paths resolve from the project instead of stale locations;
+3. extend the existing encoder probe to compare independent 800-frame and
+   100-frame slices against the same full-window encoding, retaining tensor
+   differences as numerical implementation evidence only;
+4. trace official accumulated-audio/prefix-rollback/final-tail behavior against
+   `Qwen3Asr::StreamChunk`, `StreamDecodeStep`, and `StreamFinalize`;
+5. select a runtime correction only when a concrete implementation mismatch is
+   demonstrated independently of `test.txt`; and
+6. keep model behavior frozen until the correction passes its numerical oracle,
+   warning-clean build, and complete CTest.
+
+If the one-second append is non-equivalent, the preferred correction separates
+encoder context from Live publication cadence: preserve the model's trained
+acoustic window while continuing to expose stable partial state at an ergonomic
+interval. The exact behavior must be TOML-owned; no audio-specific term,
+timestamp, or reference hint may enter runtime code. Only after the numerical
+contract passes does a focused real-WebSocket capture receive complete forward
+and reverse contextual semantic review. That review, not the probe, decides
+whether a candidate can enter FR9.
+
+The completed T061/T062 control now confirms that boundary: complete 800-frame
+windows match exactly, while all tested 100-frame standalone slices diverge
+from the same full encode and reach a maximum absolute difference of `0.1759`.
+Source history traces the unsupported reduction to `d7010a5`. The first bounded
+candidate is therefore `asr-final-full-context-decode`: retain the exact
+TOML-bounded segment PCM, keep the existing one-second path for provisional
+Live text, and regenerate only Final through the existing full-context native
+model path. `[asr].final_full_context_decode` owns activation and
+`[asr].final_max_new_tokens` owns its independent decode budget. See
+`streaming-encoder-boundary-review-2026-08-09.md`.
+
+## 16. Risks and Controls
 
 | Risk | Control |
 |---|---|
@@ -417,8 +462,10 @@ instruction reliably preserves domain terms.
 | UI appears correct while terminal state differs | Compare event, typed, terminal, persisted, exported, and rendered states by stable `text_id` |
 | Enumerated audio source has no working transducer | Preserve direct and controlled-playback probes, leave voiced microphone gates open, and never substitute fake-device evidence |
 | Temporary artifacts disappear | Store raw evidence under persistent gitignored project artifacts, cite hashes in committed reports |
+| A Live-latency change invalidates trained encoder context | Prove 100-frame and 800-frame locality separately; decouple publication cadence from acoustic windowing when needed |
+| Numerical parity is mistaken for transcript correctness | Limit oracle claims to tensors, tokens, and deterministic state; require complete contextual review on the production WebSocket path |
 
-## 16. Constitution Check
+## 17. Constitution Check
 
 This plan preserves zero runtime dependencies, one common time base, independent
 typed pipelines, production-WebSocket validation, TOML-owned behavior, trusted

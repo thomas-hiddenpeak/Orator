@@ -50,9 +50,9 @@ int main() {
   std::printf("-- v2.1 closing baseline --\n");
   {
     pipeline::AuditoryStream::Config defaults;
-    CHECK(defaults.diarizer_weights ==
-              "models/sortformer_4spk_v2.1.safetensors",
-          "compile-time diarizer default is v2.1");
+    CHECK(
+        defaults.diarizer_weights == "models/sortformer_4spk_v2.1.safetensors",
+        "compile-time diarizer default is v2.1");
     CHECK(defaults.asr_vad_gate_chunk_ms > 0,
           "compile-time ASR VAD gate chunk is positive");
     CHECK(defaults.diar_chunk_len == 340,
@@ -82,6 +82,10 @@ int main() {
           "checked-in v2.1 cache update period is 188");
     CHECK(checked_in.asr_vad_gate_chunk_ms == 100,
           "checked-in ASR VAD gate chunk is frozen at 100 ms");
+    CHECK(checked_in.asr_final_full_context_decode,
+          "checked-in ASR Final uses complete admitted segment context");
+    CHECK(checked_in.asr_final_max_new_tokens == 384,
+          "checked-in ASR Final has an independent token budget");
     CHECK(checked_in.asr_system_prompt ==
               "你是一个专业的中文普通话语音识别系统，"
               "请准确识别并转录所有语音内容。",
@@ -110,6 +114,8 @@ vad_gate_chunk_ms = 80
 vad_trail_sec = 2.5
 vad_min_overlap_sec = 0.25
 max_new_tokens = 64
+final_max_new_tokens = 320
+final_full_context_decode = true
 max_audio_tokens = 2000
 segment_sec = 30.0
 language = "English"
@@ -245,6 +251,10 @@ ws_text_log_path = "/tmp/ws-frames.jsonl"
     CHECK(cfg.asr_vad_min_overlap_sec == 0.25,
           "cfg.asr_vad_min_overlap_sec == 0.25");
     CHECK(cfg.asr_max_new_tokens == 64, "cfg.asr_max_new_tokens == 64");
+    CHECK(cfg.asr_final_max_new_tokens == 320,
+          "cfg.asr_final_max_new_tokens == 320");
+    CHECK(cfg.asr_final_full_context_decode == true,
+          "cfg.asr_final_full_context_decode == true");
     CHECK(cfg.asr_max_audio_tokens == 2000, "cfg.asr_max_audio_tokens == 2000");
     CHECK(cfg.asr_segment_sec == 30.0, "cfg.asr_segment_sec == 30.0");
     CHECK(cfg.asr_language == "English", "cfg.asr_language == English");
@@ -403,6 +413,11 @@ ws_text_log_path = "/tmp/ws-frames.jsonl"
     const std::string resolved = pipeline::SerializeResolvedConfig(cfg);
     CHECK(resolved.find("\"windowed_encoder\":true") != std::string::npos,
           "resolved config contains ASR execution mode");
+    CHECK(resolved.find("\"final_max_new_tokens\":320") != std::string::npos,
+          "resolved config contains ASR Final token budget");
+    CHECK(resolved.find("\"final_full_context_decode\":true") !=
+              std::string::npos,
+          "resolved config contains ASR full-context Final switch");
     CHECK(resolved.find("\"vad_gate_chunk_ms\":80") != std::string::npos,
           "resolved config contains deterministic ASR gate chunk");
     CHECK(resolved.find("\"ws_text_log_path\":\"/tmp/ws-frames.jsonl\"") !=
@@ -418,8 +433,7 @@ ws_text_log_path = "/tmp/ws-frames.jsonl"
     CHECK(resolved.find("\"precompute_max_spans_per_cycle\":4") !=
               std::string::npos,
           "resolved config contains speaker-fusion precompute cycle limit");
-    CHECK(resolved.find(
-              "\"right_bounded_short_primary_unit_enable\":true") !=
+    CHECK(resolved.find("\"right_bounded_short_primary_unit_enable\":true") !=
               std::string::npos,
           "resolved config contains right-bounded experiment switch");
     CHECK(resolved.find(

@@ -57,7 +57,7 @@ void Qwen3Asr::Reset() {
 // stripped).
 std::string Qwen3Asr::BuildAndRun(const std::vector<float>& encoder_out,
                                   int n_tokens, const std::string& prefix_text,
-                                  cudaStream_t stream) {
+                                  int max_new_tokens, cudaStream_t stream) {
   const int H = decoder_->hidden_size();
 
   // ---- prompt token ids ----
@@ -111,7 +111,7 @@ std::string Qwen3Asr::BuildAndRun(const std::vector<float>& encoder_out,
   // within a few tokens of EOS (short utterances dominate streaming) while
   // keeping the per-token sync overhead amortized. ----
   std::vector<int> out_tokens =
-      decoder_->DecodeGreedy(T, max_new_tokens_, kImEnd, kEndOfText,
+      decoder_->DecodeGreedy(T, max_new_tokens, kImEnd, kEndOfText,
                              cfg_.eos_ban_steps, cfg_.decode_batch, stream);
   if (prof) {
     auto p2 = now();
@@ -138,6 +138,20 @@ std::string Qwen3Asr::BuildAndRun(const std::vector<float>& encoder_out,
 
 std::string Qwen3Asr::TranscribeText(const float* samples, int num_samples,
                                      cudaStream_t stream) {
+  return TranscribeTextWithLimit(samples, num_samples, max_new_tokens_, stream);
+}
+
+std::string Qwen3Asr::TranscribeFinal(const float* pcm, int n,
+                                      cudaStream_t stream) {
+  const int limit = cfg_.final_max_new_tokens > 0 ? cfg_.final_max_new_tokens
+                                                  : max_new_tokens_;
+  return TranscribeTextWithLimit(pcm, n, limit, stream);
+}
+
+std::string Qwen3Asr::TranscribeTextWithLimit(const float* samples,
+                                              int num_samples,
+                                              int max_new_tokens,
+                                              cudaStream_t stream) {
   if (!loaded_) throw std::runtime_error("Qwen3Asr: weights not loaded");
   if (samples == nullptr || num_samples <= 0) return "";
 
@@ -157,7 +171,8 @@ std::string Qwen3Asr::TranscribeText(const float* samples, int num_samples,
   if (n_tokens <= 0) return "";
   auto t_enc = now();
 
-  std::string text = BuildAndRun(enc, n_tokens, /*prefix_text=*/"", stream);
+  std::string text =
+      BuildAndRun(enc, n_tokens, /*prefix_text=*/"", max_new_tokens, stream);
   auto t_dec = now();
 
   if (prof) {
@@ -188,7 +203,7 @@ std::string Qwen3Asr::TranscribeWindow(const float* samples, int num_samples,
   if (n_tokens <= 0) return "";
 
   // Returns only the newly generated continuation; the caller holds the prefix.
-  return BuildAndRun(enc, n_tokens, prefix_text, stream);
+  return BuildAndRun(enc, n_tokens, prefix_text, max_new_tokens_, stream);
 }
 
 // ---- Incremental KV-cache streaming session (Spec 003) --------------------

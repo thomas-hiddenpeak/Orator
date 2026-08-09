@@ -98,6 +98,10 @@ class TestAsr : public IAsr {
     return "";
   }
   std::string StreamFinalize(cudaStream_t /*stream*/) override { return ""; }
+  std::string TranscribeFinal(const float* /*pcm*/, int /*n*/,
+                              cudaStream_t /*stream*/) override {
+    return "";
+  }
   int stream_audio_tokens() const override { return 0; }
   std::string name() const override { return "test_asr"; }
 };

@@ -26,13 +26,13 @@ bool ApplyTomlConfig(const std::string& path,
   }
 
   if (auto* diarizer = config["diarizer"].as_table()) {
-    constexpr const char* kUnsupportedDiarizerKeys[] = {
-        "spkcache_refresh_rate", "use_silence_profile"};
+    constexpr const char* kUnsupportedDiarizerKeys[] = {"spkcache_refresh_rate",
+                                                        "use_silence_profile"};
     for (const char* unsupported : kUnsupportedDiarizerKeys) {
       if (diarizer->contains(unsupported)) {
-        std::cerr << "[config] unsupported [diarizer]." << unsupported
-                  << " in " << path
-                  << "; this non-NeMo control has been removed" << std::endl;
+        std::cerr << "[config] unsupported [diarizer]." << unsupported << " in "
+                  << path << "; this non-NeMo control has been removed"
+                  << std::endl;
         return false;
       }
     }
@@ -73,6 +73,12 @@ bool ApplyTomlConfig(const std::string& path,
     }
     if (auto v = sec->get("max_new_tokens")) {
       if (auto n = v->value<int>()) cfg.asr_max_new_tokens = *n;
+    }
+    if (auto v = sec->get("final_max_new_tokens")) {
+      if (auto n = v->value<int>()) cfg.asr_final_max_new_tokens = *n;
+    }
+    if (auto v = sec->get("final_full_context_decode")) {
+      if (auto b = v->value<bool>()) cfg.asr_final_full_context_decode = *b;
     }
     if (auto v = sec->get("max_audio_tokens")) {
       if (auto n = v->value<int>()) cfg.asr_max_audio_tokens = *n;

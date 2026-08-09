@@ -218,6 +218,7 @@ void AuditoryStream::Start() {
     ac.system_prompt = config_.asr_system_prompt;
     ac.eos_ban_steps = config_.asr_ban_steps;
     ac.decode_batch = config_.asr_decode_batch;
+    ac.final_max_new_tokens = config_.asr_final_max_new_tokens;
     ac.profile = config_.asr_profile;
     ac.encoder_windowed_attention = config_.asr_windowed_encoder;
     ac.cuda_graph_enabled = config_.asr_cuda_graph_enabled;
@@ -420,6 +421,7 @@ void AuditoryStream::StartWorkers() {
     p.asr_vad_trail_sec = config_.asr_vad_trail_sec;
     p.asr_vad_min_overlap_sec = config_.asr_vad_min_overlap_sec;
     p.max_audio_tokens = config_.asr_max_audio_tokens;
+    p.final_full_context_decode = config_.asr_final_full_context_decode;
 
     asr_worker_ = std::make_unique<AsrWorker>(
         asr_.get(), p, [this](const std::string& json) { EmitLocked(json); },

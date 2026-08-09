@@ -272,6 +272,7 @@ void AsrWorker::ProcessIncremental(const float* samples, int n, bool finalize) {
 void AsrWorker::EmitIncrementalChunk(const float* samples, int n,
                                      bool finalize) {
   const auto t0 = Clock::now();
+  bool segment_closed = false;
   {
     gpu::DeviceGuard gpu(/*own_stream=*/true);
     if (n > 0) {
@@ -279,8 +280,13 @@ void AsrWorker::EmitIncrementalChunk(const float* samples, int n,
         inc_seg_start_sample_ = inc_abs_pos_;
         inc_seg_samples_ = 0;
         inc_live_text_.clear();
+        inc_segment_audio_.clear();
         asr_->StreamReset(inc_seg_start_sample_);
         inc_in_segment_ = true;
+      }
+      if (params_.final_full_context_decode) {
+        inc_segment_audio_.insert(inc_segment_audio_.end(), samples,
+                                  samples + n);
       }
       inc_live_text_ = asr_->StreamChunk(samples, n, stream_);
       inc_seg_samples_ += n;
@@ -288,8 +294,9 @@ void AsrWorker::EmitIncrementalChunk(const float* samples, int n,
       inc_seg_end_sample_ = inc_abs_pos_;
     }
     if (inc_in_segment_ && finalize) {
-      inc_live_text_ = asr_->StreamFinalize(stream_);
+      inc_live_text_ = FinalizeDecoderSegment();
       inc_in_segment_ = false;
+      segment_closed = true;
     }
     // VAD groups still need a hard duration cap for continuous speech and
     // decoder-cache safety. Downstream forced alignment supplies fine time
@@ -297,8 +304,9 @@ void AsrWorker::EmitIncrementalChunk(const float* samples, int n,
     if (inc_in_segment_ && params_.segment_sec > 0.0 &&
         inc_seg_samples_ >=
             static_cast<long>(params_.segment_sec * params_.sample_rate)) {
-      inc_live_text_ = asr_->StreamFinalize(stream_);
+      inc_live_text_ = FinalizeDecoderSegment();
       inc_in_segment_ = false;
+      segment_closed = true;
     }
     // KV-cache safety cap: force-finalize before GPU memory crash.
     // Root cause: GqaDecodeAttnKernel at layer 0 has an illegal memory access
@@ -313,14 +321,17 @@ void AsrWorker::EmitIncrementalChunk(const float* samples, int n,
     // segments before the cap is reached.
     if (inc_in_segment_ && params_.max_audio_tokens > 0 &&
         asr_->stream_audio_tokens() >= params_.max_audio_tokens) {
-      inc_live_text_ = asr_->StreamFinalize(stream_);
+      inc_live_text_ = FinalizeDecoderSegment();
       inc_in_segment_ = false;
+      segment_closed = true;
     }
   }
   compute_sec_.fetch_add(Secs(t0, Clock::now()), std::memory_order_relaxed);
 
-  const bool segment_closed = !inc_in_segment_ && !inc_live_text_.empty();
-  if (segment_closed) {
+  const bool handle_closed_segment =
+      segment_closed &&
+      (params_.final_full_context_decode || !inc_live_text_.empty());
+  if (handle_closed_segment) {
     const double seg_start = tb_.SecondsAt(inc_seg_start_sample_);
     const double seg_end = tb_.SecondsAt(inc_seg_end_sample_);
     // The deterministic gate feeds only typed VAD-backed audio. Keep the
@@ -344,7 +355,7 @@ void AsrWorker::EmitIncrementalChunk(const float* samples, int n,
         }
       }
     }
-    if (!keep) {
+    if (!keep || inc_live_text_.empty()) {
       if (emit_ && !inc_delivered_text_.empty()) {
         emit_(
             "{\"type\":\"asr_retract\",\"source\":\"qwen3_asr\","
@@ -375,6 +386,7 @@ void AsrWorker::EmitIncrementalChunk(const float* samples, int n,
       }
       inc_live_text_.clear();
     }
+    inc_segment_audio_.clear();
   } else if (inc_in_segment_) {
     bool expose_partial = true;
     if (params_.asr_vad_gate && timeline_) {
@@ -405,11 +417,21 @@ void AsrWorker::EmitIncrementalChunk(const float* samples, int n,
   }
 }
 
+std::string AsrWorker::FinalizeDecoderSegment() {
+  std::string text = asr_->StreamFinalize(stream_);
+  if (!params_.final_full_context_decode) return text;
+  if (inc_segment_audio_.empty()) return "";
+  return asr_->TranscribeFinal(inc_segment_audio_.data(),
+                               static_cast<int>(inc_segment_audio_.size()),
+                               stream_);
+}
+
 void AsrWorker::Reset() {
   inc_in_segment_ = false;
   inc_abs_pos_ = 0;
   inc_seg_samples_ = 0;
   inc_live_text_.clear();
+  inc_segment_audio_.clear();
   inc_text_id_ = 0;
   inc_delivered_text_.clear();
   finalizing_ = false;

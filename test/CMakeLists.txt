@@ -151,6 +151,14 @@ set_tests_properties(
 # WebSocket itself.
 find_program(Python3_EXECUTABLE python3)
 if(Python3_EXECUTABLE)
+  add_test(NAME test_asr_oracle_contract
+    COMMAND ${Python3_EXECUTABLE}
+      ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/test_asr_oracle_contract.py)
+  set_tests_properties(test_asr_oracle_contract PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    TIMEOUT 30
+    LABELS "python;unit;model-parity")
+
   add_test(NAME test_repro_manifest
     COMMAND ${Python3_EXECUTABLE}
       ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/test_repro_manifest.py)

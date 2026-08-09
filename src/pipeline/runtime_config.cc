@@ -86,6 +86,8 @@ std::string SerializeResolvedConfig(const AuditoryStream::Config& c) {
   asr.Add("vad_min_overlap_sec", c.asr_vad_min_overlap_sec);
   asr.Add("max_audio_tokens", c.asr_max_audio_tokens);
   asr.Add("max_new_tokens", c.asr_max_new_tokens);
+  asr.Add("final_max_new_tokens", c.asr_final_max_new_tokens);
+  asr.Add("final_full_context_decode", c.asr_final_full_context_decode);
   asr.Add("segment_sec", c.asr_segment_sec);
   asr.Add("language", c.asr_language);
   asr.Add("system_prompt", c.asr_system_prompt);
@@ -231,9 +233,8 @@ std::string SerializeResolvedConfig(const AuditoryStream::Config& c) {
                      c.speaker_fusion_posterior_future_epoch_enable);
   speaker_fusion.Add("source_leading_primary_prefix_enable",
                      c.speaker_fusion_source_leading_primary_prefix_enable);
-  speaker_fusion.Add(
-      "right_bounded_short_primary_unit_enable",
-      c.speaker_fusion_right_bounded_short_primary_unit_enable);
+  speaker_fusion.Add("right_bounded_short_primary_unit_enable",
+                     c.speaker_fusion_right_bounded_short_primary_unit_enable);
   speaker_fusion.Add("precompute_interval_sec",
                      c.speaker_fusion_precompute_interval_sec);
   speaker_fusion.Add("precompute_max_spans_per_cycle",

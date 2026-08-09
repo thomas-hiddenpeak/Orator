@@ -54,8 +54,15 @@ vad_min_overlap_sec = 0.12
 # Crash at ~1768 tokens; 1500 leaves a comfortable margin (~115s audio)
 max_audio_tokens = 1500
 
-# Max decode tokens per segment
+# Max decode tokens per provisional Live step
 max_new_tokens = 32
+
+# Re-decode finalized VAD-bounded segments from their complete admitted PCM.
+# Live remains incremental; only Final uses this full-context path.
+final_full_context_decode = true
+
+# Independent decode budget for the bounded full-context Final path.
+final_max_new_tokens = 384
 
 # Hard segment cap (seconds) for finalized ASR chunks. The final comprehensive
 # timeline and Web UI handle view segmentation separately; keep this value tuned

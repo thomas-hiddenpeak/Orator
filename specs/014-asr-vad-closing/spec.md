@@ -7,7 +7,10 @@
   pass their bounded reviews, but active physical-microphone scenarios remain
   blocked by unavailable effective capture hardware; Phase 3B causal review
   traces one prompt-conditioned decoder factor and rejects/removes the first
-  empty-system-prompt candidate; ASR semantic closing and full-candidate
+  empty-system-prompt candidate; Phase 3C is revalidating the native streaming
+  encoder and decoder boundaries against the official implementation; the
+  resulting TOML-owned full-context Final candidate passes its engineering gate
+  and awaits focused contextual review; ASR semantic closing and full-candidate
   acceptance remain open
 - **Owner**: project owner
 - **Constitution**: v1.7.0
@@ -101,6 +104,14 @@ The following facts define the start of this work:
     complete focused context, failed to recover the legal term, introduced new
     material regressions, and was removed before longer gates. See
     `final-asr-prompt-causality-review-2026-08-09.md`.
+13. Code and history inspection after that rejection finds an unresolved model-
+    integration contract. The original numerical probe validates standalone
+    800-mel-frame (eight-second) encoder windows, while the production stream
+    appends independently encoded 100-mel-frame (one-second) blocks. The model
+    attention window spans eight such convolution chunks. No retained oracle
+    evidence currently proves that the one-second block is numerically
+    equivalent to its full-window slice. This is a migration question, not an
+    ASR product verdict.
 
 ## 3. Objective and Claim Boundary
 
@@ -260,6 +271,22 @@ The accepted commit, configuration, artifacts, hashes, complete manual review,
 known limitations, microphone/browser evidence, and holdout status MUST be
 recorded in this spec, its tasks, `PROJECT_STATE.md`, and the Spec 013 final
 report. No release tag is created until all applicable Spec 013 gates are signed.
+
+### FR13 - Native streaming model-boundary parity
+
+Before a second ASR product candidate is authorized, the project MUST pin the
+official Qwen3-ASR reference revision, repair the offline oracle's repository
+and model paths, and revalidate every native streaming assumption affected by
+the one-second production step. At minimum this covers prompt tokenization,
+audio-encoder window locality, accumulated audio ordering, prefix rollback,
+greedy decoding, and final-tail handling.
+
+Numerical probes may compare tensors, token IDs, and deterministic decoder
+state because those are implementation contracts. They MUST NOT evaluate
+transcript meaning, calculate product accuracy, rank candidate output, or issue
+an acceptance verdict. Any runtime correction must be reference-free, expose
+its tunable value through `orator.toml`, preserve the frozen FR50 speaker line,
+and pass FR9 before full-session acceptance.
 
 ## 6. Acceptance Gates
 
