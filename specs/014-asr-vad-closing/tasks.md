@@ -109,10 +109,15 @@ its named evidence exists. Mechanical checks never assign product correctness.
   forward/reverse contextual review. Both remove unchanged Live repeats, retain
   exact canonical final product tracks, and preserve all prior ASR and speaker
   judgments. See `live-partial-publication-review-2026-08-09.md`.
-- [ ] **T037** Pass one 360-second real-WebSocket capture and complete
-  forward/reverse contextual review.
-- [ ] **T038** Pass one 600-second real-WebSocket capture and complete
-  forward/reverse contextual review.
+- [x] **T037** Pass one 360-second real-WebSocket capture and complete
+  forward/reverse contextual review. Clean `a1c8d1d` runs at `0.993x`, has no
+  unchanged partial publication or mechanical issue, and preserves the prior
+  ASR/speaker interpretation across all 39 in-scope contributions.
+- [x] **T038** Pass one 600-second real-WebSocket capture and complete
+  forward/reverse contextual review. All 93 contributions were read in both
+  directions; publication passes while ASR remains approximately 80-89% with
+  the signed critical residuals unchanged. See
+  `live-partial-publication-review-2026-08-09.md`.
 - [ ] **T039** Remove or explicitly archive a rejected candidate before starting
   another hypothesis. After three failed implementations, restore the accepted
   baseline and revise the root-cause analysis.

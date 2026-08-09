@@ -144,3 +144,85 @@ preserves the conditional FR50 boundary and the existing ASR limitations.
 - **Speaker guard**: unchanged within the conditional FR50 boundary.
 - **Candidate status**: accepted for the 360-second gate, not yet accepted as
   the Spec 014 release baseline.
+
+## 360-second promotion gate
+
+The next run uses clean commit
+`a1c8d1d2924cc6a6bd68f329344d38780c51d59c`, an empty isolated registry,
+the same checked-in behavior, and a TOML copy whose only differences are ports
+and artifact paths.
+
+| Fact | Result |
+|---|---|
+| Raw SHA-256 | `03d0426c82e7773b5888759d9612d3526b388b80b8302c1a67f220231dfe1fbe` |
+| Manifest SHA-256 | `1d8cb54e45a2145e097782d20872b6056d6cdda574de6cff817fb70ca3349b82` |
+| Wall / stream factor | `362.393 s / 0.993x` |
+| Direct-end wait | `2.393 s` |
+| Diar / ASR | `54 / 30` |
+| Partial text transitions | `261` |
+| Adjacent unchanged partial states | none |
+| Contract / observer issues | none; producer, early, and late terminal views converge |
+
+The reviewer read every contribution from `ref-0001` through the audible
+portion of `ref-0039`, then reread the same complete evidence from the cutoff
+back to the opening. Main discussion meaning remains visible, with an
+approximately 80-89% semantic judgment. `RM1`, Shi Yi's name, the `70`
+calculation, and the rebuilt allocation proposal remain material failures.
+Wider context restores Tang's first-rule statement and the Hangzhou/Chengdu
+relationship that were unsafe at the 120-second cutoff. The second portion of
+`ref-0039` begins after this cutoff and is not judged as missing here.
+
+Main speaker ownership remains usable. The known cold-start, short-turn,
+overlap, and character-edge residuals remain; no new identity permutation,
+drift, long-turn rewrite, or policy topology appears. The publication contract
+passes 360 seconds. ASR critical meaning remains open and no accuracy promotion
+is claimed.
+
+## 600-second promotion gate
+
+The 600-second run independently restarts the same clean commit with another
+empty isolated registry and storage tree.
+
+| Fact | Result |
+|---|---|
+| Raw SHA-256 | `4c754c472c34eba3030391f7d0d0dcdd5b949ef89128d00c24e9e45f51a019fd` |
+| Manifest SHA-256 | `c128baeafa6b77be130a063861ac2236f2ecb5ac00fc804cab8f8a82eb5669ff` |
+| Wall / stream factor | `601.614 s / 0.997x` |
+| Direct-end wait | `1.614 s` |
+| Diar / ASR | `98 / 52` |
+| Partial text transitions | `424` |
+| Adjacent unchanged partial states | none |
+| Contract / observer issues | none; producer, early, and late terminal views converge |
+
+The reviewer read all 93 contributions intersecting `0-600` chronologically,
+then reread `ref-0093` back through `ref-0001` in complete context. The
+approximately 80-89% semantic interpretation from the signed full-baseline
+opening block remains unchanged. Reverse context recovers the Hangzhou/Chengdu
+relationship, Tang's first-rule statement, the direct `50 亿` decision,
+`0.7`, `28.8`, and the operative `15/25/51/Tang` allocation despite local
+wording errors.
+
+The critical failures that remain after reverse reconciliation are
+`ref-0001`, `ref-0019`, `ref-0022`, `ref-0031`, `ref-0039`, `ref-0047`,
+`ref-0052`, `ref-0066`, `ref-0077`, `ref-0081`, and `ref-0092`. They cover the
+product/person names, missing `70`, action-right/capital-speaking mechanism,
+person/value association, a lost negation, an absent independent concurrence,
+`34.4` reduced to `34`, the judgment that Tang's share is too small, and a
+`100` versus `1 亿` contradiction. This list is manually retained from complete
+context; no executable result produced it or its interpretation.
+
+The final business view retains the same known speaker residual classes and no
+new policy regression. Publication remains one event per actual partial text
+transition throughout the longer session, while every final, alignment group,
+business entry, observer terminal, and source extent completes normally.
+
+## Updated transitional verdict
+
+- **Live publication contract**: passed engineering, three silence, repeated
+  120-second, 360-second, and 600-second gates.
+- **ASR semantics**: unchanged; the 600-second result remains approximately
+  80-89% and fails critical meaning.
+- **Speaker guard**: unchanged within the conditional FR50 boundary.
+- **Candidate status**: publication correction is accepted for browser and
+  physical-microphone validation before full A/B acceptance. It is not an ASR,
+  endpoint, or speaker accuracy promotion.
