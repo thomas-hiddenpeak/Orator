@@ -90,3 +90,11 @@ GCC ABI notes predate and do not arise from this change. Retained mel, encoder,
 decoder, oracle-provenance, registration, WebSocket, and Web model gates are
 included in that complete run. These are engineering and numerical contracts,
 not transcript evaluation or product acceptance.
+
+Inactive implementation commit `2acae3a` is pushed to `master`. The next
+candidate changes the only output-affecting value from `stream_mode =
+"kv_append"` to `stream_mode = "accumulated_redecode"`; configuration assertions
+and SDD status change with it, while all other runtime values remain fixed.
+With that candidate active, focused tests pass `4/4`, complete CTest passes
+`75/75` in `50.92` seconds, and a clean-first build again emits no warning or
+error. Real-WebSocket capture and contextual review have not yet occurred.

@@ -15,9 +15,10 @@
   eight-second numerical gates under the restored 100-frame control; complete
   forward/reverse review rejects the isolated 800-frame candidate and restores
   that control; Phase 3E adds the official accumulated-audio state transition
-  behind a typed, inactive TOML mode and passes its control-side engineering
-  gate; candidate activation, real-WebSocket capture, contextual review, ASR
-  semantic closing, and full-candidate acceptance remain open
+  behind a typed TOML mode and passes its control-side engineering gate; the
+  accumulated candidate is now active for its engineering gate, while clean
+  commit, real-WebSocket capture, contextual review, ASR semantic closing, and
+  full-candidate acceptance remain open
 - **Owner**: project owner
 - **Constitution**: v1.7.0
 - **Depends on**: Spec 003 (streaming ASR), Spec 004 (typed comprehensive

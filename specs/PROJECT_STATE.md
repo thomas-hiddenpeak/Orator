@@ -16,7 +16,8 @@ work is specified under [specs/](.).
 
 - **Last updated**: 2026-08-09 (Spec 014 Phase 3E official accumulated-audio
   streaming implementation passes its inactive control-side engineering gate;
-  candidate activation and contextual product review remain open)
+  the candidate is active for engineering validation, with capture and
+  contextual product review still open)
 - **Branch**: `master`
 - **Constitution**: v1.7.0
 - **Active focused work**: **Spec 014 Phase 1 and Phase 2 are complete.** The
@@ -109,10 +110,13 @@ work is specified under [specs/](.).
   rejected, a pinned-source audit shows that official Qwen streaming re-feeds
   all accumulated segment audio every two seconds, not independently frozen
   encoder windows. Phase 3E now implements that state transition behind typed
-  TOML while leaving `stream_mode = "kv_append"` active. Focused tests pass
-  `4/4`, complete CTest passes `75/75` in `53.14` seconds, and a clean-first
-  build emits no warning or error. This is an inactive implementation gate, not
-  transcript evaluation or product acceptance. See
+  TOML. Inactive implementation commit `2acae3a` is pushed with `stream_mode =
+  "kv_append"`; focused tests pass `4/4`, complete CTest passes `75/75` in
+  `53.14` seconds, and a clean-first build emits no warning or error. The next
+  candidate activates only `stream_mode = "accumulated_redecode"`; its focused
+  tests pass `4/4`, complete CTest passes `75/75` in `50.92` seconds, and a
+  clean-first build emits no warning or error. It has no capture or product
+  verdict yet. See
   [official-streaming-state-review-2026-08-09.md](014-asr-vad-closing/official-streaming-state-review-2026-08-09.md).
 - **Speaker-business closure**: **CURRENT REAL-PATH BASELINE `525/556`;
   SPEAKER-TIME GATES PASS; 19 CRITICAL RESIDUALS REMAIN; FULL CANONICAL
@@ -1019,7 +1023,7 @@ finds no FR28 natural-turn speaker regression. FR28 is retained for the
 | `OverlapTimelineMerger` / `ITimelineMerger` | 🗑️ Removed | The old one-shot max-overlap merger and its orphaned interface were deleted — superseded by `ComprehensiveTimeline` (Spec 004). |
 | WebSocket server (libwebsockets v4.3.3) | ✅ Refactored | Replaced hand-rolled POSIX WS with libwebsockets (multi-client, RFC 6455/7692). One connection owns audio production while browser and diagnostic observers receive the same broadcast stream without resetting it; concurrent producer bytes are rejected. Eliminated file-scope static variables (`serve_server`, `serve_factory`, `pss_list_head`) → instance members via `lws_context_user`. Thread-safe `SendText` with wakeup/cancel-service. ServeOnce mode for unit tests. |
 | ASR + WS integration | Spec 014 Live publication correction accepted through 600 seconds; full acceptance open | `AuditoryStream` owns one private `PipelineAudioCache` per active producer and uses separate worker threads. One session-owned `TimeBase` is injected into all active stores and workers. Final ASR live emission and its typed sink reuse one `text_id`; partial rejection emits a matching retract, and the terminal ASR track serializes the ID. ASR buffers undecided audio, reads typed stable VAD frontiers from `ComprehensiveTimeline`, applies TOML lead/chunk settings, and drains only after final VAD is frozen; forced alignment consumes finalized ASR records. Commit `a1c8d1d` places typed and direct partial publication under the same text-state transition guard. Three silence, repeated 120-second, 360-second, and 600-second real-WebSocket gates contain no unchanged adjacent partial publication, preserve exact final product behavior, and receive complete in-scope contextual review. Chromium file transport/persistence and bounded room-tone capture are reviewed; voiced physical-microphone, endpoint, full A/B, and ASR semantic acceptance remain open. |
-| Native ASR streaming (Specs 003 and 014) | KV-append control retained; official accumulated-audio mode implemented but inactive | The existing control keeps persistent KV cache, prefix rollback, and partial publication. Phase 3D proves that changing only its append unit to a numerically local 800-frame window does not produce acceptable text, so checked-in `stream_window_mel_frames` remains 100. The pinned official source instead re-feeds all accumulated audio every two seconds. Phase 3E adds typed `kv_append` / `accumulated_redecode`, chunk duration, and rollback values, then implements the growing-PCM decode and unpadded tail without changing VAD, prompt, alignment, speaker, or publication policy. Checked-in `stream_mode` remains `kv_append`; focused tests pass `4/4`, complete CTest passes `75/75` in `53.14` seconds, and a clean-first build emits no warning/error. No candidate transcript or product verdict exists yet. Historical script-derived CER and parameter-sweep claims are not accepted product evidence under Constitution 1.7.0. |
+| Native ASR streaming (Specs 003 and 014) | Official accumulated-audio candidate active; capture and review open | The existing control keeps persistent KV cache, prefix rollback, and partial publication. Phase 3D proves that changing only its append unit to a numerically local 800-frame window does not produce acceptable text, so checked-in `stream_window_mel_frames` remains 100. The pinned official source instead re-feeds all accumulated audio every two seconds. Phase 3E adds typed `kv_append` / `accumulated_redecode`, chunk duration, and rollback values, then implements the growing-PCM decode and unpadded tail without changing VAD, prompt, alignment, speaker, or publication policy. Inactive commit `2acae3a` passes focused `4/4`, complete `75/75` CTest, and clean-first build under `kv_append`; checked-in `stream_mode` now activates `accumulated_redecode` for the next engineering gate. No candidate transcript or product verdict exists yet. Historical script-derived CER and parameter-sweep claims are not accepted product evidence under Constitution 1.7.0. |
 | Revisable comprehensive timeline (Spec 004) | FR50 is the current real-path speaker baseline; T102 time gates pass; canonical closure open | `ComprehensiveTimeline` stores typed diarization, raw diar frame posterior, primary speaker, ASR, VAD, alignment, voiceprint, and business tracks and publishes immutable snapshots/typed updates. Its VAD snapshot includes observed, active, and confirmed-silence frontiers used by scheduling-invariant ASR gating. `BusinessSpeakerPipeline` consumes typed `SpeakerEvidenceStage` output and owns orchestration/publication; the internal `SpeakerFusionPolicy` owns rule execution. FR49's clean `1f09052` ladder manually retains `523/556`. FR50's false-default TOML policy repairs `ref-0327` and `ref-0417`; exact-clean remediation commit `a6f0d33` moves acoustic-only primary-run work into live precompute without changing final scoring. Its full empty/frozen-registry A/B artifacts both receive complete chronological and reverse contextual review and manually retain `525/556`, with 26 confident-wrong, four missing, one uncertain, and 19 critical failures. No executable result produces the ledger. Full direct-end waits pass independently at `26.013/26.789 s`, so T232 promotes FR50 as the real-path baseline. FR51 stops the unsupported single-context final-fusion branch. FR53's attempted text-free primary activity is rejected and fully removed because six unsupported controls share its final-view topology. FR54 retains evidence-only raw VAD capture/packet support, but four contextual readings find no shared safe topology and stop without a runtime change. FR57 completes four independent complete-context time readings and manually signs each run at 3529/3612 source seconds, approximately 97.70 percent; all complete fixed blocks and canonical speakers pass. Checked-in VAD threshold is `0.5`. Critical residual, confident-wrong-zero, ASR, locked holdout, browser/microphone, report, and release gates remain open. |
 | Reusable common time base (Spec 004) | FR50 full-session A/B mechanical gate passed; product closure open | `AuditoryStream` owns one immutable `TimeBase` and injects it into every active private cache, worker, and retained audio store. Finalization reconciles exact sample extents for input, diarization, speaker identity, ASR, VAD, alignment, and business speaker. FR50 exact-clean full Run A and restarted Run B both close all seven tracks at exactly 57,841,920 samples with zero declared extent gap and true reconciliation flags. This is a mechanical contract result; product closure remains open under Spec 013. |
 | Pipeline protocol layer (Spec 004) | ✅ Implemented | Phases 7–12 complete: data types (topic.h, schema.h), pipeline registry, topic router, storage layer (MEMORY + DISK), ProtocolTimeline integration, WS v2 envelope with describe command, --storage-disk-path flag. 25/25 tests pass. |
@@ -1193,15 +1197,14 @@ Findings:
 
 ## 7. Immediate next step
 
-Complete Spec 014 T071 by committing and pushing the inactive official
-accumulated-audio implementation while `stream_mode = "kv_append"`. Then change
-only that TOML field to `accumulated_redecode`, repeat the engineering gates,
-commit the clean candidate, and run the identical 102-second real-WebSocket
-focus at 1.0x with 100 ms frames. Read every Live, Final, and comprehensive-view
-contribution chronologically and in reverse against the complete human
-reference. Preserve every other ASR/VAD, FR50, model, time-base, and publication
-value; do not start T048, 360/600-second gates, or a full run until the focused
-candidate passes complete contextual review.
+Complete Spec 014 T072 by repeating the engineering gates with only
+`stream_mode = "accumulated_redecode"` active, commit and push that clean
+candidate, and run the identical 102-second real-WebSocket focus at 1.0x with
+100 ms frames. Read every Live, Final, and comprehensive-view contribution
+chronologically and in reverse against the complete human reference. Preserve
+every other ASR/VAD, FR50, model, time-base, and publication value; do not start
+T048, 360/600-second gates, or a full run until the focused candidate passes
+complete contextual review.
 
 Phase 4 Chromium file transport, persistence, reload, export, reconnect, and
 desktop/mobile review are complete. Its physical-endpoint room-tone subcase is
