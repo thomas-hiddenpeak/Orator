@@ -552,6 +552,36 @@ the exact same 102-second source and real-WebSocket procedure. No additional
 parameter value is tried unless complete contextual evidence first rejects or
 accepts this hypothesis and a new SDD step is written.
 
+The exact one-second run passes its mechanical and engineering gates, but
+complete chronological and reverse reading rejects the hypothesis. It preserves
+the same false short Final, never produces the critical exclusive-signing term,
+retains legal and numeric substitutions, and adds unstable Live text. The
+runtime returns to `kv_append`; neither a longer candidate gate nor another
+cadence or rollback value is permitted from this evidence.
+
+## 15.7 Phase 3G: Decoder-State Root Cause
+
+The failed cadence result separates two contexts that a global parameter cannot
+safely resolve. The correct negation exists in Live before rollback, while the
+exclusive-signing term is absent from every accumulated Live state. Reducing
+rollback could preserve the former but also freeze the latter's early wrong
+wording and other hallucinations. Parameter adjustment therefore stops.
+
+The next implementation is diagnostic only. Under an opt-in debug setting, the
+inactive accumulated path will record one bounded row per decode step: segment
+sample extent on the common time base, chunk ID, Final-tail flag, raw decoded
+token IDs before rollback, retained token count and IDs, retained prefix text,
+generated token IDs/text, and token budget. The production default remains
+disabled and `kv_append`; the trace must not read `test.txt`, label correctness,
+compare candidates, or select a parameter.
+
+The same fixed 102-second source is sufficient because it contains both causal
+contexts. Review first reconciles the native rows with the pinned official
+state transition and then reads the raw text in full conversation context. A
+specific implementation mismatch may authorize one separately specified fix.
+If the state transition is faithful and the evidence instead describes model
+uncertainty, the accumulated branch stops without another product candidate.
+
 ## 16. Risks and Controls
 
 | Risk | Control |

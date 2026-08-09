@@ -59,11 +59,11 @@ max_new_tokens = 32
 
 # Streaming state implementation. "kv_append" is the restored control;
 # "accumulated_redecode" follows the official growing-audio state machine.
-stream_mode = "accumulated_redecode"
+stream_mode = "kv_append"
 
-# Official streaming cadence and rollback policy. Both modes capture these
-# values so candidate activation changes only stream_mode.
-stream_chunk_ms = 1000
+# Official accumulated-mode cadence and rollback policy. These typed values
+# remain dormant while the restored kv_append control is active.
+stream_chunk_ms = 2000
 stream_unfixed_chunks = 2
 stream_unfixed_tokens = 5
 

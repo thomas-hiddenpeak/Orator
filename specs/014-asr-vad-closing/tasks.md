@@ -294,17 +294,46 @@ its named evidence exists. Mechanical checks never assign product correctness.
   `test_config` passes, complete CTest passes `75/75` in `52.89` seconds, the
   build emits no warning or error, and no server/client/tegrastats process
   remains. Rejection/restoration commit `1310b1f` is pushed to `master`.
-- [ ] **T076** Activate `accumulated_redecode` with
+- [x] **T076** Activate `accumulated_redecode` with
   `stream_chunk_ms = 1000`, leaving rollback, VAD, prompt, segment cap, align,
   v2.1, FR50, time base, and publication unchanged. Repeat engineering gates
   and commit the clean candidate before output. The TOML candidate is active;
   focused tests pass `4/4`, complete CTest passes `75/75` in `52.24` seconds,
-  and the build emits no warning or error. Commit remains pending.
-- [ ] **T077** Stream the identical 102-second focus at 1.0x/100 ms with source,
-  time-base, telemetry, observer, and terminal evidence.
-- [ ] **T078** Read every Live, Final, and comprehensive-view contribution
+  and the build emits no warning or error. Clean candidate commit `244006e` is
+  pushed before output.
+- [x] **T077** Stream the identical 102-second focus at 1.0x/100 ms with source,
+  time-base, telemetry, observer, and terminal evidence. Exact source/config/
+  binary provenance remains fixed, all seven tracks reconcile at 1,632,000
+  samples, the run reports `0.988x`, direct terminal return is 1.280 seconds,
+  and both telemetry sources and observers are complete.
+- [x] **T078** Read every Live, Final, and comprehensive-view contribution
   chronologically and in reverse. Restore `kv_append` on any new critical
-  meaning, omission, or unusable Live state; otherwise return to T048.
+  meaning, omission, or unusable Live state; otherwise return to T048. Both
+  complete readings reject the candidate: the false short Final, missing
+  exclusive-signing term, legal/numeric substitutions, and visible Live
+  hallucinations remain. Restore the control and do not start T048. See
+  `official-accumulated-1s-review-2026-08-09.md`.
+
+### Phase 3G: Decoder-State Root Cause
+
+- [x] **T079** Under restored `kv_append` and dormant 2000 ms accumulated
+  values, pass focused config, complete CTest, warning review, commit/push the
+  Phase 3F rejection record, and verify no capture process remains. Focused
+  `test_config` passes, complete CTest passes `75/75` in `52.75` seconds, the
+  build emits no warning or error, and no capture process remains. This
+  rejection/restoration change is ready for its transitional commit and push.
+- [ ] **T080** Specify and implement one opt-in, bounded raw decoder-state trace
+  for the inactive accumulated path. Record only audio extent, chunk/Final
+  state, raw and retained token IDs, rollback boundary, text prefix,
+  continuation, and token budget; keep it disabled in checked-in TOML.
+- [ ] **T081** Pass focused and complete engineering gates under the inactive
+  control, commit/push before evidence, then capture the identical 102-second
+  focus with the trace enabled only through isolated `orator.toml`.
+- [ ] **T082** Read every trace transition against the pinned official source
+  contract and the complete human conversation in chronological and reverse
+  context. No code may compare text or select a candidate. Authorize one new
+  runtime hypothesis only if a concrete mismatch is established; otherwise
+  stop the accumulated branch at `kv_append`.
 
 ## Phase 4: Web UI and Physical Microphone
 

@@ -17,9 +17,10 @@
   that control; Phase 3E adds the official accumulated-audio state transition
   behind a typed TOML mode and passes its control-side engineering gate; complete
   forward/reverse review rejects the two-second accumulated candidate and
-  restores `kv_append`; Phase 3F activates one bounded one-second accumulated
-  cadence candidate for engineering validation, while clean capture, contextual
-  review, ASR semantic closing, and full-candidate acceptance remain open
+  restores `kv_append`; Phase 3F also rejects the bounded one-second accumulated
+  cadence after complete forward/reverse review and restores the control;
+  Phase 3G is limited to decoder-state root-cause evidence, while ASR semantic
+  closing and full-candidate acceptance remain open
 - **Owner**: project owner
 - **Constitution**: v1.7.0
 - **Depends on**: Spec 003 (streaming ASR), Spec 004 (typed comprehensive
@@ -337,6 +338,32 @@ It MUST retain `stream_unfixed_chunks = 2`, `stream_unfixed_tokens = 5`, the
 alignment, speaker, time-base, and publication value. No sweep or automated
 candidate comparison is permitted. Complete forward/reverse contextual review
 of the same focused source decides whether longer gates are authorized.
+
+The exact one-second capture passes source, real-time, time-base, telemetry,
+observer, and engineering contracts. Complete contextual review rejects it: a
+correct Live negation is still replaced by a false Final action, the critical
+exclusive-signing term never appears, legal and numeric substitutions remain,
+and additional unusable Live text is exposed. The checked-in control MUST return
+to `kv_append` with the dormant 2000 ms accumulated value. No duration or
+rollback sweep is authorized.
+
+### FR16 - Decoder-state root-cause evidence
+
+After the full-context Final, 800-frame append, two-second accumulated, and
+one-second accumulated hypotheses fail complete focused review, the next phase
+MUST NOT introduce another product-output candidate. It MAY add opt-in raw
+diagnostic capture for the inactive accumulated implementation, limited to each
+decode step's common-time-base audio extent, chunk identifier, tokenized input
+prefix, rollback boundary, generated continuation, token budget, and Final-tail
+state.
+
+The trace MUST be disabled in the checked-in product configuration, bounded by
+the existing VAD segment cap, and free of reference text, correctness labels,
+candidate ranking, or parameter selection. Review MUST compare the native state
+transition with the pinned official source contract and the already captured
+conversation. A new runtime candidate is authorized only after a concrete
+implementation mismatch or model-state hypothesis is documented in spec,
+plan, and tasks; otherwise this branch stops at the restored control.
 
 ## 6. Acceptance Gates
 
