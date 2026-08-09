@@ -334,14 +334,40 @@ its named evidence exists. Mechanical checks never assign product correctness.
   `3/3`, complete CTest passes `75/75` in `52.90` seconds, and compilation emits
   no warning or error. Checked-in TOML remains `kv_append` with tracing false
   and an empty path; this change is the clean inactive implementation source.
-- [ ] **T082** After T081 is pushed, capture the identical 102-second focus with
+- [x] **T082** After T081 is pushed, capture the identical 102-second focus with
   trace enabled only through an isolated `orator.toml`. Retain exact source,
   config, binary, run, trace, time-base, observer, and telemetry provenance.
-- [ ] **T083** Read every trace transition against the pinned official source
+  Clean commit `b92f6ba` produces 91 trace rows across eight segments; all
+  source/config/binary hashes remain stable, all seven extents close at
+  1,632,000 samples, observers match, and required telemetry coverage passes.
+- [x] **T083** Read every trace transition against the pinned official source
   contract and the complete human conversation in chronological and reverse
   context. No code may compare text or select a candidate. Authorize one new
   runtime hypothesis only if a concrete mismatch is established; otherwise
-  stop the accumulated branch at `kv_append`.
+  stop the accumulated branch at `kv_append`. All 91 rows have been read in
+  both directions. Accumulated state transitions match the pinned source. The
+  native first-three-token EOS ban is absent from official vLLM sampling and is
+  the sole authorized mismatch; cadence, rollback, VAD, prompt, and fusion stay
+  frozen. See `decoder-state-root-cause-review-2026-08-10.md`.
+
+### Phase 3H: Official Greedy Termination
+
+- [ ] **T084** Commit and push the T082/T083 evidence report and Phase 3H SDD
+  while checked-in behavior remains `kv_append`, dormant 2000 ms, and
+  `ban_steps = 3`.
+- [ ] **T085** Reproduce the exact Phase 3F one-second accumulated state and set
+  only `ban_steps = 0` relative to that artifact. Keep trace false and every
+  VAD, prompt, segment, model, alignment, speaker, time-base, and publication
+  value fixed. Pass focused configuration tests, complete CTest, and a
+  warning-clean build, then commit/push before product evidence.
+- [ ] **T086** Stream the identical 102-second WAV through the real WebSocket at
+  1x with early/late observers, direct `end`, continuous telemetry, exact
+  provenance, and full common-time-base reconciliation. Mechanical tools MUST
+  NOT compare transcript text or issue a verdict.
+- [ ] **T087** Read every Live, Final, and comprehensive contribution in complete
+  chronological and reverse context against `test.txt`. Reject and restore the
+  control on any critical regression or failure of the focused contexts; only a
+  complete contextual pass may authorize T048 and longer gates.
 
 ## Phase 4: Web UI and Physical Microphone
 

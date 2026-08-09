@@ -599,6 +599,47 @@ specific implementation mismatch may authorize one separately specified fix.
 If the state transition is faithful and the evidence instead describes model
 uncertainty, the accumulated branch stops without another product candidate.
 
+The exact trace is now complete. All 91 rows are read in forward and reverse
+state order against the complete conversation. Accumulation, first-two-chunk
+empty prefixes, five-token rollback, U+FFFD extension, Final-tail boundary, and
+state replacement match the pinned official source. The trace shows both a
+correct Live negation replaced during Final and critical words that never enter
+any generated state, so neither cadence nor rollback receives another trial.
+
+## 15.8 Phase 3H: Official Greedy Termination
+
+Source inspection identifies one contract difference outside the accumulated
+state machine. Official vLLM sampling sets only zero temperature and a maximum
+token count. Native `AsrTextDecoder::DecodeGreedy` instead bans both EOS IDs for
+the first `ban_steps` argmax positions; the checked-in value is three. The
+existing six-identical-token guard also differs from the official sampling
+configuration, but no Phase 3G continuation ends with six identical IDs, so it
+did not activate and is not part of this candidate.
+
+The candidate is defined against the immutable Phase 3F one-second artifact,
+not as a sweep from the current `kv_append` control. It reproduces
+`accumulated_redecode`, 1000 ms, two unfixed chunks, five rollback tokens, and a
+32-token stream budget, then changes only `ban_steps` from three to zero. All
+other TOML values remain fixed and trace remains false. This directly tests the
+official decoder-termination contract while preserving the exact state machine
+whose transitions T083 audited.
+
+First update and push SDD while the restored control is still checked in. Then
+activate the candidate in TOML, update only exact configuration assertions, run
+focused and complete engineering gates, and commit/push the clean candidate
+before capturing output. The evidence run reuses the exact 102-second WAV,
+real-WebSocket pacing, observers, direct `end`, and telemetry procedure.
+
+The reviewer reads every Live event, Final record, and comprehensive-view item
+chronologically and in reverse context. Particular attention goes to the
+correct negation overwritten in segment 0, absent exclusive-signing term in
+segment 2, legal/name/unit substitutions in segments 3-4, preserved no-equity
+commitment in segment 5, short Final addition in segment 6, and temporary
+investment assertion in segment 7. These are context controls, not a script
+scorecard. Any critical regression or failure of the focused causal contexts
+restores the control immediately and ends this decoder branch. Only a clean
+contextual pass can return to the duration ladder in T048.
+
 ## 16. Risks and Controls
 
 | Risk | Control |

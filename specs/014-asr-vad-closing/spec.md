@@ -19,9 +19,11 @@
   forward/reverse review rejects the two-second accumulated candidate and
   restores `kv_append`; Phase 3F also rejects the bounded one-second accumulated
   cadence after complete forward/reverse review and restores the control;
-  Phase 3G adds a default-off raw decoder-state trace and passes its engineering
-  gate, while exact trace capture, root-cause review, ASR semantic closing, and
-  full-candidate acceptance remain open
+  Phase 3G adds a default-off raw decoder-state trace, passes its engineering
+  gate, and completes an exact 91-row forward/reverse root-cause review; the
+  accumulated state transition matches the pinned official source, while one
+  concrete initial-token EOS-suppression mismatch authorizes a single Phase 3H
+  candidate; ASR semantic closing and full-candidate acceptance remain open
 - **Owner**: project owner
 - **Constitution**: v1.7.0
 - **Depends on**: Spec 003 (streaming ASR), Spec 004 (typed comprehensive
@@ -371,6 +373,44 @@ The checked-in field names are `[asr].stream_state_trace` and
 `accumulated_redecode` and a non-empty path in the same resolved configuration.
 The default MUST remain false with an empty path, and inactive execution MUST
 not create a trace file or capture additional decode tokens.
+
+The exact Phase 3G trace contains 91 rows across all eight focused VAD segments.
+Complete chronological and reverse review establishes that native accumulation,
+unfixed-prefix handling, five-token rollback, Final-tail handling, and state
+replacement match the pinned official implementation. It also distinguishes
+correct Live text overwritten at Final from critical terms that never appear in
+any generated state. See
+`decoder-state-root-cause-review-2026-08-10.md`.
+
+### FR17 - Official greedy termination candidate
+
+The pinned official vLLM path uses greedy sampling with `temperature = 0.0` and
+a maximum token budget. It does not suppress EOS for an initial minimum token
+count. The native decoder suppresses both EOS IDs during the first
+`[asr].ban_steps` argmax positions, and the checked-in value is `3`. This is the
+single concrete decoder-contract mismatch identified by T083.
+
+One candidate MAY reproduce the exact rejected Phase 3F one-second accumulated
+state and set `ban_steps = 0`. Relative to that immutable evidence state, no
+other output-affecting value may change: mode MUST be `accumulated_redecode`,
+chunk duration 1000 ms, two unfixed chunks, five rollback tokens, 32 streaming
+tokens, and the same VAD, prompt, segment cap, model, alignment, Sortformer
+v2.1, FR50 fusion, time base, and publication policy. Trace MUST remain disabled
+for the product run.
+
+The candidate MUST pass focused configuration tests, complete CTest, and a
+warning-clean build before it is committed and pushed. It then MUST stream the
+identical 102-second source through the real WebSocket. Every Live, Final, and
+comprehensive contribution MUST be read in chronological and reverse context
+against the complete human reference. Mechanical tools may verify only source,
+configuration, timing, time-base, observer, persistence, telemetry, and schema
+contracts.
+
+Any new critical assertion, loss of a preserved commitment, unusable endpoint
+behavior, or failure to repair the focused critical contexts rejects the
+candidate and restores `kv_append`, dormant 2000 ms, and `ban_steps = 3`. It
+MUST NOT authorize a second decoder parameter. Only a complete contextual pass
+may authorize 360-second, 600-second, or full evidence gates.
 
 ## 6. Acceptance Gates
 
