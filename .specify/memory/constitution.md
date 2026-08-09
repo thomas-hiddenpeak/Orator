@@ -6,9 +6,9 @@ conflicts with the Constitution, the Constitution takes precedence. Amending it
 is a deliberate, recorded action (see *Amendment Process*), not an undocumented
 change.
 
-- **Version**: 1.7.0
+- **Version**: 1.8.0
 - **Ratified**: 2026-06-12
-- **Last amended**: 2026-07-15
+- **Last amended**: 2026-08-10
 
 ---
 
@@ -210,6 +210,26 @@ acceptance criteria, enforced in review:
    stop before semantic judgment or result aggregation. Automated numerical
    parity and mechanical contract checks are component evidence only and MUST
    NOT be represented as product accuracy or acceptance evidence.
+8. **Short or focused input is diagnostic evidence only.** A 120-second,
+   360-second, 600-second, fixed-window, or otherwise shortened run MAY locate a
+   causal defect, verify an engineering contract, or establish that a longer
+   run is mechanically executable. It MUST NOT accept or reject a product
+   candidate, rank or select candidates, assign or estimate global accuracy,
+   claim an overall improvement or regression, terminate full-length semantic
+   evaluation, or close an accuracy requirement.
+9. **Every product-result decision requires full-length contextual review.**
+   Before any ASR, diarization, speaker-attribution, endpoint, hallucination, or
+   comprehensive-timeline candidate receives a product verdict or global
+   accuracy statement, the exact candidate MUST process the complete canonical
+   `test.mp3`. The reviewer MUST read every `test.txt` contribution and all
+   relevant system evidence in chronological order and again in reverse
+   contextual windows, then reconcile the two complete readings manually.
+   Local defects remain valid diagnostic findings, but they have no independent
+   authority to decide the candidate's global semantic result.
+10. A run MAY stop before completion for an observed crash, out-of-memory
+    condition, transport failure, corrupt artifact, or other mechanical state
+    that prevents a valid full capture. That stop records only the mechanical
+    failure; it MUST NOT be converted into a semantic accuracy claim.
 
 ### 6.2 — Test Levels and Device Metrics
 
@@ -390,4 +410,4 @@ state claim:
 - When guidance is silent, Articles II (accuracy) and V (quality) take
   precedence over other considerations.
 
-**Version 1.7.0 · Ratified 2026-06-12 · Last amended 2026-07-15**
+**Version 1.8.0 · Ratified 2026-06-12 · Last amended 2026-08-10**
