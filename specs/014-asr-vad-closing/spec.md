@@ -5,8 +5,10 @@
   passes engineering, three-run silence, repeated 120-second, 360-second, and
   600-second gates; Phase 4 Chromium file input and physical-endpoint room tone
   pass their bounded reviews, but active physical-microphone scenarios remain
-  blocked by unavailable effective capture hardware; ASR semantic closing and
-  full-candidate acceptance remain open
+  blocked by unavailable effective capture hardware; Phase 3B causal review
+  traces one prompt-conditioned decoder defect and activates an experimental
+  empty-system-prompt candidate; ASR semantic closing and full-candidate
+  acceptance remain open
 - **Owner**: project owner
 - **Constitution**: v1.7.0
 - **Depends on**: Spec 003 (streaming ASR), Spec 004 (typed comprehensive
@@ -90,6 +92,14 @@ The following facts define the start of this work:
     Playwright Firefox exists, and no WebKit browser/driver is installed.
     Safari is unavailable on Linux. This records the target-environment limit;
     it is not a cross-browser behavior result.
+12. Complete direct rereading of the frozen full baseline and a common-clock
+    trace of `ref-0226`/`ref-0227` show that the repeated legal phrase is already
+    replaced by text copied from the configured system prompt in decoder Live
+    partials and the final ASR record. Alignment and the business-speaker view
+    preserve that text rather than creating it. One reference-free candidate,
+    an empty `[asr].system_prompt` with every other value frozen, is implemented
+    for staged validation but is not accepted. See
+    `final-asr-prompt-causality-review-2026-08-09.md`.
 
 ## 3. Objective and Claim Boundary
 

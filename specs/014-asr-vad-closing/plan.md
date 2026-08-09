@@ -363,7 +363,41 @@ short-gap, long-gap, and terminal-drain cases remain controls. The real
 WebSocket gate then verifies that repeated unchanged Live events are absent
 without using that mechanical observation to judge transcript correctness.
 
-## 14. Risks and Controls
+## 14. Final ASR Prompt Candidate
+
+Complete forward and reverse contextual rereading rejects long decoder sessions
+or tail drift as the common source of final ASR meaning loss. The clearest
+common-clock trace is `text_id=133`: VAD admits both repetitions of
+`一致行动的人`, the decoder publishes `语音识别` while the segment is still Live,
+forced alignment assigns times to those already-finalized characters, and the
+business-speaker view copies them into speaker-bounded entries. The configured
+system prompt itself contains `语音识别`.
+
+The first final-meaning candidate therefore changes only
+`[asr].system_prompt` in `orator.toml` from the historical Chinese instruction
+to an empty string. The model's local chat template supports empty system text,
+and its README transcription examples do not add a custom system instruction.
+The candidate carries no `test.txt` vocabulary and leaves the language hint,
+segment cap, decoder limits, VAD, alignment, FR50 speaker behavior, and all
+model code unchanged.
+
+Validation order is:
+
+1. assert checked-in TOML resolution and run the warning-clean build plus full
+   CTest;
+2. review a focused real-WebSocket excerpt containing the complete repeated
+   legal-term exchange, without treating that one phrase as promotion evidence;
+3. complete three independent silence reviews and two independent canonical
+   120-second forward/reverse context reviews;
+4. only after those controls pass, complete 360-second and 600-second forward
+   and reverse context reviews; and
+5. reject and remove the candidate on any new critical meaning, hallucination,
+   endpoint, or frozen-speaker regression.
+
+No full candidate run is authorized by the diagnosis or focused excerpt. See
+`final-asr-prompt-causality-review-2026-08-09.md`.
+
+## 15. Risks and Controls
 
 | Risk | Control |
 |---|---|
@@ -376,7 +410,7 @@ without using that mechanical observation to judge transcript correctness.
 | Enumerated audio source has no working transducer | Preserve direct and controlled-playback probes, leave voiced microphone gates open, and never substitute fake-device evidence |
 | Temporary artifacts disappear | Store raw evidence under persistent gitignored project artifacts, cite hashes in committed reports |
 
-## 15. Constitution Check
+## 16. Constitution Check
 
 This plan preserves zero runtime dependencies, one common time base, independent
 typed pipelines, production-WebSocket validation, TOML-owned behavior, trusted

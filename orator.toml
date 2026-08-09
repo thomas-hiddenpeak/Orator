@@ -67,9 +67,9 @@ segment_sec = 24.0
 # Language hint ("" = auto-detect)
 language = "Chinese"
 
-# System prompt for ASR decoder. Keep the accepted prompt explicit so the
-# resolved run configuration describes the model input exactly.
-system_prompt = "你是一个专业的中文普通话语音识别系统，请准确识别并转录所有语音内容。"
+# Use the model-native empty system message. A generic ASR instruction can
+# condition ambiguous speech toward words contained in the instruction.
+system_prompt = ""
 
 # Decoder beam ban steps (suppress repetitive n-grams)
 ban_steps = 3

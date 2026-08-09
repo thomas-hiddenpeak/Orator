@@ -124,19 +124,28 @@ its named evidence exists. Mechanical checks never assign product correctness.
 
 ### Phase 3B: Final ASR Meaning
 
-- [ ] **T045** Freeze the accepted Live-publication correction as the control and
+- [x] **T045** Freeze the accepted Live-publication correction as the control and
   re-read the immutable full-baseline critical contexts with their complete
   ASR, VAD, forced-alignment, and final speaker evidence. Select one causal
   defect class by direct contextual review; no script, metric, or query may
-  label, rank, or select the work.
-- [ ] **T046** Trace the selected defect through admitted PCM, typed VAD
+  label, rank, or select the work. Complete direct forward/reverse rereading
+  selects bounded system-prompt-conditioned lexical substitution; long sessions
+  and tail drift are rejected as a common explanation.
+- [x] **T046** Trace the selected defect through admitted PCM, typed VAD
   frontiers, decoder-session boundaries, final ASR records, alignment units,
   and comprehensive revisions on the common sample clock. Distinguish endpoint
-  ownership from decoder semantic loss before changing behavior.
-- [ ] **T047** Specify one reference-free correction and explicit abstention and
+  ownership from decoder semantic loss before changing behavior. `text_id=133`
+  exposes the prompt phrase in Live output before finalization; downstream
+  alignment and business projection preserve it. See
+  `final-asr-prompt-causality-review-2026-08-09.md`.
+- [x] **T047** Specify one reference-free correction and explicit abstention and
   control contexts. Keep every tunable value in `orator.toml`, preserve the
   frozen Sortformer v2.1/FR50 behavior, and add focused tests. Run the trusted
   numerical oracle before product review if any model-stage behavior changes.
+  Candidate `asr-empty-system-prompt` changes only the checked-in TOML value.
+  Its config-contract test passes, the warning-clean build completes, and all
+  `74/74` registered tests pass in `52.74 s`; staged product evidence remains
+  pending.
 - [ ] **T048** Pass warning-clean build, complete CTest, three independent
   silence reviews, and two independent 120-second real-WebSocket contextual
   reviews. Remove or archive the candidate if its controls fail.
