@@ -289,15 +289,17 @@ its named evidence exists. Mechanical checks never assign product correctness.
   complete, discarding a correct Live prefix and reproducing the rejected fresh
   full-context result. The official API makes chunk duration configurable. One
   one-second accumulated candidate is authorized; no parameter sweep is.
-- [ ] **T075** Under restored `kv_append`, pass focused config and full CTest,
+- [x] **T075** Under restored `kv_append`, pass focused config and full CTest,
   commit and push the rejected-candidate record, and verify no process remains.
   `test_config` passes, complete CTest passes `75/75` in `52.89` seconds, the
   build emits no warning or error, and no server/client/tegrastats process
-  remains. Commit and push are pending.
+  remains. Rejection/restoration commit `1310b1f` is pushed to `master`.
 - [ ] **T076** Activate `accumulated_redecode` with
   `stream_chunk_ms = 1000`, leaving rollback, VAD, prompt, segment cap, align,
   v2.1, FR50, time base, and publication unchanged. Repeat engineering gates
-  and commit the clean candidate before output.
+  and commit the clean candidate before output. The TOML candidate is active;
+  focused tests pass `4/4`, complete CTest passes `75/75` in `52.24` seconds,
+  and the build emits no warning or error. Commit remains pending.
 - [ ] **T077** Stream the identical 102-second focus at 1.0x/100 ms with source,
   time-base, telemetry, observer, and terminal evidence.
 - [ ] **T078** Read every Live, Final, and comprehensive-view contribution

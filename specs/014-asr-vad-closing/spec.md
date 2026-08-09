@@ -17,9 +17,9 @@
   that control; Phase 3E adds the official accumulated-audio state transition
   behind a typed TOML mode and passes its control-side engineering gate; complete
   forward/reverse review rejects the two-second accumulated candidate and
-  restores `kv_append`; Phase 3F authorizes one bounded one-second accumulated
-  cadence candidate, while ASR semantic closing and full-candidate acceptance
-  remain open
+  restores `kv_append`; Phase 3F activates one bounded one-second accumulated
+  cadence candidate for engineering validation, while clean capture, contextual
+  review, ASR semantic closing, and full-candidate acceptance remain open
 - **Owner**: project owner
 - **Constitution**: v1.7.0
 - **Depends on**: Spec 003 (streaming ASR), Spec 004 (typed comprehensive

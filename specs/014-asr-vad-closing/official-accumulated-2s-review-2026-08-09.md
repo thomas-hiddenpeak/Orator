@@ -95,4 +95,6 @@ longer gate is authorized.
 
 After restoration, checked-in `test_config` passes and complete CTest passes
 `75/75` in `52.89` seconds. The build emits no warning or error, and all capture
-processes are stopped. Commit and push remain the last T075 actions.
+processes are stopped. Rejection/restoration commit `1310b1f` is pushed to
+`master`; the separately specified 1000 ms candidate is now active for its
+engineering gate.
