@@ -23,8 +23,9 @@
   gate, and completes an exact 91-row forward/reverse root-cause review; the
   accumulated state transition matches the pinned official source, while one
   concrete initial-token EOS-suppression mismatch authorizes a single Phase 3H
-  candidate; that candidate now passes focused and complete engineering gates
-  and awaits exact contextual evidence; ASR semantic closing and full-candidate
+  candidate; that candidate passes engineering and mechanical gates but fails
+  complete forward/reverse contextual review, so `kv_append`, dormant 2000 ms,
+  and `ban_steps = 3` are restored; ASR semantic closing and full-candidate
   acceptance remain open
 - **Owner**: project owner
 - **Constitution**: v1.7.0
@@ -413,6 +414,15 @@ behavior, or failure to repair the focused critical contexts rejects the
 candidate and restores `kv_append`, dormant 2000 ms, and `ban_steps = 3`. It
 MUST NOT authorize a second decoder parameter. Only a complete contextual pass
 may authorize 360-second, 600-second, or full evidence gates.
+
+The exact Phase 3H run passes source, real-time, time-base, observer, telemetry,
+and engineering contracts. Complete reading of all 81 Live events, eight Final
+records, and 28 comprehensive contributions in both directions rejects it. The
+correct Live negation is still overwritten, the exclusive-signing term remains
+absent, legal/name/unit substitutions remain, and the unsupported investment
+Live remains visible. The restored control is required, and this accumulated
+decoder-parameter branch is closed. See
+`official-greedy-termination-review-2026-08-10.md`.
 
 ## 6. Acceptance Gates
 

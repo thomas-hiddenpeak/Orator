@@ -640,6 +640,14 @@ scorecard. Any critical regression or failure of the focused causal contexts
 restores the control immediately and ends this decoder branch. Only a clean
 contextual pass can return to the duration ladder in T048.
 
+The exact candidate run completes its mechanical gates, but complete forward
+and reverse reading rejects it. Removing EOS suppression does not repair the
+correct Live negation overwritten at Final, the absent exclusive-signing term,
+the legal/name/unit substitutions, or the visible investment hallucination.
+The comprehensive view preserves the same Final errors. Restore `kv_append`,
+dormant 2000 ms, and `ban_steps = 3`; do not run a longer gate or another
+decoder parameter from this branch.
+
 ## 16. Risks and Controls
 
 | Risk | Control |

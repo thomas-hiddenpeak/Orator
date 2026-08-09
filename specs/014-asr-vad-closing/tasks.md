@@ -364,14 +364,26 @@ its named evidence exists. Mechanical checks never assign product correctness.
   config test passes, complete CTest passes `75/75` in `51.84` seconds, and the
   build emits no warning or error. The clean candidate is committed and pushed
   by this checkpoint before T086 starts.
-- [ ] **T086** Stream the identical 102-second WAV through the real WebSocket at
+- [x] **T086** Stream the identical 102-second WAV through the real WebSocket at
   1x with early/late observers, direct `end`, continuous telemetry, exact
   provenance, and full common-time-base reconciliation. Mechanical tools MUST
-  NOT compare transcript text or issue a verdict.
-- [ ] **T087** Read every Live, Final, and comprehensive contribution in complete
+  NOT compare transcript text or issue a verdict. Clean commit `a9ebea7` runs
+  at `0.987x`, returns terminal state in 1.330 seconds, closes all seven extents
+  at 1,632,000 samples, matches both observers, and passes telemetry coverage.
+- [x] **T087** Read every Live, Final, and comprehensive contribution in complete
   chronological and reverse context against `test.txt`. Reject and restore the
   control on any critical regression or failure of the focused contexts; only a
-  complete contextual pass may authorize T048 and longer gates.
+  complete contextual pass may authorize T048 and longer gates. All 81 Live,
+  eight Final, and 28 comprehensive entries are read in both directions. The
+  candidate repairs no focused critical context and retains the unsupported
+  investment Live, so it is rejected. Restore `kv_append`, dormant 2000 ms,
+  and `ban_steps = 3`; no longer gate or decoder sweep is authorized. See
+  `official-greedy-termination-review-2026-08-10.md`.
+- [x] **T088** Under the restored control, pass focused configuration, complete
+  CTest, warning review, and process cleanup; update state documentation and
+  commit/push the rejection before any new hypothesis. Focused `test_config`
+  passes, complete CTest passes `75/75` in `52.86` seconds, compilation emits no
+  warning or error, and no server, client, or `tegrastats` process remains.
 
 ## Phase 4: Web UI and Physical Microphone
 
