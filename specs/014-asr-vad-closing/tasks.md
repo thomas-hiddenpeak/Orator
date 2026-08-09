@@ -264,16 +264,45 @@ its named evidence exists. Mechanical checks never assign product correctness.
   and a subsequent clean-first build emits no warning or error. Inactive
   implementation commit `2acae3a` is pushed to `master` with `kv_append`
   checked in and no candidate output.
-- [ ] **T072** Change only TOML to `accumulated_redecode`, repeat the engineering
+- [x] **T072** Change only TOML to `accumulated_redecode`, repeat the engineering
   gates, commit the clean candidate, and stream the identical 102-second focused
   input through the production WebSocket at 1.0x/100 ms with observer and
   telemetry evidence. The candidate is now active in TOML; focused tests pass
   `4/4`, complete CTest passes `75/75` in `50.92` seconds, and a clean-first
-  build emits no warning or error. Commit, capture, and evidence remain pending.
-- [ ] **T073** Read every Live, Final, and comprehensive-view contribution in
+  build emits no warning or error. Clean pushed commit `a6ba893` captures the
+  exact 102-second source at `0.99x` with direct terminal return in `1.024`
+  seconds and complete source/time/telemetry/observer evidence.
+- [x] **T073** Read every Live, Final, and comprehensive-view contribution in
   chronological and reverse context against the complete human reference. Stop
   on a real-time failure, new critical meaning, omission, or unusable Live state;
   otherwise return to T048. No code may compare or label transcript output.
+  Both complete readings reject the candidate: long-segment continuation is
+  restored, but a correct negation in Live is replaced by a false Final action,
+  the exact exclusive-signing question regresses, and one Live state invents an
+  investment instruction. `kv_append` is restored. See
+  `official-accumulated-2s-review-2026-08-09.md`.
+
+### Phase 3F: One-Second Accumulated Cadence
+
+- [x] **T074** Derive one bounded follow-up from the complete Phase 3E reading.
+  At two seconds, short segments can finalize before the two unfixed chunks are
+  complete, discarding a correct Live prefix and reproducing the rejected fresh
+  full-context result. The official API makes chunk duration configurable. One
+  one-second accumulated candidate is authorized; no parameter sweep is.
+- [ ] **T075** Under restored `kv_append`, pass focused config and full CTest,
+  commit and push the rejected-candidate record, and verify no process remains.
+  `test_config` passes, complete CTest passes `75/75` in `52.89` seconds, the
+  build emits no warning or error, and no server/client/tegrastats process
+  remains. Commit and push are pending.
+- [ ] **T076** Activate `accumulated_redecode` with
+  `stream_chunk_ms = 1000`, leaving rollback, VAD, prompt, segment cap, align,
+  v2.1, FR50, time base, and publication unchanged. Repeat engineering gates
+  and commit the clean candidate before output.
+- [ ] **T077** Stream the identical 102-second focus at 1.0x/100 ms with source,
+  time-base, telemetry, observer, and terminal evidence.
+- [ ] **T078** Read every Live, Final, and comprehensive-view contribution
+  chronologically and in reverse. Restore `kv_append` on any new critical
+  meaning, omission, or unusable Live state; otherwise return to T048.
 
 ## Phase 4: Web UI and Physical Microphone
 

@@ -527,6 +527,31 @@ reverse, Live, Final, and comprehensive-view review decides whether the mode can
 return to T048. Performance below the real-time gate or any new critical meaning
 restores `kv_append` immediately.
 
+## 15.6 Phase 3F: One-Second Accumulated Cadence
+
+The complete Phase 3E reading shows a state-transition failure rather than a
+new encoder failure. The first 2-second Live text correctly contains the key
+negation, but a residual-tail Final occurs while `chunk_id` is still below the
+two-unfixed-chunk boundary. Finalization therefore uses an empty prefix and
+reproduces the rejected fresh full-context wording. The same run proves that
+growing-audio continuation removes the earlier long-segment truncation.
+
+The official state constructor accepts a configurable positive chunk duration.
+One bounded candidate will retain accumulated re-decode and change its cadence
+from 2000 ms to 1000 ms. A roughly 3.5-second segment then completes three decode
+steps before its residual tail, allowing the existing five-token rollback to
+participate in Final without adding a special-case policy. This also restores
+the one-second update cadence under which the frozen control had retained the
+exclusive-signing question, but that historical observation is only a causal
+hypothesis and not evidence that the candidate will succeed.
+
+The rejected candidate is first restored to `kv_append`, tested, documented,
+committed, and pushed. The next clean candidate changes only the accumulated
+chunk duration relative to Phase 3E, repeats engineering gates, and then uses
+the exact same 102-second source and real-WebSocket procedure. No additional
+parameter value is tried unless complete contextual evidence first rejects or
+accepts this hypothesis and a new SDD step is written.
+
 ## 16. Risks and Controls
 
 | Risk | Control |

@@ -98,3 +98,9 @@ and SDD status change with it, while all other runtime values remain fixed.
 With that candidate active, focused tests pass `4/4`, complete CTest passes
 `75/75` in `50.92` seconds, and a clean-first build again emits no warning or
 error. Real-WebSocket capture and contextual review have not yet occurred.
+
+Phase 3E capture and complete contextual review are now recorded in
+`official-accumulated-2s-review-2026-08-09.md`. The two-second candidate is
+rejected and checked-in TOML returns to `kv_append`. Its long-segment behavior
+supports retaining the implementation for a separately specified one-second
+cadence trial; it does not support product promotion.

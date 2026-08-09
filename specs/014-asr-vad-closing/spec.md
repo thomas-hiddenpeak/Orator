@@ -15,10 +15,11 @@
   eight-second numerical gates under the restored 100-frame control; complete
   forward/reverse review rejects the isolated 800-frame candidate and restores
   that control; Phase 3E adds the official accumulated-audio state transition
-  behind a typed TOML mode and passes its control-side engineering gate; the
-  accumulated candidate is now active for its engineering gate, while clean
-  commit, real-WebSocket capture, contextual review, ASR semantic closing, and
-  full-candidate acceptance remain open
+  behind a typed TOML mode and passes its control-side engineering gate; complete
+  forward/reverse review rejects the two-second accumulated candidate and
+  restores `kv_append`; Phase 3F authorizes one bounded one-second accumulated
+  cadence candidate, while ASR semantic closing and full-candidate acceptance
+  remain open
 - **Owner**: project owner
 - **Constitution**: v1.7.0
 - **Depends on**: Spec 003 (streaming ASR), Spec 004 (typed comprehensive
@@ -320,6 +321,22 @@ the restored KV-append control until the accumulated mode passes its engineering
 gate. The mode MUST remain bounded by the existing segment cap and common time
 base, MUST NOT inspect reference text or choose between transcript candidates,
 and MUST leave VAD, prompt, alignment, Sortformer v2.1, and FR50 fusion fixed.
+
+### FR15 - Bounded accumulated cadence correction
+
+Complete Phase 3E review establishes that the two-second accumulated candidate
+can preserve long-segment continuation while still replacing a correct early
+Live negation during short-segment Final and regressing a critical question. A
+single follow-up MAY set `stream_chunk_ms = 1000` in accumulated mode so a short
+segment reaches prefix rollback before Final. This is a cadence hypothesis, not
+an accepted accuracy improvement.
+
+The candidate MUST differ from Phase 3E output behavior only by chunk duration.
+It MUST retain `stream_unfixed_chunks = 2`, `stream_unfixed_tokens = 5`, the
+100-frame dormant KV control value, and every VAD, prompt, segment, model,
+alignment, speaker, time-base, and publication value. No sweep or automated
+candidate comparison is permitted. Complete forward/reverse contextual review
+of the same focused source decides whether longer gates are authorized.
 
 ## 6. Acceptance Gates
 

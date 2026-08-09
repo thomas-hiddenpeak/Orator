@@ -84,8 +84,8 @@ int main() {
           "checked-in ASR VAD gate chunk is frozen at 100 ms");
     CHECK(!checked_in.asr_final_full_context_decode,
           "checked-in ASR Final disables rejected full-context candidate");
-    CHECK(checked_in.asr_stream_mode == "accumulated_redecode",
-          "checked-in ASR stream mode activates the official candidate");
+    CHECK(checked_in.asr_stream_mode == "kv_append",
+          "checked-in ASR stream mode restores the accepted control");
     CHECK(checked_in.asr_stream_chunk_ms == 2000,
           "checked-in ASR accumulated chunk is the official 2000 ms");
     CHECK(checked_in.asr_stream_unfixed_chunks == 2,
