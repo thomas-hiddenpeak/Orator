@@ -84,8 +84,8 @@ int main() {
           "checked-in ASR VAD gate chunk is frozen at 100 ms");
     CHECK(!checked_in.asr_final_full_context_decode,
           "checked-in ASR Final disables rejected full-context candidate");
-    CHECK(checked_in.asr_stream_window_mel_frames == 100,
-          "checked-in ASR encoder append window is the 100-frame control");
+    CHECK(checked_in.asr_stream_window_mel_frames == 800,
+          "checked-in ASR encoder append window is the 800-frame candidate");
     CHECK(checked_in.asr_final_max_new_tokens == 384,
           "checked-in ASR Final has an independent token budget");
     CHECK(checked_in.asr_system_prompt ==

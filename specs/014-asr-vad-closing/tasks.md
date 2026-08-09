@@ -220,7 +220,8 @@ its named evidence exists. Mechanical checks never assign product correctness.
   the isolated 800-frame candidate and read every Live and Final state in
   chronological and reverse conversational context against `test.txt`. Reject
   on any new critical meaning or unusable Live behavior; do not start a duration
-  ladder from mechanical evidence.
+  ladder from mechanical evidence. The checked-in TOML now activates only the
+  800-frame window; all other candidate controls remain frozen.
 - [ ] **T068** Only if T067 demonstrates a semantic advantage without a control
   regression, specify a second candidate that retains the accepted one-second
   provisional Live view and replays the model-defined trained-window stream only

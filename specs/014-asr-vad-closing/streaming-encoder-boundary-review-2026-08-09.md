@@ -266,3 +266,17 @@ slices, with maximum absolute difference `0.000e+00`. The raw log SHA-256 is
 again `b420acc57d1679e70844d0af3a215587d5f35248cc616c25dfbbd51306aa9784`,
 identical to the prior control. This remains numerical implementation evidence,
 not transcript evaluation. T067 is the first authorized product-output step.
+
+For T067, the checked-in TOML changes only
+`[asr].stream_window_mel_frames` from 100 to 800. The rejected full-context
+Final switch stays false. Prompt, VAD, decoder rollback, segment cap, alignment,
+Sortformer v2.1, FR50 speaker policy, and common time base remain fixed. Product
+status stays open until the exact real-WebSocket artifact receives complete
+forward and reverse contextual review.
+
+The 800-frame checked-in candidate passes a second warning-clean build and all
+`75/75` registered tests in `50.77` seconds. Build-log SHA-256:
+`562e3e406e469efa00246bf85c1ae89539ae10cbbb2df28c91470f6cefb48692`.
+CTest-log SHA-256:
+`ee2905fefee04b5f3c71bde06cdd56fea2b20cc13aebdcb9175b30a46ea2c997`.
+These are engineering gates only.

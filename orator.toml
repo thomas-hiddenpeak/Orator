@@ -57,9 +57,10 @@ max_audio_tokens = 1500
 # Max decode tokens per provisional Live step
 max_new_tokens = 32
 
-# Acoustic append unit for the incremental Qwen3 encoder. The accepted control
-# is 100 mel frames (1 s); 800 is the model-defined trained attention window.
-stream_window_mel_frames = 100
+# Acoustic append unit for the incremental Qwen3 encoder. This isolated
+# candidate uses the model-defined 800-frame (8 s) trained attention window;
+# the restored control is 100 frames (1 s).
+stream_window_mel_frames = 800
 
 # Evidence-only rejected candidate: re-decode finalized VAD-bounded segments
 # from their complete admitted PCM. Keep disabled in the accepted runtime.
