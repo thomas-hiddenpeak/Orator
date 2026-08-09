@@ -575,6 +575,23 @@ generated token IDs/text, and token budget. The production default remains
 disabled and `kv_append`; the trace must not read `test.txt`, label correctness,
 compare candidates, or select a parameter.
 
+The typed TOML fields are `[asr].stream_state_trace` and
+`[asr].stream_state_trace_path`. The switch is false and the path empty in the
+checked-in control. Configuration rejects tracing unless the isolated TOML also
+selects `accumulated_redecode` and supplies a path. A small `io/` JSONL writer
+owns the file, truncates it once when the diagnostic model initializes, and
+flushes one row after each successful decode. `StreamReset(base_sample)` starts
+each numbered segment, so every row carries the exact absolute base/end sample
+without adding a second clock or changing the ASR interface.
+
+The model records generated IDs directly from greedy decode rather than
+re-tokenizing output. It records the exact pre-rollback IDs and retained token
+slice used by the existing prefix policy, raw generated text, product
+continuation text, configured token budget, and whether the decode is an
+unfixed chunk or Final tail. Shared `io::JsonEscape` keeps JSON serialization
+identical across this writer, the existing sink, and pipeline events. When the
+switch is false, no writer is constructed and no extra token capture occurs.
+
 The same fixed 102-second source is sufficient because it contains both causal
 contexts. Review first reconciles the native rows with the pinned official
 state transition and then reads the raw text in full conversation context. A

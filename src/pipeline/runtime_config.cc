@@ -93,6 +93,8 @@ std::string SerializeResolvedConfig(const AuditoryStream::Config& c) {
   asr.Add("stream_unfixed_chunks", c.asr_stream_unfixed_chunks);
   asr.Add("stream_unfixed_tokens", c.asr_stream_unfixed_tokens);
   asr.Add("stream_window_mel_frames", c.asr_stream_window_mel_frames);
+  asr.Add("stream_state_trace", c.asr_stream_state_trace);
+  asr.Add("stream_state_trace_path", c.asr_stream_state_trace_path);
   asr.Add("segment_sec", c.asr_segment_sec);
   asr.Add("language", c.asr_language);
   asr.Add("system_prompt", c.asr_system_prompt);

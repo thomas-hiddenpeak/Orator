@@ -98,6 +98,8 @@ class AuditoryStream {
     int asr_stream_unfixed_chunks = 2;
     int asr_stream_unfixed_tokens = 5;
     int asr_stream_window_mel_frames = 100;
+    bool asr_stream_state_trace = false;
+    std::string asr_stream_state_trace_path;
     double asr_segment_sec = 24.0;
     std::string asr_language = "Chinese";
     std::string asr_system_prompt =

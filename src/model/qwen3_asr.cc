@@ -9,6 +9,7 @@
 #include <cstring>
 #include <stdexcept>
 #include <sstream>
+#include <utility>
 
 namespace orator {
 namespace model {
@@ -38,6 +39,13 @@ void Qwen3Asr::Initialize(const core::AsrConfig& config) {
     throw std::invalid_argument(
         "Qwen3Asr: stream_window_mel_frames must be 100 or 800");
   }
+  if (config.stream_state_trace &&
+      (config.stream_mode != "accumulated_redecode" ||
+       config.stream_state_trace_path.empty())) {
+    throw std::invalid_argument(
+        "Qwen3Asr: stream-state trace requires accumulated_redecode and a "
+        "non-empty path");
+  }
   cfg_ = config;
   stream_mode_ = config.stream_mode;
   stream_chunk_ms_ = config.stream_chunk_ms;
@@ -47,6 +55,11 @@ void Qwen3Asr::Initialize(const core::AsrConfig& config) {
   stream_unfixed_chunks_ = config.stream_unfixed_chunks;
   stream_unfixed_tokens_ = config.stream_unfixed_tokens;
   stream_window_mel_frames_ = config.stream_window_mel_frames;
+  stream_state_trace_.reset();
+  if (config.stream_state_trace) {
+    stream_state_trace_ = std::make_unique<io::AsrStreamStateTrace>(
+        config.stream_state_trace_path);
+  }
   if (!config.language.empty()) language_ = config.language;
 }
 
@@ -88,7 +101,9 @@ void Qwen3Asr::Reset() {
 // stripped).
 std::string Qwen3Asr::BuildAndRun(const std::vector<float>& encoder_out,
                                   int n_tokens, const std::string& prefix_text,
-                                  int max_new_tokens, cudaStream_t stream) {
+                                  int max_new_tokens,
+                                  std::vector<int>* generated_tokens,
+                                  cudaStream_t stream) {
   const int H = decoder_->hidden_size();
 
   // ---- prompt token ids ----
@@ -144,6 +159,7 @@ std::string Qwen3Asr::BuildAndRun(const std::vector<float>& encoder_out,
   std::vector<int> out_tokens =
       decoder_->DecodeGreedy(T, max_new_tokens, kImEnd, kEndOfText,
                              cfg_.eos_ban_steps, cfg_.decode_batch, stream);
+  if (generated_tokens != nullptr) *generated_tokens = out_tokens;
   if (prof) {
     auto p2 = now();
     auto ms = [](auto a, auto b) {
@@ -203,7 +219,8 @@ std::string Qwen3Asr::TranscribeTextWithLimit(const float* samples,
   auto t_enc = now();
 
   std::string text =
-      BuildAndRun(enc, n_tokens, /*prefix_text=*/"", max_new_tokens, stream);
+      BuildAndRun(enc, n_tokens, /*prefix_text=*/"", max_new_tokens,
+                  /*generated_tokens=*/nullptr, stream);
   auto t_dec = now();
 
   if (prof) {
@@ -220,6 +237,13 @@ std::string Qwen3Asr::TranscribeTextWithLimit(const float* samples,
 std::string Qwen3Asr::TranscribeWindow(const float* samples, int num_samples,
                                        const std::string& prefix_text,
                                        cudaStream_t stream) {
+  return TranscribeWindowWithTokens(samples, num_samples, prefix_text,
+                                    /*generated_tokens=*/nullptr, stream);
+}
+
+std::string Qwen3Asr::TranscribeWindowWithTokens(
+    const float* samples, int num_samples, const std::string& prefix_text,
+    std::vector<int>* generated_tokens, cudaStream_t stream) {
   if (!loaded_) throw std::runtime_error("Qwen3Asr: weights not loaded");
   if (samples == nullptr || num_samples <= 0) return "";
 
@@ -234,7 +258,8 @@ std::string Qwen3Asr::TranscribeWindow(const float* samples, int num_samples,
   if (n_tokens <= 0) return "";
 
   // Returns only the newly generated continuation; the caller holds the prefix.
-  return BuildAndRun(enc, n_tokens, prefix_text, max_new_tokens_, stream);
+  return BuildAndRun(enc, n_tokens, prefix_text, max_new_tokens_,
+                     generated_tokens, stream);
 }
 
 // ---- Streaming session (Spec 003 / Spec 014) -------------------------------
@@ -257,6 +282,7 @@ void Qwen3Asr::StreamReset(long base_sample) {
   if (stream_mode_ == "accumulated_redecode") {
     stream_cache_ckpt_ = 0;
     stream_active_ = true;
+    if (stream_state_trace_) stream_state_trace_->BeginSegment(base_sample);
     return;
   }
 
@@ -393,41 +419,57 @@ std::string Qwen3Asr::AccumulatedStreamChunk(const float* pcm, int n,
   return text;
 }
 
-std::string Qwen3Asr::AccumulatedPrefix(bool final_tail) const {
-  if (stream_chunk_id_ < stream_unfixed_chunks_ ||
-      stream_raw_decoded_.empty()) {
+std::string Qwen3Asr::AccumulatedPrefix(
+    bool final_tail, std::vector<int>* raw_decoded_tokens,
+    std::vector<int>* retained_prefix_tokens) const {
+  if (raw_decoded_tokens != nullptr) raw_decoded_tokens->clear();
+  if (retained_prefix_tokens != nullptr) retained_prefix_tokens->clear();
+  if (stream_raw_decoded_.empty()) {
     return "";
   }
 
   const std::vector<int> current = tokenizer_.Encode(stream_raw_decoded_);
+  if (raw_decoded_tokens != nullptr) *raw_decoded_tokens = current;
+  if (stream_chunk_id_ < stream_unfixed_chunks_) return "";
   if (current.empty()) return "";
 
   if (final_tail) {
     const int end = std::min(
         static_cast<int>(current.size()),
         std::max(1, static_cast<int>(current.size()) - stream_unfixed_tokens_));
-    return tokenizer_.Decode(
-        std::vector<int>(current.begin(), current.begin() + end),
-        /*skip_special=*/true);
+    std::vector<int> retained(current.begin(), current.begin() + end);
+    if (retained_prefix_tokens != nullptr) *retained_prefix_tokens = retained;
+    return tokenizer_.Decode(retained, /*skip_special=*/true);
   }
 
   int rollback = stream_unfixed_tokens_;
   while (true) {
     const int end = std::max(0, static_cast<int>(current.size()) - rollback);
     if (end <= 0) return "";
-    std::string prefix = tokenizer_.Decode(
-        std::vector<int>(current.begin(), current.begin() + end),
-        /*skip_special=*/true);
-    if (prefix.find("\xEF\xBF\xBD") == std::string::npos) return prefix;
+    std::vector<int> retained(current.begin(), current.begin() + end);
+    std::string prefix = tokenizer_.Decode(retained, /*skip_special=*/true);
+    if (prefix.find("\xEF\xBF\xBD") == std::string::npos) {
+      if (retained_prefix_tokens != nullptr) {
+        *retained_prefix_tokens = std::move(retained);
+      }
+      return prefix;
+    }
     ++rollback;
   }
 }
 
 std::string Qwen3Asr::DecodeAccumulated(int num_samples, bool final_tail,
                                         cudaStream_t stream) {
-  const std::string prefix = AccumulatedPrefix(final_tail);
-  const std::string continuation =
-      TranscribeWindow(seg_pcm_.data(), num_samples, prefix, stream);
+  const int chunk_id = stream_chunk_id_;
+  std::vector<int> raw_decoded_tokens;
+  std::vector<int> retained_prefix_tokens;
+  std::vector<int> generated_tokens;
+  const std::string prefix = AccumulatedPrefix(
+      final_tail, stream_state_trace_ ? &raw_decoded_tokens : nullptr,
+      stream_state_trace_ ? &retained_prefix_tokens : nullptr);
+  const std::string continuation = TranscribeWindowWithTokens(
+      seg_pcm_.data(), num_samples, prefix,
+      stream_state_trace_ ? &generated_tokens : nullptr, stream);
   stream_raw_decoded_ = prefix + continuation;
   stream_processed_samples_ = num_samples;
 
@@ -436,6 +478,25 @@ std::string Qwen3Asr::DecodeAccumulated(int num_samples, bool final_tail,
   stream_audio_tokens_ =
       mel_frames > 0 ? AsrAudioTower::OutputLength(mel_frames) : 0;
   ++stream_chunk_id_;
+
+  if (stream_state_trace_) {
+    io::AsrStreamStateRecord record;
+    record.end_sample = seg_base_sample_ + num_samples;
+    record.chunk_id = chunk_id;
+    record.final_tail = final_tail;
+    record.unfixed_prefix = chunk_id < stream_unfixed_chunks_;
+    record.max_new_tokens = max_new_tokens_;
+    record.unfixed_chunks = stream_unfixed_chunks_;
+    record.unfixed_tokens = stream_unfixed_tokens_;
+    record.raw_decoded_token_ids = std::move(raw_decoded_tokens);
+    record.retained_prefix_token_ids = std::move(retained_prefix_tokens);
+    record.retained_prefix_text = prefix;
+    record.generated_text =
+        tokenizer_.Decode(generated_tokens, /*skip_special=*/true);
+    record.generated_token_ids = std::move(generated_tokens);
+    record.continuation_text = continuation;
+    stream_state_trace_->Write(record);
+  }
   return CurrentLiveText();
 }
 

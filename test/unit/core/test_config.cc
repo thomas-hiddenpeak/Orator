@@ -92,6 +92,10 @@ int main() {
           "checked-in ASR unfixed chunk count is official");
     CHECK(checked_in.asr_stream_unfixed_tokens == 5,
           "checked-in ASR rollback token count is official");
+    CHECK(!checked_in.asr_stream_state_trace,
+          "checked-in ASR decoder-state trace is disabled");
+    CHECK(checked_in.asr_stream_state_trace_path.empty(),
+          "checked-in ASR decoder-state trace path is empty");
     CHECK(
         checked_in.asr_stream_window_mel_frames == 100,
         "checked-in ASR encoder append window restores the 100-frame control");
@@ -131,6 +135,8 @@ stream_mode = "accumulated_redecode"
 stream_chunk_ms = 1500
 stream_unfixed_chunks = 3
 stream_unfixed_tokens = 7
+stream_state_trace = true
+stream_state_trace_path = "/tmp/asr-state.jsonl"
 stream_window_mel_frames = 800
 max_audio_tokens = 2000
 segment_sec = 30.0
@@ -278,6 +284,9 @@ ws_text_log_path = "/tmp/ws-frames.jsonl"
           "cfg.asr_stream_unfixed_chunks == 3");
     CHECK(cfg.asr_stream_unfixed_tokens == 7,
           "cfg.asr_stream_unfixed_tokens == 7");
+    CHECK(cfg.asr_stream_state_trace, "cfg.asr_stream_state_trace == true");
+    CHECK(cfg.asr_stream_state_trace_path == "/tmp/asr-state.jsonl",
+          "cfg.asr_stream_state_trace_path");
     CHECK(cfg.asr_stream_window_mel_frames == 800,
           "cfg.asr_stream_window_mel_frames == 800");
     CHECK(cfg.asr_max_audio_tokens == 2000, "cfg.asr_max_audio_tokens == 2000");
@@ -452,6 +461,12 @@ ws_text_log_path = "/tmp/ws-frames.jsonl"
           "resolved config contains ASR unfixed chunk count");
     CHECK(resolved.find("\"stream_unfixed_tokens\":7") != std::string::npos,
           "resolved config contains ASR rollback token count");
+    CHECK(resolved.find("\"stream_state_trace\":true") != std::string::npos,
+          "resolved config contains ASR decoder-state trace switch");
+    CHECK(
+        resolved.find("\"stream_state_trace_path\":\"/tmp/asr-state.jsonl\"") !=
+            std::string::npos,
+        "resolved config contains ASR decoder-state trace path");
     CHECK(
         resolved.find("\"stream_window_mel_frames\":800") != std::string::npos,
         "resolved config contains ASR encoder append window");
@@ -524,6 +539,31 @@ stream_unfixed_tokens = 129
     pipeline::AuditoryStream::Config cfg;
     CHECK(!io::ApplyTomlConfig(path, cfg),
           "oversized ASR rollback token count is rejected");
+    std::remove(path.c_str());
+  }
+
+  {
+    std::string path = WriteTemp(R"(
+[asr]
+stream_mode = "accumulated_redecode"
+stream_state_trace = true
+)");
+    pipeline::AuditoryStream::Config cfg;
+    CHECK(!io::ApplyTomlConfig(path, cfg),
+          "ASR stream-state trace without a path is rejected");
+    std::remove(path.c_str());
+  }
+
+  {
+    std::string path = WriteTemp(R"(
+[asr]
+stream_mode = "kv_append"
+stream_state_trace = true
+stream_state_trace_path = "/tmp/asr-state.jsonl"
+)");
+    pipeline::AuditoryStream::Config cfg;
+    CHECK(!io::ApplyTomlConfig(path, cfg),
+          "ASR stream-state trace on the control mode is rejected");
     std::remove(path.c_str());
   }
 

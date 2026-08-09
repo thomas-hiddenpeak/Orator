@@ -1,9 +1,11 @@
 #include <cstdio>
+#include <fstream>
 #include <iostream>
 #include <sstream>
 #include <string>
 
 #include "core/types.h"
+#include "io/asr_stream_state_trace.h"
 #include "io/json_sink.h"
 #include "pipeline/json_util.h"
 
@@ -189,6 +191,50 @@ int main() {
     CHECK(Contains(output, "\n"), "pretty JsonSink output has newlines");
     CHECK(Contains(output, "  "), "pretty JsonSink output has indentation");
     std::printf("  output:\n%s", output.c_str());
+  }
+
+  // ── Raw ASR stream-state JSONL ──────────────────────────────────────
+  std::printf("\n-- ASR stream-state trace --\n");
+  {
+    const std::string path = "/tmp/orator_asr_stream_state_test.jsonl";
+    {
+      io::AsrStreamStateTrace trace(path);
+      trace.BeginSegment(1600);
+      io::AsrStreamStateRecord record;
+      record.end_sample = 3200;
+      record.chunk_id = 2;
+      record.final_tail = true;
+      record.max_new_tokens = 32;
+      record.unfixed_chunks = 2;
+      record.unfixed_tokens = 5;
+      record.raw_decoded_token_ids = {10, 11, 12};
+      record.retained_prefix_token_ids = {10};
+      record.retained_prefix_text = "前\"缀";
+      record.generated_token_ids = {20, 21};
+      record.generated_text = "续\n文";
+      record.continuation_text = "续文";
+      trace.Write(record);
+    }
+
+    std::ifstream input(path);
+    std::ostringstream contents;
+    contents << input.rdbuf();
+    const std::string jsonl = contents.str();
+    CHECK(Contains(jsonl, "\"base_sample\":1600"),
+          "ASR trace preserves the common-clock base sample");
+    CHECK(Contains(jsonl, "\"end_sample\":3200"),
+          "ASR trace preserves the common-clock end sample");
+    CHECK(Contains(jsonl, "\"rollback_tokens_applied\":2"),
+          "ASR trace preserves the rollback boundary");
+    CHECK(Contains(jsonl, "\"raw_decoded_token_ids\":[10,11,12]"),
+          "ASR trace preserves raw token ids");
+    CHECK(Contains(jsonl, "\"retained_prefix_token_ids\":[10]"),
+          "ASR trace preserves retained token ids");
+    CHECK(Contains(jsonl, "前\\\"缀") && Contains(jsonl, "续\\n文"),
+          "ASR trace escapes raw UTF-8 text as JSON");
+    CHECK(!jsonl.empty() && jsonl.back() == '\n',
+          "ASR trace writes one complete JSONL row");
+    std::remove(path.c_str());
   }
 
   // ── Summary ─────────────────────────────────────────────────────────

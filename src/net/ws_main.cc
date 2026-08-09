@@ -195,6 +195,7 @@ int main(int argc, char** argv) {
             << " stream_mode=" << cfg.asr_stream_mode
             << " stream_chunk_ms=" << cfg.asr_stream_chunk_ms
             << " stream_window_mel=" << cfg.asr_stream_window_mel_frames
+            << " stream_state_trace=" << cfg.asr_stream_state_trace
             << " segment=" << cfg.asr_segment_sec
             << "s lang=" << cfg.asr_language << std::endl;
   std::cout << "  send binary PCM (int16le mono 16k); text {\"flush\"} or "

@@ -18,6 +18,7 @@
 
 #include "core/stages.h"
 #include "feature/whisper_mel.h"
+#include "io/asr_stream_state_trace.h"
 #include "io/bpe_tokenizer.h"
 #include "io/sharded_safetensor.h"
 #include "model/asr_audio_tower.h"
@@ -97,6 +98,9 @@ class Qwen3Asr final : public core::IAsr {
   int stream_unfixed_chunks() const { return stream_unfixed_chunks_; }
   int stream_unfixed_tokens() const { return stream_unfixed_tokens_; }
   int stream_window_mel_frames() const { return stream_window_mel_frames_; }
+  bool stream_state_trace_enabled() const {
+    return stream_state_trace_ != nullptr;
+  }
 
   // Energy-VAD speech segmentation. Splits [0,num_samples) into bounded speech
   // spans (sample offsets) separated by silence, capping each at
@@ -116,6 +120,7 @@ class Qwen3Asr final : public core::IAsr {
  private:
   std::string BuildAndRun(const std::vector<float>& encoder_out, int n_tokens,
                           const std::string& prefix_text, int max_new_tokens,
+                          std::vector<int>* generated_tokens,
                           cudaStream_t stream = 0);
   std::string TranscribeTextWithLimit(const float* samples, int num_samples,
                                       int max_new_tokens,
@@ -128,7 +133,13 @@ class Qwen3Asr final : public core::IAsr {
   std::string AccumulatedStreamChunk(const float* pcm, int n,
                                      cudaStream_t stream);
   std::string AccumulatedStreamFinalize(cudaStream_t stream);
-  std::string AccumulatedPrefix(bool final_tail) const;
+  std::string AccumulatedPrefix(
+      bool final_tail, std::vector<int>* raw_decoded_tokens = nullptr,
+      std::vector<int>* retained_prefix_tokens = nullptr) const;
+  std::string TranscribeWindowWithTokens(const float* samples, int num_samples,
+                                         const std::string& prefix_text,
+                                         std::vector<int>* generated_tokens,
+                                         cudaStream_t stream);
   std::string DecodeAccumulated(int num_samples, bool final_tail,
                                 cudaStream_t stream);
   // Current live transcript = running raw decode with the language tag removed.
@@ -176,6 +187,7 @@ class Qwen3Asr final : public core::IAsr {
   int stream_processed_samples_ = 0;
   int stream_window_mel_frames_ = kConvWindowMel;
   bool stream_active_ = false;
+  std::unique_ptr<io::AsrStreamStateTrace> stream_state_trace_;
 
   // Special token ids (Qwen3-ASR).
   static constexpr int kImStart = 151644;

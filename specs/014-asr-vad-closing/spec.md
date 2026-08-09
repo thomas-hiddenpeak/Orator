@@ -19,8 +19,9 @@
   forward/reverse review rejects the two-second accumulated candidate and
   restores `kv_append`; Phase 3F also rejects the bounded one-second accumulated
   cadence after complete forward/reverse review and restores the control;
-  Phase 3G is limited to decoder-state root-cause evidence, while ASR semantic
-  closing and full-candidate acceptance remain open
+  Phase 3G adds a default-off raw decoder-state trace and passes its engineering
+  gate, while exact trace capture, root-cause review, ASR semantic closing, and
+  full-candidate acceptance remain open
 - **Owner**: project owner
 - **Constitution**: v1.7.0
 - **Depends on**: Spec 003 (streaming ASR), Spec 004 (typed comprehensive
@@ -364,6 +365,12 @@ transition with the pinned official source contract and the already captured
 conversation. A new runtime candidate is authorized only after a concrete
 implementation mismatch or model-state hypothesis is documented in spec,
 plan, and tasks; otherwise this branch stops at the restored control.
+
+The checked-in field names are `[asr].stream_state_trace` and
+`[asr].stream_state_trace_path`. Enabling the switch MUST require
+`accumulated_redecode` and a non-empty path in the same resolved configuration.
+The default MUST remain false with an empty path, and inactive execution MUST
+not create a trace file or capture additional decode tokens.
 
 ## 6. Acceptance Gates
 

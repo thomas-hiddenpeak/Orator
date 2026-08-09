@@ -224,6 +224,8 @@ void AuditoryStream::Start() {
     ac.stream_unfixed_chunks = config_.asr_stream_unfixed_chunks;
     ac.stream_unfixed_tokens = config_.asr_stream_unfixed_tokens;
     ac.stream_window_mel_frames = config_.asr_stream_window_mel_frames;
+    ac.stream_state_trace = config_.asr_stream_state_trace;
+    ac.stream_state_trace_path = config_.asr_stream_state_trace_path;
     ac.profile = config_.asr_profile;
     ac.encoder_windowed_attention = config_.asr_windowed_encoder;
     ac.cuda_graph_enabled = config_.asr_cuda_graph_enabled;

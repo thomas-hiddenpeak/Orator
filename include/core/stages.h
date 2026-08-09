@@ -98,6 +98,8 @@ struct AsrConfig {
   int stream_unfixed_chunks = 2;
   int stream_unfixed_tokens = 5;
   int stream_window_mel_frames = 100;
+  bool stream_state_trace = false;
+  std::string stream_state_trace_path;
   bool profile = false;
   bool encoder_windowed_attention = false;
   bool cuda_graph_enabled = true;

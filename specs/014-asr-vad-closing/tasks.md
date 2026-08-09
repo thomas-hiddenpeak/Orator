@@ -320,16 +320,24 @@ its named evidence exists. Mechanical checks never assign product correctness.
   values, pass focused config, complete CTest, warning review, commit/push the
   Phase 3F rejection record, and verify no capture process remains. Focused
   `test_config` passes, complete CTest passes `75/75` in `52.75` seconds, the
-  build emits no warning or error, and no capture process remains. This
-  rejection/restoration change is ready for its transitional commit and push.
-- [ ] **T080** Specify and implement one opt-in, bounded raw decoder-state trace
+  build emits no warning or error, and no capture process remains.
+  Rejection/restoration commit `3924fb8` is pushed to `master`.
+- [x] **T080** Specify and implement one opt-in, bounded raw decoder-state trace
   for the inactive accumulated path. Record only audio extent, chunk/Final
   state, raw and retained token IDs, rollback boundary, text prefix,
-  continuation, and token budget; keep it disabled in checked-in TOML.
-- [ ] **T081** Pass focused and complete engineering gates under the inactive
-  control, commit/push before evidence, then capture the identical 102-second
-  focus with the trace enabled only through isolated `orator.toml`.
-- [ ] **T082** Read every trace transition against the pinned official source
+  continuation, and token budget; keep it disabled in checked-in TOML. Typed
+  `[asr].stream_state_trace` and `stream_state_trace_path` flow through resolved
+  config to an `io/` JSONL writer. Each accumulated decode row records exact
+  common-clock samples and token state without reference text or judgments.
+- [x] **T081** Pass focused and complete engineering gates under the inactive
+  control, then commit/push before evidence. Focused config/JSON/Qwen tests pass
+  `3/3`, complete CTest passes `75/75` in `52.90` seconds, and compilation emits
+  no warning or error. Checked-in TOML remains `kv_append` with tracing false
+  and an empty path; this change is the clean inactive implementation source.
+- [ ] **T082** After T081 is pushed, capture the identical 102-second focus with
+  trace enabled only through an isolated `orator.toml`. Retain exact source,
+  config, binary, run, trace, time-base, observer, and telemetry provenance.
+- [ ] **T083** Read every trace transition against the pinned official source
   contract and the complete human conversation in chronological and reverse
   context. No code may compare text or select a candidate. Authorize one new
   runtime hypothesis only if a concrete mismatch is established; otherwise

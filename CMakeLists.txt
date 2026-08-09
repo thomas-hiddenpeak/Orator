@@ -69,6 +69,7 @@ set(ORATOR_CORE_SOURCES
     src/io/sharded_safetensor.cc
     src/io/bpe_tokenizer.cc
     src/io/json_sink.cc
+    src/io/asr_stream_state_trace.cc
     src/io/audio_file.cc
     src/io/reference_transcript.cc
     src/io/config_reader.cc

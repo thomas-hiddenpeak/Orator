@@ -135,6 +135,22 @@ bool ApplyTomlConfig(const std::string& path,
         cfg.asr_stream_window_mel_frames = *n;
       }
     }
+    if (auto v = sec->get("stream_state_trace")) {
+      if (auto b = v->value<bool>()) cfg.asr_stream_state_trace = *b;
+    }
+    if (auto v = sec->get("stream_state_trace_path")) {
+      if (auto s = v->value<std::string>()) {
+        cfg.asr_stream_state_trace_path = *s;
+      }
+    }
+    if (cfg.asr_stream_state_trace &&
+        (cfg.asr_stream_mode != "accumulated_redecode" ||
+         cfg.asr_stream_state_trace_path.empty())) {
+      std::cerr << "[config] [asr].stream_state_trace requires "
+                   "accumulated_redecode and a non-empty trace path in "
+                << path << std::endl;
+      return false;
+    }
     if (auto v = sec->get("max_audio_tokens")) {
       if (auto n = v->value<int>()) cfg.asr_max_audio_tokens = *n;
     }

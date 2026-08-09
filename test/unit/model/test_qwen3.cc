@@ -121,6 +121,7 @@ static void TestStreamModeValidation() {
   ASSERT_TRUE(asr.stream_chunk_ms() == 2000);
   ASSERT_TRUE(asr.stream_unfixed_chunks() == 2);
   ASSERT_TRUE(asr.stream_unfixed_tokens() == 5);
+  ASSERT_TRUE(!asr.stream_state_trace_enabled());
 
   cfg.stream_mode = "accumulated_redecode";
   cfg.stream_chunk_ms = 1500;
@@ -132,8 +133,23 @@ static void TestStreamModeValidation() {
   ASSERT_TRUE(asr.stream_unfixed_chunks() == 3);
   ASSERT_TRUE(asr.stream_unfixed_tokens() == 7);
 
+  cfg.stream_state_trace = true;
+  cfg.stream_state_trace_path.clear();
+  ASSERT_THROWS(asr.Initialize(cfg));
+  cfg.stream_state_trace_path = "/tmp/orator_qwen3_stream_state_test.jsonl";
+  ASSERT_NO_THROW(asr.Initialize(cfg));
+  ASSERT_TRUE(asr.stream_state_trace_enabled());
+  cfg.stream_state_trace = false;
+  ASSERT_NO_THROW(asr.Initialize(cfg));
+  ASSERT_TRUE(!asr.stream_state_trace_enabled());
+  std::remove(cfg.stream_state_trace_path.c_str());
+
   cfg.stream_mode = "candidate_selector";
   ASSERT_THROWS(asr.Initialize(cfg));
+  cfg.stream_mode = "kv_append";
+  cfg.stream_state_trace = true;
+  ASSERT_THROWS(asr.Initialize(cfg));
+  cfg.stream_state_trace = false;
   cfg.stream_mode = "accumulated_redecode";
   cfg.stream_chunk_ms = 0;
   ASSERT_THROWS(asr.Initialize(cfg));

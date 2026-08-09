@@ -67,6 +67,11 @@ stream_chunk_ms = 2000
 stream_unfixed_chunks = 2
 stream_unfixed_tokens = 5
 
+# Evidence-only accumulated decoder-state trace. It is invalid unless
+# accumulated_redecode and a non-empty output path are set in this TOML.
+stream_state_trace = false
+stream_state_trace_path = ""
+
 # Acoustic append unit for the incremental Qwen3 encoder. The rejected
 # 800-frame causal candidate is retained as an allowed evidence value; the
 # checked-in runtime is restored to the 100-frame (1 s) control.
