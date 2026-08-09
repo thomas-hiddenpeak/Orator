@@ -6,11 +6,12 @@
   retained. Phase 3B through Phase 3G provide diagnostic and numerical evidence
   for native ASR state behavior. Phase 3H's exact 102-second run identifies
   local semantic defects but, under Constitution 1.8.0, cannot reject the
-  candidate or close the accumulated decoder branch. Phase 3I reopens the exact
-  `accumulated_redecode`, 1000 ms, `ban_steps = 0` candidate for a complete
-  3615.120-second real-WebSocket run and full chronological/reverse contextual
-  review. ASR semantic closing, active physical-microphone coverage, and full
-  candidate acceptance remain open.
+  candidate or close the accumulated decoder branch. Phase 3I now activates the
+  exact `accumulated_redecode`, 1000 ms, `ban_steps = 0` candidate after its
+  engineering gates; the complete 3615.120-second real-WebSocket run and full
+  chronological/reverse contextual review are next. ASR semantic closing,
+  active physical-microphone coverage, and full candidate acceptance remain
+  open.
 - **Owner**: project owner
 - **Constitution**: v1.8.0
 - **Depends on**: Spec 003 (streaming ASR), Spec 004 (typed comprehensive

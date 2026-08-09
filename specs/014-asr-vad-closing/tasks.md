@@ -394,11 +394,14 @@ chronological/reverse contextual review also support it.
   accuracy statements, candidate ranking, and decisions to stop evaluation
   require complete `test.mp3` plus all 556 `test.txt` contributions reviewed
   chronologically and in reverse context. Amendment commit `d07b7af` is pushed.
-- [ ] **T090** Reactivate the exact Phase 3H candidate in `orator.toml`:
+- [x] **T090** Reactivate the exact Phase 3H candidate in `orator.toml`:
   `accumulated_redecode`, 1000 ms, `ban_steps = 0`, trace false. Keep every
   other output-affecting value fixed, update exact configuration assertions,
   pass focused configuration tests, complete CTest, and a warning-clean build,
-  then commit and push the candidate before capture.
+  then commit and push the candidate before capture. The exact configuration
+  test passes, the complete suite passes `75/75` in `51.93` seconds, and the
+  clean build emits no warning or error diagnostic. Commit/push completes
+  before T091 starts.
 - [ ] **T091** Run all 3615.120 seconds of `test.mp3` at 1.0x/100 ms through
   the production WebSocket with an empty isolated registry, early and late
   observers, direct `end`, continuous runtime telemetry, continuous
