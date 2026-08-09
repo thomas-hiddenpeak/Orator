@@ -475,6 +475,23 @@ trained-window streaming path at Final. This sequencing separates model-window
 evidence from presentation latency and avoids selecting between transcripts by
 code.
 
+The isolated T067 result fails that prerequisite. Complete contextual review
+finds that the 800-frame path contributes useful long-segment vocabulary but
+does not provide a uniformly safer transcript: short residual segments repeat
+the rejected complete-context errors, two long Finals stop before critical
+business clauses, and the first Live state still contains the configured prompt
+phrase. The missing clauses are absent before forced alignment and speaker
+fusion, so downstream evidence cannot reconstruct them. Phase 3D therefore
+restores the 100-frame control and does not implement the proposed Final replay.
+
+The revised causal analysis separates three facts: 800-frame encoder locality
+is numerically valid; an eight-second decode cadence with a 32-token continuation
+budget can leave long contributions unfinished; and a short residual encoded as
+one complete block can still be semantically worse than the legacy 100-frame
+stream. A later candidate must address decoder continuation and short-tail
+handling as explicit model contracts. It may not select between alternative
+transcripts by code or infer correctness from tensor parity.
+
 ## 16. Risks and Controls
 
 | Risk | Control |

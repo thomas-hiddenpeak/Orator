@@ -280,3 +280,97 @@ The 800-frame checked-in candidate passes a second warning-clean build and all
 CTest-log SHA-256:
 `ee2905fefee04b5f3c71bde06cdd56fea2b20cc13aebdcb9175b30a46ea2c997`.
 These are engineering gates only.
+
+## Phase 3D Focused Capture
+
+The isolated run uses clean commit
+`291c63dd66c54d9f6ac6a2ede9d4cf1b70487fa5` and the same continuous 102-second
+source span as T064. The worktree and config remain unchanged from client start
+through terminal capture.
+
+- WAV SHA-256:
+  `5c806e0e3dd6839cf9657804b639381f07abe8a4f3c5a5befee9d565d88f0cdc`;
+- streamed PCM SHA-256:
+  `49b86debff7b300281886d0680e112d300a3cf8b287f5fe6039fe11620b23d10`;
+- run SHA-256:
+  `1414e5b2dd673018a07234fa563ef1426a6ceebcd183c3e6f501dd10b2bcec14`;
+- isolated TOML SHA-256:
+  `5978abd8ca5ea1f29bfa30f802ab43e8a2a72fbad7746b46489e5dc7a65f3ced`;
+- server binary SHA-256:
+  `f1c1788f0deb3a4551eff41da40a42604102219001b5902ac12f374aad623e99`;
+- pacing: `1.0x`, 100 ms frames, total wall `103.06` seconds, reported stream
+  factor `0.99x`, and direct terminal wait `1.061` seconds; and
+- terminal tracks: 22 diarization segments, eight Final ASR segments, and eight
+  alignment groups, with the required telemetry and observer paths present.
+
+Raw evidence is retained under
+`artifacts/spec014/candidates/asr-trained-window-800/focused-legal-context/`.
+All server and client processes are stopped after capture.
+
+## Phase 3D Complete Contextual Review
+
+The reviewer read every Final and all six Live states chronologically against
+the complete human-listened passage, then reread the terminal comprehensive
+view from its last contribution to its first. No script labeled or compared any
+text.
+
+1. The opening repeats the rejected “雷总也是出汗了” assertion instead of the
+   human “雷总也不说话了”. The negation is lost and a different action is
+   invented.
+2. “他过完年之后再没找过我” remains coherent.
+3. The signed-agreement question again becomes “签了总项目” rather than the
+   human “签了独家吗”, and “没跟他说” remains degraded. This repeats a critical
+   business error.
+4. The legal discussion's first Live state still displays “语音识别”. At the next
+   trained-window update that changes to “一支新的”, not “一致行动的人”. Final
+   stops immediately after “把零起量界的股权变过来，然后”, omitting the finite-
+   partner holding structure, ten-percent option pool, and ten/fifteen decision.
+   Those are critical missing business clauses.
+5. The next contribution recovers “员工的期权” and changes the magnitude toward
+   “三到四”, but invents the unit in “十五个月” and still omits “万” from “3万4”.
+   This is useful acoustic evidence mixed with new critical numeric meaning.
+6. The following contribution preserves “才值得给” and its purchasing rationale,
+   then Final stops at “我不可能”. It omits “给股份啊，这他妈太致命了” and the
+   acknowledgment, removing the central commitment from the comprehensive view.
+7. “故事就是这么多故事” remains a smaller regression from the human “这么个故事”.
+8. The last contribution removes the unsupported labor-service investment text
+   and preserves the holding-ratio goal and “好嘞”; its opening disfluency is
+   imperfect but does not add a new business assertion.
+
+The reverse reading confirms that the improved final contribution cannot repair
+the earlier omitted option-pool decision or no-equity commitment. It also
+confirms that the short residual segments reproduce the same critical errors as
+the rejected full-context Final candidate, while only some long trained-window
+segments gain useful vocabulary.
+
+Live is not acceptable as a product view. Segments shorter than eight seconds
+have no textual Live state before Final. Longer segments update only at the
+trained-window boundary, and the first visible legal state still contains the
+literal prompt phrase. The later replacement does not make the earlier visible
+assertion harmless.
+
+The terminal comprehensive view assigns speakers and aligned time spans only to
+the text supplied by ASR. Neither forced alignment nor the frozen speaker fusion
+path contains the omitted clauses, so their joint evidence cannot restore those
+business statements. No speaker-policy change or speaker-baseline conclusion is
+made from this cold-start focused clip.
+
+## Phase 3D Decision
+
+T067 requires rejection for a new critical meaning or unusable Live behavior.
+Both conditions occur. The 800-frame candidate is rejected before silence,
+120-second, 360-second, 600-second, or full-session gates. T068's proposed dual-
+path Final replay is not authorized because its prerequisite failed.
+
+The checked-in TOML returns to the 100-frame control. The typed 100/800 boundary
+and numerical evidence remain useful for diagnosis, but exact encoder locality
+is not transcript acceptance. The next causal analysis must independently
+address decoder continuation and short residual-tail behavior; it may not use
+code to select the better transcript.
+
+The restored configuration passes a build with no `warning:` or `error:`
+diagnostic and all `75/75` registered tests in `52.75` seconds. Build-log
+SHA-256:
+`0a8dc167ccb4ca5c9a080ebe49b6de2559d1f6b5c2cc6a0634af4c32a90e160c`.
+CTest-log SHA-256:
+`2fa42e1c3f67f948014e3476d7eb44a69a62eb708cfb1ebc33f0494ed61fdf97`.

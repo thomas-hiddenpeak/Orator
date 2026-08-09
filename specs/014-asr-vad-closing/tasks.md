@@ -216,17 +216,29 @@ its named evidence exists. Mechanical checks never assign product correctness.
   validation. The repeated 16-second numerical probe again gives exact equality
   for both 800-frame slices and reproduces SHA-256 `b420acc5...9784`; the build
   has no warning/error diagnostic and all `75/75` tests pass in `52.85` seconds.
-- [ ] **T067** Capture the same complete 102-second real-WebSocket context under
+- [x] **T067** Capture the same complete 102-second real-WebSocket context under
   the isolated 800-frame candidate and read every Live and Final state in
   chronological and reverse conversational context against `test.txt`. Reject
   on any new critical meaning or unusable Live behavior; do not start a duration
-  ladder from mechanical evidence. The checked-in TOML now activates only the
-  800-frame window; all other candidate controls remain frozen.
-- [ ] **T068** Only if T067 demonstrates a semantic advantage without a control
+  ladder from mechanical evidence. The capture commit activates only the
+  800-frame window; all other candidate controls remain frozen. Clean commit
+  `291c63d` streams the exact 102-second input at `0.99x`; direct terminal wait
+  is `1.061` seconds and all provenance is stable. Complete forward/reverse and
+  comprehensive-view review finds useful lexical repairs, but two long business
+  statements are critically truncated, “十五” becomes “十五个月”, short segments
+  repeat the rejected “出汗了/总项目” assertions, and the first eight-second Live
+  state still displays “语音识别”. The candidate is rejected.
+- [x] **T068** Only if T067 demonstrates a semantic advantage without a control
   regression, specify a second candidate that retains the accepted one-second
   provisional Live view and replays the model-defined trained-window stream only
   for Final. Repeat engineering and focused contextual gates before returning to
   T048. Otherwise restore the 100-frame control and revise the causal analysis.
+  T067 fails the prerequisite, so no replay implementation is authorized. The
+  checked-in TOML returns to 100 frames; the typed 100/800 evidence boundary is
+  retained, and the next hypothesis must address decoder continuation and short-
+  tail behavior without treating encoder locality as transcript correctness.
+  The restored configuration passes a warning-clean build and all `75/75` tests
+  in `52.75` seconds.
 
 ## Phase 4: Web UI and Physical Microphone
 

@@ -12,10 +12,9 @@
   resulting TOML-owned full-context Final candidate passes its engineering gate
   but fails complete focused contextual review and is disabled; Phase 3D now
   exposes a typed TOML acoustic window, passes its engineering and exact
-  eight-second numerical gates under the restored 100-frame control, and now
-  activates the isolated 800-frame candidate for its focused capture; ASR
-  semantic closing and
-  full-candidate acceptance remain open
+  eight-second numerical gates under the restored 100-frame control; complete
+  forward/reverse review rejects the isolated 800-frame candidate and restores
+  that control; ASR semantic closing and full-candidate acceptance remain open
 - **Owner**: project owner
 - **Constitution**: v1.7.0
 - **Depends on**: Spec 003 (streaming ASR), Spec 004 (typed comprehensive
