@@ -23,7 +23,9 @@
   gate, and completes an exact 91-row forward/reverse root-cause review; the
   accumulated state transition matches the pinned official source, while one
   concrete initial-token EOS-suppression mismatch authorizes a single Phase 3H
-  candidate; ASR semantic closing and full-candidate acceptance remain open
+  candidate; that candidate now passes focused and complete engineering gates
+  and awaits exact contextual evidence; ASR semantic closing and full-candidate
+  acceptance remain open
 - **Owner**: project owner
 - **Constitution**: v1.7.0
 - **Depends on**: Spec 003 (streaming ASR), Spec 004 (typed comprehensive

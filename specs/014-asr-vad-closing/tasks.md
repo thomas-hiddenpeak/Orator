@@ -352,14 +352,18 @@ its named evidence exists. Mechanical checks never assign product correctness.
 
 ### Phase 3H: Official Greedy Termination
 
-- [ ] **T084** Commit and push the T082/T083 evidence report and Phase 3H SDD
+- [x] **T084** Commit and push the T082/T083 evidence report and Phase 3H SDD
   while checked-in behavior remains `kv_append`, dormant 2000 ms, and
-  `ban_steps = 3`.
-- [ ] **T085** Reproduce the exact Phase 3F one-second accumulated state and set
+  `ban_steps = 3`. Transitional evidence commit `5340cd0` is pushed to
+  `master`.
+- [x] **T085** Reproduce the exact Phase 3F one-second accumulated state and set
   only `ban_steps = 0` relative to that artifact. Keep trace false and every
   VAD, prompt, segment, model, alignment, speaker, time-base, and publication
   value fixed. Pass focused configuration tests, complete CTest, and a
-  warning-clean build, then commit/push before product evidence.
+  warning-clean build, then commit/push before product evidence. The focused
+  config test passes, complete CTest passes `75/75` in `51.84` seconds, and the
+  build emits no warning or error. The clean candidate is committed and pushed
+  by this checkpoint before T086 starts.
 - [ ] **T086** Stream the identical 102-second WAV through the real WebSocket at
   1x with early/late observers, direct `end`, continuous telemetry, exact
   provenance, and full common-time-base reconciliation. Mechanical tools MUST

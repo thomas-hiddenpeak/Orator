@@ -57,13 +57,14 @@ max_audio_tokens = 1500
 # Max decode tokens per provisional Live step
 max_new_tokens = 32
 
-# Streaming state implementation. "kv_append" is the restored control;
-# "accumulated_redecode" follows the official growing-audio state machine.
-stream_mode = "kv_append"
+# Phase 3H candidate: official growing-audio state with the official greedy
+# termination contract. Restore "kv_append" immediately if contextual review
+# rejects this candidate.
+stream_mode = "accumulated_redecode"
 
-# Official accumulated-mode cadence and rollback policy. These typed values
-# remain dormant while the restored kv_append control is active.
-stream_chunk_ms = 2000
+# Exact Phase 3F one-second accumulated cadence and rollback policy. Phase 3H
+# changes only EOS suppression relative to that immutable evidence run.
+stream_chunk_ms = 1000
 stream_unfixed_chunks = 2
 stream_unfixed_tokens = 5
 
@@ -98,8 +99,9 @@ language = "Chinese"
 # the resolved run configuration describes the model input exactly.
 system_prompt = "你是一个专业的中文普通话语音识别系统，请准确识别并转录所有语音内容。"
 
-# Decoder beam ban steps (suppress repetitive n-grams)
-ban_steps = 3
+# Number of initial argmax positions that suppress both EOS IDs. The pinned
+# official vLLM greedy sampler has no minimum-token or EOS-suppression rule.
+ban_steps = 0
 
 # Decode batch size (parallel token candidates)
 decode_batch = 4
