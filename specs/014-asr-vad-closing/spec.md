@@ -6,7 +6,7 @@
   600-second gates; Phase 4 Chromium file input and physical-endpoint room tone
   pass their bounded reviews, but active physical-microphone scenarios remain
   blocked by unavailable effective capture hardware; Phase 3B causal review
-  traces one prompt-conditioned decoder defect and activates an experimental
+  traces one prompt-conditioned decoder factor and rejects/removes the first
   empty-system-prompt candidate; ASR semantic closing and full-candidate
   acceptance remain open
 - **Owner**: project owner
@@ -97,8 +97,9 @@ The following facts define the start of this work:
     replaced by text copied from the configured system prompt in decoder Live
     partials and the final ASR record. Alignment and the business-speaker view
     preserve that text rather than creating it. One reference-free candidate,
-    an empty `[asr].system_prompt` with every other value frozen, is implemented
-    for staged validation but is not accepted. See
+    an empty `[asr].system_prompt` with every other value frozen, was tested in
+    complete focused context, failed to recover the legal term, introduced new
+    material regressions, and was removed before longer gates. See
     `final-asr-prompt-causality-review-2026-08-09.md`.
 
 ## 3. Objective and Claim Boundary

@@ -5,8 +5,8 @@
 - **Scope**: Spec 014 T045-T047, final ASR meaning only
 - **Control**: clean full baseline `96b8347`, with the accepted Live publication
   correction frozen and FR50 speaker behavior unchanged
-- **Result**: T045-T047 complete; one reference-free TOML candidate is active
-  for staged validation but is not accepted
+- **Result**: T045-T047 complete; the first reference-free TOML candidate was
+  rejected by complete focused-context review and removed
 - **Product gate**: unchanged and open
 
 No executable code, script, query, metric, formula, or lexical rule assigned a
@@ -105,7 +105,8 @@ That history does not establish a current product-quality benefit.
 
 ## T047 Candidate
 
-The only behavioral change in candidate `asr-empty-system-prompt` is:
+The only behavioral change in historical candidate
+`asr-empty-system-prompt` was:
 
 ```toml
 [asr]
@@ -119,11 +120,11 @@ FR50 settings are controls. No alternative instruction is added, because a
 longer instruction could create a different conditioning bias and would mix two
 hypotheses.
 
-The focused engineering test asserts that the checked-in TOML resolves an empty
-ASR system prompt. The warning-clean build completes and all `74/74` registered
-tests pass in `52.74s`. Existing model numerical gates remain unchanged because
-no model weight, kernel, precision, feature extraction, encoder, or decoder
-implementation changes.
+The focused engineering test asserted that the candidate TOML resolved an empty
+ASR system prompt. The warning-clean build completed and all `74/74` registered
+tests passed in `52.74s`. Existing model numerical gates remained unchanged
+because no model weight, kernel, precision, feature extraction, encoder, or
+decoder implementation changed.
 
 The staged product review uses these direct contexts:
 
@@ -147,12 +148,68 @@ improvement does not outweigh a new name, number, negation, endpoint,
 hallucination, or speaker regression elsewhere. The candidate is removed if a
 staged control fails. No full run is authorized before T048 and T049 complete.
 
+## Focused Candidate Review
+
+The candidate was captured from exact clean commit `5accc5f` through the real
+WebSocket path at `1.0x` with 100ms frames. The source is the continuous
+`1536-1638s` portion of `test.mp3`, decoded without resampling drift to a
+102-second, 16kHz mono PCM WAV so the review includes the complete
+`ref-0223`-`ref-0231` conversation around both repeated legal terms.
+
+Mechanical evidence only:
+
+- artifact:
+  `artifacts/spec014/candidates/asr-empty-system-prompt/focused-legal-context/`;
+- WAV SHA-256:
+  `5c806e0e3dd6839cf9657804b639381f07abe8a4f3c5a5befee9d565d88f0cdc`;
+- run SHA-256:
+  `e8834d3a4374433e165b4dadd34899532518e07a09b2a7172421edd981ac6865`;
+- captured config SHA-256:
+  `ce989ea4887ba9375be0c6df8150f595669f1aa51d70f0a31fad858e91deaec8`;
+- `wall_clock_ok`, `timebase_ok`, and `timebase_reconciled` are true;
+- all seven pipeline extents equal the exact 1,632,000 input samples;
+- direct terminal return is 1.159 seconds after the final frame; and
+- required telemetry coverage and observer terminal identity pass their
+  mechanical contracts.
+
+The reviewer then read every final ASR and business-speaker entry against the
+complete human reference in chronological order and again from the terminal
+context back to the start. Both readings reach the same decision:
+
+- The first `一致行动的人` becomes `女性`; the second becomes `一个`. Removing
+  the prompt phrase removes the exact `语音识别` echo but does not recover either
+  legal statement.
+- `雷总也不说话了` becomes `伟哥也说话了`. The baseline already lost the
+  negation, but retained `雷总`; the candidate adds a material name regression.
+- The repeated `十五`/`十够了` option-pool discussion becomes repeated
+  `树多的`/`十度的`, whereas the frozen baseline retains enough of the repeated
+  `十` conclusion to follow that exchange. This is a second material regression
+  under the same decoder boundaries.
+- `灵启疆界`, `有限合伙人直接持`, and `放期权里` remain unusable as
+  `林启江界`, `有些货直接吃`, and `放弃权利`; the later unsupported
+  `让劳务...投钱` insertion also remains.
+- The later explanation that only work none of the four understand merits
+  equity, and the final wish for the holding to exceed the boss's, remain
+  contextually recoverable. These controls do not repair the failed critical
+  terms or offset the new regressions.
+
+The empty-system-prompt candidate therefore fails its own focused causal
+context and is rejected before silence or canonical 120-second gates. This
+result refines the diagnosis: the historical prompt can contaminate ambiguous
+decoding, but removing all system conditioning also destabilizes other
+ambiguous language and does not recover the business terms. Prompt conditioning
+is an active decoder factor, not a sufficient standalone root-cause repair.
+The checked-in TOML and its config-contract test are restored to the frozen
+pre-candidate prompt after this review. The restored tree is warning-clean and
+all `74/74` registered tests pass again in `52.79s`.
+
 ## Current Conclusion
 
 T045-T047 are complete. The current baseline's ASR meaning loss is already
 present at the decoder output, and the strongest directly traced instance is
 consistent with prompt contamination rather than VAD, forced alignment, or
-comprehensive-timeline rewriting. Candidate `asr-empty-system-prompt` is active
-as a one-variable experiment and ready for staged contextual review. No ASR,
-speaker, microphone, full-candidate, or industrial-closing gate advances from
-this diagnosis alone.
+comprehensive-timeline rewriting. The first one-variable correction proves that
+prompt conditioning changes ambiguous output, but it fails to restore the
+target meaning and introduces new material regressions. It is rejected and
+removed; no active final-ASR candidate remains. No ASR, speaker, microphone,
+full-candidate, or industrial-closing gate advances from this experiment.

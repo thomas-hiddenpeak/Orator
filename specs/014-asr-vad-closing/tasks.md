@@ -144,8 +144,11 @@ its named evidence exists. Mechanical checks never assign product correctness.
   numerical oracle before product review if any model-stage behavior changes.
   Candidate `asr-empty-system-prompt` changes only the checked-in TOML value.
   Its config-contract test passes, the warning-clean build completes, and all
-  `74/74` registered tests pass in `52.74 s`; staged product evidence remains
-  pending.
+  `74/74` registered tests pass in `52.74 s`. Complete forward/reverse review of
+  the clean 102-second focused legal context rejects it: neither repeated legal
+  term recovers, while a name and neighboring option-pool discussion regress.
+  The candidate is removed and the pre-candidate prompt restored before T048;
+  the restored tree is warning-clean and all `74/74` tests pass in `52.79 s`.
 - [ ] **T048** Pass warning-clean build, complete CTest, three independent
   silence reviews, and two independent 120-second real-WebSocket contextual
   reviews. Remove or archive the candidate if its controls fail.

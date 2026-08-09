@@ -397,6 +397,14 @@ Validation order is:
 No full candidate run is authorized by the diagnosis or focused excerpt. See
 `final-asr-prompt-causality-review-2026-08-09.md`.
 
+The clean `5accc5f` focused run rejects this candidate before step 3. Both
+repetitions of the legal term remain unusable, while a name and the neighboring
+option-pool discussion regress under otherwise identical decoder boundaries.
+The checked-in TOML is restored to the pre-candidate prompt and T048 does not
+start. The next hypothesis must account for the fact that system conditioning
+changes ambiguous decoding but neither the historical instruction nor an empty
+instruction reliably preserves domain terms.
+
 ## 15. Risks and Controls
 
 | Risk | Control |

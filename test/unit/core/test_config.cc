@@ -82,8 +82,10 @@ int main() {
           "checked-in v2.1 cache update period is 188");
     CHECK(checked_in.asr_vad_gate_chunk_ms == 100,
           "checked-in ASR VAD gate chunk is frozen at 100 ms");
-    CHECK(checked_in.asr_system_prompt.empty(),
-          "checked-in ASR uses the model-native empty system prompt");
+    CHECK(checked_in.asr_system_prompt ==
+              "你是一个专业的中文普通话语音识别系统，"
+              "请准确识别并转录所有语音内容。",
+          "checked-in ASR restores the pre-candidate system prompt control");
     const std::string removed_v2_path =
         std::string(ORATOR_TEST_SOURCE_DIR) +
         "/models/sortformer_4spk_v2.safetensors";
