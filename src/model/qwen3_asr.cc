@@ -16,7 +16,13 @@ namespace model {
 Qwen3Asr::Qwen3Asr() = default;
 
 void Qwen3Asr::Initialize(const core::AsrConfig& config) {
+  if (config.stream_window_mel_frames != kConvWindowMel &&
+      config.stream_window_mel_frames != kAttentionWindowMel) {
+    throw std::invalid_argument(
+        "Qwen3Asr: stream_window_mel_frames must be 100 or 800");
+  }
   cfg_ = config;
+  stream_window_mel_frames_ = config.stream_window_mel_frames;
   if (!config.language.empty()) language_ = config.language;
 }
 
@@ -208,7 +214,7 @@ std::string Qwen3Asr::TranscribeWindow(const float* samples, int num_samples,
 
 // ---- Incremental KV-cache streaming session (Spec 003) --------------------
 // StreamReset prefills the fixed system prefix (up to <audio_start>) ONCE and
-// records the checkpoint. StreamChunk encodes each completed 8 s window
+// records the checkpoint. StreamChunk encodes each completed configured window
 // standalone and appends its audio-token KV after the checkpoint (reusing the
 // persistent system + earlier-audio KV), then re-prefills the short suffix and
 // decodes. StreamFinalize flushes the residual tail.
@@ -260,7 +266,7 @@ std::string Qwen3Asr::StreamChunk(const float* pcm, int n,
   const int hop = 160;  // WhisperFeatureExtractor hop
   const int local_frames = static_cast<int>(seg_pcm_.size() / hop);
   const int avail_frames = seg_pcm_frame_offset_ + local_frames;
-  if (avail_frames - seg_encoded_frames_ < kStreamWindowMel) {
+  if (avail_frames - seg_encoded_frames_ < stream_window_mel_frames_) {
     return CurrentLiveText();
   }
 
@@ -282,21 +288,25 @@ std::string Qwen3Asr::StreamChunk(const float* pcm, int n,
   double encode_ms = 0.0;
   int windows = 0;
   while ((seg_pcm_frame_offset_ + n_frames) - seg_encoded_frames_ >=
-         kStreamWindowMel) {
+         stream_window_mel_frames_) {
     const int local_start = seg_encoded_frames_ - seg_pcm_frame_offset_;
-    if (local_start < 0 || local_start + kStreamWindowMel > n_frames) break;
-    // Slice this window's mel columns [local_start, +kStreamWindowMel) into a
-    // contiguous [128, kStreamWindowMel] for a standalone (chunk-local) encode.
-    std::vector<float> sub(static_cast<size_t>(F) * kStreamWindowMel);
+    if (local_start < 0 ||
+        local_start + stream_window_mel_frames_ > n_frames) {
+      break;
+    }
+    // Slice this window's mel columns into a contiguous tensor for one
+    // standalone chunk-local encode.
+    std::vector<float> sub(static_cast<size_t>(F) *
+                           stream_window_mel_frames_);
     for (int f = 0; f < F; ++f)
-      for (int t = 0; t < kStreamWindowMel; ++t)
-        sub[static_cast<size_t>(f) * kStreamWindowMel + t] =
+      for (int t = 0; t < stream_window_mel_frames_; ++t)
+        sub[static_cast<size_t>(f) * stream_window_mel_frames_ + t] =
             mel[static_cast<size_t>(f) * n_frames + (local_start + t)];
 
     const auto e0 = pnow();
     int toks = 0;
     std::vector<float> enc =
-        encoder_->Forward(sub.data(), kStreamWindowMel, &toks, stream);
+        encoder_->Forward(sub.data(), stream_window_mel_frames_, &toks, stream);
     if (toks <= 0) {
       break;
     }
@@ -309,7 +319,7 @@ std::string Qwen3Asr::StreamChunk(const float* pcm, int n,
           std::chrono::duration<double, std::milli>(pnow() - e0).count();
     stream_cache_ckpt_ += toks;
     stream_audio_tokens_ += toks;
-    seg_encoded_frames_ += kStreamWindowMel;
+    seg_encoded_frames_ += stream_window_mel_frames_;
     ++windows;
     changed = true;
   }
@@ -399,7 +409,7 @@ std::string Qwen3Asr::StreamDecodeStep(cudaStream_t stream) {
 std::string Qwen3Asr::StreamFinalize(cudaStream_t stream) {
   if (!stream_active_) return CurrentLiveText();
 
-  // Flush the residual (< 8 s) tail, if any: encode the remaining mel frames
+  // Flush the residual tail, if any: encode the remaining mel frames
   // (the last conv chunk is padded, as in the single-segment path) and append.
   const int hop = 160;
   const int local_frames = static_cast<int>(seg_pcm_.size() / hop);

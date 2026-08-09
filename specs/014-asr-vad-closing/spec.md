@@ -11,9 +11,10 @@
   encoder and decoder boundaries against the official implementation; the
   resulting TOML-owned full-context Final candidate passes its engineering gate
   but fails complete focused contextual review and is disabled; Phase 3D now
-  isolates the model's trained eight-second encoder window before authorizing
-  another product candidate; ASR semantic closing and full-candidate acceptance
-  remain open
+  exposes a typed TOML acoustic window, passes its engineering and exact
+  eight-second numerical gates under the restored 100-frame control, and awaits
+  the isolated 800-frame focused capture; ASR semantic closing and
+  full-candidate acceptance remain open
 - **Owner**: project owner
 - **Constitution**: v1.7.0
 - **Depends on**: Spec 003 (streaming ASR), Spec 004 (typed comprehensive

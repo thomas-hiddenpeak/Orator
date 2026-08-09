@@ -84,6 +84,8 @@ int main() {
           "checked-in ASR VAD gate chunk is frozen at 100 ms");
     CHECK(!checked_in.asr_final_full_context_decode,
           "checked-in ASR Final disables rejected full-context candidate");
+    CHECK(checked_in.asr_stream_window_mel_frames == 100,
+          "checked-in ASR encoder append window is the 100-frame control");
     CHECK(checked_in.asr_final_max_new_tokens == 384,
           "checked-in ASR Final has an independent token budget");
     CHECK(checked_in.asr_system_prompt ==
@@ -116,6 +118,7 @@ vad_min_overlap_sec = 0.25
 max_new_tokens = 64
 final_max_new_tokens = 320
 final_full_context_decode = true
+stream_window_mel_frames = 800
 max_audio_tokens = 2000
 segment_sec = 30.0
 language = "English"
@@ -255,6 +258,8 @@ ws_text_log_path = "/tmp/ws-frames.jsonl"
           "cfg.asr_final_max_new_tokens == 320");
     CHECK(cfg.asr_final_full_context_decode == true,
           "cfg.asr_final_full_context_decode == true");
+    CHECK(cfg.asr_stream_window_mel_frames == 800,
+          "cfg.asr_stream_window_mel_frames == 800");
     CHECK(cfg.asr_max_audio_tokens == 2000, "cfg.asr_max_audio_tokens == 2000");
     CHECK(cfg.asr_segment_sec == 30.0, "cfg.asr_segment_sec == 30.0");
     CHECK(cfg.asr_language == "English", "cfg.asr_language == English");
@@ -418,6 +423,9 @@ ws_text_log_path = "/tmp/ws-frames.jsonl"
     CHECK(resolved.find("\"final_full_context_decode\":true") !=
               std::string::npos,
           "resolved config contains ASR full-context Final switch");
+    CHECK(resolved.find("\"stream_window_mel_frames\":800") !=
+              std::string::npos,
+          "resolved config contains ASR encoder append window");
     CHECK(resolved.find("\"vad_gate_chunk_ms\":80") != std::string::npos,
           "resolved config contains deterministic ASR gate chunk");
     CHECK(resolved.find("\"ws_text_log_path\":\"/tmp/ws-frames.jsonl\"") !=
@@ -441,6 +449,19 @@ ws_text_log_path = "/tmp/ws-frames.jsonl"
               std::string::npos,
           "resolved config contains candidate confirmation count");
 
+    std::remove(path.c_str());
+  }
+
+  // ── ASR encoder append window is restricted to evidenced values ─────
+  std::printf("\n-- ASR encoder append window --\n");
+  {
+    std::string path = WriteTemp(R"(
+[asr]
+stream_window_mel_frames = 200
+)");
+    pipeline::AuditoryStream::Config cfg;
+    CHECK(!io::ApplyTomlConfig(path, cfg),
+          "unsupported ASR encoder append window is rejected");
     std::remove(path.c_str());
   }
 

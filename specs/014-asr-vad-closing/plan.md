@@ -459,7 +459,7 @@ is retained only as inactive evidence and no silence or duration ladder is
 authorized.
 
 Phase 3D isolates the demonstrated boundary before adding another compound
-design. The runtime will expose the acoustic append window through typed TOML,
+design. The runtime exposes the acoustic append window through typed TOML,
 with 100 mel frames as the restored control and the model-defined 800 mel frames
 as the only candidate value. Everything else, including decoder rollback and
 Final behavior, remains fixed. The same 102-second context is sufficient for

@@ -93,6 +93,7 @@ struct AsrConfig {
   int eos_ban_steps = 3;
   int decode_batch = 4;
   int final_max_new_tokens = 384;
+  int stream_window_mel_frames = 100;
   bool profile = false;
   bool encoder_windowed_attention = false;
   bool cuda_graph_enabled = true;

@@ -244,3 +244,25 @@ The next causal control changes only the acoustic append window from the current
 numerical locality control. It keeps the accepted streaming decoder and Final
 policy. The same complete context will be reviewed before considering a
 low-latency Live plus trained-window Final replay design.
+
+## Phase 3D Engineering Control
+
+The append unit is now a typed `[asr].stream_window_mel_frames` value carried in
+the resolved configuration and into `Qwen3Asr`. The parser and model both reject
+values other than the evidenced 100-frame control and 800-frame trained window.
+The checked-in TOML remains at 100 for this engineering commit; no product
+candidate output is produced from the parameterization work.
+
+Focused configuration and model tests pass. The complete build contains no
+`warning:` or `error:` diagnostic, and all `75/75` registered tests pass in
+`52.85` seconds. Build-log SHA-256:
+`fb033fb6e8ee66b477ed8d00fd8aa4ab40e344b653f49ade800fcbdce51f6d18`.
+CTest-log SHA-256:
+`7787994efbe8442cd4691803b720d15f1320fe8ca2011b500b9571ea785f771c`.
+
+The 16-second 800-frame encoder probe is repeated after parameterization. Both
+complete 104-token windows remain exactly equal to their full windowed-encoder
+slices, with maximum absolute difference `0.000e+00`. The raw log SHA-256 is
+again `b420acc57d1679e70844d0af3a215587d5f35248cc616c25dfbbd51306aa9784`,
+identical to the prior control. This remains numerical implementation evidence,
+not transcript evaluation. T067 is the first authorized product-output step.

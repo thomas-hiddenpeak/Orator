@@ -80,6 +80,17 @@ bool ApplyTomlConfig(const std::string& path,
     if (auto v = sec->get("final_full_context_decode")) {
       if (auto b = v->value<bool>()) cfg.asr_final_full_context_decode = *b;
     }
+    if (auto v = sec->get("stream_window_mel_frames")) {
+      if (auto n = v->value<int>()) {
+        if (*n != 100 && *n != 800) {
+          std::cerr << "[config] [asr].stream_window_mel_frames must be 100 "
+                       "or 800 in "
+                    << path << std::endl;
+          return false;
+        }
+        cfg.asr_stream_window_mel_frames = *n;
+      }
+    }
     if (auto v = sec->get("max_audio_tokens")) {
       if (auto n = v->value<int>()) cfg.asr_max_audio_tokens = *n;
     }

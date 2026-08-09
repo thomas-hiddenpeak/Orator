@@ -192,6 +192,7 @@ int main(int argc, char** argv) {
             << "\n"
             << "  vad:      " << cfg.vad_model << "\n"
             << "  asr_cfg:  max_new=" << cfg.asr_max_new_tokens
+            << " stream_window_mel=" << cfg.asr_stream_window_mel_frames
             << " segment=" << cfg.asr_segment_sec
             << "s lang=" << cfg.asr_language << std::endl;
   std::cout << "  send binary PCM (int16le mono 16k); text {\"flush\"} or "

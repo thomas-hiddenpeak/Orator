@@ -91,6 +91,25 @@ static void TestInitializeDefault() {
   ASSERT_NO_THROW(asr.Initialize(AsrConfig{}));
 }
 
+static void TestStreamWindowValidation() {
+  TEST("TestStreamWindowValidation: only evidenced windows are accepted");
+  Qwen3Asr asr;
+  AsrConfig cfg;
+
+  cfg.stream_window_mel_frames = 100;
+  ASSERT_NO_THROW(asr.Initialize(cfg));
+  ASSERT_TRUE(asr.stream_window_mel_frames() == 100);
+
+  cfg.stream_window_mel_frames = 800;
+  ASSERT_NO_THROW(asr.Initialize(cfg));
+  ASSERT_TRUE(asr.stream_window_mel_frames() == 800);
+
+  cfg.stream_window_mel_frames = 200;
+  ASSERT_THROWS(asr.Initialize(cfg));
+  cfg.stream_window_mel_frames = 0;
+  ASSERT_THROWS(asr.Initialize(cfg));
+}
+
 static void TestSetMaxNewTokens() {
   TEST("TestSetMaxNewTokens: set_max_new_tokens does not throw");
   Qwen3Asr asr;
@@ -180,6 +199,7 @@ int main() {
   TestName();
   TestInitialize();
   TestInitializeDefault();
+  TestStreamWindowValidation();
   TestSetMaxNewTokens();
   TestSetLanguage();
   TestLoadWeightsNonexistent();

@@ -201,15 +201,21 @@ its named evidence exists. Mechanical checks never assign product correctness.
 
 ### Phase 3D: Trained-Window Causal Control
 
-- [ ] **T065** Restore the accepted streaming Final as the exact control and
+- [x] **T065** Restore the accepted streaming Final as the exact control and
   expose one TOML-owned acoustic append window without changing Live publication
   code, VAD, prompt, decoder rollback, alignment, Sortformer v2.1, FR50 fusion,
   or the common time base. The candidate value is the model-defined 800 mel
-  frames (eight seconds); the current 100-frame value is the control.
-- [ ] **T066** Prove mechanically that the configured 800-frame path uses the
+  frames (eight seconds); the current 100-frame value is the control. Typed
+  `[asr].stream_window_mel_frames` now flows through TOML, the resolved snapshot,
+  `AuditoryStream::Config`, and `AsrConfig`; both parser and Qwen reject every
+  value except the evidenced 100/800 pair. The checked-in value remains 100.
+- [x] **T066** Prove mechanically that the configured 800-frame path uses the
   already accepted complete-window numerical contract, then pass focused tests,
   warning-clean build, and complete CTest. Neither tensors nor tests may assign
-  transcript correctness.
+  transcript correctness. Config/model tests prove 800-frame propagation and
+  validation. The repeated 16-second numerical probe again gives exact equality
+  for both 800-frame slices and reproduces SHA-256 `b420acc5...9784`; the build
+  has no warning/error diagnostic and all `75/75` tests pass in `52.85` seconds.
 - [ ] **T067** Capture the same complete 102-second real-WebSocket context under
   the isolated 800-frame candidate and read every Live and Final state in
   chronological and reverse conversational context against `test.txt`. Reject
