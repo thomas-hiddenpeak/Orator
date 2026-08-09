@@ -1,13 +1,16 @@
 # Spec 006 — Web UI Client for Real-Time Dual-Pipeline Transcription
 
-- **Status**: In progress (updated 2026-07-13). The modular ES client, complete
+- **Status**: In progress (updated 2026-08-09). The modular ES client, complete
   typed-event routing, live observability, stable-ID convergence, session
   persistence/load, exact export, reconnect reset, and file/microphone input
   paths are implemented. A real Chromium + real WebSocket 12 s run passed file
   upload, live rows, terminal reconciliation, export, reload, restart/reconnect,
-  responsive screenshots, and fake-device microphone capture. The requested
-  graphical multi-track timeline/zoom controls, physical microphone evidence,
-  and non-Chromium compatibility evidence remain open. See §4b and §4c.
+  responsive screenshots, and fake-device microphone capture. A later
+  real-Chromium physical-endpoint room-tone session also passes its bounded
+  contextual review, but the host cannot currently deliver sustained speech to
+  its only board analog capture source. The requested graphical multi-track
+  timeline/zoom controls and voiced physical-microphone evidence remain open;
+  Firefox and Safari/WebKit are unavailable on this target. See §4b and §4c.
 - **Created**: 2026-06-18
 - **Owner**: project owner
 

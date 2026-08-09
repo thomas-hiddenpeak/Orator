@@ -194,5 +194,9 @@ residuals remain, while no browser-only omission, duplication, stale partial,
 endpoint cut, or speaker-policy change appears. This contextual conclusion is
 manual and not produced by the pacing measurements.
 
-T040 and T041 are complete. Physical microphone and non-Chromium evidence remain
-open; no ASR, endpoint, or speaker accuracy promotion follows.
+T040 and T041 are complete. At this checkpoint, physical microphone and non-
+Chromium availability were open. The later
+`physical-microphone-review-2026-08-09.md` records one bounded physical-endpoint
+room-tone review, the ineffective voiced capture path, and unavailable Firefox
+and Safari/WebKit environments. Active-speech microphone evidence remains open;
+no ASR, endpoint, or speaker accuracy promotion follows.

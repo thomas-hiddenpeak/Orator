@@ -122,6 +122,29 @@ its named evidence exists. Mechanical checks never assign product correctness.
   another hypothesis. After three failed implementations, restore the accepted
   baseline and revise the root-cause analysis.
 
+### Phase 3B: Final ASR Meaning
+
+- [ ] **T045** Freeze the accepted Live-publication correction as the control and
+  re-read the immutable full-baseline critical contexts with their complete
+  ASR, VAD, forced-alignment, and final speaker evidence. Select one causal
+  defect class by direct contextual review; no script, metric, or query may
+  label, rank, or select the work.
+- [ ] **T046** Trace the selected defect through admitted PCM, typed VAD
+  frontiers, decoder-session boundaries, final ASR records, alignment units,
+  and comprehensive revisions on the common sample clock. Distinguish endpoint
+  ownership from decoder semantic loss before changing behavior.
+- [ ] **T047** Specify one reference-free correction and explicit abstention and
+  control contexts. Keep every tunable value in `orator.toml`, preserve the
+  frozen Sortformer v2.1/FR50 behavior, and add focused tests. Run the trusted
+  numerical oracle before product review if any model-stage behavior changes.
+- [ ] **T048** Pass warning-clean build, complete CTest, three independent
+  silence reviews, and two independent 120-second real-WebSocket contextual
+  reviews. Remove or archive the candidate if its controls fail.
+- [ ] **T049** Only after T048 passes, run 360-second and 600-second real-
+  WebSocket gates with complete chronological and reverse contextual review of
+  ASR meaning, endpoint behavior, and final speaker ownership. Do not authorize
+  a full run or Phase 5 from mechanical evidence.
+
 ## Phase 4: Web UI and Physical Microphone
 
 - [x] **T040** Validate file-input Live partial/retract/final replacement,
@@ -151,12 +174,26 @@ its named evidence exists. Mechanical checks never assign product correctness.
   `browser-persistence-review-2026-08-09.md`.
 - [ ] **T042** Run physical-microphone sessions covering silence, room tone,
   short speech, continuous speech, pauses, interruption, overlap, and ordinary
-  background noise.
+  background noise. The available Jetson APE analog source has completed direct
+  capture probes and one real-Chromium 30-second room-tone session at clean
+  documentation commit `d2ac5d1`. No USB source is present, and controlled
+  playback does not reach the capture endpoint as sustained speech. Short
+  speech, continuous speech, pauses, interruption, overlap, and voiced
+  background-noise cases therefore remain open; fake-device evidence cannot
+  complete this task.
 - [ ] **T043** Complete contextual review of microphone ASR, VAD endpoint,
   hallucination, speaker, and Live/Final behavior; record hardware/browser
-  provenance.
-- [ ] **T044** Record Firefox and Safari/WebKit behavior when available; document
-  an explicit environment limitation when unavailable.
+  provenance. All 89 room-tone WebSocket log lines and the terminal/browser
+  state were read chronologically and in reverse. The reviewer finds no
+  substantive speech assertion in the no-deliberate-speech context, but no
+  spoken reference exists and active-speech endpoint/ASR/speaker behavior is
+  not evaluated. See `physical-microphone-review-2026-08-09.md`.
+- [x] **T044** Record Firefox and Safari/WebKit behavior when available; document
+  an explicit environment limitation when unavailable. Chromium 148 is the only
+  executable browser available. Ubuntu's Firefox command is an uninstalled-snap
+  launcher, Playwright has no Firefox/WebKit bundle, the installed WebKitGTK
+  library has no browser or driver, and Safari is unavailable on Linux. No
+  unsupported compatibility result is claimed.
 
 ## Phase 5: Full Candidate Acceptance
 

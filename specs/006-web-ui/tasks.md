@@ -413,11 +413,14 @@ validate through the real `rate=1` WS path.
   surface raw RPC errors, and restore reconnect scheduling after WS errors.
 - [x] **W13** Add and register dependency-free JavaScript contract tests.
 - [~] **W14** Real Chromium passed real WebSocket file audio, reconnect, exact
-  session load/export, and fake-device microphone capture. Physical microphone
-  input and non-Chromium browsers remain acceptance work. Spec 014's 2026-08-09
+  session load/export, and fake-device microphone capture. Spec 014's 2026-08-09
   repetition found and corrected a same-second empty-reset overwrite; focused
   and full tests plus one corrected Chromium run pass, with the clean-commit
   repeat tracked by Spec 014 T040. The first clean 120-second repeat then found
   relative-timer pacing drift; the absolute-deadline candidate passes its Web
   contract, full CTest, and exact clean 120-second Chromium repeat. T040/T041
-  are complete; physical microphone and non-Chromium work keep W14 open.
+  are complete. A real physical-endpoint room-tone capture then reaches terminal
+  state without a speech assertion or browser error, but direct and controlled-
+  playback probes show no effective voiced capture path. Firefox and WebKit are
+  unavailable on this target. Voiced physical-microphone validation keeps W14
+  open; see Spec 014's `physical-microphone-review-2026-08-09.md`.

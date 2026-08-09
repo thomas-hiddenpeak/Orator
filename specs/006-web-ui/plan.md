@@ -477,3 +477,11 @@ clean commit `d09b13b` passes the exact 120-second browser repeat. Independent
 timing separates source completion from the intentional automatic Flush and
 terminal End; the direct-end-only `wall_clock_ok` field is not used to reject
 this different interactive control sequence.
+
+The follow-up real-Chromium room-tone session uses the actual Jetson APE analog
+source without fake-device flags and reaches coherent terminal state without a
+browser error or speech assertion. Direct and controlled-playback captures do
+not establish an effective voiced input path, so physical speech remains open.
+Firefox is only an unusable snap launcher on this host, and no WebKit browser or
+driver is installed; Safari is unavailable on Linux. Spec 014 records this
+environment boundary without claiming non-Chromium behavior.

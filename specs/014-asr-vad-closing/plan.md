@@ -302,6 +302,30 @@ the user sends End, so that combined field is retained as evidence but cannot
 judge browser source pacing. Browser mechanics remain distinct from product
 accuracy.
 
+### 11.3 Physical-input availability boundary
+
+Physical-microphone acceptance requires proof that voiced acoustic input reaches
+the browser capture source. Device enumeration alone is insufficient. Before a
+speech scenario is reviewed, retain the source identity and a direct capture,
+inspect the captured waveform, and use a known voiced source to establish that
+the environment can deliver sustained speech into that source.
+
+If the host exposes a source but cannot deliver a working acoustic signal:
+
+1. retain the probes and one real-browser room-tone session as bounded evidence;
+2. complete contextual review of every emitted event and terminal state;
+3. leave active-speech microphone tasks open and state the hardware limitation;
+4. record Firefox and Safari/WebKit availability without installing an
+   unrelated browser stack or substituting a fake microphone;
+5. do not start Phase 5 full-candidate acceptance; and
+6. return to the next already-proven ASR semantic defect class using the frozen
+   full baseline and the staged silence/120/360/600 gates.
+
+When functional capture hardware becomes available, resume short speech,
+continuous speech, pause, interruption, overlap, and ordinary background-noise
+sessions before candidate freeze. This availability boundary does not waive
+FR10 and does not authorize a model, endpoint, VAD, or speaker parameter change.
+
 ## 12. Final Acceptance and Handoff
 
 When full A/B pass:
@@ -349,6 +373,7 @@ without using that mechanical observation to judge transcript correctness.
 | Script-derived accuracy enters the process | Tools are limited to capture, hashes, schema checks, and unjudged evidence display |
 | Repeated full runs consume time without a supported hypothesis | Full run only after silence, 120, 360, and 600 gates pass |
 | UI appears correct while terminal state differs | Compare event, typed, terminal, persisted, exported, and rendered states by stable `text_id` |
+| Enumerated audio source has no working transducer | Preserve direct and controlled-playback probes, leave voiced microphone gates open, and never substitute fake-device evidence |
 | Temporary artifacts disappear | Store raw evidence under persistent gitignored project artifacts, cite hashes in committed reports |
 
 ## 15. Constitution Check

@@ -3,8 +3,10 @@
 - **Feature**: `014-asr-vad-closing`
 - **Status**: Phase 1 and Phase 2 complete; bounded Live publication candidate
   passes engineering, three-run silence, repeated 120-second, 360-second, and
-  600-second gates; Phase 4 Chromium file input, Live/Final, persistence,
-  export, reconnect, and desktop/mobile gates pass; physical microphone next
+  600-second gates; Phase 4 Chromium file input and physical-endpoint room tone
+  pass their bounded reviews, but active physical-microphone scenarios remain
+  blocked by unavailable effective capture hardware; ASR semantic closing and
+  full-candidate acceptance remain open
 - **Owner**: project owner
 - **Constitution**: v1.7.0
 - **Depends on**: Spec 003 (streaming ASR), Spec 004 (typed comprehensive
@@ -72,6 +74,22 @@ The following facts define the start of this work:
    The same review preserves the conditional FR50 speaker boundary and finds
    unchanged Live partials repeatedly published over WebSocket. See
    `full-baseline-context-review-2026-08-09.md`.
+9. Clean commit `d09b13b` passes the complete 120-second real-Chromium file
+   flow, including Live/Final convergence, persistence, reload, export,
+   reconnect, and desktop/mobile review. The complete forward/reverse context
+   reading finds no browser-only semantic or speaker change. See
+   `browser-persistence-review-2026-08-09.md`.
+10. Clean documentation commit `d2ac5d1` completes one real-Chromium
+    physical-endpoint room-tone session. Complete chronological and reverse
+    event review finds no substantive speech assertion in the no-deliberate-
+    speech context. The host exposes only the Jetson APE board analog source;
+    direct and playback/capture probes do not establish a working microphone
+    signal, so active-speech microphone requirements remain open. See
+    `physical-microphone-review-2026-08-09.md`.
+11. Firefox is an unusable snap launcher on this host, no Firefox snap or
+    Playwright Firefox exists, and no WebKit browser/driver is installed.
+    Safari is unavailable on Linux. This records the target-environment limit;
+    it is not a cross-browser behavior result.
 
 ## 3. Objective and Claim Boundary
 
