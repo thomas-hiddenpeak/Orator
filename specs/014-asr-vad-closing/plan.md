@@ -492,6 +492,41 @@ stream. A later candidate must address decoder continuation and short-tail
 handling as explicit model contracts. It may not select between alternative
 transcripts by code or infer correctness from tensor parity.
 
+## 15.5 Phase 3E: Official Accumulated Streaming
+
+The pinned official implementation does not freeze either 100-frame or
+800-frame encoder output. It buffers arbitrary incoming PCM, consumes one
+two-second chunk at a time, appends that chunk to `audio_accum`, and re-feeds all
+accumulated segment audio to the model. The first two decode steps use an empty
+text prefix. Later steps tokenize the previous raw decode, remove five tokens
+with invalid-character protection, and ask the model only for the continuation.
+Finalization appends and decodes the unpadded residual tail. The official
+streaming example uses a 32-token generation limit because continuation happens
+every two seconds.
+
+The native implementation will add a typed ASR streaming mode with two values:
+the existing `kv_append` control and `accumulated_redecode`. Associated TOML
+fields own chunk duration and rollback counts. In accumulated mode, `Qwen3Asr`
+retains only the current VAD-bounded segment PCM, tracks the amount admitted to
+complete official chunks, and invokes the existing full mel/encoder/decoder
+primitive on each growing prefix. The previously decoded text supplies only the
+rolled-back prefix; no transcript comparison or selection occurs.
+
+The existing 24-second segment cap bounds PCM, mel, encoder, decoder, and total
+recompute cost. `stream_audio_tokens()` reports the current accumulated acoustic
+extent so the existing cache-safety guard remains conservative. The mode reuses
+the same model instance and CUDA stream; it adds no runtime dependency or
+cross-pipeline communication.
+
+Implementation proceeds in two clean commits. The first adds typed mode/state
+configuration, source-contract validation, focused tests, and complete build/
+CTest evidence while keeping `kv_append` checked in. The second changes only
+TOML to `accumulated_redecode`, repeats engineering gates, and becomes the clean
+source for one exact 102-second real-WebSocket capture. Complete chronological,
+reverse, Live, Final, and comprehensive-view review decides whether the mode can
+return to T048. Performance below the real-time gate or any new critical meaning
+restores `kv_append` immediately.
+
 ## 16. Risks and Controls
 
 | Risk | Control |

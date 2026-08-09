@@ -110,6 +110,38 @@ static void TestStreamWindowValidation() {
   ASSERT_THROWS(asr.Initialize(cfg));
 }
 
+static void TestStreamModeValidation() {
+  TEST("TestStreamModeValidation: official accumulated state is typed");
+  Qwen3Asr asr;
+  AsrConfig cfg;
+
+  cfg.stream_mode = "kv_append";
+  ASSERT_NO_THROW(asr.Initialize(cfg));
+  ASSERT_EQ(asr.stream_mode(), "kv_append");
+  ASSERT_TRUE(asr.stream_chunk_ms() == 2000);
+  ASSERT_TRUE(asr.stream_unfixed_chunks() == 2);
+  ASSERT_TRUE(asr.stream_unfixed_tokens() == 5);
+
+  cfg.stream_mode = "accumulated_redecode";
+  cfg.stream_chunk_ms = 1500;
+  cfg.stream_unfixed_chunks = 3;
+  cfg.stream_unfixed_tokens = 7;
+  ASSERT_NO_THROW(asr.Initialize(cfg));
+  ASSERT_EQ(asr.stream_mode(), "accumulated_redecode");
+  ASSERT_TRUE(asr.stream_chunk_ms() == 1500);
+  ASSERT_TRUE(asr.stream_unfixed_chunks() == 3);
+  ASSERT_TRUE(asr.stream_unfixed_tokens() == 7);
+
+  cfg.stream_mode = "candidate_selector";
+  ASSERT_THROWS(asr.Initialize(cfg));
+  cfg.stream_mode = "accumulated_redecode";
+  cfg.stream_chunk_ms = 0;
+  ASSERT_THROWS(asr.Initialize(cfg));
+  cfg.stream_chunk_ms = 2000;
+  cfg.stream_unfixed_chunks = -1;
+  ASSERT_THROWS(asr.Initialize(cfg));
+}
+
 static void TestSetMaxNewTokens() {
   TEST("TestSetMaxNewTokens: set_max_new_tokens does not throw");
   Qwen3Asr asr;
@@ -200,6 +232,7 @@ int main() {
   TestInitialize();
   TestInitializeDefault();
   TestStreamWindowValidation();
+  TestStreamModeValidation();
   TestSetMaxNewTokens();
   TestSetLanguage();
   TestLoadWeightsNonexistent();

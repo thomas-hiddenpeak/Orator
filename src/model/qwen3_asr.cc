@@ -16,12 +16,36 @@ namespace model {
 Qwen3Asr::Qwen3Asr() = default;
 
 void Qwen3Asr::Initialize(const core::AsrConfig& config) {
+  if (config.stream_mode != "kv_append" &&
+      config.stream_mode != "accumulated_redecode") {
+    throw std::invalid_argument(
+        "Qwen3Asr: stream_mode must be kv_append or accumulated_redecode");
+  }
+  if (config.sample_rate <= 0 || config.stream_chunk_ms <= 0 ||
+      config.stream_chunk_ms > 8000 || config.stream_chunk_ms % 100 != 0 ||
+      (static_cast<long long>(config.sample_rate) * config.stream_chunk_ms) %
+              1000 !=
+          0) {
+    throw std::invalid_argument(
+        "Qwen3Asr: stream_chunk_ms must form an exact positive sample count");
+  }
+  if (config.stream_unfixed_chunks < 0 || config.stream_unfixed_chunks > 64 ||
+      config.stream_unfixed_tokens < 0 || config.stream_unfixed_tokens > 128) {
+    throw std::invalid_argument("Qwen3Asr: invalid stream rollback values");
+  }
   if (config.stream_window_mel_frames != kConvWindowMel &&
       config.stream_window_mel_frames != kAttentionWindowMel) {
     throw std::invalid_argument(
         "Qwen3Asr: stream_window_mel_frames must be 100 or 800");
   }
   cfg_ = config;
+  stream_mode_ = config.stream_mode;
+  stream_chunk_ms_ = config.stream_chunk_ms;
+  stream_chunk_samples_ =
+      static_cast<int>(static_cast<long long>(config.sample_rate) *
+                       config.stream_chunk_ms / 1000);
+  stream_unfixed_chunks_ = config.stream_unfixed_chunks;
+  stream_unfixed_tokens_ = config.stream_unfixed_tokens;
   stream_window_mel_frames_ = config.stream_window_mel_frames;
   if (!config.language.empty()) language_ = config.language;
 }
@@ -54,6 +78,7 @@ void Qwen3Asr::Reset() {
   stream_cache_ckpt_ = 0;
   stream_audio_tokens_ = 0;
   stream_chunk_id_ = 0;
+  stream_processed_samples_ = 0;
   stream_raw_decoded_.clear();
   stream_active_ = false;
 }
@@ -212,12 +237,9 @@ std::string Qwen3Asr::TranscribeWindow(const float* samples, int num_samples,
   return BuildAndRun(enc, n_tokens, prefix_text, max_new_tokens_, stream);
 }
 
-// ---- Incremental KV-cache streaming session (Spec 003) --------------------
-// StreamReset prefills the fixed system prefix (up to <audio_start>) ONCE and
-// records the checkpoint. StreamChunk encodes each completed configured window
-// standalone and appends its audio-token KV after the checkpoint (reusing the
-// persistent system + earlier-audio KV), then re-prefills the short suffix and
-// decodes. StreamFinalize flushes the residual tail.
+// ---- Streaming session (Spec 003 / Spec 014) -------------------------------
+// The control path retains the incremental KV append implementation. The
+// accumulated-redecode path follows the official growing-audio state machine.
 
 void Qwen3Asr::StreamReset(long base_sample) {
   if (!loaded_) throw std::runtime_error("Qwen3Asr: weights not loaded");
@@ -229,7 +251,14 @@ void Qwen3Asr::StreamReset(long base_sample) {
   seg_logmel_max_ = -1e30f;
   stream_audio_tokens_ = 0;
   stream_chunk_id_ = 0;
+  stream_processed_samples_ = 0;
   stream_raw_decoded_.clear();
+
+  if (stream_mode_ == "accumulated_redecode") {
+    stream_cache_ckpt_ = 0;
+    stream_active_ = true;
+    return;
+  }
 
   // Fixed system prefix up to and including <audio_start>. Matches BuildAndRun.
   const std::string& sys_prompt = cfg_.system_prompt;
@@ -253,6 +282,9 @@ std::string Qwen3Asr::StreamChunk(const float* pcm, int n,
                                   cudaStream_t stream) {
   if (!loaded_) throw std::runtime_error("Qwen3Asr: weights not loaded");
   if (!stream_active_) StreamReset(0);
+  if (stream_mode_ == "accumulated_redecode") {
+    return AccumulatedStreamChunk(pcm, n, stream);
+  }
   if (pcm != nullptr && n > 0) seg_pcm_.insert(seg_pcm_.end(), pcm, pcm + n);
 
   const bool prof = cfg_.profile;
@@ -290,14 +322,12 @@ std::string Qwen3Asr::StreamChunk(const float* pcm, int n,
   while ((seg_pcm_frame_offset_ + n_frames) - seg_encoded_frames_ >=
          stream_window_mel_frames_) {
     const int local_start = seg_encoded_frames_ - seg_pcm_frame_offset_;
-    if (local_start < 0 ||
-        local_start + stream_window_mel_frames_ > n_frames) {
+    if (local_start < 0 || local_start + stream_window_mel_frames_ > n_frames) {
       break;
     }
     // Slice this window's mel columns into a contiguous tensor for one
     // standalone chunk-local encode.
-    std::vector<float> sub(static_cast<size_t>(F) *
-                           stream_window_mel_frames_);
+    std::vector<float> sub(static_cast<size_t>(F) * stream_window_mel_frames_);
     for (int f = 0; f < F; ++f)
       for (int t = 0; t < stream_window_mel_frames_; ++t)
         sub[static_cast<size_t>(f) * stream_window_mel_frames_ + t] =
@@ -348,6 +378,65 @@ std::string Qwen3Asr::StreamChunk(const float* pcm, int n,
              ms(ps0, ps_mel), encode_ms, ms(pd0, pnow()), windows);
   }
   return decoded;
+}
+
+std::string Qwen3Asr::AccumulatedStreamChunk(const float* pcm, int n,
+                                             cudaStream_t stream) {
+  if (pcm != nullptr && n > 0) seg_pcm_.insert(seg_pcm_.end(), pcm, pcm + n);
+
+  std::string text = CurrentLiveText();
+  while (static_cast<int>(seg_pcm_.size()) - stream_processed_samples_ >=
+         stream_chunk_samples_) {
+    text = DecodeAccumulated(stream_processed_samples_ + stream_chunk_samples_,
+                             /*final_tail=*/false, stream);
+  }
+  return text;
+}
+
+std::string Qwen3Asr::AccumulatedPrefix(bool final_tail) const {
+  if (stream_chunk_id_ < stream_unfixed_chunks_ ||
+      stream_raw_decoded_.empty()) {
+    return "";
+  }
+
+  const std::vector<int> current = tokenizer_.Encode(stream_raw_decoded_);
+  if (current.empty()) return "";
+
+  if (final_tail) {
+    const int end = std::min(
+        static_cast<int>(current.size()),
+        std::max(1, static_cast<int>(current.size()) - stream_unfixed_tokens_));
+    return tokenizer_.Decode(
+        std::vector<int>(current.begin(), current.begin() + end),
+        /*skip_special=*/true);
+  }
+
+  int rollback = stream_unfixed_tokens_;
+  while (true) {
+    const int end = std::max(0, static_cast<int>(current.size()) - rollback);
+    if (end <= 0) return "";
+    std::string prefix = tokenizer_.Decode(
+        std::vector<int>(current.begin(), current.begin() + end),
+        /*skip_special=*/true);
+    if (prefix.find("\xEF\xBF\xBD") == std::string::npos) return prefix;
+    ++rollback;
+  }
+}
+
+std::string Qwen3Asr::DecodeAccumulated(int num_samples, bool final_tail,
+                                        cudaStream_t stream) {
+  const std::string prefix = AccumulatedPrefix(final_tail);
+  const std::string continuation =
+      TranscribeWindow(seg_pcm_.data(), num_samples, prefix, stream);
+  stream_raw_decoded_ = prefix + continuation;
+  stream_processed_samples_ = num_samples;
+
+  constexpr int kMelHopSamples = 160;
+  const int mel_frames = num_samples / kMelHopSamples;
+  stream_audio_tokens_ =
+      mel_frames > 0 ? AsrAudioTower::OutputLength(mel_frames) : 0;
+  ++stream_chunk_id_;
+  return CurrentLiveText();
 }
 
 std::string Qwen3Asr::StreamDecodeStep(cudaStream_t stream) {
@@ -408,6 +497,9 @@ std::string Qwen3Asr::StreamDecodeStep(cudaStream_t stream) {
 
 std::string Qwen3Asr::StreamFinalize(cudaStream_t stream) {
   if (!stream_active_) return CurrentLiveText();
+  if (stream_mode_ == "accumulated_redecode") {
+    return AccumulatedStreamFinalize(stream);
+  }
 
   // Flush the residual tail, if any: encode the remaining mel frames
   // (the last conv chunk is padded, as in the single-segment path) and append.
@@ -450,6 +542,18 @@ std::string Qwen3Asr::StreamFinalize(cudaStream_t stream) {
   if (appended) {
     text = StreamDecodeStep(stream);
   } else if (stream_audio_tokens_ > 0) {
+    text = CurrentLiveText();
+  }
+  stream_active_ = false;
+  return text;
+}
+
+std::string Qwen3Asr::AccumulatedStreamFinalize(cudaStream_t stream) {
+  std::string text;
+  if (static_cast<int>(seg_pcm_.size()) > stream_processed_samples_) {
+    text = DecodeAccumulated(static_cast<int>(seg_pcm_.size()),
+                             /*final_tail=*/true, stream);
+  } else if (stream_processed_samples_ > 0) {
     text = CurrentLiveText();
   }
   stream_active_ = false;

@@ -88,6 +88,10 @@ std::string SerializeResolvedConfig(const AuditoryStream::Config& c) {
   asr.Add("max_new_tokens", c.asr_max_new_tokens);
   asr.Add("final_max_new_tokens", c.asr_final_max_new_tokens);
   asr.Add("final_full_context_decode", c.asr_final_full_context_decode);
+  asr.Add("stream_mode", c.asr_stream_mode);
+  asr.Add("stream_chunk_ms", c.asr_stream_chunk_ms);
+  asr.Add("stream_unfixed_chunks", c.asr_stream_unfixed_chunks);
+  asr.Add("stream_unfixed_tokens", c.asr_stream_unfixed_tokens);
   asr.Add("stream_window_mel_frames", c.asr_stream_window_mel_frames);
   asr.Add("segment_sec", c.asr_segment_sec);
   asr.Add("language", c.asr_language);

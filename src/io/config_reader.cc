@@ -80,6 +80,50 @@ bool ApplyTomlConfig(const std::string& path,
     if (auto v = sec->get("final_full_context_decode")) {
       if (auto b = v->value<bool>()) cfg.asr_final_full_context_decode = *b;
     }
+    if (auto v = sec->get("stream_mode")) {
+      if (auto s = v->value<std::string>()) {
+        if (*s != "kv_append" && *s != "accumulated_redecode") {
+          std::cerr << "[config] [asr].stream_mode must be kv_append or "
+                       "accumulated_redecode in "
+                    << path << std::endl;
+          return false;
+        }
+        cfg.asr_stream_mode = *s;
+      }
+    }
+    if (auto v = sec->get("stream_chunk_ms")) {
+      if (auto n = v->value<int>()) {
+        if (*n <= 0 || *n > 8000 || *n % 100 != 0) {
+          std::cerr << "[config] [asr].stream_chunk_ms must be a positive "
+                       "100 ms multiple no greater than 8000 in "
+                    << path << std::endl;
+          return false;
+        }
+        cfg.asr_stream_chunk_ms = *n;
+      }
+    }
+    if (auto v = sec->get("stream_unfixed_chunks")) {
+      if (auto n = v->value<int>()) {
+        if (*n < 0 || *n > 64) {
+          std::cerr << "[config] [asr].stream_unfixed_chunks must be in "
+                       "[0,64] in "
+                    << path << std::endl;
+          return false;
+        }
+        cfg.asr_stream_unfixed_chunks = *n;
+      }
+    }
+    if (auto v = sec->get("stream_unfixed_tokens")) {
+      if (auto n = v->value<int>()) {
+        if (*n < 0 || *n > 128) {
+          std::cerr << "[config] [asr].stream_unfixed_tokens must be in "
+                       "[0,128] in "
+                    << path << std::endl;
+          return false;
+        }
+        cfg.asr_stream_unfixed_tokens = *n;
+      }
+    }
     if (auto v = sec->get("stream_window_mel_frames")) {
       if (auto n = v->value<int>()) {
         if (*n != 100 && *n != 800) {

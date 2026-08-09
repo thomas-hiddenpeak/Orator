@@ -93,6 +93,10 @@ class AuditoryStream {
     int asr_max_new_tokens = 32;
     int asr_final_max_new_tokens = 384;
     bool asr_final_full_context_decode = false;
+    std::string asr_stream_mode = "kv_append";
+    int asr_stream_chunk_ms = 2000;
+    int asr_stream_unfixed_chunks = 2;
+    int asr_stream_unfixed_tokens = 5;
     int asr_stream_window_mel_frames = 100;
     double asr_segment_sec = 24.0;
     std::string asr_language = "Chinese";

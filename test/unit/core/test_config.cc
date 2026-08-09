@@ -84,8 +84,17 @@ int main() {
           "checked-in ASR VAD gate chunk is frozen at 100 ms");
     CHECK(!checked_in.asr_final_full_context_decode,
           "checked-in ASR Final disables rejected full-context candidate");
-    CHECK(checked_in.asr_stream_window_mel_frames == 100,
-          "checked-in ASR encoder append window restores the 100-frame control");
+    CHECK(checked_in.asr_stream_mode == "kv_append",
+          "checked-in ASR stream mode is the restored control");
+    CHECK(checked_in.asr_stream_chunk_ms == 2000,
+          "checked-in ASR accumulated chunk is the official 2000 ms");
+    CHECK(checked_in.asr_stream_unfixed_chunks == 2,
+          "checked-in ASR unfixed chunk count is official");
+    CHECK(checked_in.asr_stream_unfixed_tokens == 5,
+          "checked-in ASR rollback token count is official");
+    CHECK(
+        checked_in.asr_stream_window_mel_frames == 100,
+        "checked-in ASR encoder append window restores the 100-frame control");
     CHECK(checked_in.asr_final_max_new_tokens == 384,
           "checked-in ASR Final has an independent token budget");
     CHECK(checked_in.asr_system_prompt ==
@@ -118,6 +127,10 @@ vad_min_overlap_sec = 0.25
 max_new_tokens = 64
 final_max_new_tokens = 320
 final_full_context_decode = true
+stream_mode = "accumulated_redecode"
+stream_chunk_ms = 1500
+stream_unfixed_chunks = 3
+stream_unfixed_tokens = 7
 stream_window_mel_frames = 800
 max_audio_tokens = 2000
 segment_sec = 30.0
@@ -258,6 +271,13 @@ ws_text_log_path = "/tmp/ws-frames.jsonl"
           "cfg.asr_final_max_new_tokens == 320");
     CHECK(cfg.asr_final_full_context_decode == true,
           "cfg.asr_final_full_context_decode == true");
+    CHECK(cfg.asr_stream_mode == "accumulated_redecode",
+          "cfg.asr_stream_mode == accumulated_redecode");
+    CHECK(cfg.asr_stream_chunk_ms == 1500, "cfg.asr_stream_chunk_ms == 1500");
+    CHECK(cfg.asr_stream_unfixed_chunks == 3,
+          "cfg.asr_stream_unfixed_chunks == 3");
+    CHECK(cfg.asr_stream_unfixed_tokens == 7,
+          "cfg.asr_stream_unfixed_tokens == 7");
     CHECK(cfg.asr_stream_window_mel_frames == 800,
           "cfg.asr_stream_window_mel_frames == 800");
     CHECK(cfg.asr_max_audio_tokens == 2000, "cfg.asr_max_audio_tokens == 2000");
@@ -423,9 +443,18 @@ ws_text_log_path = "/tmp/ws-frames.jsonl"
     CHECK(resolved.find("\"final_full_context_decode\":true") !=
               std::string::npos,
           "resolved config contains ASR full-context Final switch");
-    CHECK(resolved.find("\"stream_window_mel_frames\":800") !=
+    CHECK(resolved.find("\"stream_mode\":\"accumulated_redecode\"") !=
               std::string::npos,
-          "resolved config contains ASR encoder append window");
+          "resolved config contains ASR stream mode");
+    CHECK(resolved.find("\"stream_chunk_ms\":1500") != std::string::npos,
+          "resolved config contains ASR accumulated chunk duration");
+    CHECK(resolved.find("\"stream_unfixed_chunks\":3") != std::string::npos,
+          "resolved config contains ASR unfixed chunk count");
+    CHECK(resolved.find("\"stream_unfixed_tokens\":7") != std::string::npos,
+          "resolved config contains ASR rollback token count");
+    CHECK(
+        resolved.find("\"stream_window_mel_frames\":800") != std::string::npos,
+        "resolved config contains ASR encoder append window");
     CHECK(resolved.find("\"vad_gate_chunk_ms\":80") != std::string::npos,
           "resolved config contains deterministic ASR gate chunk");
     CHECK(resolved.find("\"ws_text_log_path\":\"/tmp/ws-frames.jsonl\"") !=
@@ -449,6 +478,52 @@ ws_text_log_path = "/tmp/ws-frames.jsonl"
               std::string::npos,
           "resolved config contains candidate confirmation count");
 
+    std::remove(path.c_str());
+  }
+
+  // ── ASR stream mode rejects unknown implementations ────────────────
+  std::printf("\n-- ASR stream mode --\n");
+  {
+    std::string path = WriteTemp(R"(
+[asr]
+stream_mode = "candidate_selector"
+)");
+    pipeline::AuditoryStream::Config cfg;
+    CHECK(!io::ApplyTomlConfig(path, cfg),
+          "unknown ASR stream mode is rejected");
+    std::remove(path.c_str());
+  }
+
+  {
+    std::string path = WriteTemp(R"(
+[asr]
+stream_chunk_ms = 2050
+)");
+    pipeline::AuditoryStream::Config cfg;
+    CHECK(!io::ApplyTomlConfig(path, cfg),
+          "non-100 ms ASR stream chunk is rejected");
+    std::remove(path.c_str());
+  }
+
+  {
+    std::string path = WriteTemp(R"(
+[asr]
+stream_unfixed_chunks = -1
+)");
+    pipeline::AuditoryStream::Config cfg;
+    CHECK(!io::ApplyTomlConfig(path, cfg),
+          "negative ASR unfixed chunk count is rejected");
+    std::remove(path.c_str());
+  }
+
+  {
+    std::string path = WriteTemp(R"(
+[asr]
+stream_unfixed_tokens = 129
+)");
+    pipeline::AuditoryStream::Config cfg;
+    CHECK(!io::ApplyTomlConfig(path, cfg),
+          "oversized ASR rollback token count is rejected");
     std::remove(path.c_str());
   }
 

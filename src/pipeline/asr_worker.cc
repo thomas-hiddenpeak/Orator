@@ -248,17 +248,15 @@ const float* AsrWorker::PendingData() const {
   return pending_audio_.data() + pending_offset_;
 }
 
-// Incremental KV-cache path: continuous audio is fed into the engine's
-// streaming session, which carries KV context across its 8 s windows. The
-// segment is committed (one timeline token) and the session reset at the
-// segment cap or on finalize.
+// Continuous audio is fed into the engine's selected streaming mode. The
+// segment is committed as one timeline token and reset at the segment cap or on
+// finalize.
 //
 // Large chunks (from WaitAndRead reading all remaining audio) are split into
-// small (<= 8 s) pieces so the KV-cache safety cap can fire between them.
-// Without this, a single 256 s chunk encodes 32 windows at once, overflowing
-// the KV-cache (max_seq_len=2048) before the per-chunk cap check is reached.
+// small (<= 8 s) pieces so worker-level duration and acoustic-extent guards can
+// fire between them. The selected engine mode owns its finer decode cadence.
 void AsrWorker::ProcessIncremental(const float* samples, int n, bool finalize) {
-  const int max_chunk = 8 * params_.sample_rate;  // one 8s encoded window max
+  const int max_chunk = 8 * params_.sample_rate;
   int off = 0;
   while (off < n) {
     const int take = std::min(n - off, max_chunk);

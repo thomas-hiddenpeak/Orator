@@ -93,6 +93,10 @@ struct AsrConfig {
   int eos_ban_steps = 3;
   int decode_batch = 4;
   int final_max_new_tokens = 384;
+  std::string stream_mode = "kv_append";
+  int stream_chunk_ms = 2000;
+  int stream_unfixed_chunks = 2;
+  int stream_unfixed_tokens = 5;
   int stream_window_mel_frames = 100;
   bool profile = false;
   bool encoder_windowed_attention = false;

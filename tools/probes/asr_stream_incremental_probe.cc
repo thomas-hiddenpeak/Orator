@@ -1,13 +1,12 @@
 // asr_stream_incremental_probe (Spec 003 T031): drive the incremental
 // KV-cache streaming session and measure per-step cost, sustained real-time
-// factor, and memory, and write the transcript for CER (T040).
+// factor, and memory. The transcript is raw evidence for contextual review.
 //
 // Feeds audio to Qwen3Asr::StreamChunk in small slices (simulating a live
-// stream). The session encodes each completed 8 s window standalone, appends
-// its audio-token KV to the persistent cache, re-prefills only the short suffix
-// and decodes. Per decode step (one per completed window) the probe records the
-// wall time; the cost should stay flat across the stream (O(one window)) rather
-// than growing linearly as the unbounded-window probe did.
+// stream). The probe intentionally exercises the class's default `kv_append`
+// control: each completed configured window is encoded standalone and appended
+// to the persistent cache. Per decode step the probe records wall time; the
+// cost should stay flat across the stream rather than grow with elapsed audio.
 //
 // A boundary reset (StreamFinalize + StreamReset) bounds the cache length: pass
 // a segment cap in seconds; the probe commits and restarts at the cap.
@@ -33,7 +32,10 @@ long VmRssKb() {
   std::string key, unit;
   long val = 0;
   while (f >> key) {
-    if (key == "VmRSS:") { f >> val >> unit; return val; }
+    if (key == "VmRSS:") {
+      f >> val >> unit;
+      return val;
+    }
     std::getline(f, unit);
   }
   return 0;
@@ -43,12 +45,22 @@ std::string JsonEscape(const std::string& s) {
   std::string o;
   for (char c : s) {
     switch (c) {
-      case '"': o += "\\\""; break;
-      case '\\': o += "\\\\"; break;
-      case '\n': o += "\\n"; break;
-      case '\r': break;
-      case '\t': o += "\\t"; break;
-      default: o += c;
+      case '"':
+        o += "\\\"";
+        break;
+      case '\\':
+        o += "\\\\";
+        break;
+      case '\n':
+        o += "\\n";
+        break;
+      case '\r':
+        break;
+      case '\t':
+        o += "\\t";
+        break;
+      default:
+        o += c;
     }
   }
   return o;
@@ -67,7 +79,8 @@ int main(int argc, char** argv) {
   const std::string model_dir = argv[2];
   const double dur_sec = argc > 3 ? std::atof(argv[3]) : 120.0;
   const double feed_sec = argc > 4 ? std::atof(argv[4]) : 1.0;
-  const double seg_cap_sec = argc > 5 ? std::atof(argv[5]) : 0.0;  // 0 = no reset
+  const double seg_cap_sec =
+      argc > 5 ? std::atof(argv[5]) : 0.0;  // 0 = no reset
   const std::string out_json = argc > 6 ? argv[6] : "";
   const int sr = 16000;
 
@@ -89,10 +102,10 @@ int main(int argc, char** argv) {
     return std::chrono::duration<double, std::milli>(y - x).count();
   };
 
-  std::vector<double> step_ms;     // per decode-step wall time
-  std::string committed;            // committed text across segments
+  std::vector<double> step_ms;  // per decode-step wall time
+  std::string committed;        // committed text across segments
   std::string live;
-  long seg_consumed = 0;            // samples in current segment
+  long seg_consumed = 0;  // samples in current segment
 
   auto t_start = now();
   asr.StreamReset(0);
@@ -108,10 +121,11 @@ int main(int argc, char** argv) {
       last_chunk_id = asr.stream_chunk_id();
       step_ms.push_back(ms(s0, s1));
       live = t;
-      std::printf("   step %2zu  audio=%6.1fs  tokens=%4d  wall=%7.1fms  "
-                  "VmRSS=%ldMB\n",
-                  step_ms.size(), (off + n) / double(sr),
-                  asr.stream_audio_tokens(), step_ms.back(), VmRssKb() / 1024);
+      std::printf(
+          "   step %2zu  audio=%6.1fs  tokens=%4d  wall=%7.1fms  "
+          "VmRSS=%ldMB\n",
+          step_ms.size(), (off + n) / double(sr), asr.stream_audio_tokens(),
+          step_ms.back(), VmRssKb() / 1024);
     }
     // Boundary reset to bound the cache length.
     if (seg_cap > 0 && seg_consumed >= seg_cap) {
@@ -141,11 +155,14 @@ int main(int argc, char** argv) {
     for (size_t i = 0; i < third; ++i) first_avg += step_ms[i];
     for (size_t i = step_ms.size() - third; i < step_ms.size(); ++i)
       last_avg += step_ms[i];
-    if (third > 0) { first_avg /= third; last_avg /= third; }
-    std::printf(">> per-step wall: first-third avg %.1fms  last-third avg %.1fms"
-                "  ratio %.2f (bounded if near 1, O(n) if growing)\n",
-                first_avg, last_avg,
-                first_avg > 0 ? last_avg / first_avg : 0.0);
+    if (third > 0) {
+      first_avg /= third;
+      last_avg /= third;
+    }
+    std::printf(
+        ">> per-step wall: first-third avg %.1fms  last-third avg %.1fms"
+        "  ratio %.2f (bounded if near 1, O(n) if growing)\n",
+        first_avg, last_avg, first_avg > 0 ? last_avg / first_avg : 0.0);
   }
   std::printf(">> final transcript (%zu chars):\n%s\n", committed.size(),
               committed.c_str());

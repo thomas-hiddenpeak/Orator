@@ -14,7 +14,10 @@
   exposes a typed TOML acoustic window, passes its engineering and exact
   eight-second numerical gates under the restored 100-frame control; complete
   forward/reverse review rejects the isolated 800-frame candidate and restores
-  that control; ASR semantic closing and full-candidate acceptance remain open
+  that control; Phase 3E adds the official accumulated-audio state transition
+  behind a typed, inactive TOML mode and passes its control-side engineering
+  gate; candidate activation, real-WebSocket capture, contextual review, ASR
+  semantic closing, and full-candidate acceptance remain open
 - **Owner**: project owner
 - **Constitution**: v1.7.0
 - **Depends on**: Spec 003 (streaming ASR), Spec 004 (typed comprehensive
@@ -299,6 +302,23 @@ evidence. The next authorized step is a single-variable causal control using
 the model's 800-mel-frame trained attention window while restoring the accepted
 streaming Final policy. That control is diagnostic and cannot be promoted until
 its own complete contextual review passes.
+
+### FR14 - Official accumulated-audio streaming state
+
+After the empty-prompt, full-context Final, and 800-frame append candidates all
+fail focused contextual review, no further encoder-window or prompt candidate is
+authorized until the native runtime can exercise the official Qwen3-ASR
+streaming state transition. That mode MUST accumulate exact PCM within the
+existing VAD-bounded segment, decode every official two-second chunk from all
+audio accumulated so far, apply the official first-two-chunk empty-prefix and
+five-token rollback policy, and flush an unpadded residual tail.
+
+Activation, chunk duration, unfixed-chunk count, and unfixed-token count MUST be
+typed TOML values captured in the resolved configuration. The default remains
+the restored KV-append control until the accumulated mode passes its engineering
+gate. The mode MUST remain bounded by the existing segment cap and common time
+base, MUST NOT inspect reference text or choose between transcript candidates,
+and MUST leave VAD, prompt, alignment, Sortformer v2.1, and FR50 fusion fixed.
 
 ## 6. Acceptance Gates
 

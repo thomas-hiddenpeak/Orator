@@ -240,6 +240,38 @@ its named evidence exists. Mechanical checks never assign product correctness.
   The restored configuration passes a warning-clean build and all `75/75` tests
   in `52.75` seconds.
 
+### Phase 3E: Official Accumulated-Audio Streaming
+
+- [x] **T069** After the third failed candidate, restore the accepted control
+  and re-audit the pinned official streaming state machine before changing code.
+  The official source confirms `audio_accum` is fully re-fed every two seconds,
+  the first two chunks use an empty prefix, later chunks roll back five tokens,
+  the residual tail is appended without padding, and the streaming example uses
+  `max_new_tokens=32`. This explains why applying that budget only every eight
+  seconds caused T067's long-segment truncation. See
+  `official-streaming-state-review-2026-08-09.md`.
+- [x] **T070** Add a TOML-owned `kv_append` / `accumulated_redecode` mode plus
+  typed chunk and rollback values. Implement the official state transition in
+  `Qwen3Asr`, keep `kv_append` checked in, and add source-contract/config/model
+  tests. Do not alter VAD, prompt, segment cap, alignment, Sortformer, speaker
+  policy, or publication semantics. The inactive implementation passes focused
+  `test_config`, `test_qwen3`, `test_asr_worker`, and `test_registration`; all
+  typed values appear in the resolved configuration.
+- [ ] **T071** Under the checked-in control, pass focused tests, warning-clean
+  build, complete CTest, and applicable retained numerical gates. Commit and
+  push the inactive implementation before producing candidate output. The
+  focused tests pass `4/4`, complete CTest passes `75/75` in `53.14` seconds,
+  and a subsequent clean-first build emits no warning or error. Commit and push
+  remain outstanding, so this task is not yet complete.
+- [ ] **T072** Change only TOML to `accumulated_redecode`, repeat the engineering
+  gates, commit the clean candidate, and stream the identical 102-second focused
+  input through the production WebSocket at 1.0x/100 ms with observer and
+  telemetry evidence.
+- [ ] **T073** Read every Live, Final, and comprehensive-view contribution in
+  chronological and reverse context against the complete human reference. Stop
+  on a real-time failure, new critical meaning, omission, or unusable Live state;
+  otherwise return to T048. No code may compare or label transcript output.
+
 ## Phase 4: Web UI and Physical Microphone
 
 - [x] **T040** Validate file-input Live partial/retract/final replacement,

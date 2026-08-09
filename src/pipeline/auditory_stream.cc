@@ -219,6 +219,10 @@ void AuditoryStream::Start() {
     ac.eos_ban_steps = config_.asr_ban_steps;
     ac.decode_batch = config_.asr_decode_batch;
     ac.final_max_new_tokens = config_.asr_final_max_new_tokens;
+    ac.stream_mode = config_.asr_stream_mode;
+    ac.stream_chunk_ms = config_.asr_stream_chunk_ms;
+    ac.stream_unfixed_chunks = config_.asr_stream_unfixed_chunks;
+    ac.stream_unfixed_tokens = config_.asr_stream_unfixed_tokens;
     ac.stream_window_mel_frames = config_.asr_stream_window_mel_frames;
     ac.profile = config_.asr_profile;
     ac.encoder_windowed_attention = config_.asr_windowed_encoder;

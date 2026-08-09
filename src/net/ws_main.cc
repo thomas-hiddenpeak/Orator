@@ -192,6 +192,8 @@ int main(int argc, char** argv) {
             << "\n"
             << "  vad:      " << cfg.vad_model << "\n"
             << "  asr_cfg:  max_new=" << cfg.asr_max_new_tokens
+            << " stream_mode=" << cfg.asr_stream_mode
+            << " stream_chunk_ms=" << cfg.asr_stream_chunk_ms
             << " stream_window_mel=" << cfg.asr_stream_window_mel_frames
             << " segment=" << cfg.asr_segment_sec
             << "s lang=" << cfg.asr_language << std::endl;

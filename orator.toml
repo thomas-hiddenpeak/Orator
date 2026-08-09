@@ -57,6 +57,16 @@ max_audio_tokens = 1500
 # Max decode tokens per provisional Live step
 max_new_tokens = 32
 
+# Streaming state implementation. "kv_append" is the restored control;
+# "accumulated_redecode" follows the official growing-audio state machine.
+stream_mode = "kv_append"
+
+# Official streaming cadence and rollback policy. These are captured even while
+# kv_append is active so a candidate changes only stream_mode.
+stream_chunk_ms = 2000
+stream_unfixed_chunks = 2
+stream_unfixed_tokens = 5
+
 # Acoustic append unit for the incremental Qwen3 encoder. The rejected
 # 800-frame causal candidate is retained as an allowed evidence value; the
 # checked-in runtime is restored to the 100-frame (1 s) control.
