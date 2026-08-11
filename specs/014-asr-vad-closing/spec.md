@@ -13,7 +13,9 @@
   600-second block and the Live/critical-meaning gates, and is rejected. The
   checked-in runtime restores the `kv_append`, dormant 2000 ms accumulated,
   `ban_steps = 3` control. ASR semantic closing and active physical-microphone
-  coverage remain open.
+  coverage remain open. Further ASR inference work is handed off to Spec 015;
+  this spec remains the immutable historical evidence line and authorizes no
+  additional model or parameter candidate.
 - **Owner**: project owner
 - **Constitution**: v1.8.0
 - **Depends on**: Spec 003 (streaming ASR), Spec 004 (typed comprehensive

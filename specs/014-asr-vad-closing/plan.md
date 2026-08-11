@@ -3,6 +3,10 @@
 > This document defines HOW Spec 014 is executed. Requirements and acceptance
 > gates are in `spec.md`; ordered work is in `tasks.md`.
 
+Phase 3I is the terminal ASR inference experiment in this plan. Spec 015 owns
+all subsequent ASR model-parity and product-closing work. The evidence and
+restored control recorded here remain immutable inputs to that new plan.
+
 ## 1. Execution Strategy
 
 The work is divided into two independent controls:

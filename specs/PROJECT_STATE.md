@@ -1265,6 +1265,8 @@ Findings:
 
 - [specs/014-asr-vad-closing/official-greedy-full-context-review-2026-08-10.md](014-asr-vad-closing/official-greedy-full-context-review-2026-08-10.md) - **Phase 3I full-length review complete; candidate rejected**. The exact clean candidate passes real-time and mechanical gates. Complete chronological/reverse review of all 556 reference contributions and all 2,664 Live partials manually places ASR at 70-79 percent, with every complete block below 90 percent and unrepaired critical errors throughout. Live provisional hallucinations and cross-speaker long rows are user-visible. The frozen conditional FR50 speaker boundary is preserved; canonical speaker closure does not advance.
 
+- [specs/015-asr-inference-closing/spec.md](015-asr-inference-closing/spec.md) - **Planning active; no runtime candidate authorized (2026-08-11)**. ASR closing restarts from pinned official PCM-to-token numerical parity rather than another focused transcript or TOML parameter experiment. The scope permits only Qwen3-ASR feature, encoder, decoder, ASR streaming/endpoint, and later ASR Live/Final work. Sortformer v2.1, TitaNet, registry, FR50 fusion, shared VAD, forced alignment, comprehensive speaker ownership, common time base, and every non-ASR TOML section are frozen controls. The first executable work is a reproducible freeze manifest and restoration of a trusted official numerical oracle; the current offline environments are CPU-only and have no vLLM package. No ASR product candidate may run until mel, long-context encoder, prompt/cache, per-step decoder, rollback, final-tail, and complete token-sequence parity have no unexplained delta. Product decisions remain complete `test.mp3` chronological/reverse contextual reviews only.
+
 - [specs/014-asr-vad-closing/physical-microphone-review-2026-08-09.md](014-asr-vad-closing/physical-microphone-review-2026-08-09.md) - **Bounded room-tone review complete; active physical-microphone coverage open**. Chromium uses the real Jetson APE analog source without fake-device flags. All 89 events and terminal/browser state receive complete chronological and reverse contextual review. No substantive speech assertion appears in the no-deliberate-speech context. Direct and controlled-playback probes do not establish a working voiced capture path, so T042/T043 remain open; T044 records unavailable Firefox and Safari/WebKit environments.
 
 ## 7. Immediate next step
@@ -1272,10 +1274,11 @@ Findings:
 Phase 3I is complete. Keep the restored `kv_append`, dormant 2000 ms
 accumulated cadence, `ban_steps = 3`, current VAD/prompt/segment values,
 Sortformer v2.1, and frozen FR50 behavior unchanged. Do not start another
-decoder parameter experiment from a focused excerpt. The next ASR phase must
-first specify one full-session hypothesis that separates Final semantic loss
-from Live endpoint/text-row ownership, names its complete contextual controls,
-and commits to the same full-length product-decision boundary before capture.
+decoder parameter experiment from a focused excerpt. Spec 015 now owns the ASR
+closing line. Its next executable work is Phase 0/1 only: freeze and enforce the
+speaker/non-ASR control manifest, then restore a trusted pinned Qwen3-ASR
+numerical oracle. No product candidate is authorized before complete
+PCM-to-token parity has no unexplained delta.
 
 Phase 4 Chromium file transport, persistence, reload, export, reconnect, and
 desktop/mobile review are complete. Its physical-endpoint room-tone subcase is
