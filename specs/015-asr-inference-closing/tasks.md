@@ -7,9 +7,9 @@ contextual and reviewer-owned; tools stop at numerical or mechanical evidence.
 
 - [ ] **T001** Record clean baseline commit `c235830`, worktree, root TOML,
   official-source revision, model hashes, binary hash, and device provenance.
-- [ ] **T002** Define and record the frozen speaker/non-ASR path and resolved
+- [x] **T002** Define and record the frozen speaker/non-ASR path and resolved
   configuration manifest.
-- [ ] **T003** Add a mechanical changed-path and resolved-config guard that
+- [x] **T003** Add a mechanical changed-path and resolved-config guard that
   fails when a Spec 015 candidate modifies the frozen control surface.
 - [ ] **T004** Run a warning-clean build and complete CTest under the unchanged
   baseline; verify no capture process remains.

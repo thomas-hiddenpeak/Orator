@@ -167,6 +167,23 @@ if(Python3_EXECUTABLE)
     TIMEOUT 30
     LABELS "python;unit;reproducibility")
 
+  add_test(NAME test_spec015_freeze_guard_unit
+    COMMAND ${Python3_EXECUTABLE}
+      ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/test_spec015_freeze_guard.py)
+  set_tests_properties(test_spec015_freeze_guard_unit PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    TIMEOUT 30
+    LABELS "python;unit;reproducibility")
+
+  add_test(NAME test_spec015_freeze_guard
+    COMMAND ${Python3_EXECUTABLE}
+      ${CMAKE_SOURCE_DIR}/tools/verify/py/spec015_freeze_guard.py
+      --repo ${CMAKE_SOURCE_DIR})
+  set_tests_properties(test_spec015_freeze_guard PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    TIMEOUT 30
+    LABELS "python;unit;reproducibility")
+
   add_test(NAME test_ws_unified_manifest
     COMMAND ${Python3_EXECUTABLE}
       ${CMAKE_CURRENT_SOURCE_DIR}/integration/py/test_ws_unified_manifest.py)
