@@ -1,7 +1,7 @@
 # Spec 015: ASR Inference and Product Closing
 
-- **Status**: Phase 0 in progress; frozen-control guard implemented; no runtime
-  candidate is authorized yet
+- **Status**: Phase 0 complete; Phase 1 numerical-oracle restoration active; no
+  runtime candidate is authorized yet
 - **Created**: 2026-08-11
 - **Baseline**: `c235830254f9737f170429a1379d5cfd62657cae`
 - **Historical evidence**: Spec 014 through Phase 3I

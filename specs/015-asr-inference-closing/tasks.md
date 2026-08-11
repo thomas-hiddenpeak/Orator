@@ -5,20 +5,20 @@ contextual and reviewer-owned; tools stop at numerical or mechanical evidence.
 
 ## Phase 0 - Freeze and Baseline
 
-- [ ] **T001** Record clean baseline commit `c235830`, worktree, root TOML,
+- [x] **T001** Record clean baseline commit `c235830`, worktree, root TOML,
   official-source revision, model hashes, binary hash, and device provenance.
 - [x] **T002** Define and record the frozen speaker/non-ASR path and resolved
   configuration manifest.
 - [x] **T003** Add a mechanical changed-path and resolved-config guard that
   fails when a Spec 015 candidate modifies the frozen control surface.
-- [ ] **T004** Run a warning-clean build and complete CTest under the unchanged
+- [x] **T004** Run a warning-clean build and complete CTest under the unchanged
   baseline; verify no capture process remains.
-- [ ] **T005** Freeze the Phase 3I full report and artifact provenance as the
+- [x] **T005** Freeze the Phase 3I full report and artifact provenance as the
   immutable ASR product baseline. Do not rerun audio in this task.
 
 ## Phase 1 - Numerical Oracle
 
-- [ ] **T006** Verify the pinned official Qwen3-ASR checkout is clean at
+- [x] **T006** Verify the pinned official Qwen3-ASR checkout is clean at
   `7c6daf77a2421100f5fb066495372c00129d39ff` and freeze required source files.
 - [ ] **T007** Restore a usable offline official PyTorch oracle environment;
   prefer CUDA, with bounded CPU execution as the documented fallback.
